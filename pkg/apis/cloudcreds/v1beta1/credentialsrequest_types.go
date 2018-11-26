@@ -17,16 +17,26 @@ limitations under the License.
 package v1beta1
 
 import (
+	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
+// NOTE: Run "make" to regenerate code after modifying this file
 
 // CredentialsRequestSpec defines the desired state of CredentialsRequest
 type CredentialsRequestSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+
+	// Secret points to the secret where the credentials should be stored once generated.
+	Secret corev1.ObjectReference `json:"secret"`
+
+	// AWS contains the details for credentials requested for an AWS cluster component.
+	AWS *AWSCreds `json:"awsCreds"`
+}
+
+type AWSCreds struct {
+	RoleName string
+	UserName string
+	Actions  []string
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest
@@ -40,6 +50,7 @@ type CredentialsRequestStatus struct {
 
 // CredentialsRequest is the Schema for the credentialsrequests API
 // +k8s:openapi-gen=true
+// +kubebuilder:subresource:status
 type CredentialsRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
