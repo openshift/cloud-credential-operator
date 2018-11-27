@@ -18,8 +18,9 @@ package credentialsrequest
 
 import (
 	"context"
-	"log"
 	"reflect"
+
+	log "github.com/sirupsen/logrus"
 
 	cloudcredsv1beta1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
 	appsv1 "k8s.io/api/apps/v1"
