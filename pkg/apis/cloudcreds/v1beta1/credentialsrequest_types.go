@@ -30,19 +30,35 @@ type CredentialsRequestSpec struct {
 	Secret corev1.ObjectReference `json:"secret"`
 
 	// AWS contains the details for credentials requested for an AWS cluster component.
-	AWS *AWSCreds `json:"awsCreds"`
+	AWS *AWSCreds `json:"awsCreds,omitempty"`
 }
 
 type AWSCreds struct {
-	RoleName string
-	UserName string
-	Actions  []string
+	Actions []string
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest
 type CredentialsRequestStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	// Provisioned is true once the credentials have been initially provisioned.
+	Provisioned bool `json:"provisioned"`
+
+	// LastSyncTimestamp is the time that the zone was last sync'd.
+	LastSyncTimestamp *metav1.Time `json:"lastSyncTimestamp,omitempty"`
+
+	// LastSyncGeneration is the generation of the credentials request resource
+	// that was last synced. Used to determine if the object has changed and
+	// requires a sync.
+	LastSyncGeneration int64 `json:"lastSyncGeneration"`
+
+	// AWS contains AWS specific status.
+	AWS *AWSStatus `json:"aws,omitempty"`
+}
+
+type AWSStatus struct {
+	// Role is the name of the role created in AWS for these credentials.
+	Role string `json:"role"`
+	// User is the name of the User created in AWS for these credentials.
+	User string `json:"user"`
 }
 
 // +genclient
@@ -55,7 +71,7 @@ type CredentialsRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
-	Spec   CredentialsRequestSpec   `json:"spec,omitempty"`
+	Spec   CredentialsRequestSpec   `json:"spec"`
 	Status CredentialsRequestStatus `json:"status,omitempty"`
 }
 
