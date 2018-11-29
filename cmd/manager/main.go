@@ -18,14 +18,19 @@ package main
 
 import (
 	"flag"
+	golog "log"
 	"os"
+	"time"
 
+	"github.com/golang/glog"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 
 	"github.com/openshift/cloud-creds/pkg/apis"
 	"github.com/openshift/cloud-creds/pkg/controller"
 	"github.com/openshift/cloud-creds/pkg/webhook"
+	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -102,12 +107,32 @@ func NewRootCommand() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
+	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
+	initializeGlog(cmd.PersistentFlags())
 	flag.CommandLine.Parse([]string{})
 
 	return cmd
 }
 
+func initializeGlog(flags *pflag.FlagSet) {
+	golog.SetOutput(glogWriter{}) // Redirect all regular go log output to glog
+	golog.SetFlags(0)
+	go wait.Forever(glog.Flush, 5*time.Second) // Periodically flush logs
+	f := flags.Lookup("logtostderr")           // Default to logging to stderr
+	if f != nil {
+		f.Value.Set("true")
+	}
+}
+
+type glogWriter struct{}
+
+func (writer glogWriter) Write(data []byte) (n int, err error) {
+	glog.Info(string(data))
+	return len(data), nil
+}
+
 func main() {
+	defer glog.Flush()
 	cmd := NewRootCommand()
 	err := cmd.Execute()
 	if err != nil {
