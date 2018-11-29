@@ -21,20 +21,36 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const (
+	// FinalizerDeprovision is used on CredentialsRequests to ensure we delete the
+	// credentials in AWS before allowing the CredentialsRequest to be deleted in etcd.
+	FinalizerDeprovision string = "cloudcreds.openshift.io/deprovision"
+)
+
 // NOTE: Run "make" to regenerate code after modifying this file
 
 // CredentialsRequestSpec defines the desired state of CredentialsRequest
 type CredentialsRequestSpec struct {
 
+	// ClusterName is a user friendly name for the cluster these credentials are to be associated with.
+	// It is used for naming the credential objects in the cloud provider, in conjunction with a random
+	// suffix when necessary.
+	ClusterName string `json:"clusterName"`
+
+	// ClusterID is a unique identifier for the cluster these credentials belong to. Used to ensure
+	// credentials are cleaned up during deprovision.
+	ClusterID string `json:"clusterID"`
+
 	// Secret points to the secret where the credentials should be stored once generated.
 	Secret corev1.ObjectReference `json:"secret"`
 
 	// AWS contains the details for credentials requested for an AWS cluster component.
-	AWS *AWSCreds `json:"awsCreds,omitempty"`
+	AWS *AWSCreds `json:"aws,omitempty"`
 }
 
+// AWSCreds contains the required information to create a user policy in AWS.
 type AWSCreds struct {
-	Actions []string
+	Actions []string `json:"actions"`
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest
@@ -42,7 +58,7 @@ type CredentialsRequestStatus struct {
 	// Provisioned is true once the credentials have been initially provisioned.
 	Provisioned bool `json:"provisioned"`
 
-	// LastSyncTimestamp is the time that the zone was last sync'd.
+	// LastSyncTimestamp is the time that the credentials were last synced.
 	LastSyncTimestamp *metav1.Time `json:"lastSyncTimestamp,omitempty"`
 
 	// LastSyncGeneration is the generation of the credentials request resource
@@ -54,9 +70,8 @@ type CredentialsRequestStatus struct {
 	AWS *AWSStatus `json:"aws,omitempty"`
 }
 
+// AWSStatus containes the status of the credentials request in AWS.
 type AWSStatus struct {
-	// Role is the name of the role created in AWS for these credentials.
-	Role string `json:"role"`
 	// User is the name of the User created in AWS for these credentials.
 	User string `json:"user"`
 }

@@ -18,18 +18,18 @@ package credentialsrequest
 
 import (
 	"context"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
-	cloudcredsv1beta1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
-	//corev1 "k8s.io/api/core/v1"
+	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
+
 	"k8s.io/apimachinery/pkg/api/errors"
-	//metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	//"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -57,7 +57,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to CredentialsRequest
-	err = c.Watch(&source.Kind{Type: &cloudcredsv1beta1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &ccv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -78,27 +78,106 @@ type ReconcileCredentialsRequest struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=cloudcreds.openshift.io,resources=credentialsrequests,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	// Fetch the CredentialsRequest instance
-	instance := &cloudcredsv1beta1.CredentialsRequest{}
-	crLog := log.WithFields(
+	cr := &ccv1.CredentialsRequest{}
+	logger := log.WithFields(
 		log.Fields{
 			"controller": "credentialsrequest",
 			"name":       request.NamespacedName.Name,
 			"namespace":  request.NamespacedName.Namespace,
 		})
-	crLog.Info("syncing credentials request")
-	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	logger.Info("syncing credentials request")
+	err := r.Get(context.TODO(), request.NamespacedName, cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			// Object not found, return.  Created objects are automatically garbage collected.
-			// For additional cleanup logic use finalizers.
-			crLog.Debug("not found")
+			logger.Debug("credentials request no longer exists")
 			return reconcile.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
-		crLog.WithError(err).Error("error getting credentials request, requeuing")
+		logger.WithError(err).Error("error getting credentials request, requeuing")
 		return reconcile.Result{}, err
+	}
+	logger.Info("%v", cr.Spec)
+
+	if !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
+		if cr.DeletionTimestamp == nil {
+			// Ensure the finalizer is set on any not-deleted requests:
+			logger.Info("adding deprovision finalizer")
+			err = r.addDeprovisionFinalizer(cr)
+			return reconcile.Result{}, err
+		} else {
+			// If deleted and finalizer is also gone, we can return, nothing for us to do.
+			logger.Info("credentials request deleted and finalizer no longer present, nothing to do")
+			return reconcile.Result{}, nil
+		}
+	}
+
+	if cr.Spec.AWS != nil {
+		err := r.reconcileAWS(cr, logger)
+		if err != nil {
+			logger.WithError(err).Error("error reconciling AWS credentials")
+			return reconcile.Result{}, err
+		}
+	} else {
+		logger.Warn("no platform defined")
+		return reconcile.Result{}, nil
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileCredentialsRequest) updateStatus(cr *ccv1.CredentialsRequest, logger log.FieldLogger) error {
+	logger.Debug("updating credentials request status")
+	origCR := cr
+	cr = cr.DeepCopy()
+
+	// Update cluster deployment status if changed:
+	if !reflect.DeepEqual(cr.Status, origCR.Status) {
+		logger.Infof("status has changed, updating")
+		logger.Debugf("orig: %v", origCR)
+		logger.Debugf("new : %v", cr.Status)
+		err := r.Status().Update(context.TODO(), cr)
+		if err != nil {
+			logger.WithError(err).Error("error updating credentials request")
+			return err
+		}
+	} else {
+		logger.Debugf("status unchanged")
+	}
+
+	return nil
+}
+
+func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(cr *ccv1.CredentialsRequest) error {
+	cr = cr.DeepCopy()
+	AddFinalizer(cr, ccv1.FinalizerDeprovision)
+	return r.Update(context.TODO(), cr)
+}
+
+func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(cr *ccv1.CredentialsRequest) error {
+	cr = cr.DeepCopy()
+	DeleteFinalizer(cr, ccv1.FinalizerDeprovision)
+	return r.Update(context.TODO(), cr)
+}
+
+// HasFinalizer returns true if the given object has the given finalizer
+func HasFinalizer(object metav1.Object, finalizer string) bool {
+	for _, f := range object.GetFinalizers() {
+		if f == finalizer {
+			return true
+		}
+	}
+	return false
+}
+
+// AddFinalizer adds a finalizer to the given object
+func AddFinalizer(object metav1.Object, finalizer string) {
+	finalizers := sets.NewString(object.GetFinalizers()...)
+	finalizers.Insert(finalizer)
+	object.SetFinalizers(finalizers.List())
+}
+
+// DeleteFinalizer removes a finalizer from the given object
+func DeleteFinalizer(object metav1.Object, finalizer string) {
+	finalizers := sets.NewString(object.GetFinalizers()...)
+	finalizers.Delete(finalizer)
+	object.SetFinalizers(finalizers.List())
 }
