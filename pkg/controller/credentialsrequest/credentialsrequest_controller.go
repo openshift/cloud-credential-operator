@@ -78,7 +78,6 @@ type ReconcileCredentialsRequest struct {
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
 // +kubebuilder:rbac:groups=cloudcreds.openshift.io,resources=credentialsrequests,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	cr := &ccv1.CredentialsRequest{}
 	logger := log.WithFields(
 		log.Fields{
 			"controller": "credentialsrequest",
@@ -86,6 +85,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			"namespace":  request.NamespacedName.Namespace,
 		})
 	logger.Info("syncing credentials request")
+	cr := &ccv1.CredentialsRequest{}
 	err := r.Get(context.TODO(), request.NamespacedName, cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -96,6 +96,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, err
 	}
 	logger.Info("%v", cr.Spec)
+	// Maintain a copy, but work on a copy of the credentials request:
+	origCR := cr
+	cr = cr.DeepCopy()
 
 	if !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
 		if cr.DeletionTimestamp == nil {
@@ -121,20 +124,23 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, nil
 	}
 
+	err = r.updateStatus(origCR, cr, logger)
+	if err != nil {
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileCredentialsRequest) updateStatus(cr *ccv1.CredentialsRequest, logger log.FieldLogger) error {
+func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *ccv1.CredentialsRequest, logger log.FieldLogger) error {
 	logger.Debug("updating credentials request status")
-	origCR := cr
-	cr = cr.DeepCopy()
 
 	// Update cluster deployment status if changed:
-	if !reflect.DeepEqual(cr.Status, origCR.Status) {
+	if !reflect.DeepEqual(newCR.Status, origCR.Status) {
 		logger.Infof("status has changed, updating")
-		logger.Debugf("orig: %v", origCR)
-		logger.Debugf("new : %v", cr.Status)
-		err := r.Status().Update(context.TODO(), cr)
+		logger.Debugf("orig: %v", origCR.Status.AWS)
+		logger.Debugf("new : %v", *newCR.Status.AWS)
+		err := r.Status().Update(context.TODO(), newCR)
 		if err != nil {
 			logger.WithError(err).Error("error updating credentials request")
 			return err

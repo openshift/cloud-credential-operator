@@ -62,7 +62,8 @@ func NewCredSyncer(awsClient Client, kubeClient kclient.Client, secret corev1.Ob
 }
 
 // Sync idempotently ensures the user exists with the given permissions.
-func (cs *CredSyncer) Sync() error {
+// Returns the access key ID in AWS, only if one had to be created.
+func (cs *CredSyncer) Sync() (string, error) {
 	cs.logger.Info("syncing credential to AWS")
 
 	// Check if the user already exists:
@@ -74,14 +75,14 @@ func (cs *CredSyncer) Sync() error {
 				cs.logger.Info("user does not exist, creating")
 				err := cs.createUser()
 				if err != nil {
-					return err
+					return "", err
 				}
 				cs.logger.Info("successfully created user")
 			default:
-				return formatAWSErr(aerr)
+				return "", formatAWSErr(aerr)
 			}
 		} else {
-			return fmt.Errorf("unknown error getting user from AWS: %v", err)
+			return "", fmt.Errorf("unknown error getting user from AWS: %v", err)
 		}
 	} else {
 		cs.logger.Debug("user exists: %v", user)
@@ -90,15 +91,15 @@ func (cs *CredSyncer) Sync() error {
 	// TODO: check if user policy needs to be set? user generation and last set time.
 	err = cs.setUserPolicy()
 	if err != nil {
-		return err
+		return "", err
 	}
 	cs.logger.Info("successfully set user policy")
 
 	// Check if the credentials secret exists, if not we need to generate a new access key and store it:
 	// TODO: this assumes that if the secret exists, nobody has deleted the AWS access key manually. We should periodically check the list as well.
-	// TODO: should we cleanup an pre-existing keys? dangerous to leave them around, but could someone gen a key and delete the secret for legit reasons?
 	secret := &corev1.Secret{}
 	err = cs.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: cs.secret.Namespace, Name: cs.secret.Name}, secret)
+	var accessKeyID string
 	if err != nil {
 		if errors.IsNotFound(err) {
 			cs.logger.Info("secret does not exist, generating new AWS access key")
@@ -107,28 +108,24 @@ func (cs *CredSyncer) Sync() error {
 			// This will allow deleting the secret in Kubernetes to revoke old credentials and create new.
 			err := cs.deleteAllAccessKeys()
 			if err != nil {
-				return err
+				return "", err
 			}
 
 			accessKey, err := cs.createAccessKey()
 			if err != nil {
 				cs.logger.WithError(err).Error("error creating AWS access key")
-				return err
+				return "", err
 			}
-			err = cs.syncAccessKeySecret(accessKey)
-			if err != nil {
-				cs.logger.WithError(err).Error("error syncing access key secret")
-				return err
-			}
+			accessKeyID = *accessKey.AccessKeyId
 		} else {
 			cs.logger.WithError(err).Error("error getting credentials secret")
-			return err
+			return "", err
 		}
 	} else {
 		cs.logger.Debug("access key secret already exists")
 	}
 
-	return nil
+	return accessKeyID, nil
 }
 
 func (cs *CredSyncer) deleteAllAccessKeys() error {
@@ -262,6 +259,12 @@ func (cs *CredSyncer) createAccessKey() (*iam.AccessKey, error) {
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error creating access key for user %s: %v", cs.userName, err)
+	}
+	cs.logger.WithField("accessKeyID", *accessKeyResult.AccessKey.AccessKeyId).Info("access key created")
+
+	err = cs.syncAccessKeySecret(accessKeyResult.AccessKey)
+	if err != nil {
+		return nil, err
 	}
 	return accessKeyResult.AccessKey, err
 }

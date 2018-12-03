@@ -79,12 +79,14 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 		return r.removeDeprovisionFinalizer(cr)
 	}
 
-	err = syncer.Sync()
+	userAccessKeyID, err := syncer.Sync()
 	if err != nil {
 		log.WithError(err).Error("error syncing credential to AWS")
 	}
 
-	// TODO: status
+	if userAccessKeyID != "" {
+		cr.Status.AWS.AccessKeyID = userAccessKeyID
+	}
 
 	return nil
 }
