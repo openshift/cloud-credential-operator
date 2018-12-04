@@ -83,7 +83,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 		}
 	}
 
-	syncer := ccaws.NewCredSyncer(awsClient, cr.Spec.Secret, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries)
+	syncer := ccaws.NewCredSyncer(awsClient, cr.Spec.Secret, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, cr.Status.AWS.AccessKeyID)
 
 	if cr.DeletionTimestamp != nil {
 		err := syncer.Delete()

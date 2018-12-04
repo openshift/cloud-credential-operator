@@ -34,22 +34,24 @@ import (
 // CredSyncer allows idempotently creating a user and policy in AWS, generating an AWS access key if required and
 // storing it in the requested secret.
 type CredSyncer struct {
-	awsClient Client
-	userName  string
-	entries   []ccv1.StatementEntry
-	logger    log.FieldLogger
+	awsClient         Client
+	userName          string
+	entries           []ccv1.StatementEntry
+	logger            log.FieldLogger
+	existingAccessKey string
 }
 
 // NewCredSyncer creates a new CredSyncer.
-func NewCredSyncer(awsClient Client, secret corev1.ObjectReference, username string, entries []ccv1.StatementEntry) *CredSyncer {
+func NewCredSyncer(awsClient Client, secret corev1.ObjectReference, username string, entries []ccv1.StatementEntry, existingAccessKey string) *CredSyncer {
 	logger := log.WithFields(log.Fields{
 		"userName": username,
 	})
 	return &CredSyncer{
-		awsClient: awsClient,
-		userName:  username,
-		entries:   entries,
-		logger:    logger,
+		awsClient:         awsClient,
+		userName:          username,
+		entries:           entries,
+		logger:            logger,
+		existingAccessKey: existingAccessKey,
 	}
 }
 
@@ -89,7 +91,11 @@ func (cs *CredSyncer) Sync(forceNewAccessKey bool) (*iam.AccessKey, error) {
 
 	var accessKey *iam.AccessKey
 	// TODO: also check if the access key ID on the request is still valid in AWS
-	if forceNewAccessKey {
+	accessKeyExists, err := cs.accessKeyExists()
+	if err != nil {
+		return nil, err
+	}
+	if forceNewAccessKey || !accessKeyExists {
 		cs.logger.Info("generating new AWS access key")
 
 		// Users are allowed a max of two keys, if we decided we need to generate one, we should cleanup all pre-existing access keys.
@@ -107,6 +113,26 @@ func (cs *CredSyncer) Sync(forceNewAccessKey bool) (*iam.AccessKey, error) {
 	}
 
 	return accessKey, nil
+}
+
+func (cs *CredSyncer) accessKeyExists() (bool, error) {
+	if cs.existingAccessKey == "" {
+		return false, nil
+	}
+
+	keys, err := cs.awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(cs.userName)})
+	if err != nil {
+		cs.logger.WithError(err).Error("error listing all access keys for user")
+		return false, err
+	}
+
+	for _, key := range keys.AccessKeyMetadata {
+		if *key.AccessKeyId == cs.existingAccessKey {
+			return true, nil
+		}
+	}
+	cs.logger.WithField("accessKeyID", cs.existingAccessKey).Warn("access key no longer exists")
+	return false, nil
 }
 
 func (cs *CredSyncer) deleteAllAccessKeys() error {
