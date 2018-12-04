@@ -24,12 +24,15 @@ import (
 
 	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -127,6 +130,28 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	err = r.updateStatus(origCR, cr, logger)
 	if err != nil {
 		return reconcile.Result{}, err
+	}
+
+	// Ensure we have the controller reference set on the managed secret if it exists:
+	// TODO: we could refactor a bit so this is set when it's created, but it's done in sync.go which currently doesn't know about the full CR.
+	secret := &corev1.Secret{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.Secret.Namespace, Name: cr.Spec.Secret.Name}, secret)
+	if err != nil {
+		logger.WithError(err).Error("error looking up secret")
+		return reconcile.Result{}, err
+	}
+
+	if len(secret.OwnerReferences) == 0 {
+		if err = controllerutil.SetControllerReference(cr, secret, r.scheme); err != nil {
+			logger.WithError(err).Error("error setting controller reference on secret")
+			return reconcile.Result{}, err
+		}
+
+		if err = r.Client.Update(context.TODO(), secret); err != nil {
+			logger.WithError(err).Error("error updating controller reference on secret")
+			return reconcile.Result{}, err
+		}
+		logger.Info("successfully set controller reference on secret")
 	}
 
 	return reconcile.Result{}, nil
