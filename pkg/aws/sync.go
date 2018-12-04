@@ -23,6 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -41,12 +43,12 @@ type CredSyncer struct {
 	kubeClient kclient.Client
 	secret     corev1.ObjectReference
 	userName   string
-	actions    []string
+	entries    []ccv1.StatementEntry
 	logger     log.FieldLogger
 }
 
 // NewCredSyncer creates a new CredSyncer.
-func NewCredSyncer(awsClient Client, kubeClient kclient.Client, secret corev1.ObjectReference, username string, actions []string) *CredSyncer {
+func NewCredSyncer(awsClient Client, kubeClient kclient.Client, secret corev1.ObjectReference, username string, entries []ccv1.StatementEntry) *CredSyncer {
 	logger := log.WithFields(log.Fields{
 		"secret":   fmt.Sprintf("%s/%s", secret.Namespace, secret.Name),
 		"userName": username,
@@ -56,7 +58,7 @@ func NewCredSyncer(awsClient Client, kubeClient kclient.Client, secret corev1.Ob
 		kubeClient: kubeClient,
 		secret:     secret,
 		userName:   username,
-		actions:    actions,
+		entries:    entries,
 		logger:     logger,
 	}
 }
@@ -221,14 +223,15 @@ func (cs *CredSyncer) setUserPolicy() error {
 	policyName := cs.getPolicyName()
 
 	policyDoc := PolicyDocument{
-		Version: "2012-10-17",
-		Statement: []StatementEntry{
-			StatementEntry{
-				Effect:   "Allow",
-				Action:   cs.actions,
-				Resource: "*",
-			},
-		},
+		Version:   "2012-10-17",
+		Statement: []StatementEntry{},
+	}
+	for _, se := range cs.entries {
+		policyDoc.Statement = append(policyDoc.Statement, StatementEntry{
+			Effect:   se.Effect,
+			Action:   se.Action,
+			Resource: se.Resource,
+		})
 	}
 	b, err := json.Marshal(&policyDoc)
 	if err != nil {
@@ -331,11 +334,14 @@ func formatAWSErr(aerr awserr.Error) error {
 	}
 }
 
+// PolicyDocument is a simple type used to serialize to AWS' PolicyDocument format.
 type PolicyDocument struct {
 	Version   string
 	Statement []StatementEntry
 }
 
+// StatementEntry is a simple type used to serialize to AWS' PolicyDocument format. We cannot
+// re-use ccv1.StatementEntry due to different conventions for the serialization keys. (caps)
 type StatementEntry struct {
 	Effect   string
 	Action   []string
