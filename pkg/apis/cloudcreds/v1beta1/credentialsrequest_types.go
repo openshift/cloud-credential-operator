@@ -50,7 +50,18 @@ type CredentialsRequestSpec struct {
 
 // AWSCreds contains the required information to create a user policy in AWS.
 type AWSCreds struct {
-	Actions []string `json:"actions"`
+	// StatementEntries contains a list of policy statements that should be associated with this credentials access key.
+	StatementEntries []StatementEntry `json:"statementEntries"`
+}
+
+// StatementEntry models an AWS policy statement entry.
+type StatementEntry struct {
+	// Effect indicates if this policy statement is to Allow or Deny.
+	Effect string `json:"effect"`
+	// Action describes the particular AWS service actions that should be allowed or denied. (i.e. ec2:StartInstances, iam:ChangePassword)
+	Action []string `json:"action"`
+	// Resource specifies the object(s) this statement should apply to. (or "*" for all)
+	Resource string `json:"resource"`
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest
