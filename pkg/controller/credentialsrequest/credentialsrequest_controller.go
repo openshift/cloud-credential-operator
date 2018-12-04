@@ -32,7 +32,6 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -139,19 +138,6 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	if err != nil {
 		logger.WithError(err).Error("error looking up secret")
 		return reconcile.Result{}, err
-	}
-
-	if len(secret.OwnerReferences) == 0 {
-		if err = controllerutil.SetControllerReference(cr, secret, r.scheme); err != nil {
-			logger.WithError(err).Error("error setting controller reference on secret")
-			return reconcile.Result{}, err
-		}
-
-		if err = r.Client.Update(context.TODO(), secret); err != nil {
-			logger.WithError(err).Error("error updating controller reference on secret")
-			return reconcile.Result{}, err
-		}
-		logger.Info("successfully set controller reference on secret")
 	}
 
 	return reconcile.Result{}, nil
