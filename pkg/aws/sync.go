@@ -17,7 +17,6 @@ limitations under the License.
 package aws
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 
@@ -30,42 +29,33 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/types"
-	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 // CredSyncer allows idempotently creating a user and policy in AWS, generating an AWS access key if required and
 // storing it in the requested secret.
 type CredSyncer struct {
-	awsClient  Client
-	kubeClient kclient.Client
-	secret     corev1.ObjectReference
-	userName   string
-	entries    []ccv1.StatementEntry
-	logger     log.FieldLogger
+	awsClient Client
+	userName  string
+	entries   []ccv1.StatementEntry
+	logger    log.FieldLogger
 }
 
 // NewCredSyncer creates a new CredSyncer.
-func NewCredSyncer(awsClient Client, kubeClient kclient.Client, secret corev1.ObjectReference, username string, entries []ccv1.StatementEntry) *CredSyncer {
+func NewCredSyncer(awsClient Client, secret corev1.ObjectReference, username string, entries []ccv1.StatementEntry) *CredSyncer {
 	logger := log.WithFields(log.Fields{
-		"secret":   fmt.Sprintf("%s/%s", secret.Namespace, secret.Name),
 		"userName": username,
 	})
 	return &CredSyncer{
-		awsClient:  awsClient,
-		kubeClient: kubeClient,
-		secret:     secret,
-		userName:   username,
-		entries:    entries,
-		logger:     logger,
+		awsClient: awsClient,
+		userName:  username,
+		entries:   entries,
+		logger:    logger,
 	}
 }
 
-// Sync idempotently ensures the user exists with the given permissions.
+// Sync idempotently ensures the user exists with the given permissions, and the expected activation key is present.
 // Returns the access key ID in AWS, only if one had to be created.
-func (cs *CredSyncer) Sync() (string, error) {
+func (cs *CredSyncer) Sync(forceNewAccessKey bool) (*iam.AccessKey, error) {
 	cs.logger.Info("syncing credential to AWS")
 
 	// Check if the user already exists:
@@ -77,14 +67,14 @@ func (cs *CredSyncer) Sync() (string, error) {
 				cs.logger.Info("user does not exist, creating")
 				err := cs.createUser()
 				if err != nil {
-					return "", err
+					return nil, err
 				}
 				cs.logger.Info("successfully created user")
 			default:
-				return "", formatAWSErr(aerr)
+				return nil, formatAWSErr(aerr)
 			}
 		} else {
-			return "", fmt.Errorf("unknown error getting user from AWS: %v", err)
+			return nil, fmt.Errorf("unknown error getting user from AWS: %v", err)
 		}
 	} else {
 		cs.logger.Debug("user exists: %v", user)
@@ -93,41 +83,30 @@ func (cs *CredSyncer) Sync() (string, error) {
 	// TODO: check if user policy needs to be set? user generation and last set time.
 	err = cs.setUserPolicy()
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 	cs.logger.Info("successfully set user policy")
 
-	// Check if the credentials secret exists, if not we need to generate a new access key and store it:
-	// TODO: this assumes that if the secret exists, nobody has deleted the AWS access key manually. We should periodically check the list as well.
-	secret := &corev1.Secret{}
-	err = cs.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: cs.secret.Namespace, Name: cs.secret.Name}, secret)
-	var accessKeyID string
-	if err != nil {
-		if errors.IsNotFound(err) {
-			cs.logger.Info("secret does not exist, generating new AWS access key")
+	var accessKey *iam.AccessKey
+	// TODO: also check if the access key ID on the request is still valid in AWS
+	if forceNewAccessKey {
+		cs.logger.Info("generating new AWS access key")
 
-			// Users are allowed a max of two keys, if we decided we need to generate one, we should cleanup all pre-existing access keys.
-			// This will allow deleting the secret in Kubernetes to revoke old credentials and create new.
-			err := cs.deleteAllAccessKeys()
-			if err != nil {
-				return "", err
-			}
-
-			accessKey, err := cs.createAccessKey()
-			if err != nil {
-				cs.logger.WithError(err).Error("error creating AWS access key")
-				return "", err
-			}
-			accessKeyID = *accessKey.AccessKeyId
-		} else {
-			cs.logger.WithError(err).Error("error getting credentials secret")
-			return "", err
+		// Users are allowed a max of two keys, if we decided we need to generate one, we should cleanup all pre-existing access keys.
+		// This will allow deleting the secret in Kubernetes to revoke old credentials and create new.
+		err := cs.deleteAllAccessKeys()
+		if err != nil {
+			return nil, err
 		}
-	} else {
-		cs.logger.Debug("access key secret already exists")
+
+		accessKey, err = cs.createAccessKey()
+		if err != nil {
+			cs.logger.WithError(err).Error("error creating AWS access key")
+			return nil, err
+		}
 	}
 
-	return accessKeyID, nil
+	return accessKey, nil
 }
 
 func (cs *CredSyncer) deleteAllAccessKeys() error {
@@ -264,57 +243,7 @@ func (cs *CredSyncer) createAccessKey() (*iam.AccessKey, error) {
 		return nil, fmt.Errorf("error creating access key for user %s: %v", cs.userName, err)
 	}
 	cs.logger.WithField("accessKeyID", *accessKeyResult.AccessKey.AccessKeyId).Info("access key created")
-
-	err = cs.syncAccessKeySecret(accessKeyResult.AccessKey)
-	if err != nil {
-		return nil, err
-	}
 	return accessKeyResult.AccessKey, err
-}
-
-func (cs *CredSyncer) syncAccessKeySecret(accessKey *iam.AccessKey) error {
-	secretExists := false
-
-	secret := &corev1.Secret{}
-	cs.logger.Debug("checking if access key secret exists")
-	err := cs.kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: cs.secret.Namespace, Name: cs.secret.Name}, secret)
-	secretFound := (err == nil)
-	unexpectedError := (err != nil && !errors.IsNotFound(err))
-
-	if unexpectedError {
-		return fmt.Errorf("error querying for existing registry secret: %v", err)
-	} else if secretFound {
-		secretExists = true
-	}
-
-	if secretExists {
-		cs.logger.Info("access key secret exists, removing it")
-		// Delete the current secret before saving the new access key creds:
-		err := cs.kubeClient.Delete(context.TODO(), secret)
-		if err != nil {
-			cs.logger.WithError(err).Error("error deleting previous secret")
-			return fmt.Errorf("error deleting existing secret: %v", err)
-		}
-	}
-
-	cs.logger.Info("creating secret")
-	err = cs.kubeClient.Create(context.TODO(), &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cs.secret.Name,
-			Namespace: cs.secret.Namespace,
-		},
-		StringData: map[string]string{
-			"aws_access_key_id":     *accessKey.AccessKeyId,
-			"aws_secret_access_key": *accessKey.SecretAccessKey,
-		},
-	})
-	if err != nil {
-		cs.logger.WithError(err).Error("error creating secret")
-		return err
-	}
-
-	cs.logger.Info("secret created successfully")
-	return nil
 }
 
 func formatAWSErr(aerr awserr.Error) error {

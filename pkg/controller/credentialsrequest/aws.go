@@ -18,6 +18,7 @@ package credentialsrequest
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -25,6 +26,12 @@ import (
 	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
 	ccaws "github.com/openshift/cloud-creds/pkg/aws"
 
+	"github.com/aws/aws-sdk-go/service/iam"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
@@ -67,8 +74,16 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 		return err
 	}
 
-	logger.Debug("aws client = %v", awsClient)
-	syncer := ccaws.NewCredSyncer(awsClient, r.Client, cr.Spec.Secret, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries)
+	// Check if the credentials secret exists, if not we need to inform the syncer to generate a new one:
+	existingSecret := &corev1.Secret{}
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.Secret.Namespace, Name: cr.Spec.Secret.Name}, existingSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Debug("secret does not exist")
+		}
+	}
+
+	syncer := ccaws.NewCredSyncer(awsClient, cr.Spec.Secret, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries)
 
 	if cr.DeletionTimestamp != nil {
 		err := syncer.Delete()
@@ -79,13 +94,58 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 		return r.removeDeprovisionFinalizer(cr)
 	}
 
-	userAccessKeyID, err := syncer.Sync()
+	forceNewAccessKey := existingSecret == nil
+	userAccessKey, err := syncer.Sync(forceNewAccessKey)
 	if err != nil {
 		log.WithError(err).Error("error syncing credential to AWS")
+		return err
 	}
 
-	if userAccessKeyID != "" {
-		cr.Status.AWS.AccessKeyID = userAccessKeyID
+	if userAccessKey != nil {
+		err := r.syncAccessKeySecret(cr, userAccessKey, existingSecret, logger)
+		if err != nil {
+			log.WithError(err).Error("error saving access key to secret")
+			return err
+		}
+
+		// Save the access key ID to status
+		// TODO Necessary or jsut use the secret data?
+		cr.Status.AWS.AccessKeyID = *userAccessKey.AccessKeyId
+	}
+
+	return nil
+}
+
+func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+
+	if existingSecret == nil {
+		logger.Info("creating secret")
+		err := r.Client.Create(context.TODO(), &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cr.Spec.Secret.Name,
+				Namespace: cr.Spec.Secret.Namespace,
+			},
+			StringData: map[string]string{
+				"aws_access_key_id":     *accessKey.AccessKeyId,
+				"aws_secret_access_key": *accessKey.SecretAccessKey,
+			},
+		})
+		if err != nil {
+			logger.WithError(err).Error("error creating secret")
+			return err
+		}
+		logger.Info("secret created successfully")
+		return nil
+	}
+
+	// Update the existing secret:
+	logger.Info("updating secret")
+	existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
+	existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
+	err := r.Client.Update(context.TODO(), existingSecret)
+	if err != nil {
+		logger.WithError(err).Error("error updating secret")
+		return err
 	}
 
 	return nil
