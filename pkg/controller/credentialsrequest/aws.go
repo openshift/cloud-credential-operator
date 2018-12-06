@@ -118,16 +118,18 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 
 func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, logger log.FieldLogger) error {
 
-	if existingSecret == nil {
+	if existingSecret == nil || existingSecret.Name == "" {
 		logger.Info("creating secret")
+		b64AccessKeyID := base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId))
+		b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
 		err := r.Client.Create(context.TODO(), &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.Secret.Name,
 				Namespace: cr.Spec.Secret.Namespace,
 			},
-			StringData: map[string]string{
-				"aws_access_key_id":     *accessKey.AccessKeyId,
-				"aws_secret_access_key": *accessKey.SecretAccessKey,
+			Data: map[string][]byte{
+				"aws_access_key_id":     []byte(b64AccessKeyID),
+				"aws_secret_access_key": []byte(b64SecretAccessKey),
 			},
 		})
 		if err != nil {
@@ -139,7 +141,7 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 	}
 
 	// Update the existing secret:
-	logger.Info("updating secret")
+	logger.Info("updating secret: %v", existingSecret)
 	existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
 	existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
 	err := r.Client.Update(context.TODO(), existingSecret)

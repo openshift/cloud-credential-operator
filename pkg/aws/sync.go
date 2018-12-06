@@ -89,9 +89,15 @@ func (cs *CredSyncer) Sync(forceNewAccessKey bool) (*iam.AccessKey, error) {
 	}
 	cs.logger.Info("successfully set user policy")
 
+	allUserKeys, err := cs.awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(cs.userName)})
+	if err != nil {
+		cs.logger.WithError(err).Error("error listing all access keys for user")
+		return nil, err
+	}
+
 	var accessKey *iam.AccessKey
 	// TODO: also check if the access key ID on the request is still valid in AWS
-	accessKeyExists, err := cs.accessKeyExists()
+	accessKeyExists, err := cs.accessKeyExists(allUserKeys)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +106,7 @@ func (cs *CredSyncer) Sync(forceNewAccessKey bool) (*iam.AccessKey, error) {
 
 		// Users are allowed a max of two keys, if we decided we need to generate one, we should cleanup all pre-existing access keys.
 		// This will allow deleting the secret in Kubernetes to revoke old credentials and create new.
-		err := cs.deleteAllAccessKeys()
+		err := cs.deleteAllAccessKeys(allUserKeys)
 		if err != nil {
 			return nil, err
 		}
@@ -115,18 +121,12 @@ func (cs *CredSyncer) Sync(forceNewAccessKey bool) (*iam.AccessKey, error) {
 	return accessKey, nil
 }
 
-func (cs *CredSyncer) accessKeyExists() (bool, error) {
+func (cs *CredSyncer) accessKeyExists(allUserKeys *iam.ListAccessKeysOutput) (bool, error) {
 	if cs.existingAccessKey == "" {
 		return false, nil
 	}
 
-	keys, err := cs.awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(cs.userName)})
-	if err != nil {
-		cs.logger.WithError(err).Error("error listing all access keys for user")
-		return false, err
-	}
-
-	for _, key := range keys.AccessKeyMetadata {
+	for _, key := range allUserKeys.AccessKeyMetadata {
 		if *key.AccessKeyId == cs.existingAccessKey {
 			return true, nil
 		}
@@ -135,13 +135,9 @@ func (cs *CredSyncer) accessKeyExists() (bool, error) {
 	return false, nil
 }
 
-func (cs *CredSyncer) deleteAllAccessKeys() error {
+func (cs *CredSyncer) deleteAllAccessKeys(allUserKeys *iam.ListAccessKeysOutput) error {
 	log.Info("deleting all AWS access keys")
-	keys, err := cs.awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(cs.userName)})
-	if err != nil {
-		return err
-	}
-	for _, kmd := range keys.AccessKeyMetadata {
+	for _, kmd := range allUserKeys.AccessKeyMetadata {
 		akLog := cs.logger.WithFields(log.Fields{
 			"accessKeyID": *kmd.AccessKeyId,
 			"createDate":  *kmd.CreateDate,
@@ -179,7 +175,13 @@ func (cs *CredSyncer) Delete() error {
 	}
 	cs.logger.Info("user policy deleted")
 
-	err = cs.deleteAllAccessKeys()
+	allUserKeys, err := cs.awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(cs.userName)})
+	if err != nil {
+		cs.logger.WithError(err).Error("error listing all access keys for user")
+		return err
+	}
+
+	err = cs.deleteAllAccessKeys(allUserKeys)
 	if err != nil {
 		return err
 	}

@@ -18,11 +18,12 @@ package credentialsrequest
 
 import (
 	"context"
+	"encoding/base64"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
-	//"github.com/stretchr/testify/assert"
 	"github.com/golang/mock/gomock"
+	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	//apiequality "k8s.io/apimachinery/pkg/api/equality"
@@ -42,6 +43,7 @@ import (
 	mockaws "github.com/openshift/cloud-creds/pkg/aws/mock"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
 )
 
@@ -64,6 +66,15 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		return nil
 	}
 
+	getSecret := func(c client.Client) *corev1.Secret {
+		secret := &corev1.Secret{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: testSecretName, Namespace: testSecretNamespace}, secret)
+		if err == nil {
+			return secret
+		}
+		return nil
+	}
+
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
@@ -72,7 +83,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		validate           func(client.Client, *testing.T)
 	}{
 		{
-			name: "Add finalizer",
+			name: "add finalizer",
 			existing: []runtime.Object{
 				func() *ccv1.CredentialsRequest {
 					cr := testCredentialsRequest()
@@ -84,13 +95,40 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				//mockTestUser(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cr := getCR(c)
 				if cr == nil || !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
 					t.Errorf("did not get expected finalizer")
+				}
+			},
+		},
+		{
+			name: "new credential",
+			existing: []runtime.Object{
+				testCredentialsRequest(),
+				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
+			},
+			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockCreateUser(mockAWSClient)
+				mockListAccessKeysEmpty(mockAWSClient)
+				mockCreateAccessKey(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				if cr == nil || !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
+					t.Errorf("did not get expected finalizer")
+				}
+
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID, base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey, base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
 				}
 			},
 		},
@@ -133,16 +171,17 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 }
 
 const (
-	testCRName          = "openshift-component-a"
-	testNamespace       = "myproject"
-	testClusterName     = "testcluster"
-	testClusterID       = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
-	secretNamespace     = "openshift-image-registry"
-	testSecretName      = "test-secret"
-	testSecretNamespace = "myproject"
-	testAWSUser         = "mycluster-test-aws-user"
-	testAWSUserID       = "FAKEAWSUSERID"
-	testAccessKeyID     = "FAKEAWSACCESSKEYID"
+	testCRName             = "openshift-component-a"
+	testNamespace          = "myproject"
+	testClusterName        = "testcluster"
+	testClusterID          = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
+	secretNamespace        = "openshift-image-registry"
+	testSecretName         = "test-secret"
+	testSecretNamespace    = "myproject"
+	testAWSUser            = "mycluster-test-aws-user"
+	testAWSUserID          = "FAKEAWSUSERID"
+	testAWSAccessKeyID     = "FAKEAWSACCESSKEYID"
+	testAWSSecretAccessKey = "KEEPITSECRET"
 )
 
 func testCredentialsRequest() *ccv1.CredentialsRequest {
@@ -174,7 +213,7 @@ func testCredentialsRequest() *ccv1.CredentialsRequest {
 		Status: ccv1.CredentialsRequestStatus{
 			AWS: &ccv1.AWSStatus{
 				User:        testAWSUser,
-				AccessKeyID: testAccessKeyID,
+				AccessKeyID: testAWSAccessKeyID,
 			},
 		},
 	}
@@ -195,7 +234,11 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 	return s
 }
 
-func mockTestUser(mockAWSClient *mockaws.MockClient) {
+func mockGetUserNotFound(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil))
+}
+
+func mockGetUser(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
 		&iam.GetUserOutput{
 			User: &iam.User{
@@ -209,4 +252,57 @@ func mockTestUser(mockAWSClient *mockaws.MockClient) {
 				},
 			},
 		}, nil)
+}
+
+func mockListAccessKeysEmpty(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().ListAccessKeys(
+		&iam.ListAccessKeysInput{
+			UserName: aws.String(testAWSUser),
+		}).Return(
+		&iam.ListAccessKeysOutput{
+			AccessKeyMetadata: []*iam.AccessKeyMetadata{},
+		}, nil)
+}
+
+func mockCreateUser(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().CreateUser(
+		&iam.CreateUserInput{
+			UserName: aws.String(testAWSUser),
+			// TODO: tags?
+		}).Return(
+		&iam.CreateUserOutput{
+			User: &iam.User{
+				UserName: aws.String(testAWSUser),
+				UserId:   aws.String(testAWSUserID),
+			},
+		}, nil)
+}
+
+func mockCreateAccessKey(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().CreateAccessKey(
+		&iam.CreateAccessKeyInput{
+			UserName: aws.String(testAWSUser),
+		}).Return(
+		&iam.CreateAccessKeyOutput{
+			AccessKey: &iam.AccessKey{
+				AccessKeyId:     aws.String(testAWSAccessKeyID),
+				SecretAccessKey: aws.String(testAWSSecretAccessKey),
+			},
+		}, nil)
+}
+
+func mockPutUserPolicy(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any()).Return(&iam.PutUserPolicyOutput{}, nil)
+}
+
+func base64DecodeOrFail(t *testing.T, data []byte) string {
+	decoded, err := base64.StdEncoding.DecodeString(string(data))
+	if err != nil {
+		t.Logf("error decoding base64")
+		t.Fail()
+		return ""
+	} else {
+		return string(decoded)
+	}
+
 }
