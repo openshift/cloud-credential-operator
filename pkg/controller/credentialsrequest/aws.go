@@ -94,7 +94,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 		return r.removeDeprovisionFinalizer(cr)
 	}
 
-	forceNewAccessKey := existingSecret == nil
+	forceNewAccessKey := existingSecret == nil || existingSecret.Name == ""
 	userAccessKey, err := syncer.Sync(forceNewAccessKey)
 	if err != nil {
 		log.WithError(err).Error("error syncing credential to AWS")

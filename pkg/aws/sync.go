@@ -140,7 +140,6 @@ func (cs *CredSyncer) deleteAllAccessKeys(allUserKeys *iam.ListAccessKeysOutput)
 	for _, kmd := range allUserKeys.AccessKeyMetadata {
 		akLog := cs.logger.WithFields(log.Fields{
 			"accessKeyID": *kmd.AccessKeyId,
-			"createDate":  *kmd.CreateDate,
 		})
 		akLog.Info("deleting access key")
 		_, err := cs.awsClient.DeleteAccessKey(&iam.DeleteAccessKeyInput{AccessKeyId: kmd.AccessKeyId, UserName: aws.String(cs.userName)})
