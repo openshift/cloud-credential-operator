@@ -127,6 +127,7 @@ func LoadCredsFromSecret(kubeClient client.Client, namespace, secretName string)
 		return nil, nil, err
 	}
 	accessKeyID, ok := secret.Data[awsCredsSecretIDKey]
+	fmt.Printf("hi %v", secret)
 	if !ok {
 		return nil, nil, fmt.Errorf("AWS credentials secret %v did not contain key %v",
 			secretName, awsCredsSecretIDKey)

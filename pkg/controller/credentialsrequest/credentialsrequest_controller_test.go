@@ -26,7 +26,6 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
-	//apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -34,7 +33,6 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
-	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/cloud-creds/pkg/apis"
@@ -116,19 +114,90 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockPutUserPolicy(mockAWSClient)
 				mockCreateUser(mockAWSClient)
 				mockListAccessKeysEmpty(mockAWSClient)
-				mockCreateAccessKey(mockAWSClient)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
-				cr := getCR(c)
-				if cr == nil || !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
-					t.Errorf("did not get expected finalizer")
-				}
-
 				targetSecret := getSecret(c)
 				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID, base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey, base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
+					assert.Equal(t, testAWSAccessKeyID,
+						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
+				}
+			},
+		},
+		{
+			name: "cred exists",
+			existing: []runtime.Object{
+				testCredentialsRequest(),
+				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
+				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+			},
+			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID,
+						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
+				}
+			},
+		},
+		{
+			name: "cred missing access key exists",
+			existing: []runtime.Object{
+				testCredentialsRequest(),
+				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
+			},
+			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
+				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID2,
+						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey2,
+						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
+				}
+			},
+		},
+		{
+			name: "cred exists access key missing",
+			existing: []runtime.Object{
+				testCredentialsRequest(),
+				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
+				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+			},
+			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockListAccessKeysEmpty(mockAWSClient)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID2,
+						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey2,
+						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
 				}
 			},
 		},
@@ -171,17 +240,19 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 }
 
 const (
-	testCRName             = "openshift-component-a"
-	testNamespace          = "myproject"
-	testClusterName        = "testcluster"
-	testClusterID          = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
-	secretNamespace        = "openshift-image-registry"
-	testSecretName         = "test-secret"
-	testSecretNamespace    = "myproject"
-	testAWSUser            = "mycluster-test-aws-user"
-	testAWSUserID          = "FAKEAWSUSERID"
-	testAWSAccessKeyID     = "FAKEAWSACCESSKEYID"
-	testAWSSecretAccessKey = "KEEPITSECRET"
+	testCRName              = "openshift-component-a"
+	testNamespace           = "myproject"
+	testClusterName         = "testcluster"
+	testClusterID           = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
+	secretNamespace         = "openshift-image-registry"
+	testSecretName          = "test-secret"
+	testSecretNamespace     = "myproject"
+	testAWSUser             = "mycluster-test-aws-user"
+	testAWSUserID           = "FAKEAWSUSERID"
+	testAWSAccessKeyID      = "FAKEAWSACCESSKEYID"
+	testAWSAccessKeyID2     = "FAKEAWSACCESSKEYID2"
+	testAWSSecretAccessKey  = "KEEPITSECRET"
+	testAWSSecretAccessKey2 = "KEEPITSECRET2"
 )
 
 func testCredentialsRequest() *ccv1.CredentialsRequest {
@@ -226,9 +297,8 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 			Namespace: namespace,
 		},
 		Data: map[string][]byte{
-			// TODO: these are not properly b64 encoded
-			"aws_access_key_id":     []byte(accessKeyID),
-			"aws_secret_access_key": []byte(secretAccessKey),
+			"aws_access_key_id":     []byte(base64.StdEncoding.EncodeToString([]byte(accessKeyID))),
+			"aws_secret_access_key": []byte(base64.StdEncoding.EncodeToString([]byte(secretAccessKey))),
 		},
 	}
 	return s
@@ -264,6 +334,20 @@ func mockListAccessKeysEmpty(mockAWSClient *mockaws.MockClient) {
 		}, nil)
 }
 
+func mockListAccessKeys(mockAWSClient *mockaws.MockClient, accessKeyID string) {
+	mockAWSClient.EXPECT().ListAccessKeys(
+		&iam.ListAccessKeysInput{
+			UserName: aws.String(testAWSUser),
+		}).Return(
+		&iam.ListAccessKeysOutput{
+			AccessKeyMetadata: []*iam.AccessKeyMetadata{
+				{
+					AccessKeyId: aws.String(accessKeyID),
+				},
+			},
+		}, nil)
+}
+
 func mockCreateUser(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().CreateUser(
 		&iam.CreateUserInput{
@@ -278,19 +362,26 @@ func mockCreateUser(mockAWSClient *mockaws.MockClient) {
 		}, nil)
 }
 
-func mockCreateAccessKey(mockAWSClient *mockaws.MockClient) {
+func mockCreateAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID, secretAccessKey string) {
 	mockAWSClient.EXPECT().CreateAccessKey(
 		&iam.CreateAccessKeyInput{
 			UserName: aws.String(testAWSUser),
 		}).Return(
 		&iam.CreateAccessKeyOutput{
 			AccessKey: &iam.AccessKey{
-				AccessKeyId:     aws.String(testAWSAccessKeyID),
-				SecretAccessKey: aws.String(testAWSSecretAccessKey),
+				AccessKeyId:     aws.String(accessKeyID),
+				SecretAccessKey: aws.String(secretAccessKey),
 			},
 		}, nil)
 }
 
+func mockDeleteAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID string) {
+	mockAWSClient.EXPECT().DeleteAccessKey(
+		&iam.DeleteAccessKeyInput{
+			UserName:    aws.String(testAWSUser),
+			AccessKeyId: aws.String(accessKeyID),
+		}).Return(&iam.DeleteAccessKeyOutput{}, nil)
+}
 func mockPutUserPolicy(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any()).Return(&iam.PutUserPolicyOutput{}, nil)
 }
