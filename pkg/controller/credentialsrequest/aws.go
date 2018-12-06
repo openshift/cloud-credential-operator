@@ -69,7 +69,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 	}
 
 	logger.Debug("creating AWS client")
-	awsClient, err := ccaws.NewClient(accessKeyID, secretAccessKey)
+	awsClient, err := r.awsClientBuilder(accessKeyID, secretAccessKey)
 	if err != nil {
 		return err
 	}

@@ -23,6 +23,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
+	ccaws "github.com/openshift/cloud-creds/pkg/aws"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,7 +48,11 @@ func Add(mgr manager.Manager) error {
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
-	return &ReconcileCredentialsRequest{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+	return &ReconcileCredentialsRequest{
+		Client:           mgr.GetClient(),
+		scheme:           mgr.GetScheme(),
+		awsClientBuilder: ccaws.NewClient,
+	}
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -72,7 +77,8 @@ var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
 // ReconcileCredentialsRequest reconciles a CredentialsRequest object
 type ReconcileCredentialsRequest struct {
 	client.Client
-	scheme *runtime.Scheme
+	scheme           *runtime.Scheme
+	awsClientBuilder func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error)
 }
 
 // Reconcile reads that state of the cluster for a CredentialsRequest object and makes changes based on the state read
@@ -97,12 +103,12 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		logger.WithError(err).Error("error getting credentials request, requeuing")
 		return reconcile.Result{}, err
 	}
-	logger.Info("%v", cr.Spec)
 	// Maintain a copy, but work on a copy of the credentials request:
 	origCR := cr
 	cr = cr.DeepCopy()
 
 	if !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
+		logger.Info("no finalizer")
 		if cr.DeletionTimestamp == nil {
 			// Ensure the finalizer is set on any not-deleted requests:
 			logger.Info("adding deprovision finalizer")

@@ -17,71 +17,196 @@ limitations under the License.
 package credentialsrequest
 
 import (
+	"context"
 	"testing"
-	"time"
 
-	"github.com/onsi/gomega"
-	cloudcredsv1beta1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
-	"golang.org/x/net/context"
-	appsv1 "k8s.io/api/apps/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	log "github.com/sirupsen/logrus"
+	//"github.com/stretchr/testify/assert"
+	"github.com/golang/mock/gomock"
+
+	corev1 "k8s.io/api/core/v1"
+	//apiequality "k8s.io/apimachinery/pkg/api/equality"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	//"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	"github.com/openshift/cloud-creds/pkg/apis"
+	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
+	ccaws "github.com/openshift/cloud-creds/pkg/aws"
+	mockaws "github.com/openshift/cloud-creds/pkg/aws/mock"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/iam"
 )
 
 var c client.Client
 
-var expectedRequest = reconcile.Request{NamespacedName: types.NamespacedName{Name: "foo", Namespace: "default"}}
-var depKey = types.NamespacedName{Name: "foo-deployment", Namespace: "default"}
+func init() {
+	log.SetLevel(log.DebugLevel)
+}
 
-const timeout = time.Second * 5
+func TestCredentialsRequestReconcile(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
 
-func TestReconcile(t *testing.T) {
-	g := gomega.NewGomegaWithT(t)
-	instance := &cloudcredsv1beta1.CredentialsRequest{ObjectMeta: metav1.ObjectMeta{Name: "foo", Namespace: "default"}}
-
-	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request to a
-	// channel when it is finished.
-	mgr, err := manager.New(cfg, manager.Options{})
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	c = mgr.GetClient()
-
-	recFn, requests := SetupTestReconcile(newReconciler(mgr))
-	g.Expect(add(mgr, recFn)).NotTo(gomega.HaveOccurred())
-
-	stopMgr, mgrStopped := StartTestManager(mgr, g)
-
-	defer func() {
-		close(stopMgr)
-		mgrStopped.Wait()
-	}()
-
-	// Create the CredentialsRequest object and expect the Reconcile and Deployment to be created
-	err = c.Create(context.TODO(), instance)
-	// The instance object may not be a valid object because it might be missing some required fields.
-	// Please modify the instance object by adding required fields and then remove the following if statement.
-	if apierrors.IsInvalid(err) {
-		t.Logf("failed to create object, got an invalid object error: %v", err)
-		return
+	// Utility function to get the test credentials request from the fake client
+	getCR := func(c client.Client) *ccv1.CredentialsRequest {
+		cr := &ccv1.CredentialsRequest{}
+		err := c.Get(context.TODO(), client.ObjectKey{Name: testCRName, Namespace: testNamespace}, cr)
+		if err == nil {
+			return cr
+		}
+		return nil
 	}
-	g.Expect(err).NotTo(gomega.HaveOccurred())
-	defer c.Delete(context.TODO(), instance)
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
 
-	deploy := &appsv1.Deployment{}
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
-		Should(gomega.Succeed())
+	tests := []struct {
+		name               string
+		existing           []runtime.Object
+		expectErr          bool
+		buildMockAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
+		validate           func(client.Client, *testing.T)
+	}{
+		{
+			name: "Add finalizer",
+			existing: []runtime.Object{
+				func() *ccv1.CredentialsRequest {
+					cr := testCredentialsRequest()
+					// Remove the finalizer
+					cr.ObjectMeta.Finalizers = []string{}
+					return cr
+				}(),
+				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
+			},
+			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				//mockTestUser(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				if cr == nil || !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
+					t.Errorf("did not get expected finalizer")
+				}
+			},
+		},
+	}
 
-	// Delete the Deployment and expect Reconcile to be called for Deployment deletion
-	g.Expect(c.Delete(context.TODO(), deploy)).NotTo(gomega.HaveOccurred())
-	g.Eventually(requests, timeout).Should(gomega.Receive(gomega.Equal(expectedRequest)))
-	g.Eventually(func() error { return c.Get(context.TODO(), depKey, deploy) }, timeout).
-		Should(gomega.Succeed())
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
 
-	// Manually delete Deployment since GC isn't enabled in the test control plane
-	g.Expect(c.Delete(context.TODO(), deploy)).To(gomega.Succeed())
+			mockAWSClient := test.buildMockAWSClient(mockCtrl)
+			fakeClient := fake.NewFakeClient(test.existing...)
+			rcr := &ReconcileCredentialsRequest{
+				Client: fakeClient,
+				scheme: scheme.Scheme,
+				awsClientBuilder: func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error) {
+					return mockAWSClient, nil
+				},
+			}
 
+			_, err := rcr.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      testCRName,
+					Namespace: testNamespace,
+				},
+			})
+
+			if test.validate != nil {
+				test.validate(fakeClient, t)
+			}
+
+			if err != nil && !test.expectErr {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if err == nil && test.expectErr {
+				t.Errorf("Expected error but got none")
+			}
+		})
+	}
+}
+
+const (
+	testCRName          = "openshift-component-a"
+	testNamespace       = "myproject"
+	testClusterName     = "testcluster"
+	testClusterID       = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
+	secretNamespace     = "openshift-image-registry"
+	testSecretName      = "test-secret"
+	testSecretNamespace = "myproject"
+	testAWSUser         = "mycluster-test-aws-user"
+	testAWSUserID       = "FAKEAWSUSERID"
+	testAccessKeyID     = "FAKEAWSACCESSKEYID"
+)
+
+func testCredentialsRequest() *ccv1.CredentialsRequest {
+	return &ccv1.CredentialsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        testCRName,
+			Namespace:   testNamespace,
+			Finalizers:  []string{ccv1.FinalizerDeprovision},
+			UID:         types.UID("1234"),
+			Annotations: map[string]string{},
+		},
+		Spec: ccv1.CredentialsRequestSpec{
+			ClusterName: testClusterName,
+			ClusterID:   testClusterID,
+			Secret:      corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
+			AWS: &ccv1.AWSCreds{
+				StatementEntries: []ccv1.StatementEntry{
+					{
+						Effect: "Allow",
+						Action: []string{
+							"s3:CreateBucket",
+							"s3:DeleteBucket",
+						},
+						Resource: "*",
+					},
+				},
+			},
+		},
+		Status: ccv1.CredentialsRequestStatus{
+			AWS: &ccv1.AWSStatus{
+				User:        testAWSUser,
+				AccessKeyID: testAccessKeyID,
+			},
+		},
+	}
+}
+
+func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
+	s := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: map[string][]byte{
+			// TODO: these are not properly b64 encoded
+			"aws_access_key_id":     []byte(accessKeyID),
+			"aws_secret_access_key": []byte(secretAccessKey),
+		},
+	}
+	return s
+}
+
+func mockTestUser(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+		&iam.GetUserOutput{
+			User: &iam.User{
+				UserId:   aws.String(testAWSUserID),
+				UserName: aws.String(testAWSUser),
+				Tags: []*iam.Tag{
+					{
+						Key:   aws.String("tectonicClusterID"),
+						Value: aws.String("testClusterID"),
+					},
+				},
+			},
+		}, nil)
 }
