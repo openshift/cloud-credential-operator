@@ -24,7 +24,12 @@ import (
 const (
 	// FinalizerDeprovision is used on CredentialsRequests to ensure we delete the
 	// credentials in AWS before allowing the CredentialsRequest to be deleted in etcd.
-	FinalizerDeprovision string = "cloudcreds.openshift.io/deprovision"
+	FinalizerDeprovision string = "credminter.openshift.io/deprovision"
+
+	// AnnotationCredentialsRequest is used on Secrets created as a target of CredentailsRequests.
+	// The annotation value will map back to the namespace/name of the CredentialsRequest that created
+	// or adopted the secret.
+	AnnotationCredentialsRequest string = "credminter.openshift.io/credentials-request"
 )
 
 // NOTE: Run "make" to regenerate code after modifying this file

@@ -19,6 +19,7 @@ package credentialsrequest
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -173,6 +174,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
 					assert.Equal(t, testAWSSecretAccessKey2,
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
+					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[ccv1.AnnotationCredentialsRequest])
 				}
 			},
 		},
@@ -198,6 +200,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
 					assert.Equal(t, testAWSSecretAccessKey2,
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
+					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[ccv1.AnnotationCredentialsRequest])
 				}
 			},
 		},
