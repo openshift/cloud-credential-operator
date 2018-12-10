@@ -23,7 +23,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	ccv1 "github.com/openshift/cred-minter/pkg/apis/cloudcreds/v1beta1"
+	ccv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
 	ccaws "github.com/openshift/cred-minter/pkg/aws"
 
 	"github.com/aws/aws-sdk-go/service/iam"

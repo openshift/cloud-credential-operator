@@ -14,10 +14,10 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package v1beta1 contains API Schema definitions for the cloudcreds v1beta1 API group
+// Package v1beta1 contains API Schema definitions for the credminter v1beta1 API group
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=github.com/openshift/cred-minter/pkg/apis/cloudcreds
+// +k8s:conversion-gen=github.com/openshift/cred-minter/pkg/apis/credminter
 // +k8s:defaulter-gen=TypeMeta
-// +groupName=cloudcreds.openshift.io
+// +groupName=credminter.openshift.io
 package v1beta1
