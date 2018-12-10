@@ -31,10 +31,14 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/tools/cache"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
@@ -65,6 +69,56 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch for changes to CredentialsRequest
 	err = c.Watch(&source.Kind{Type: &ccv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Define a mapping for secrets to the credentials requests that created them. (if applicable)
+	mapFn := handler.ToRequestsFunc(
+		func(a handler.MapObject) []reconcile.Request {
+			// Predicate below should ensure this map function is not called if the
+			// secret does not have our label:
+			namespace, name, err := cache.SplitMetaNamespaceKey(a.Meta.GetAnnotations()[ccv1.AnnotationCredentialsRequest])
+			if err != nil {
+				log.WithField("labels", a.Meta.GetAnnotations()).WithError(err).Error("error splitting namespace key for label")
+				// WARNING: No way to return an error here...
+				return []reconcile.Request{}
+			}
+
+			log.WithFields(log.Fields{"name": name, "namespace": namespace}).Debug("parsed annotation")
+
+			return []reconcile.Request{
+				{NamespacedName: types.NamespacedName{
+					Name:      name,
+					Namespace: namespace,
+				}},
+			}
+		})
+
+	// 'UpdateFunc' and 'CreateFunc' used to determine if a event for the given object should trigger a sync:
+	p := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			// The object doesn't contain our label, so we have nothing to reconcile.
+			if _, ok := e.MetaOld.GetAnnotations()[ccv1.AnnotationCredentialsRequest]; !ok {
+				return false
+			}
+			return true
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			if _, ok := e.Meta.GetAnnotations()[ccv1.AnnotationCredentialsRequest]; !ok {
+				return false
+			}
+			return true
+		},
+	}
+
+	// Watch Secrets and reconcile if we see one with our label.
+	err = c.Watch(
+		&source.Kind{Type: &corev1.Secret{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: mapFn,
+		},
+		p)
 	if err != nil {
 		return err
 	}

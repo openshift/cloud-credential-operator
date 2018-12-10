@@ -109,7 +109,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 		}
 
 		// Save the access key ID to status
-		// TODO Necessary or jsut use the secret data?
+		// TODO Necessary or just use the secret data?
 		cr.Status.AWS.AccessKeyID = *userAccessKey.AccessKeyId
 	}
 
@@ -126,6 +126,9 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.Secret.Name,
 				Namespace: cr.Spec.Secret.Namespace,
+				Annotations: map[string]string{
+					ccv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+				},
 			},
 			Data: map[string][]byte{
 				"aws_access_key_id":     []byte(b64AccessKeyID),
@@ -142,6 +145,10 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 
 	// Update the existing secret:
 	logger.Info("updating secret: %v", existingSecret)
+	if existingSecret.Annotations == nil {
+		existingSecret.Annotations = map[string]string{}
+	}
+	existingSecret.Annotations[ccv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
 	existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
 	err := r.Client.Update(context.TODO(), existingSecret)
