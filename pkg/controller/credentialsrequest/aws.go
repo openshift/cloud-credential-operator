@@ -33,6 +33,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
+
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -122,7 +124,7 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 		logger.Info("creating secret")
 		b64AccessKeyID := base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId))
 		b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
-		err := r.Client.Create(context.TODO(), &corev1.Secret{
+		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.Secret.Name,
 				Namespace: cr.Spec.Secret.Namespace,
@@ -134,7 +136,14 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 				"aws_access_key_id":     []byte(b64AccessKeyID),
 				"aws_secret_access_key": []byte(b64SecretAccessKey),
 			},
-		})
+		}
+		// Ensure secrets are "owned" by the credentials request that created or adopted them:
+		if err := controllerutil.SetControllerReference(cr, secret, r.scheme); err != nil {
+			logger.WithError(err).Error("error setting controller reference on secret")
+			return err
+		}
+
+		err := r.Client.Create(context.TODO(), secret)
 		if err != nil {
 			logger.WithError(err).Error("error creating secret")
 			return err
@@ -151,6 +160,11 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 	existingSecret.Annotations[ccv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
 	existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
+	// Ensure secrets are "owned" by the credentials request that created or adopted them:
+	if err := controllerutil.SetControllerReference(cr, existingSecret, r.scheme); err != nil {
+		logger.WithError(err).Error("error setting controller reference on secret")
+		return err
+	}
 	err := r.Client.Update(context.TODO(), existingSecret)
 	if err != nil {
 		logger.WithError(err).Error("error updating secret")
