@@ -19,7 +19,7 @@ limitations under the License.
 // Package v1beta1 contains API Schema definitions for the cloudcreds v1beta1 API group
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=github.com/openshift/cloud-creds/pkg/apis/cloudcreds
+// +k8s:conversion-gen=github.com/openshift/cred-minter/pkg/apis/cloudcreds
 // +k8s:defaulter-gen=TypeMeta
 // +groupName=cloudcreds.openshift.io
 package v1beta1

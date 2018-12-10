@@ -1,8 +1,8 @@
-# OpenShift Cloud Creds
+# OpenShift Credentials Minter
 
-Cloud Creds is a controller that will sync on a CredentailsRequest custom
+Cred Minter is a controller that will sync on a CredentailsRequest custom
 resource definition. CredentialsRequests allow OpenShift components to
-request fine grained credentials for a particular cloud provider. 
+request fine grained credentials for a particular cloud provider.
 
 ## Design Principles
 
@@ -29,5 +29,5 @@ $ make run
 # Future Work
 
   1. Integration with the OpenShift Installer.
-  1. Cloud Creds Operator.
+  1. Cred Minter Operator.
   1. CI + dist-git image publishing.

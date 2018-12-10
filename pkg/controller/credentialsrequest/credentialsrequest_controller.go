@@ -22,8 +22,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
-	ccaws "github.com/openshift/cloud-creds/pkg/aws"
+	ccv1 "github.com/openshift/cred-minter/pkg/apis/cloudcreds/v1beta1"
+	ccaws "github.com/openshift/cred-minter/pkg/aws"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"

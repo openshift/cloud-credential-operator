@@ -35,10 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-creds/pkg/apis"
-	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
-	ccaws "github.com/openshift/cloud-creds/pkg/aws"
-	mockaws "github.com/openshift/cloud-creds/pkg/aws/mock"
+	"github.com/openshift/cred-minter/pkg/apis"
+	ccv1 "github.com/openshift/cred-minter/pkg/apis/cloudcreds/v1beta1"
+	ccaws "github.com/openshift/cred-minter/pkg/aws"
+	mockaws "github.com/openshift/cred-minter/pkg/aws/mock"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"

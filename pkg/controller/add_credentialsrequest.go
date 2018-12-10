@@ -17,7 +17,7 @@ limitations under the License.
 package controller
 
 import (
-	"github.com/openshift/cloud-creds/pkg/controller/credentialsrequest"
+	"github.com/openshift/cred-minter/pkg/controller/credentialsrequest"
 )
 
 func init() {

@@ -22,7 +22,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	ccv1 "github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
+	ccv1 "github.com/openshift/cred-minter/pkg/apis/cloudcreds/v1beta1"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
