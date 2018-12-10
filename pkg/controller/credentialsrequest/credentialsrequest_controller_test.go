@@ -204,6 +204,22 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "cred deletion",
+			existing: []runtime.Object{
+				testCredentialsRequestWithDeletionTimestamp(),
+				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
+				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+			},
+			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				mockDeleteUser(mockAWSClient)
+				mockDeleteUserPolicy(mockAWSClient)
+				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
+				return mockAWSClient
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -257,6 +273,13 @@ const (
 	testAWSSecretAccessKey  = "KEEPITSECRET"
 	testAWSSecretAccessKey2 = "KEEPITSECRET2"
 )
+
+func testCredentialsRequestWithDeletionTimestamp() *ccv1.CredentialsRequest {
+	cr := testCredentialsRequest()
+	now := metav1.Now()
+	cr.DeletionTimestamp = &now
+	return cr
+}
 
 func testCredentialsRequest() *ccv1.CredentialsRequest {
 	return &ccv1.CredentialsRequest{
@@ -325,6 +348,16 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 				},
 			},
 		}, nil)
+}
+
+func mockDeleteUser(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().DeleteUser(gomock.Any()).Return(
+		&iam.DeleteUserOutput{}, nil)
+}
+
+func mockDeleteUserPolicy(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().DeleteUserPolicy(gomock.Any()).Return(
+		&iam.DeleteUserPolicyOutput{}, nil)
 }
 
 func mockListAccessKeysEmpty(mockAWSClient *mockaws.MockClient) {
