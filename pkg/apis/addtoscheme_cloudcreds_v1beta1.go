@@ -17,7 +17,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/openshift/cloud-creds/pkg/apis/cloudcreds/v1beta1"
+	"github.com/openshift/cred-minter/pkg/apis/cloudcreds/v1beta1"
 )
 
 func init() {
