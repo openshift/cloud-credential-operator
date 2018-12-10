@@ -16,12 +16,12 @@ limitations under the License.
 
 // NOTE: Boilerplate only.  Ignore this file.
 
-// Package v1beta1 contains API Schema definitions for the cloudcreds v1beta1 API group
+// Package v1beta1 contains API Schema definitions for the credminter v1beta1 API group
 // +k8s:openapi-gen=true
 // +k8s:deepcopy-gen=package,register
-// +k8s:conversion-gen=github.com/openshift/cred-minter/pkg/apis/cloudcreds
+// +k8s:conversion-gen=github.com/openshift/cred-minter/pkg/apis/credminter
 // +k8s:defaulter-gen=TypeMeta
-// +groupName=cloudcreds.openshift.io
+// +groupName=credminter.openshift.io
 package v1beta1
 
 import (
@@ -31,7 +31,7 @@ import (
 
 var (
 	// SchemeGroupVersion is group version used to register these objects
-	SchemeGroupVersion = schema.GroupVersion{Group: "cloudcreds.openshift.io", Version: "v1beta1"}
+	SchemeGroupVersion = schema.GroupVersion{Group: "credminter.openshift.io", Version: "v1beta1"}
 
 	// SchemeBuilder is used to add go types to the GroupVersionKind scheme
 	SchemeBuilder = &scheme.Builder{GroupVersion: SchemeGroupVersion}

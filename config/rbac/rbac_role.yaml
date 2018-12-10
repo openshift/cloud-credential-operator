@@ -5,7 +5,7 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - cloudcreds.openshift.io
+  - credminter.openshift.io
   resources:
   - credentialsrequests
   verbs:

@@ -14,5 +14,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-// Package cloudcreds contains cloudcreds API versions
-package cloudcreds
+// Package credminter contains credminter API versions
+package credminter

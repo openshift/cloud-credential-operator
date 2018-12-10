@@ -37,7 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/cred-minter/pkg/apis"
-	ccv1 "github.com/openshift/cred-minter/pkg/apis/cloudcreds/v1beta1"
+	ccv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
 	ccaws "github.com/openshift/cred-minter/pkg/aws"
 	mockaws "github.com/openshift/cred-minter/pkg/aws/mock"
 
