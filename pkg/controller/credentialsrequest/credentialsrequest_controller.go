@@ -22,7 +22,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	ccv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
+	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
 	ccaws "github.com/openshift/cred-minter/pkg/aws"
 
 	corev1 "k8s.io/api/core/v1"
@@ -68,7 +68,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to CredentialsRequest
-	err = c.Watch(&source.Kind{Type: &ccv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
+	// TODO: we should limit the namespaces where we watch, we want all requests in one namespace so anyone with admin on a namespace cannot create
+	// a request for any credentials they want.
+	err = c.Watch(&source.Kind{Type: &minterv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -78,7 +80,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		func(a handler.MapObject) []reconcile.Request {
 			// Predicate below should ensure this map function is not called if the
 			// secret does not have our label:
-			namespace, name, err := cache.SplitMetaNamespaceKey(a.Meta.GetAnnotations()[ccv1.AnnotationCredentialsRequest])
+			namespace, name, err := cache.SplitMetaNamespaceKey(a.Meta.GetAnnotations()[minterv1.AnnotationCredentialsRequest])
 			if err != nil {
 				log.WithField("labels", a.Meta.GetAnnotations()).WithError(err).Error("error splitting namespace key for label")
 				// WARNING: No way to return an error here...
@@ -99,13 +101,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// The object doesn't contain our label, so we have nothing to reconcile.
-			if _, ok := e.MetaOld.GetAnnotations()[ccv1.AnnotationCredentialsRequest]; !ok {
+			if _, ok := e.MetaOld.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
 			}
 			return true
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			if _, ok := e.Meta.GetAnnotations()[ccv1.AnnotationCredentialsRequest]; !ok {
+			if _, ok := e.Meta.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
 			}
 			return true
@@ -147,7 +149,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			"namespace":  request.NamespacedName.Namespace,
 		})
 	logger.Info("syncing credentials request")
-	cr := &ccv1.CredentialsRequest{}
+	cr := &minterv1.CredentialsRequest{}
 	err := r.Get(context.TODO(), request.NamespacedName, cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
@@ -161,7 +163,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	origCR := cr
 	cr = cr.DeepCopy()
 
-	if !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
+	if !HasFinalizer(cr, minterv1.FinalizerDeprovision) {
 		logger.Info("no finalizer")
 		if cr.DeletionTimestamp == nil {
 			// Ensure the finalizer is set on any not-deleted requests:
@@ -203,7 +205,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *ccv1.CredentialsRequest, logger log.FieldLogger) error {
+func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	logger.Debug("updating credentials request status")
 
 	// Update cluster deployment status if changed:
@@ -223,15 +225,15 @@ func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *ccv1.Credentia
 	return nil
 }
 
-func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(cr *ccv1.CredentialsRequest) error {
+func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
 	cr = cr.DeepCopy()
-	AddFinalizer(cr, ccv1.FinalizerDeprovision)
+	AddFinalizer(cr, minterv1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cr)
 }
 
-func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(cr *ccv1.CredentialsRequest) error {
+func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
 	cr = cr.DeepCopy()
-	DeleteFinalizer(cr, ccv1.FinalizerDeprovision)
+	DeleteFinalizer(cr, minterv1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cr)
 }
 
