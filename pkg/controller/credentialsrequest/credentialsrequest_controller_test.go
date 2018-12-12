@@ -37,8 +37,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/cred-minter/pkg/apis"
-	ccv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
-	ccaws "github.com/openshift/cred-minter/pkg/aws"
+	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
+	minteraws "github.com/openshift/cred-minter/pkg/aws"
 	mockaws "github.com/openshift/cred-minter/pkg/aws/mock"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -56,8 +56,8 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 
 	// Utility function to get the test credentials request from the fake client
-	getCR := func(c client.Client) *ccv1.CredentialsRequest {
-		cr := &ccv1.CredentialsRequest{}
+	getCR := func(c client.Client) *minterv1.CredentialsRequest {
+		cr := &minterv1.CredentialsRequest{}
 		err := c.Get(context.TODO(), client.ObjectKey{Name: testCRName, Namespace: testNamespace}, cr)
 		if err == nil {
 			return cr
@@ -84,7 +84,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "add finalizer",
 			existing: []runtime.Object{
-				func() *ccv1.CredentialsRequest {
+				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequest()
 					// Remove the finalizer
 					cr.ObjectMeta.Finalizers = []string{}
@@ -98,7 +98,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				cr := getCR(c)
-				if cr == nil || !HasFinalizer(cr, ccv1.FinalizerDeprovision) {
+				if cr == nil || !HasFinalizer(cr, minterv1.FinalizerDeprovision) {
 					t.Errorf("did not get expected finalizer")
 				}
 			},
@@ -174,7 +174,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
 					assert.Equal(t, testAWSSecretAccessKey2,
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
-					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[ccv1.AnnotationCredentialsRequest])
+					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				}
 			},
 		},
@@ -200,7 +200,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						base64DecodeOrFail(t, targetSecret.Data["aws_access_key_id"]))
 					assert.Equal(t, testAWSSecretAccessKey2,
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
-					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[ccv1.AnnotationCredentialsRequest])
+					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				}
 			},
 		},
@@ -232,7 +232,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 				scheme: scheme.Scheme,
-				awsClientBuilder: func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error) {
+				awsClientBuilder: func(accessKeyID, secretAccessKey []byte) (minteraws.Client, error) {
 					return mockAWSClient, nil
 				},
 			}
@@ -274,28 +274,28 @@ const (
 	testAWSSecretAccessKey2 = "KEEPITSECRET2"
 )
 
-func testCredentialsRequestWithDeletionTimestamp() *ccv1.CredentialsRequest {
+func testCredentialsRequestWithDeletionTimestamp() *minterv1.CredentialsRequest {
 	cr := testCredentialsRequest()
 	now := metav1.Now()
 	cr.DeletionTimestamp = &now
 	return cr
 }
 
-func testCredentialsRequest() *ccv1.CredentialsRequest {
-	return &ccv1.CredentialsRequest{
+func testCredentialsRequest() *minterv1.CredentialsRequest {
+	return &minterv1.CredentialsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testCRName,
 			Namespace:   testNamespace,
-			Finalizers:  []string{ccv1.FinalizerDeprovision},
+			Finalizers:  []string{minterv1.FinalizerDeprovision},
 			UID:         types.UID("1234"),
 			Annotations: map[string]string{},
 		},
-		Spec: ccv1.CredentialsRequestSpec{
+		Spec: minterv1.CredentialsRequestSpec{
 			ClusterName: testClusterName,
 			ClusterID:   testClusterID,
 			Secret:      corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
-			AWS: &ccv1.AWSCreds{
-				StatementEntries: []ccv1.StatementEntry{
+			AWS: &minterv1.AWSCreds{
+				StatementEntries: []minterv1.StatementEntry{
 					{
 						Effect: "Allow",
 						Action: []string{
@@ -307,8 +307,8 @@ func testCredentialsRequest() *ccv1.CredentialsRequest {
 				},
 			},
 		},
-		Status: ccv1.CredentialsRequestStatus{
-			AWS: &ccv1.AWSStatus{
+		Status: minterv1.CredentialsRequestStatus{
+			AWS: &minterv1.AWSStatus{
 				User:        testAWSUser,
 				AccessKeyID: testAWSAccessKeyID,
 			},

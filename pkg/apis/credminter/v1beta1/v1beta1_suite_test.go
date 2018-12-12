@@ -17,10 +17,11 @@ limitations under the License.
 package v1beta1
 
 import (
-	"log"
 	"os"
 	"path/filepath"
 	"testing"
+
+	log "github.com/sirupsen/logrus"
 
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
@@ -38,15 +39,15 @@ func TestMain(m *testing.M) {
 
 	err := SchemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("error adding to scheme")
 	}
 
 	if cfg, err = t.Start(); err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("error starting")
 	}
 
 	if c, err = client.New(cfg, client.Options{Scheme: scheme.Scheme}); err != nil {
-		log.Fatal(err)
+		log.WithError(err).Fatal("error creating client")
 	}
 
 	code := m.Run()

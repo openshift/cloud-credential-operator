@@ -23,8 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	ccv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
-	ccaws "github.com/openshift/cred-minter/pkg/aws"
+	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
+	minteraws "github.com/openshift/cred-minter/pkg/aws"
 
 	"github.com/aws/aws-sdk-go/service/iam"
 
@@ -42,9 +42,9 @@ const (
 	awsCredsSecret    = "aws-creds"
 )
 
-func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, logger log.FieldLogger) error {
+func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	if cr.Status.AWS == nil {
-		cr.Status.AWS = &ccv1.AWSStatus{}
+		cr.Status.AWS = &minterv1.AWSStatus{}
 	}
 
 	// Generate a randomized User for the credentials:
@@ -65,7 +65,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 	logger.Debug("loading AWS credentials from secret")
 	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 	// cluster, we need to load different secrets for each cluster.
-	accessKeyID, secretAccessKey, err := ccaws.LoadCredsFromSecret(r.Client, awsCredsNamespace, awsCredsSecret)
+	accessKeyID, secretAccessKey, err := minteraws.LoadCredsFromSecret(r.Client, awsCredsNamespace, awsCredsSecret)
 	if err != nil {
 		return err
 	}
@@ -85,7 +85,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 		}
 	}
 
-	syncer := ccaws.NewCredSyncer(awsClient, cr.Spec.Secret, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, cr.Status.AWS.AccessKeyID)
+	syncer := minteraws.NewCredSyncer(awsClient, cr.Spec.Secret, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, cr.Status.AWS.AccessKeyID)
 
 	if cr.DeletionTimestamp != nil {
 		err := syncer.Delete()
@@ -118,7 +118,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *ccv1.CredentialsRequest, 
 	return nil
 }
 
-func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, logger log.FieldLogger) error {
 
 	if existingSecret == nil || existingSecret.Name == "" {
 		logger.Info("creating secret")
@@ -129,7 +129,7 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 				Name:      cr.Spec.Secret.Name,
 				Namespace: cr.Spec.Secret.Namespace,
 				Annotations: map[string]string{
-					ccv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 				},
 			},
 			Data: map[string][]byte{
@@ -157,7 +157,7 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *ccv1.CredentialsRe
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
 	}
-	existingSecret.Annotations[ccv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
 	existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
 	// Ensure secrets are "owned" by the credentials request that created or adopted them:
