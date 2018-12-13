@@ -226,13 +226,11 @@ func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.Crede
 }
 
 func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
-	cr = cr.DeepCopy()
 	AddFinalizer(cr, minterv1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cr)
 }
 
 func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
-	cr = cr.DeepCopy()
 	DeleteFinalizer(cr, minterv1.FinalizerDeprovision)
 	return r.Update(context.TODO(), cr)
 }
