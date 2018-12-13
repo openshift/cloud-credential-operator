@@ -90,9 +90,6 @@ type CredentialsRequestStatus struct {
 type AWSStatus struct {
 	// User is the name of the User created in AWS for these credentials.
 	User string `json:"user"`
-
-	// AccessKeyID is the ID of the access key created in AWS for this user and saved in the requested secret.
-	AccessKeyID string `json:"accessKeyID"`
 }
 
 // +genclient
