@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= controller:latest
+IMG ?= cred-minter:latest
 DOCKER_CMD ?= docker
 
 all: test manager
@@ -28,7 +28,8 @@ deploy: manifests
 
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go all
+	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
+	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name cred-minter
 
 # Run go fmt against code
 fmt:
@@ -48,5 +49,5 @@ buildah-build: test
 	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} .
 
 .PHONY: buildah-push
-buildah-push:
-	BUILDAH_ISOLATION=chroot sudo buildah push ${IMG} docker://${IMG}
+buildah-push: buildah-build
+	sudo buildah push --authfile=~/.docker/config.json ${IMG}

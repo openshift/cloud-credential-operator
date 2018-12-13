@@ -1,12 +1,5 @@
 # Adds namespace to all resources.
-namespace: cred-minter-system
-
-# Value of this field is prepended to the
-# names of all resources, e.g. a deployment named
-# "wordpress" becomes "alices-wordpress".
-# Note that it should also match with the prefix (text before '-') of the namespace
-# field above.
-namePrefix: cred-minter-
+namespace: openshift-cred-minter
 
 # Labels to add to all resources and selectors.
 #commonLabels:
@@ -25,9 +18,3 @@ resources:
 patches:
 - manager_image_patch.yaml
 
-vars:
-- name: WEBHOOK_SECRET_NAME
-  objref:
-    kind: Secret
-    name: webhook-server-secret
-    apiVersion: v1

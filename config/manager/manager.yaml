@@ -3,13 +3,13 @@ kind: Namespace
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: system
+  name: openshift-cred-minter
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: controller-manager-service
-  namespace: system
+  namespace: openshift-cred-minter
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
@@ -20,20 +20,32 @@ spec:
   ports:
   - port: 443
 ---
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
 metadata:
-  name: controller-manager
-  namespace: system
+  name: cred-minter
+  namespace: openshift-cred-minter
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
 spec:
   selector:
-    matchLabels:
-      control-plane: controller-manager
-      controller-tools.k8s.io: "1.0"
-  serviceName: controller-manager-service
+    control-plane: controller-manager
+    controller-tools.k8s.io: "1.0"
+  replicas: 1
+  revisionHistoryLimit: 4
+  strategy:
+    type: Rolling
+  triggers:
+    - type: "ConfigChange"
+    #- type: "ImageChange"
+      #imageChangeParams:
+        #automatic: true
+        #containerNames:
+          #- "manager"
+        #from:
+          #kind: "ImageStreamTag"
+          #name: "cluster-operator:latest"
   template:
     metadata:
       labels:
@@ -41,18 +53,9 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      - command:
-        - /root/manager
-        image: controller:latest
-        imagePullPolicy: Always
+      - image: cred-minter:latest
+        imagePullPolicy: Never
         name: manager
-        env:
-          - name: POD_NAMESPACE
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.namespace
-          - name: SECRET_NAME
-            value: $(WEBHOOK_SECRET_NAME)
         resources:
           limits:
             cpu: 100m
@@ -64,19 +67,8 @@ spec:
         - containerPort: 9876
           name: webhook-server
           protocol: TCP
-        volumeMounts:
-        - mountPath: /tmp/cert
-          name: cert
-          readOnly: true
+        command:
+          - /root/manager
+          - --log-level
+          - debug
       terminationGracePeriodSeconds: 10
-      volumes:
-      - name: cert
-        secret:
-          defaultMode: 420
-          secretName: webhook-server-secret
----
-apiVersion: v1
-kind: Secret
-metadata:
-  name: webhook-server-secret
-  namespace: system

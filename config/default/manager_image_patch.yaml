@@ -1,12 +1,14 @@
-apiVersion: apps/v1
-kind: StatefulSet
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
 metadata:
-  name: controller-manager
-  namespace: system
+  name: cred-minter
+  namespace: openshift-cred-minter
 spec:
   template:
     spec:
       containers:
       # Change the value of image field below to your controller image URL
-      - image: IMAGE_URL
-        name: manager
+      - name: manager
+        # TODO something more formal
+        image: quay.io/dgoodwin/cred-minter:latest
+        imagePullPolicy: Always
