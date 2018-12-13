@@ -196,7 +196,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	// Ensure we have the controller reference set on the managed secret if it exists:
 	// TODO: we could refactor a bit so this is set when it's created, but it's done in sync.go which currently doesn't know about the full CR.
 	secret := &corev1.Secret{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.Secret.Namespace, Name: cr.Spec.Secret.Name}, secret)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, secret)
 	if err != nil {
 		logger.WithError(err).Error("error looking up secret")
 		return reconcile.Result{}, err

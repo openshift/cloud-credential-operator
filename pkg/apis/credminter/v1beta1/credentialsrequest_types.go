@@ -46,8 +46,8 @@ type CredentialsRequestSpec struct {
 	// credentials are cleaned up during deprovision.
 	ClusterID string `json:"clusterID"`
 
-	// Secret points to the secret where the credentials should be stored once generated.
-	Secret corev1.ObjectReference `json:"secret"`
+	// SecretRef points to the secret where the credentials should be stored once generated.
+	SecretRef corev1.ObjectReference `json:"secretRef"`
 
 	// AWS contains the details for credentials requested for an AWS cluster component.
 	AWS *AWSCreds `json:"aws,omitempty"`

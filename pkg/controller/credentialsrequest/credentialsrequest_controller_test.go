@@ -293,7 +293,7 @@ func testCredentialsRequest() *minterv1.CredentialsRequest {
 		Spec: minterv1.CredentialsRequestSpec{
 			ClusterName: testClusterName,
 			ClusterID:   testClusterID,
-			Secret:      corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
+			SecretRef:   corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
 			AWS: &minterv1.AWSCreds{
 				StatementEntries: []minterv1.StatementEntry{
 					{

@@ -78,14 +78,14 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsReque
 
 	// Check if the credentials secret exists, if not we need to inform the syncer to generate a new one:
 	existingSecret := &corev1.Secret{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.Secret.Namespace, Name: cr.Spec.Secret.Name}, existingSecret)
+	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debug("secret does not exist")
 		}
 	}
 
-	syncer := minteraws.NewCredSyncer(awsClient, cr.Spec.Secret, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, cr.Status.AWS.AccessKeyID)
+	syncer := minteraws.NewCredSyncer(awsClient, cr.Spec.SecretRef, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, cr.Status.AWS.AccessKeyID)
 
 	if cr.DeletionTimestamp != nil {
 		err := syncer.Delete()
@@ -126,8 +126,8 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *minterv1.Credentia
 		b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Spec.Secret.Name,
-				Namespace: cr.Spec.Secret.Namespace,
+				Name:      cr.Spec.SecretRef.Name,
+				Namespace: cr.Spec.SecretRef.Namespace,
 				Annotations: map[string]string{
 					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 				},
