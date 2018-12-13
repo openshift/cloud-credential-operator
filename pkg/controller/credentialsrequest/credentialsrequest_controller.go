@@ -97,7 +97,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 
-	// 'UpdateFunc' and 'CreateFunc' used to determine if a event for the given object should trigger a sync:
+	// These functions are used to determine if a event for the given object should trigger a sync:
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
 			// The object doesn't contain our label, so we have nothing to reconcile.
@@ -107,6 +107,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return true
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
+			if _, ok := e.Meta.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
+				return false
+			}
+			return true
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
 			if _, ok := e.Meta.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
 			}
