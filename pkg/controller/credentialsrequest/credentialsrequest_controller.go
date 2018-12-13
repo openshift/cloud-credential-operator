@@ -45,7 +45,6 @@ import (
 
 // Add creates a new CredentialsRequest Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
 // and Start it when the Manager is Started.
-// USER ACTION REQUIRED: update cmd/manager/main.go to call this credminter.Add(mgr) to install this Controller
 func Add(mgr manager.Manager) error {
 	return add(mgr, newReconciler(mgr))
 }
@@ -140,7 +139,7 @@ type ReconcileCredentialsRequest struct {
 // Reconcile reads that state of the cluster for a CredentialsRequest object and makes changes based on the state read
 // and what is in the CredentialsRequest.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write Deployments
-// +kubebuilder:rbac:groups=credminter.openshift.io,resources=credentialsrequests,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=credminter.openshift.io,resources=credentialsrequests;credentialsrequests/status;credentialsrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithFields(
 		log.Fields{

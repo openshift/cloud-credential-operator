@@ -17,14 +17,23 @@ request fine grained credentials for a particular cloud provider.
 
 Currently AWS is the only supported cloud provider. If running in-cluster, your credentials are expected to exist in kube-system/aws-creds with the keys aws_access_key_id and aws_secret_access_key.
 
-# Running
+# Running from source
 
-Currently the controller can only be run locally when you are logged in with admin credentials.
+Login to a cluster with admin credentials:
 
 ```
 $ make install
 $ make run
 ```
+
+# Deploying in cluster
+
+ 1. export IMG=quay.io/dgoodwin/cred-minter:latest
+   * You can upload to a personal repo if you wish to build images from source.
+ 1. make buildah-push
+ 1. make deploy
+
+Cred Minter should now be running in openshift-cred-minter.
 
 # Future Work
 
