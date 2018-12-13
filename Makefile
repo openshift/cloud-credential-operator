@@ -1,6 +1,7 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= controller:latest
+DOCKER_CMD ?= docker
 
 all: test manager
 
@@ -41,12 +42,11 @@ vet:
 generate:
 	go generate ./pkg/... ./cmd/...
 
-# Build the docker image
-docker-build: test
-	docker build . -t ${IMG}
-	@echo "updating kustomize image patch file for manager resource"
-	sed -i'' -e 's@image: .*@image: '"${IMG}"'@' ./config/default/manager_image_patch.yaml
+# Build the image with buildah
+.PHONY: buildah-build
+buildah-build: test
+	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} .
 
-# Push the docker image
-docker-push:
-	docker push ${IMG}
+.PHONY: buildah-push
+buildah-push:
+	BUILDAH_ISOLATION=chroot sudo buildah push ${IMG} docker://${IMG}
