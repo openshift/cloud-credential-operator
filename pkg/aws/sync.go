@@ -101,6 +101,7 @@ func (cs *CredSyncer) Sync(forceNewAccessKey bool) (*iam.AccessKey, error) {
 	if err != nil {
 		return nil, err
 	}
+	cs.logger.WithField("accessKeyID", cs.existingAccessKey).Debugf("access key exists? %v", accessKeyExists)
 	if forceNewAccessKey || !accessKeyExists {
 		cs.logger.Info("generating new AWS access key")
 

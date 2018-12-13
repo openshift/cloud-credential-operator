@@ -18,6 +18,7 @@ package credentialsrequest
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -86,7 +87,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 				return []reconcile.Request{}
 			}
 
-			log.WithFields(log.Fields{"name": name, "namespace": namespace}).Debug("parsed annotation")
+			log.WithField("cr", fmt.Sprintf("%s/%s", namespace, name)).Debug("parsed annotation")
 
 			return []reconcile.Request{
 				{NamespacedName: types.NamespacedName{
@@ -145,8 +146,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	logger := log.WithFields(
 		log.Fields{
 			"controller": "credentialsrequest",
-			"name":       request.NamespacedName.Name,
-			"namespace":  request.NamespacedName.Namespace,
+			"cr":         fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
 		})
 	logger.Info("syncing credentials request")
 	cr := &minterv1.CredentialsRequest{}

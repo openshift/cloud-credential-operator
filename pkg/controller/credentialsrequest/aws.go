@@ -76,6 +76,8 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsReque
 		return err
 	}
 
+	var existingAccessKeyID string
+
 	// Check if the credentials secret exists, if not we need to inform the syncer to generate a new one:
 	existingSecret := &corev1.Secret{}
 	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
@@ -83,9 +85,26 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsReque
 		if errors.IsNotFound(err) {
 			logger.Debug("secret does not exist")
 		}
+	} else {
+		keyBytes, ok := existingSecret.Data["aws_access_key_id"]
+		if !ok {
+			// Warn, but this will trigger generation of a new key and updating the secret.
+			logger.Warning("secret did not have expected key: aws_access_key_id, will be regenerated")
+		} else {
+			decoded, err := base64.StdEncoding.DecodeString(string(keyBytes))
+			if err != nil {
+				logger.WithError(err).WithFields(log.Fields{
+					"secret":    fmt.Sprintf("%s/%s", existingSecret.Namespace, existingSecret.Name),
+					"secretKey": "aws_access_key_id"}).Warning("error decoding secret property, regenerating")
+			} else {
+				existingAccessKeyID = string(decoded)
+				logger.WithField("accessKeyID", existingAccessKeyID).Debug("found access key ID in target secret")
+			}
+
+		}
 	}
 
-	syncer := minteraws.NewCredSyncer(awsClient, cr.Spec.SecretRef, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, cr.Status.AWS.AccessKeyID)
+	syncer := minteraws.NewCredSyncer(awsClient, cr.Spec.SecretRef, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, existingAccessKeyID)
 
 	if cr.DeletionTimestamp != nil {
 		err := syncer.Delete()
@@ -96,7 +115,7 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsReque
 		return r.removeDeprovisionFinalizer(cr)
 	}
 
-	forceNewAccessKey := existingSecret == nil || existingSecret.Name == ""
+	forceNewAccessKey := existingSecret == nil || existingSecret.Name == "" || existingAccessKeyID == ""
 	userAccessKey, err := syncer.Sync(forceNewAccessKey)
 	if err != nil {
 		log.WithError(err).Error("error syncing credential to AWS")
@@ -109,19 +128,19 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsReque
 			log.WithError(err).Error("error saving access key to secret")
 			return err
 		}
-
-		// Save the access key ID to status
-		// TODO Necessary or just use the secret data?
-		cr.Status.AWS.AccessKeyID = *userAccessKey.AccessKeyId
 	}
 
 	return nil
 }
 
 func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+	sLog := logger.WithFields(log.Fields{
+		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+	})
 
 	if existingSecret == nil || existingSecret.Name == "" {
-		logger.Info("creating secret")
+		sLog.Info("creating secret")
 		b64AccessKeyID := base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId))
 		b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
 		secret := &corev1.Secret{
@@ -139,16 +158,16 @@ func (r *ReconcileCredentialsRequest) syncAccessKeySecret(cr *minterv1.Credentia
 		}
 		// Ensure secrets are "owned" by the credentials request that created or adopted them:
 		if err := controllerutil.SetControllerReference(cr, secret, r.scheme); err != nil {
-			logger.WithError(err).Error("error setting controller reference on secret")
+			sLog.WithError(err).Error("error setting controller reference on secret")
 			return err
 		}
 
 		err := r.Client.Create(context.TODO(), secret)
 		if err != nil {
-			logger.WithError(err).Error("error creating secret")
+			sLog.WithError(err).Error("error creating secret")
 			return err
 		}
-		logger.Info("secret created successfully")
+		sLog.Info("secret created successfully")
 		return nil
 	}
 

@@ -309,8 +309,7 @@ func testCredentialsRequest() *minterv1.CredentialsRequest {
 		},
 		Status: minterv1.CredentialsRequestStatus{
 			AWS: &minterv1.AWSStatus{
-				User:        testAWSUser,
-				AccessKeyID: testAWSAccessKeyID,
+				User: testAWSUser,
 			},
 		},
 	}
