@@ -39,6 +39,7 @@ import (
 	"github.com/openshift/cred-minter/pkg/apis"
 	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
 	minteraws "github.com/openshift/cred-minter/pkg/aws"
+	"github.com/openshift/cred-minter/pkg/aws/actuator"
 	mockaws "github.com/openshift/cred-minter/pkg/aws/mock"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -229,15 +230,25 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 
 			mockAWSClient := test.buildMockAWSClient(mockCtrl)
 			fakeClient := fake.NewFakeClient(test.existing...)
+			codec, err := minterv1.NewCodec()
+			if err != nil {
+				t.Errorf("error creating codec: %v", err)
+				t.FailNow()
+				return
+			}
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
-				scheme: scheme.Scheme,
-				awsClientBuilder: func(accessKeyID, secretAccessKey []byte) (minteraws.Client, error) {
-					return mockAWSClient, nil
+				Actuator: &actuator.AWSActuator{
+					Client: fakeClient,
+					Codec:  codec,
+					Scheme: scheme.Scheme,
+					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte) (minteraws.Client, error) {
+						return mockAWSClient, nil
+					},
 				},
 			}
 
-			_, err := rcr.Reconcile(reconcile.Request{
+			_, err = rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testCRName,
 					Namespace: testNamespace,
@@ -282,27 +293,38 @@ func testCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.Credent
 }
 
 func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, _ := minterv1.NewCodec()
-	providerSpec, err := codec.EncodeProviderSpec(&minterv1.AWSProviderSpec{
-		StatementEntries: []minterv1.StatementEntry{
-			{
-				Effect: "Allow",
-				Action: []string{
-					"s3:CreateBucket",
-					"s3:DeleteBucket",
-				},
-				Resource: "*",
-			},
-		},
-	})
+	codec, err := minterv1.NewCodec()
 	if err != nil {
-		t.Fatalf("error encoding provider spec: %v", err)
+		t.Logf("error creating new codec: %v", err)
+		t.FailNow()
+		return nil
 	}
-	providerStatus, err := codec.EncodeProviderStatus(&minterv1.AWSProviderStatus{
-		User: testAWSUser,
-	})
+	awsProvSpec, err := codec.EncodeProviderSpec(
+		&minterv1.AWSProviderSpec{
+			StatementEntries: []minterv1.StatementEntry{
+				{
+					Effect: "Allow",
+					Action: []string{
+						"s3:CreateBucket",
+						"s3:DeleteBucket",
+					},
+					Resource: "*",
+				},
+			},
+		})
 	if err != nil {
-		t.Fatalf("error encoding provider status: %v", err)
+		t.Logf("error encoding: %v", err)
+		t.FailNow()
+		return nil
+	}
+	awsStatus, err := codec.EncodeProviderStatus(
+		&minterv1.AWSProviderStatus{
+			User: testAWSUser,
+		})
+	if err != nil {
+		t.Logf("error encoding: %v", err)
+		t.FailNow()
+		return nil
 	}
 	return &minterv1.CredentialsRequest{
 		ObjectMeta: metav1.ObjectMeta{
@@ -316,10 +338,10 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 			ClusterName:  testClusterName,
 			ClusterID:    testClusterID,
 			SecretRef:    corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
-			ProviderSpec: providerSpec,
+			ProviderSpec: awsProvSpec,
 		},
 		Status: minterv1.CredentialsRequestStatus{
-			ProviderStatus: providerStatus,
+			ProviderStatus: awsStatus,
 		},
 	}
 }
