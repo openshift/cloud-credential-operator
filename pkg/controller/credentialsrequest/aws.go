@@ -43,18 +43,35 @@ const (
 )
 
 func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
-	if cr.Status.AWS == nil {
-		cr.Status.AWS = &minterv1.AWSStatus{}
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		logger.WithError(err).Error("error creating AWS codec")
+		return fmt.Errorf("error creating AWS codec: %v", err)
+	}
+	awsStatus := &minterv1.AWSProviderStatus{}
+	if cr.Status.ProviderStatus != nil {
+		awsStatus, err = codec.DecodeProviderStatus(cr.Status.ProviderStatus, &minterv1.AWSProviderStatus{})
+		if err != nil {
+			logger.WithError(err).Error("error decoding provider status")
+			return fmt.Errorf("error decoding provider status: %v", err)
+		}
 	}
 
 	// Generate a randomized User for the credentials:
 	// TODO: check if the generated name is free
-	if cr.Status.AWS.User == "" {
-		cr.Status.AWS.User = fmt.Sprintf("%s-%s-%s", cr.Spec.ClusterName, cr.Name, utilrand.String(5))
-		if len(cr.Status.AWS.User) > 64 {
-			return fmt.Errorf("generated user name is too long for AWS: %s", cr.Status.AWS.User)
+	if awsStatus.User == "" {
+		awsStatus.User = fmt.Sprintf("%s-%s-%s", cr.Spec.ClusterName, cr.Name, utilrand.String(5))
+		if len(awsStatus.User) > 64 {
+			return fmt.Errorf("generated user name is too long for AWS: %s", awsStatus.User)
 		}
-		logger.WithField("user", cr.Status.AWS.User).Debug("generated random name for AWS user and policy")
+		logger.WithField("user", awsStatus.User).Debug("generated random name for AWS user and policy")
+
+		cr.Status.ProviderStatus, err = codec.EncodeProviderStatus(awsStatus)
+		if err != nil {
+			logger.WithError(err).Error("error encoding provider status")
+			return err
+		}
+
 		err := r.Status().Update(context.TODO(), cr)
 		if err != nil {
 			logger.WithError(err).Error("error updating credentials request")
@@ -104,7 +121,18 @@ func (r *ReconcileCredentialsRequest) reconcileAWS(cr *minterv1.CredentialsReque
 		}
 	}
 
-	syncer := minteraws.NewCredSyncer(awsClient, cr.Spec.SecretRef, cr.Status.AWS.User, cr.Spec.AWS.StatementEntries, existingAccessKeyID)
+	awsSpec := &minterv1.AWSProviderSpec{}
+	if cr.Spec.ProviderSpec != nil {
+		awsSpec, err = codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
+		if err != nil {
+			logger.WithError(err).Error("error decoding provider spec")
+			return fmt.Errorf("error decoding provider spec: %v", err)
+		}
+	} else {
+		return fmt.Errorf("no providerSpec defined")
+	}
+
+	syncer := minteraws.NewCredSyncer(awsClient, cr.Spec.SecretRef, awsStatus.User, awsSpec.StatementEntries, existingAccessKeyID)
 
 	if cr.DeletionTimestamp != nil {
 		err := syncer.Delete()

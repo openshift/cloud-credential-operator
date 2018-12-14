@@ -244,6 +244,7 @@ func (cs *CredSyncer) setUserPolicy() error {
 	if err != nil {
 		return fmt.Errorf("error marshalling policy: %v", err)
 	}
+	cs.logger.Debugf("policy doc: %s", string(b))
 
 	// This call appears to be idempotent:
 	_, err = cs.awsClient.PutUserPolicy(&iam.PutUserPolicyInput{

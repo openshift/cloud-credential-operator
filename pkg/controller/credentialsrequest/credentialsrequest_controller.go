@@ -76,6 +76,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Define a mapping for secrets to the credentials requests that created them. (if applicable)
+	// We use an annotation on secrets that refers back to their owning credentials request because
+	// the normal owner reference is not namespaced, and we want to support credentials requests being
+	// in a centralized namespace, but writing secrets into component namespaces.
 	mapFn := handler.ToRequestsFunc(
 		func(a handler.MapObject) []reconcile.Request {
 			// Predicate below should ensure this map function is not called if the
@@ -183,15 +186,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		}
 	}
 
-	if cr.Spec.AWS != nil {
-		err := r.reconcileAWS(cr, logger)
-		if err != nil {
-			logger.WithError(err).Error("error reconciling AWS credentials")
-			return reconcile.Result{}, err
-		}
-	} else {
-		logger.Warn("no platform defined")
-		return reconcile.Result{}, nil
+	// TODO: replace with actuator call:
+	err = r.reconcileAWS(cr, logger)
+	if err != nil {
+		logger.WithError(err).Error("error reconciling AWS credentials")
+		return reconcile.Result{}, err
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
@@ -217,8 +216,8 @@ func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.Crede
 	// Update cluster deployment status if changed:
 	if !reflect.DeepEqual(newCR.Status, origCR.Status) {
 		logger.Infof("status has changed, updating")
-		logger.Debugf("orig: %v", origCR.Status.AWS)
-		logger.Debugf("new : %v", *newCR.Status.AWS)
+		logger.Debugf("orig: %v", origCR.Status)
+		logger.Debugf("new : %v", newCR.Status)
 		err := r.Status().Update(context.TODO(), newCR)
 		if err != nil {
 			logger.WithError(err).Error("error updating credentials request")
