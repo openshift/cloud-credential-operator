@@ -260,6 +260,11 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 		return err
 	}
 
+	if awsStatus.User == "" {
+		logger.Warn("no user name set on credentials being deleted, most likely were never provisioned")
+		return nil
+	}
+
 	logger.Info("deleting credential from AWS")
 
 	awsClient, err := a.buildAWSClient(cr, awsStatus)

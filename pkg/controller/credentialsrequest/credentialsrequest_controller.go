@@ -133,6 +133,61 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Monitor namespace creation, and check out list of credentials requests for any destined
+	// for that new namespace. This allows us to be up and running for other components that don't
+	// yet exist, but will.
+	namespaceMapFn := handler.ToRequestsFunc(
+		func(a handler.MapObject) []reconcile.Request {
+
+			// Iterate all CredentialsRequests to determine if we have any that target
+			// this new namespace. We are not anticipating huge numbers of CredentailsRequests,
+			// nor namespace creations.
+			newNamespace := a.Meta.GetName()
+			log.WithField("namespace", newNamespace).Debug("checking for credentials requests targeting namespace")
+			crs := &minterv1.CredentialsRequestList{}
+			mgr.GetClient().List(context.TODO(), &client.ListOptions{}, crs)
+			requests := []reconcile.Request{}
+			for _, cr := range crs.Items {
+				if !cr.Status.Provisioned && cr.Spec.SecretRef.Namespace == newNamespace {
+					log.WithFields(log.Fields{
+						"namespace": newNamespace,
+						"cr":        fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+					}).Info("found credentials request for namespace")
+					requests = append(requests, reconcile.Request{
+						NamespacedName: types.NamespacedName{
+							Name:      cr.Name,
+							Namespace: cr.Namespace,
+						},
+					})
+				}
+			}
+			return requests
+		})
+
+	namespacePred := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			// WARNING: on restart, the controller sees all namespaces as creates even if they
+			// are pre-existing
+			return true
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return false
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return false
+		},
+	}
+
+	err = c.Watch(
+		&source.Kind{Type: &corev1.Namespace{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: namespaceMapFn,
+		},
+		namespacePred)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -150,11 +205,10 @@ type ReconcileCredentialsRequest struct {
 // +kubebuilder:rbac:groups=credminter.openshift.io,resources=credentialsrequests;credentialsrequests/status;credentialsrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	logger := log.WithFields(
-		log.Fields{
-			"controller": "credreq",
-			"cr":         fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
-		})
+	logger := log.WithFields(log.Fields{
+		"controller": "credreq",
+		"cr":         fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
+	})
 	logger.Info("syncing credentials request")
 	cr := &minterv1.CredentialsRequest{}
 	err := r.Get(context.TODO(), request.NamespacedName, cr)
@@ -166,6 +220,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		logger.WithError(err).Error("error getting credentials request, requeuing")
 		return reconcile.Result{}, err
 	}
+	logger = logger.WithFields(log.Fields{
+		"secret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+	})
 	// Maintain a copy, but work on a copy of the credentials request:
 	origCR := cr
 	cr = cr.DeepCopy()
@@ -198,6 +255,24 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		}
 	}
 
+	// Ensure the target namespace exists for the secret, if not, there's no point
+	// continuing:
+	targetNS := &corev1.Namespace{}
+	err = r.Get(context.TODO(), types.NamespacedName{Name: cr.Spec.SecretRef.Namespace}, targetNS)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// TODO: technically we should deprovision if a credential was in this ns, but it
+			// was then deleted.
+			logger.Warn("secret namespace does not yet exist")
+			// We will re-sync immediately when the namespace is created.
+			return reconcile.Result{}, nil
+		}
+		logger.WithError(err).Error("unexpected error looking up namespace")
+		return reconcile.Result{}, err
+	} else {
+		logger.Debug("found secret namespace")
+	}
+
 	// Hand over to the actuator:
 	exists, err := r.Actuator.Exists(context.TODO(), cr)
 	if err != nil {
@@ -210,12 +285,14 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			logger.WithError(err).Error("actuator error creating credentials")
 			return reconcile.Result{}, err
 		}
+		cr.Status.Provisioned = true
 	} else {
 		err = r.Actuator.Update(context.TODO(), cr)
 		if err != nil {
 			logger.WithError(err).Error("actuator error updating credentials")
 			return reconcile.Result{}, err
 		}
+		cr.Status.Provisioned = true
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
@@ -241,8 +318,6 @@ func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.Crede
 	// Update cluster deployment status if changed:
 	if !reflect.DeepEqual(newCR.Status, origCR.Status) {
 		logger.Infof("status has changed, updating")
-		logger.Debugf("orig: %v", origCR.Status)
-		logger.Debugf("new : %v", newCR.Status)
 		err := r.Status().Update(context.TODO(), newCR)
 		if err != nil {
 			logger.WithError(err).Error("error updating credentials request")
