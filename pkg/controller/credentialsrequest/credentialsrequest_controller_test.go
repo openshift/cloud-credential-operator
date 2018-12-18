@@ -85,7 +85,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			name: "add finalizer",
 			existing: []runtime.Object{
 				func() *minterv1.CredentialsRequest {
-					cr := testCredentialsRequest()
+					cr := testCredentialsRequest(t)
 					// Remove the finalizer
 					cr.ObjectMeta.Finalizers = []string{}
 					return cr
@@ -106,7 +106,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "new credential",
 			existing: []runtime.Object{
-				testCredentialsRequest(),
+				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 			},
 			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -131,7 +131,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred exists",
 			existing: []runtime.Object{
-				testCredentialsRequest(),
+				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
@@ -155,7 +155,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred missing access key exists",
 			existing: []runtime.Object{
-				testCredentialsRequest(),
+				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 			},
 			buildMockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -181,7 +181,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred exists access key missing",
 			existing: []runtime.Object{
-				testCredentialsRequest(),
+				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
@@ -207,7 +207,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
-				testCredentialsRequestWithDeletionTimestamp(),
+				testCredentialsRequestWithDeletionTimestamp(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
@@ -274,14 +274,36 @@ const (
 	testAWSSecretAccessKey2 = "KEEPITSECRET2"
 )
 
-func testCredentialsRequestWithDeletionTimestamp() *minterv1.CredentialsRequest {
-	cr := testCredentialsRequest()
+func testCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.CredentialsRequest {
+	cr := testCredentialsRequest(t)
 	now := metav1.Now()
 	cr.DeletionTimestamp = &now
 	return cr
 }
 
-func testCredentialsRequest() *minterv1.CredentialsRequest {
+func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
+	codec, _ := minterv1.NewCodec()
+	providerSpec, err := codec.EncodeProviderSpec(&minterv1.AWSProviderSpec{
+		StatementEntries: []minterv1.StatementEntry{
+			{
+				Effect: "Allow",
+				Action: []string{
+					"s3:CreateBucket",
+					"s3:DeleteBucket",
+				},
+				Resource: "*",
+			},
+		},
+	})
+	if err != nil {
+		t.Fatalf("error encoding provider spec: %v", err)
+	}
+	providerStatus, err := codec.EncodeProviderStatus(&minterv1.AWSProviderStatus{
+		User: testAWSUser,
+	})
+	if err != nil {
+		t.Fatalf("error encoding provider status: %v", err)
+	}
 	return &minterv1.CredentialsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testCRName,
@@ -291,26 +313,13 @@ func testCredentialsRequest() *minterv1.CredentialsRequest {
 			Annotations: map[string]string{},
 		},
 		Spec: minterv1.CredentialsRequestSpec{
-			ClusterName: testClusterName,
-			ClusterID:   testClusterID,
-			SecretRef:   corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
-			AWS: &minterv1.AWSCreds{
-				StatementEntries: []minterv1.StatementEntry{
-					{
-						Effect: "Allow",
-						Action: []string{
-							"s3:CreateBucket",
-							"s3:DeleteBucket",
-						},
-						Resource: "*",
-					},
-				},
-			},
+			ClusterName:  testClusterName,
+			ClusterID:    testClusterID,
+			SecretRef:    corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
+			ProviderSpec: providerSpec,
 		},
 		Status: minterv1.CredentialsRequestStatus{
-			AWS: &minterv1.AWSStatus{
-				User: testAWSUser,
-			},
+			ProviderStatus: providerStatus,
 		},
 	}
 }

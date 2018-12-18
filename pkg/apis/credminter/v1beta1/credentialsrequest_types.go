@@ -19,6 +19,7 @@ package v1beta1
 import (
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 const (
@@ -49,24 +50,8 @@ type CredentialsRequestSpec struct {
 	// SecretRef points to the secret where the credentials should be stored once generated.
 	SecretRef corev1.ObjectReference `json:"secretRef"`
 
-	// AWS contains the details for credentials requested for an AWS cluster component.
-	AWS *AWSCreds `json:"aws,omitempty"`
-}
-
-// AWSCreds contains the required information to create a user policy in AWS.
-type AWSCreds struct {
-	// StatementEntries contains a list of policy statements that should be associated with this credentials access key.
-	StatementEntries []StatementEntry `json:"statementEntries"`
-}
-
-// StatementEntry models an AWS policy statement entry.
-type StatementEntry struct {
-	// Effect indicates if this policy statement is to Allow or Deny.
-	Effect string `json:"effect"`
-	// Action describes the particular AWS service actions that should be allowed or denied. (i.e. ec2:StartInstances, iam:ChangePassword)
-	Action []string `json:"action"`
-	// Resource specifies the object(s) this statement should apply to. (or "*" for all)
-	Resource string `json:"resource"`
+	// ProviderSpec contains the cloud provider specific credentials specification.
+	ProviderSpec *runtime.RawExtension `json:"providerSpec,omitempty"`
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest
@@ -82,14 +67,8 @@ type CredentialsRequestStatus struct {
 	// requires a sync.
 	LastSyncGeneration int64 `json:"lastSyncGeneration"`
 
-	// AWS contains AWS specific status.
-	AWS *AWSStatus `json:"aws,omitempty"`
-}
-
-// AWSStatus containes the status of the credentials request in AWS.
-type AWSStatus struct {
-	// User is the name of the User created in AWS for these credentials.
-	User string `json:"user"`
+	// ProviderStatus contains cloud provider specific status.
+	ProviderStatus *runtime.RawExtension `json:"providerStatus,omitempty"`
 }
 
 // +genclient
@@ -116,5 +95,5 @@ type CredentialsRequestList struct {
 }
 
 func init() {
-	SchemeBuilder.Register(&CredentialsRequest{}, &CredentialsRequestList{})
+	SchemeBuilder.Register(&CredentialsRequest{}, &CredentialsRequestList{}, &AWSProviderStatus{}, &AWSProviderSpec{})
 }
