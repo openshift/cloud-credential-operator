@@ -85,6 +85,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "add finalizer",
 			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequest(t)
 					// Remove the finalizer
@@ -102,11 +103,13 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				if cr == nil || !HasFinalizer(cr, minterv1.FinalizerDeprovision) {
 					t.Errorf("did not get expected finalizer")
 				}
+				assert.False(t, cr.Status.Provisioned)
 			},
 		},
 		{
 			name: "new credential",
 			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 			},
@@ -127,11 +130,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					assert.Equal(t, testAWSSecretAccessKey,
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
 				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
 			},
 		},
 		{
 			name: "cred exists",
 			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
@@ -151,11 +157,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					assert.Equal(t, testAWSSecretAccessKey,
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
 				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
 			},
 		},
 		{
 			name: "cred missing access key exists",
 			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 			},
@@ -177,11 +186,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
 					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
 			},
 		},
 		{
 			name: "cred exists access key missing",
 			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
@@ -203,11 +215,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						base64DecodeOrFail(t, targetSecret.Data["aws_secret_access_key"]))
 					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
 			},
 		},
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
 				testCredentialsRequestWithDeletionTimestamp(t),
 				testAWSCredsSecret("kube-system", "aws-creds", "akeyid", "secretaccess"),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
@@ -274,7 +289,6 @@ const (
 	testNamespace           = "myproject"
 	testClusterName         = "testcluster"
 	testClusterID           = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
-	secretNamespace         = "openshift-image-registry"
 	testSecretName          = "test-secret"
 	testSecretNamespace     = "myproject"
 	testAWSUser             = "mycluster-test-aws-user"
@@ -342,6 +356,14 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 		},
 		Status: minterv1.CredentialsRequestStatus{
 			ProviderStatus: awsStatus,
+		},
+	}
+}
+
+func createTestNamespace(namespace string) *corev1.Namespace {
+	return &corev1.Namespace{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: namespace,
 		},
 	}
 }
