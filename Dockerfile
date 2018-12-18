@@ -1,3 +1,7 @@
+#
+# Dockerfile for building local images.
+#
+
 # Build the manager binary
 FROM registry.svc.ci.openshift.org/openshift/release:golang-1.10 as builder
 
@@ -6,6 +10,10 @@ WORKDIR /go/src/github.com/openshift/cred-minter
 COPY pkg/    pkg/
 COPY cmd/    cmd/
 COPY vendor/ vendor/
+
+# Install gomock and mockgen for the mocks used in unit tests
+RUN go get -u github.com/golang/mock/gomock
+RUN go get -u github.com/golang/mock/mockgen
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/openshift/cred-minter/cmd/manager
