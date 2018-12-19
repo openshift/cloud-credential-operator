@@ -86,9 +86,12 @@ func (a *AWSActuator) decodeProviderStatus(cr *minterv1.CredentialsRequest) (*mi
 	return awsStatus, nil
 }
 
-// Checks if the credentials currently exists. Returns true if the user exists, which implies a
-// call to Update rather than Create. Update will handle whether or not the activation key exists
-// and is still valid.
+// Checks if the credentials currently exist.
+//
+// To do this we will check if the target secret exists. This call is only used to determine
+// if we're doing a Create or an Update, but in the context of this acutator it makes no
+// difference. As such we will not check if the user exists in AWS and is correctly configured
+// as this will all be handled in both Create and Update.
 func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
 	logger := a.getLogger(cr)
 	logger.Debug("running Exists")
@@ -101,41 +104,53 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 		logger.Debug("username unset")
 		return false, nil
 	}
-	// TODO: should we check for the secret here as well? if so we need to watch out for user existing in create
 
-	awsClient, err := a.buildAWSClient(cr, awsStatus)
+	existingSecret := &corev1.Secret{}
+	err = a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Debug("target secret does not exist")
+			return false, nil
+		}
 		return false, err
 	}
 
-	// Check if the user already exists:
-	_, err = awsClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case iam.ErrCodeNoSuchEntityException:
-				logger.Info("user does not exist")
-				return false, nil
-			default:
-				return false, formatAWSErr(aerr)
-			}
-		} else {
-			return false, fmt.Errorf("unknown error getting user from AWS: %v", err)
-		}
-	}
-
+	logger.Debug("target secret exists")
 	return true, nil
+
 }
 
 // Create the credentials.
 func (a *AWSActuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return a.sync(ctx, cr)
+}
+
+// Update the credentials to the provided definition.
+func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return a.sync(ctx, cr)
+}
+
+// sync handles both create and update idempotently.
+func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	logger := a.getLogger(cr)
-	logger.Debug("running Create")
+	logger.Debug("running sync")
+	awsSpec := &minterv1.AWSProviderSpec{}
 	var err error
+	if cr.Spec.ProviderSpec != nil {
+		awsSpec, err = a.Codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
+		if err != nil {
+			logger.WithError(err).Error("error decoding provider spec")
+			return fmt.Errorf("error decoding provider spec: %v", err)
+		}
+	} else {
+		return fmt.Errorf("no providerSpec defined")
+	}
+
 	awsStatus, err := a.decodeProviderStatus(cr)
 	if err != nil {
 		return err
 	}
+
 	// Generate a randomized User for the credentials:
 	// TODO: check if the generated name is free
 	if awsStatus.User == "" {
@@ -163,43 +178,29 @@ func (a *AWSActuator) Create(ctx context.Context, cr *minterv1.CredentialsReques
 		return err
 	}
 
-	err = a.createUser(logger, awsClient, awsStatus.User)
+	// Check if the user already exists:
+	_, err = awsClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
-		logger.Error("a")
-		return err
-	}
-	logger.Info("b")
-
-	return a.Update(ctx, cr)
-
-}
-
-// Update the credentials to the provided definition.
-func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) error {
-	logger := a.getLogger(cr)
-	logger.Debug("running Update")
-	awsSpec := &minterv1.AWSProviderSpec{}
-	var err error
-	if cr.Spec.ProviderSpec != nil {
-		awsSpec, err = a.Codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
-		if err != nil {
-			logger.WithError(err).Error("error decoding provider spec")
-			return fmt.Errorf("error decoding provider spec: %v", err)
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case iam.ErrCodeNoSuchEntityException:
+				logger.WithField("userName", awsStatus.User).Debug("user does not exist, creating")
+				err = a.createUser(logger, awsClient, awsStatus.User)
+				if err != nil {
+					return err
+				}
+				logger.WithField("userName", awsStatus.User).Info("user created successfully")
+			default:
+				return formatAWSErr(aerr)
+			}
+		} else {
+			return fmt.Errorf("unknown error getting user from AWS: %v", err)
 		}
 	} else {
-		return fmt.Errorf("no providerSpec defined")
-	}
-
-	awsStatus, err := a.decodeProviderStatus(cr)
-	if err != nil {
-		return err
+		logger.WithField("userName", awsStatus.User).Info("user exists")
 	}
 
 	existingSecret, existingAccessKeyID := a.loadExistingSecret(cr)
-	awsClient, err := a.buildAWSClient(cr, awsStatus)
-	if err != nil {
-		return err
-	}
 	// TODO: check if user policy needs to be set? user generation and last set time.
 	err = a.setUserPolicy(logger, awsClient, awsSpec.StatementEntries, awsStatus)
 	if err != nil {
