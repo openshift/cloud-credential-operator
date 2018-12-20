@@ -514,15 +514,23 @@ func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Cli
 		UserName: aws.String(username),
 	}
 
-	logger.WithField("userName", username).Info("creating user")
+	uLog := logger.WithField("userName", username)
+	uLog.Info("creating user")
 	_, err := awsClient.CreateUser(input)
+
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
-			err = formatAWSErr(aerr)
-			log.WithError(err).Errorf("AWS error creating user")
-			return err
+			switch aerr.Code() {
+			case iam.ErrCodeEntityAlreadyExistsException:
+				uLog.Warn("user already exist")
+				return nil
+			default:
+				err = formatAWSErr(aerr)
+				uLog.WithError(err).Errorf("AWS error creating user")
+				return err
+			}
 		}
-		log.WithError(err).Errorf("unknown error creating user in AWS")
+		uLog.WithError(err).Errorf("unknown error creating user in AWS")
 		return fmt.Errorf("unknown error creating user in AWS: %v", err)
 	}
 
