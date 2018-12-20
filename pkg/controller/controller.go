@@ -17,16 +17,32 @@ limitations under the License.
 package controller
 
 import (
+	awsactuator "github.com/openshift/cred-minter/pkg/aws/actuator"
+	"github.com/openshift/cred-minter/pkg/controller/credentialsrequest/actuator"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // AddToManagerFuncs is a list of functions to add all Controllers to the Manager
 var AddToManagerFuncs []func(manager.Manager) error
 
+// AddToManagerWithActuatorFuncs is a list of functions to add all Controllers with Actuators to the Manager
+var AddToManagerWithActuatorFuncs []func(manager.Manager, actuator.Actuator) error
+
 // AddToManager adds all Controllers to the Manager
 func AddToManager(m manager.Manager) error {
 	for _, f := range AddToManagerFuncs {
 		if err := f(m); err != nil {
+			return err
+		}
+	}
+	for _, f := range AddToManagerWithActuatorFuncs {
+		// TODO: cleanup hard coded AWS instantiation here:
+		awsActuator, err := awsactuator.NewAWSActuator(m.GetClient(), scheme.Scheme)
+		if err != nil {
+			return err
+		}
+		if err := f(m, awsActuator); err != nil {
 			return err
 		}
 	}
