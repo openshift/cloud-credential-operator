@@ -49,6 +49,7 @@ const (
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 
+// AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
 	Client           client.Client
 	Codec            *minterv1.AWSProviderCodec
@@ -56,6 +57,7 @@ type AWSActuator struct {
 	Scheme           *runtime.Scheme
 }
 
+// NewAWSActuator creates a new AWSActuator.
 func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
