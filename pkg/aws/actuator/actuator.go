@@ -202,7 +202,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 
 	existingSecret, existingAccessKeyID := a.loadExistingSecret(cr)
 	// TODO: check if user policy needs to be set? user generation and last set time.
-	err = a.setUserPolicy(logger, awsClient, awsSpec.StatementEntries, awsStatus)
+	userPolicy, err := a.setUserPolicy(logger, awsClient, awsSpec.StatementEntries, awsStatus)
 	if err != nil {
 		return err
 	}
@@ -221,6 +221,15 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 	logger.WithField("accessKeyID", existingAccessKeyID).Debugf("access key exists? %v", accessKeyExists)
+
+	secretMissingPolicyAnnotation := false
+	if existingSecret != nil {
+		_, secretMissingPolicyAnnotation = existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied]
+		if secretMissingPolicyAnnotation {
+			logger.Warnf("target secret missing policy annotation: %s, new access key will be generated", minterv1.AnnotationAWSPolicyLastApplied)
+		}
+	}
+
 	genNewAccessKey := existingSecret == nil || existingSecret.Name == "" || existingAccessKeyID == "" || !accessKeyExists
 	if genNewAccessKey {
 		logger.Info("generating new AWS access key")
@@ -241,7 +250,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 
 	if accessKey != nil {
-		err := a.syncAccessKeySecret(cr, accessKey, existingSecret, logger)
+		err := a.syncAccessKeySecret(cr, accessKey, existingSecret, userPolicy, logger)
 		if err != nil {
 			log.WithError(err).Error("error saving access key to secret")
 			return err
@@ -375,7 +384,7 @@ func (a *AWSActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger
 	})
 }
 
-func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -390,7 +399,8 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 				Name:      cr.Spec.SecretRef.Name,
 				Namespace: cr.Spec.SecretRef.Namespace,
 				Annotations: map[string]string{
-					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+					minterv1.AnnotationCredentialsRequest:   fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+					minterv1.AnnotationAWSPolicyLastApplied: userPolicy,
 				},
 			},
 			Data: map[string][]byte{
@@ -419,6 +429,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 		existingSecret.Annotations = map[string]string{}
 	}
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+	existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied] = userPolicy
 	existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
 	existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
 	// Ensure secrets are "owned" by the credentials request that created or adopted them:
@@ -435,7 +446,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	return nil
 }
 
-func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.Client, entries []minterv1.StatementEntry, awsStatus *minterv1.AWSProviderStatus) error {
+func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.Client, entries []minterv1.StatementEntry, awsStatus *minterv1.AWSProviderStatus) (string, error) {
 	policyName := getPolicyName(awsStatus)
 
 	policyDoc := PolicyDocument{
@@ -450,10 +461,11 @@ func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.
 		})
 	}
 	b, err := json.Marshal(&policyDoc)
+	userPolicy := string(b)
 	if err != nil {
-		return fmt.Errorf("error marshalling policy: %v", err)
+		return "", fmt.Errorf("error marshalling policy: %v", err)
 	}
-	logger.Debugf("policy doc: %s", string(b))
+	logger.Debugf("policy doc: %s", userPolicy)
 
 	// This call appears to be idempotent:
 	_, err = awsClient.PutUserPolicy(&iam.PutUserPolicyInput{
@@ -463,12 +475,12 @@ func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
-			return formatAWSErr(aerr)
+			return "", formatAWSErr(aerr)
 		}
-		return fmt.Errorf("unknown error setting user policy in AWS: %v", err)
+		return "", fmt.Errorf("unknown error setting user policy in AWS: %v", err)
 	}
 
-	return nil
+	return userPolicy, nil
 }
 
 func (a *AWSActuator) accessKeyExists(logger log.FieldLogger, allUserKeys *iam.ListAccessKeysOutput, existingAccessKey string) (bool, error) {
