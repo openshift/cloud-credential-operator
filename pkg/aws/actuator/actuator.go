@@ -19,6 +19,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -43,8 +44,10 @@ import (
 )
 
 const (
-	awsCredsNamespace = "kube-system"
-	awsCredsSecret    = "aws-creds"
+	rootAWSCredsSecretNamespace = "kube-system"
+	rootAWSCredsSecret          = "aws-creds"
+	roAWSCredsSecretNamespace   = "openshift-cred-minter"
+	roAWSCredsSecret            = "cred-minter-iam-ro-creds"
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
@@ -173,13 +176,18 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	}
 
-	awsClient, err := a.buildAWSClient(cr, awsStatus)
+	awsClient, err := a.buildRootAWSClient(cr)
+	if err != nil {
+		return err
+	}
+
+	awsReadClient, err := a.buildReadAWSClient(cr)
 	if err != nil {
 		return err
 	}
 
 	// Check if the user already exists:
-	_, err = awsClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
+	_, err = awsReadClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -200,19 +208,34 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.WithField("userName", awsStatus.User).Info("user exists")
 	}
 
-	existingSecret, existingAccessKeyID := a.loadExistingSecret(cr)
 	// TODO: check if user policy needs to be set? user generation and last set time.
-	userPolicy, err := a.setUserPolicy(logger, awsClient, awsSpec.StatementEntries, awsStatus)
+	desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries)
 	if err != nil {
 		return err
 	}
-	logger.Info("successfully set user policy")
+	currentUserPolicy, err := a.getCurrentUserPolicy(logger, awsReadClient, awsStatus.User)
+	if err != nil {
+		return err
+	}
+	logger.Debugf("desired user policy: %s", desiredUserPolicy)
+	logger.Debugf("current user policy: %s", currentUserPolicy)
+	if currentUserPolicy != desiredUserPolicy {
+		err = a.setUserPolicy(logger, awsClient, awsStatus.User, desiredUserPolicy)
+		if err != nil {
+			return err
+		}
+		logger.Info("successfully set user policy")
+	} else {
+		logger.Debug("no changes to user policy")
+	}
 
-	allUserKeys, err := awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
+	allUserKeys, err := awsReadClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		logger.WithError(err).Error("error listing all access keys for user")
 		return err
 	}
+
+	existingSecret, existingAccessKeyID := a.loadExistingSecret(cr)
 
 	var accessKey *iam.AccessKey
 	// TODO: also check if the access key ID on the request is still valid in AWS
@@ -248,7 +271,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	}
 
-	err = a.syncAccessKeySecret(cr, accessKey, existingSecret, userPolicy, logger)
+	err = a.syncAccessKeySecret(cr, accessKey, existingSecret, desiredUserPolicy, logger)
 	if err != nil {
 		log.WithError(err).Error("error saving access key to secret")
 		return err
@@ -274,13 +297,13 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 
 	logger.Info("deleting credential from AWS")
 
-	awsClient, err := a.buildAWSClient(cr, awsStatus)
+	awsClient, err := a.buildRootAWSClient(cr)
 	if err != nil {
 		return err
 	}
 	_, err = awsClient.DeleteUserPolicy(&iam.DeleteUserPolicyInput{
 		UserName:   aws.String(awsStatus.User),
-		PolicyName: aws.String(getPolicyName(awsStatus)),
+		PolicyName: aws.String(getPolicyName(awsStatus.User)),
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -353,18 +376,48 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	return existingSecret, existingAccessKeyID
 }
 
-func (a *AWSActuator) buildAWSClient(cr *minterv1.CredentialsRequest, awsStatus *minterv1.AWSProviderStatus) (minteraws.Client, error) {
-	logger := a.getLogger(cr)
+// buildRootAWSClient will return an AWS client using the "root" AWS creds which are expected to
+// live in kube-system/aws-creds.
+func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
+	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret))
 
 	logger.Debug("loading AWS credentials from secret")
 	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 	// cluster, we need to load different secrets for each cluster.
-	accessKeyID, secretAccessKey, err := minteraws.LoadCredsFromSecret(a.Client, awsCredsNamespace, awsCredsSecret)
+	accessKeyID, secretAccessKey, err := minteraws.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 	if err != nil {
 		return nil, err
 	}
 
-	logger.Debug("creating AWS client")
+	logger.Debug("creating root AWS client")
+	return a.AWSClientBuilder(accessKeyID, secretAccessKey)
+}
+
+// buildReadAWSCreds will return an AWS client using the the scaled down read only AWS creds
+// for cred minter, which are expected to live in openshift-cred-minter/cred-minter-iam-ro-creds.
+// These creds would normally be created by cred minter itself, via a CredentialsRequest created
+// by the cred minter operator.
+//
+// If these are not available but root creds are, we will use the root creds instead.
+// This allows us to create the read creds initially.
+func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
+	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", roAWSCredsSecretNamespace, roAWSCredsSecret))
+	logger.Debug("loading AWS credentials from secret")
+	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
+	// cluster, we need to load different secrets for each cluster.
+	accessKeyID, secretAccessKey, err := minteraws.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Warn("read-only creds not found, checking if root creds exist")
+			accessKeyID, secretAccessKey, err = minteraws.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+			if err != nil {
+				// We've failed to find either set of creds for this client.
+				return nil, err
+			}
+		}
+	}
+
+	logger.Debug("creating read AWS client")
 	return a.AWSClientBuilder(accessKeyID, secretAccessKey)
 }
 
@@ -386,14 +439,6 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 			return fmt.Errorf("new access key secret needed but no key data provided")
 		}
 		sLog.Info("creating secret")
-		/*
-			b64AccessKeyID := base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId))
-			b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
-			sLog.WithFields(log.Fields{
-				"accessKeyID":             *accessKey.AccessKeyId,
-				"base64EncoedAccessKeyID": b64AccessKeyID,
-			}).Debug("encoded access key")
-		*/
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.SecretRef.Name,
@@ -424,7 +469,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	}
 
 	// Update the existing secret:
-	sLog.Info("updating secret")
+	sLog.Debug("updating secret")
 	origSecret := existingSecret.DeepCopy()
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
@@ -455,8 +500,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	return nil
 }
 
-func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.Client, entries []minterv1.StatementEntry, awsStatus *minterv1.AWSProviderStatus) (string, error) {
-	policyName := getPolicyName(awsStatus)
+func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry) (string, error) {
 
 	policyDoc := PolicyDocument{
 		Version:   "2012-10-17",
@@ -470,26 +514,60 @@ func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.
 		})
 	}
 	b, err := json.Marshal(&policyDoc)
-	userPolicy := string(b)
 	if err != nil {
-		return "", fmt.Errorf("error marshalling policy: %v", err)
+		return "", fmt.Errorf("error marshalling user policy: %v", err)
 	}
-	logger.Debugf("policy doc: %s", userPolicy)
+	return string(b), nil
+}
+
+func (a *AWSActuator) getCurrentUserPolicy(logger log.FieldLogger, awsReadClient minteraws.Client, userName string) (string, error) {
+	cupOut, err := awsReadClient.GetUserPolicy(&iam.GetUserPolicyInput{
+		UserName:   aws.String(userName),
+		PolicyName: aws.String(getPolicyName(userName)),
+	})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case iam.ErrCodeNoSuchEntityException:
+				logger.Warn("policy does not exist, creating")
+				// Policy doesn't exist, it needs to be created so we will just return empty string.
+				// This will not match the desired policy triggering an update.
+				return "", nil
+			default:
+				err = formatAWSErr(aerr)
+				logger.WithError(err).Errorf("AWS error getting user policy")
+				return "", err
+			}
+		} else {
+			logger.WithError(err).Error("error getting current user policy")
+			return "", err
+		}
+	}
+	urlEncoded := *cupOut.PolicyDocument
+	currentUserPolicy, err := url.QueryUnescape(urlEncoded)
+	if err != nil {
+		logger.WithError(err).Error("error URL decoding policy doc")
+	}
+	return currentUserPolicy, err
+}
+
+func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.Client, userName, userPolicy string) error {
+	policyName := getPolicyName(userName)
 
 	// This call appears to be idempotent:
-	_, err = awsClient.PutUserPolicy(&iam.PutUserPolicyInput{
-		UserName:       aws.String(awsStatus.User),
-		PolicyDocument: aws.String(string(b)),
+	_, err := awsClient.PutUserPolicy(&iam.PutUserPolicyInput{
+		UserName:       aws.String(userName),
+		PolicyDocument: aws.String(userPolicy),
 		PolicyName:     aws.String(policyName),
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
-			return "", formatAWSErr(aerr)
+			return formatAWSErr(aerr)
 		}
-		return "", fmt.Errorf("unknown error setting user policy in AWS: %v", err)
+		return fmt.Errorf("unknown error setting user policy in AWS: %v", err)
 	}
 
-	return userPolicy, nil
+	return nil
 }
 
 func (a *AWSActuator) accessKeyExists(logger log.FieldLogger, allUserKeys *iam.ListAccessKeysOutput, existingAccessKey string) (bool, error) {
@@ -560,6 +638,7 @@ func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Cli
 		uLog.WithError(err).Errorf("unknown error creating user in AWS")
 		return fmt.Errorf("unknown error creating user in AWS: %v", err)
 	}
+	uLog.Debug("user created successfully")
 
 	return nil
 }
@@ -581,9 +660,9 @@ func formatAWSErr(aerr awserr.Error) error {
 	}
 }
 
-func getPolicyName(awsStatus *minterv1.AWSProviderStatus) string {
+func getPolicyName(userName string) string {
 	// TODO: watchout for length here, we're not calculating this in the limits yet
-	return awsStatus.User + "-policy"
+	return userName + "-policy"
 }
 
 // PolicyDocument is a simple type used to serialize to AWS' PolicyDocument format.
