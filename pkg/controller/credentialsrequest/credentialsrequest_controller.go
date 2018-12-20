@@ -24,12 +24,11 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
-	ccaws "github.com/openshift/cred-minter/pkg/aws"
+	"github.com/openshift/cred-minter/pkg/controller/credentialsrequest/actuator"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/tools/cache"
@@ -44,18 +43,18 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Add creates a new CredentialsRequest Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
-// and Start it when the Manager is Started.
-func Add(mgr manager.Manager) error {
-	return add(mgr, newReconciler(mgr))
+// Add creates a new CredentialsRequest Controller and adds it to the Manager with
+// default RBAC. The Manager will set fields on the Controller and Start it when
+// the Manager is Started.
+func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator) error {
+	return add(mgr, newReconciler(mgr, actuator))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, actuator actuator.Actuator) reconcile.Reconciler {
 	return &ReconcileCredentialsRequest{
-		Client:           mgr.GetClient(),
-		scheme:           mgr.GetScheme(),
-		awsClientBuilder: ccaws.NewClient,
+		Client:   mgr.GetClient(),
+		Actuator: actuator,
 	}
 }
 
@@ -142,19 +141,18 @@ var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
 // ReconcileCredentialsRequest reconciles a CredentialsRequest object
 type ReconcileCredentialsRequest struct {
 	client.Client
-	scheme           *runtime.Scheme
-	awsClientBuilder func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error)
+	Actuator actuator.Actuator
 }
 
-// Reconcile reads that state of the cluster for a CredentialsRequest object and makes changes based on the state read
-// and what is in the CredentialsRequest.Spec
-// Automatically generate RBAC rules to allow the Controller to read and write Deployments
+// Reconcile reads that state of the cluster for a CredentialsRequest object and
+// makes changes based on the state read and what is in the CredentialsRequest.Spec
+// Automatically generate RBAC rules to allow the Controller to read and write required types.
 // +kubebuilder:rbac:groups=credminter.openshift.io,resources=credentialsrequests;credentialsrequests/status;credentialsrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithFields(
 		log.Fields{
-			"controller": "credentialsrequest",
+			"controller": "credreq",
 			"cr":         fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
 		})
 	logger.Info("syncing credentials request")
@@ -172,25 +170,52 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	origCR := cr
 	cr = cr.DeepCopy()
 
-	if !HasFinalizer(cr, minterv1.FinalizerDeprovision) {
-		logger.Info("no finalizer")
-		if cr.DeletionTimestamp == nil {
-			// Ensure the finalizer is set on any not-deleted requests:
-			logger.Info("adding deprovision finalizer")
-			err = r.addDeprovisionFinalizer(cr)
-			return reconcile.Result{}, err
+	// Handle deletion and the deprovision finalizer:
+	if cr.DeletionTimestamp != nil {
+		if HasFinalizer(cr, minterv1.FinalizerDeprovision) {
+			err = r.Actuator.Delete(context.TODO(), cr)
+			if err != nil {
+				logger.WithError(err).Error("actuator error deleting credentials exist")
+				return reconcile.Result{}, err
+			}
+			logger.Info("actuator deletion complete, removing finalizer")
+			err = r.removeDeprovisionFinalizer(cr)
+			if err != nil {
+				logger.WithError(err).Error("error removing deprovision finalizer")
+				return reconcile.Result{}, err
+			}
+			return reconcile.Result{}, nil
 		} else {
-			// If deleted and finalizer is also gone, we can return, nothing for us to do.
 			logger.Info("credentials request deleted and finalizer no longer present, nothing to do")
 			return reconcile.Result{}, nil
 		}
+	} else {
+		if !HasFinalizer(cr, minterv1.FinalizerDeprovision) {
+			// Ensure the finalizer is set on any not-deleted requests:
+			logger.Infof("adding finalizer: %s", minterv1.FinalizerDeprovision)
+			err = r.addDeprovisionFinalizer(cr)
+			return reconcile.Result{}, err
+		}
 	}
 
-	// TODO: replace with actuator call:
-	err = r.reconcileAWS(cr, logger)
+	// Hand over to the actuator:
+	exists, err := r.Actuator.Exists(context.TODO(), cr)
 	if err != nil {
-		logger.WithError(err).Error("error reconciling AWS credentials")
+		logger.WithError(err).Error("actuator error checking if credentials exist")
 		return reconcile.Result{}, err
+	}
+	if !exists {
+		err = r.Actuator.Create(context.TODO(), cr)
+		if err != nil {
+			logger.WithError(err).Error("actuator error creating credentials")
+			return reconcile.Result{}, err
+		}
+	} else {
+		err = r.Actuator.Update(context.TODO(), cr)
+		if err != nil {
+			logger.WithError(err).Error("actuator error updating credentials")
+			return reconcile.Result{}, err
+		}
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
