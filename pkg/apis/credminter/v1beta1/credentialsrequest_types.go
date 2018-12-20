@@ -31,6 +31,11 @@ const (
 	// The annotation value will map back to the namespace/name of the CredentialsRequest that created
 	// or adopted the secret.
 	AnnotationCredentialsRequest string = "credminter.openshift.io/credentials-request"
+
+	// AnnotationAWSPolicyLastApplied is added to target Secrets indicating the last AWS policy
+	// we successfully applied. It is used to compare if changes are necessary, without requiring
+	// AWS credentials to view the actual state.
+	AnnotationAWSPolicyLastApplied string = "credminter.openshift.io/aws-policy-last-applied"
 )
 
 // NOTE: Run "make" to regenerate code after modifying this file
