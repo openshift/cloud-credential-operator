@@ -20,6 +20,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -222,11 +223,10 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 	logger.WithField("accessKeyID", existingAccessKeyID).Debugf("access key exists? %v", accessKeyExists)
 
-	secretMissingPolicyAnnotation := false
 	if existingSecret != nil {
-		_, secretMissingPolicyAnnotation = existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied]
-		if secretMissingPolicyAnnotation {
-			logger.Warnf("target secret missing policy annotation: %s, new access key will be generated", minterv1.AnnotationAWSPolicyLastApplied)
+		_, ok := existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied]
+		if !ok {
+			logger.Warnf("target secret missing policy annotation: %s", minterv1.AnnotationAWSPolicyLastApplied)
 		}
 	}
 
@@ -249,12 +249,10 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	}
 
-	if accessKey != nil {
-		err := a.syncAccessKeySecret(cr, accessKey, existingSecret, userPolicy, logger)
-		if err != nil {
-			log.WithError(err).Error("error saving access key to secret")
-			return err
-		}
+	err = a.syncAccessKeySecret(cr, accessKey, existingSecret, userPolicy, logger)
+	if err != nil {
+		log.WithError(err).Error("error saving access key to secret")
+		return err
 	}
 
 	return nil
@@ -391,6 +389,9 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	})
 
 	if existingSecret == nil || existingSecret.Name == "" {
+		if accessKey == nil {
+			return fmt.Errorf("new access key secret needed but no key data provided")
+		}
 		sLog.Info("creating secret")
 		b64AccessKeyID := base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId))
 		b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
@@ -424,23 +425,32 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	}
 
 	// Update the existing secret:
-	logger.Info("updating secret: %v", existingSecret)
+	sLog.Info("updating secret")
+	origSecret := existingSecret.DeepCopy()
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
 	}
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied] = userPolicy
-	existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
-	existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
+	if accessKey != nil {
+		existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
+		existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
+	}
 	// Ensure secrets are "owned" by the credentials request that created or adopted them:
 	if err := controllerutil.SetControllerReference(cr, existingSecret, a.Scheme); err != nil {
-		logger.WithError(err).Error("error setting controller reference on secret")
+		sLog.WithError(err).Error("error setting controller reference on secret")
 		return err
 	}
-	err := a.Client.Update(context.TODO(), existingSecret)
-	if err != nil {
-		logger.WithError(err).Error("error updating secret")
-		return err
+
+	if !reflect.DeepEqual(existingSecret, origSecret) {
+		sLog.Info("target secret has changed, updating")
+		err := a.Client.Update(context.TODO(), existingSecret)
+		if err != nil {
+			sLog.WithError(err).Error("error updating secret")
+			return err
+		}
+	} else {
+		sLog.Debug("target secret unchanged")
 	}
 
 	return nil
@@ -573,6 +583,7 @@ func formatAWSErr(aerr awserr.Error) error {
 }
 
 func getPolicyName(awsStatus *minterv1.AWSProviderStatus) string {
+	// TODO: watchout for length here, we're not calculating this in the limits yet
 	return awsStatus.User + "-policy"
 }
 
