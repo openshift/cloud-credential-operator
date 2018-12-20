@@ -17,7 +17,6 @@ package actuator
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"reflect"
@@ -223,7 +222,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 	logger.WithField("accessKeyID", existingAccessKeyID).Debugf("access key exists? %v", accessKeyExists)
 
-	if existingSecret != nil {
+	if existingSecret != nil && existingSecret.Name != "" {
 		_, ok := existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied]
 		if !ok {
 			logger.Warnf("target secret missing policy annotation: %s", minterv1.AnnotationAWSPolicyLastApplied)
@@ -345,15 +344,9 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 			// Warn, but this will trigger generation of a new key and updating the secret.
 			logger.Warning("secret did not have expected key: aws_access_key_id, will be regenerated")
 		} else {
-			decoded, err := base64.StdEncoding.DecodeString(string(keyBytes))
-			if err != nil {
-				logger.WithError(err).WithFields(log.Fields{
-					"secret":    fmt.Sprintf("%s/%s", existingSecret.Namespace, existingSecret.Name),
-					"secretKey": "aws_access_key_id"}).Warning("error decoding secret property, regenerating")
-			} else {
-				existingAccessKeyID = string(decoded)
-				logger.WithField("accessKeyID", existingAccessKeyID).Debug("found access key ID in target secret")
-			}
+			decoded := string(keyBytes)
+			existingAccessKeyID = string(decoded)
+			logger.WithField("accessKeyID", existingAccessKeyID).Debug("found access key ID in target secret")
 
 		}
 	}
@@ -393,8 +386,14 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 			return fmt.Errorf("new access key secret needed but no key data provided")
 		}
 		sLog.Info("creating secret")
-		b64AccessKeyID := base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId))
-		b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
+		/*
+			b64AccessKeyID := base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId))
+			b64SecretAccessKey := base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey))
+			sLog.WithFields(log.Fields{
+				"accessKeyID":             *accessKey.AccessKeyId,
+				"base64EncoedAccessKeyID": b64AccessKeyID,
+			}).Debug("encoded access key")
+		*/
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.SecretRef.Name,
@@ -405,8 +404,8 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 				},
 			},
 			Data: map[string][]byte{
-				"aws_access_key_id":     []byte(b64AccessKeyID),
-				"aws_secret_access_key": []byte(b64SecretAccessKey),
+				"aws_access_key_id":     []byte(*accessKey.AccessKeyId),
+				"aws_secret_access_key": []byte(*accessKey.SecretAccessKey),
 			},
 		}
 		// Ensure secrets are "owned" by the credentials request that created or adopted them:
@@ -433,8 +432,8 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied] = userPolicy
 	if accessKey != nil {
-		existingSecret.Data["aws_access_key_id"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.AccessKeyId)))
-		existingSecret.Data["aws_secret_access_key"] = []byte(base64.StdEncoding.EncodeToString([]byte(*accessKey.SecretAccessKey)))
+		existingSecret.Data["aws_access_key_id"] = []byte(*accessKey.AccessKeyId)
+		existingSecret.Data["aws_secret_access_key"] = []byte(*accessKey.SecretAccessKey)
 	}
 	// Ensure secrets are "owned" by the credentials request that created or adopted them:
 	if err := controllerutil.SetControllerReference(cr, existingSecret, a.Scheme); err != nil {
