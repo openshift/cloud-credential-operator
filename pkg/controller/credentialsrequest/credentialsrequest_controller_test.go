@@ -142,6 +142,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			// This tests the case where we create our own read only creds initially:
 			name: "new credential no read-only creds available",
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
@@ -172,11 +173,73 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "cred exists",
+			// This indicates an error state.
+			name: "new credential no root creds available",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockCreateUser(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				// These calls should defer to the root AWS client because we have no ro creds:
+				mockGetUserNotFound(mockAWSClient)
+				mockGetUserPolicyMissing(mockAWSClient)
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "cred and secret exist",
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "cred and secret exist no root creds",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
 				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},

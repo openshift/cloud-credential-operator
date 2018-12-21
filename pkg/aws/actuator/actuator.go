@@ -176,24 +176,27 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	}
 
-	awsClient, err := a.buildRootAWSClient(cr)
+	rootAWSClient, err := a.buildRootAWSClient(cr)
 	if err != nil {
-		return err
+		logger.WithError(err).Warn("error building root AWS client, will error if one must be used")
 	}
 
-	awsReadClient, err := a.buildReadAWSClient(cr)
+	readAWSClient, err := a.buildReadAWSClient(cr)
 	if err != nil {
 		return err
 	}
 
 	// Check if the user already exists:
-	_, err = awsReadClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
+	_, err = readAWSClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case iam.ErrCodeNoSuchEntityException:
 				logger.WithField("userName", awsStatus.User).Debug("user does not exist, creating")
-				err = a.createUser(logger, awsClient, awsStatus.User)
+				if rootAWSClient == nil {
+					return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+				}
+				err = a.createUser(logger, rootAWSClient, awsStatus.User)
 				if err != nil {
 					return err
 				}
@@ -213,14 +216,17 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	if err != nil {
 		return err
 	}
-	currentUserPolicy, err := a.getCurrentUserPolicy(logger, awsReadClient, awsStatus.User)
+	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User)
 	if err != nil {
 		return err
 	}
 	logger.Debugf("desired user policy: %s", desiredUserPolicy)
 	logger.Debugf("current user policy: %s", currentUserPolicy)
 	if currentUserPolicy != desiredUserPolicy {
-		err = a.setUserPolicy(logger, awsClient, awsStatus.User, desiredUserPolicy)
+		if rootAWSClient == nil {
+			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+		}
+		err = a.setUserPolicy(logger, rootAWSClient, awsStatus.User, desiredUserPolicy)
 		if err != nil {
 			return err
 		}
@@ -229,7 +235,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("no changes to user policy")
 	}
 
-	allUserKeys, err := awsReadClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
+	allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		logger.WithError(err).Error("error listing all access keys for user")
 		return err
@@ -259,12 +265,15 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		// Users are allowed a max of two keys, if we decided we need to generate one,
 		// we should cleanup all pre-existing access keys. This will allow deleting the
 		// secret in Kubernetes to revoke old credentials and create new.
-		err := a.deleteAllAccessKeys(logger, awsClient, awsStatus.User, allUserKeys)
+		if rootAWSClient == nil {
+			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+		}
+		err := a.deleteAllAccessKeys(logger, rootAWSClient, awsStatus.User, allUserKeys)
 		if err != nil {
 			return err
 		}
 
-		accessKey, err = a.createAccessKey(logger, awsClient, awsStatus.User)
+		accessKey, err = a.createAccessKey(logger, rootAWSClient, awsStatus.User)
 		if err != nil {
 			logger.WithError(err).Error("error creating AWS access key")
 			return err
