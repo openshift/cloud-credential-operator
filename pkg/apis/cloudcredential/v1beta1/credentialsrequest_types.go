@@ -42,16 +42,6 @@ const (
 
 // CredentialsRequestSpec defines the desired state of CredentialsRequest
 type CredentialsRequestSpec struct {
-
-	// ClusterName is a user friendly name for the cluster these credentials are to be associated with.
-	// It is used for naming the credential objects in the cloud provider, in conjunction with a random
-	// suffix when necessary.
-	ClusterName string `json:"clusterName"`
-
-	// ClusterID is a unique identifier for the cluster these credentials belong to. Used to ensure
-	// credentials are cleaned up during deprovision.
-	ClusterID string `json:"clusterID"`
-
 	// SecretRef points to the secret where the credentials should be stored once generated.
 	SecretRef corev1.ObjectReference `json:"secretRef"`
 

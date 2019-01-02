@@ -32,6 +32,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	openshiftapiv1 "github.com/openshift/api/config/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -55,6 +57,7 @@ func init() {
 
 func TestCredentialsRequestReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
+	openshiftapiv1.Install(scheme.Scheme)
 
 	// Utility function to get the test credentials request from the fake client
 	getCR := func(c client.Client) *minterv1.CredentialsRequest {
@@ -114,12 +117,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockCreateUser(mockAWSClient)
 				mockPutUserPolicy(mockAWSClient)
 				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				mockTagUser(mockAWSClient)
 				return mockAWSClient
 			},
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -148,12 +153,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockCreateUser(mockAWSClient)
 				mockPutUserPolicy(mockAWSClient)
 				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				mockTagUser(mockAWSClient)
 				// These calls should defer to the root AWS client because we have no ro creds:
 				mockGetUserNotFound(mockAWSClient)
 				mockGetUserPolicyMissing(mockAWSClient)
@@ -179,6 +186,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -198,13 +206,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name: "cred and secret exist",
+			name: "cred and secret exist user tagged",
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -230,12 +239,47 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "cred and secret exist user missing tag",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockTagUser(mockAWSClient)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserUntagged(mockAWSClient)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
 			name: "cred and secret exist no root creds",
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -267,6 +311,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testCredentialsRequest(t),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -302,6 +347,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -337,6 +383,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -475,8 +522,6 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 			Annotations: map[string]string{},
 		},
 		Spec: minterv1.CredentialsRequestSpec{
-			ClusterName:  testClusterName,
-			ClusterID:    testClusterID,
 			SecretRef:    corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
 			ProviderSpec: awsProvSpec,
 		},
@@ -520,10 +565,20 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 				UserName: aws.String(testAWSUser),
 				Tags: []*iam.Tag{
 					{
-						Key:   aws.String("tectonicClusterID"),
-						Value: aws.String("testClusterID"),
+						Key:   aws.String("openshiftClusterID"),
+						Value: aws.String(testClusterID),
 					},
 				},
+			},
+		}, nil)
+}
+
+func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+		&iam.GetUserOutput{
+			User: &iam.User{
+				UserId:   aws.String(testAWSUserID),
+				UserName: aws.String(testAWSUser),
 			},
 		}, nil)
 }
@@ -589,6 +644,19 @@ func mockCreateAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID, secretA
 		}, nil)
 }
 
+func mockTagUser(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().TagUser(
+		&iam.TagUserInput{
+			UserName: aws.String(testAWSUser),
+			Tags: []*iam.Tag{
+				{
+					Key:   aws.String("openshiftClusterID"),
+					Value: aws.String(testClusterID),
+				},
+			},
+		}).Return(&iam.TagUserOutput{}, nil)
+}
+
 func mockDeleteAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID string) {
 	mockAWSClient.EXPECT().DeleteAccessKey(
 		&iam.DeleteAccessKeyInput{
@@ -609,4 +677,15 @@ func mockGetUserPolicy(mockAWSClient *mockaws.MockClient, policyDoc string) {
 
 func mockGetUserPolicyMissing(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUserPolicy(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such policy", nil))
+}
+
+func testClusterVersion() *openshiftapiv1.ClusterVersion {
+	return &openshiftapiv1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "version",
+		},
+		Spec: openshiftapiv1.ClusterVersionSpec{
+			ClusterID: testClusterID,
+		},
+	}
 }

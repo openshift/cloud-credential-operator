@@ -29,6 +29,8 @@ import (
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 
+	openshiftapiv1 "github.com/openshift/api/config/v1"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
@@ -48,6 +50,8 @@ const (
 	rootAWSCredsSecret          = "aws-creds"
 	roAWSCredsSecretNamespace   = "openshift-cloud-credential-operator"
 	roAWSCredsSecret            = "cloud-credential-operator-iam-ro-creds"
+	clusterVersionObjectName    = "version"
+	openshiftClusterIDKey       = "openshiftClusterID"
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
@@ -157,10 +161,12 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	// Generate a randomized User for the credentials:
 	// TODO: check if the generated name is free
 	if awsStatus.User == "" {
-		awsStatus.User = fmt.Sprintf("%s-%s-%s", cr.Spec.ClusterName, cr.Name, utilrand.String(5))
-		if len(awsStatus.User) > 64 {
-			return fmt.Errorf("generated user name is too long for AWS: %s", awsStatus.User)
+
+		username, err := generateUserName(cr.Name)
+		if err != nil {
+			return err
 		}
+		awsStatus.User = username
 		logger.WithField("user", awsStatus.User).Debug("generated random name for AWS user and policy")
 
 		cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(awsStatus)
@@ -169,7 +175,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 			return err
 		}
 
-		err := a.Client.Status().Update(ctx, cr)
+		err = a.Client.Status().Update(ctx, cr)
 		if err != nil {
 			logger.WithError(err).Error("error updating credentials request")
 			return err
@@ -186,8 +192,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
+	clusterUUID, err := a.loadClusterUUID(logger)
+	if err != nil {
+		return err
+	}
+
 	// Check if the user already exists:
-	_, err = readAWSClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
+	userOut, err := readAWSClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -196,11 +207,18 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 				if rootAWSClient == nil {
 					return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 				}
+
 				err = a.createUser(logger, rootAWSClient, awsStatus.User)
 				if err != nil {
 					return err
 				}
 				logger.WithField("userName", awsStatus.User).Info("user created successfully")
+
+				err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID))
+				if err != nil {
+					return err
+				}
+
 			default:
 				return formatAWSErr(aerr)
 			}
@@ -209,6 +227,18 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	} else {
 		logger.WithField("userName", awsStatus.User).Info("user exists")
+	}
+
+	// Check if the user has the expected tags:
+	if userOut != nil && userOut.User != nil && !userHasTag(userOut.User, openshiftClusterIDKey, string(clusterUUID)) {
+		if rootAWSClient == nil {
+			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+		}
+
+		err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID))
+		if err != nil {
+			return err
+		}
 	}
 
 	// TODO: check if user policy needs to be set? user generation and last set time.
@@ -385,6 +415,24 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	return existingSecret, existingAccessKeyID
 }
 
+func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterUUID string) error {
+	logger.WithField("clusterID", clusterUUID).Info("tagging user with cluster UUID")
+	_, err := awsClient.TagUser(&iam.TagUserInput{
+		UserName: aws.String(username),
+		Tags: []*iam.Tag{
+			{
+				Key:   aws.String("openshiftClusterID"),
+				Value: aws.String(clusterUUID),
+			},
+		},
+	})
+	if err != nil {
+		logger.WithError(err).Error("unable to tag user")
+		return err
+	}
+	return nil
+}
+
 // buildRootAWSClient will return an AWS client using the "root" AWS creds which are expected to
 // live in kube-system/aws-creds.
 func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
@@ -435,6 +483,21 @@ func (a *AWSActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger
 		"actuator": "aws",
 		"cr":       fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
+}
+
+func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (openshiftapiv1.ClusterID, error) {
+	logger.Debug("loading cluster version to read clusterID")
+	// TODO: this process will need to change if running this controller in a root hive cluster
+	clusterVer := &openshiftapiv1.ClusterVersion{}
+	err := a.Client.Get(context.Background(),
+		types.NamespacedName{Name: clusterVersionObjectName},
+		clusterVer)
+	if err != nil {
+		logger.WithError(err).Error("error fetching clusterversion object")
+		return "", err
+	}
+	logger.WithField("clusterID", clusterVer.Spec.ClusterID).Debug("found cluster ID")
+	return clusterVer.Spec.ClusterID, nil
 }
 
 func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
@@ -623,6 +686,15 @@ func (a *AWSActuator) createAccessKey(logger log.FieldLogger, awsClient minteraw
 	return accessKeyResult.AccessKey, err
 }
 
+func userHasTag(user *iam.User, key, val string) bool {
+	for _, t := range user.Tags {
+		if *t.Key == key && *t.Value == val {
+			return true
+		}
+	}
+	return false
+}
+
 func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Client, username string) error {
 	input := &iam.CreateUserInput{
 		UserName: aws.String(username),
@@ -646,8 +718,9 @@ func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Cli
 		}
 		uLog.WithError(err).Errorf("unknown error creating user in AWS")
 		return fmt.Errorf("unknown error creating user in AWS: %v", err)
+	} else {
+		uLog.Debug("user created successfully")
 	}
-	uLog.Debug("user created successfully")
 
 	return nil
 }
@@ -669,8 +742,22 @@ func formatAWSErr(aerr awserr.Error) error {
 	}
 }
 
+// generateUserName generates a unique user name for AWS and will truncate the credential name
+// to fit within the AWS limit of 64 chars if necessary.
+func generateUserName(credentialName string) (string, error) {
+	// TODO: it would be nice to include the cluster name in the username, may be added to a openshiftapi type in future. (Infrastructure mentioned)
+	if credentialName == "" {
+		return "", fmt.Errorf("empty credential name")
+	}
+	if len(credentialName) > 58 {
+		credentialName = credentialName[0:58]
+	}
+	return fmt.Sprintf("%s-%s", credentialName, utilrand.String(5)), nil
+}
+
 func getPolicyName(userName string) string {
-	// TODO: watchout for length here, we're not calculating this in the limits yet
+	// User names are limited to 64 chars, but policy names are 128, so appending policy
+	// to user name is safe here.
 	return userName + "-policy"
 }
 
