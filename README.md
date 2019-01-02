@@ -28,12 +28,12 @@ $ make run
 
 # Deploying in cluster
 
- 1. export IMG=quay.io/dgoodwin/cred-minter:latest
+ 1. export IMG=quay.io/dgoodwin/cloud-credential-operator:latest
    * You can upload to a personal repo if you wish to build images from source.
  1. make buildah-push
  1. make deploy
 
-Cred Minter should now be running in openshift-cred-minter.
+Cred Minter should now be running in openshift-cloud-credential-operator.
 
 # Future Work
 

@@ -1,6 +1,6 @@
 
 # Image URL to use all building/pushing image targets
-IMG ?= cred-minter:latest
+IMG ?= cloud-credential-operator:latest
 DOCKER_CMD ?= docker
 
 all: test manager
@@ -11,7 +11,7 @@ test: generate fmt vet manifests
 
 # Build manager binary
 manager: generate fmt vet
-	go build -o bin/manager github.com/openshift/cred-minter/cmd/manager
+	go build -o bin/manager github.com/openshift/cloud-credential-operator/cmd/manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
@@ -29,7 +29,7 @@ deploy: manifests
 # Generate manifests e.g. CRD, RBAC etc.
 manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name cred-minter
+	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name cloud-credential-operator
 
 # Run go fmt against code
 fmt:

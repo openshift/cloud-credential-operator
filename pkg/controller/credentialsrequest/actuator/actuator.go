@@ -17,7 +17,8 @@ package actuator
 
 import (
 	"context"
-	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 )
 
 // Actuator controls credentials on a specific infrastructure. All

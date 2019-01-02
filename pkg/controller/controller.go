@@ -17,8 +17,8 @@ limitations under the License.
 package controller
 
 import (
-	awsactuator "github.com/openshift/cred-minter/pkg/aws/actuator"
-	"github.com/openshift/cred-minter/pkg/controller/credentialsrequest/actuator"
+	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )

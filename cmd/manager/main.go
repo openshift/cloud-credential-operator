@@ -27,8 +27,8 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/openshift/cred-minter/pkg/apis"
-	"github.com/openshift/cred-minter/pkg/controller"
+	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	"github.com/openshift/cloud-credential-operator/pkg/controller"
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
