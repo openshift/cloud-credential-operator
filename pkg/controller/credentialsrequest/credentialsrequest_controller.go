@@ -23,8 +23,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
-	"github.com/openshift/cred-minter/pkg/controller/credentialsrequest/actuator"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// Add creates a new CredentialsRequest Controller and adds it to the Manager with
+// AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
 // default RBAC. The Manager will set fields on the Controller and Start it when
 // the Manager is Started.
 func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator) error {
@@ -202,8 +202,9 @@ type ReconcileCredentialsRequest struct {
 // Reconcile reads that state of the cluster for a CredentialsRequest object and
 // makes changes based on the state read and what is in the CredentialsRequest.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write required types.
-// +kubebuilder:rbac:groups=credminter.openshift.io,resources=credentialsrequests;credentialsrequests/status;credentialsrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests;credentialsrequests/status;credentialsrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithFields(log.Fields{
 		"controller": "credreq",

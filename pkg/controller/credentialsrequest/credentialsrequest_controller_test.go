@@ -36,11 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cred-minter/pkg/apis"
-	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
-	minteraws "github.com/openshift/cred-minter/pkg/aws"
-	"github.com/openshift/cred-minter/pkg/aws/actuator"
-	mockaws "github.com/openshift/cred-minter/pkg/aws/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
+	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
+	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -113,7 +113,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
-				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -178,30 +178,24 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
-				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockCreateUser(mockAWSClient)
-				mockPutUserPolicy(mockAWSClient)
-				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
-				// These calls should defer to the root AWS client because we have no ro creds:
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUserNotFound(mockAWSClient)
-				mockGetUserPolicyMissing(mockAWSClient)
-				mockListAccessKeysEmpty(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				assert.Nil(t, targetSecret)
 				cr := getCR(c)
-				assert.True(t, cr.Status.Provisioned)
+				assert.False(t, cr.Status.Provisioned)
 			},
+			expectErr: true,
 		},
 		{
 			name: "cred and secret exist",
@@ -209,7 +203,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
-				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -240,7 +234,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
-				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -271,7 +265,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
-				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -306,7 +300,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
-				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -341,7 +335,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequestWithDeletionTimestamp(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
-				testAWSCredsSecret("openshift-cred-minter", "cred-minter-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {

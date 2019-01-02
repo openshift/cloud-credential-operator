@@ -3,13 +3,13 @@ kind: Namespace
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: openshift-cred-minter
+  name: openshift-cloud-credential-operator
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: controller-manager-service
-  namespace: openshift-cred-minter
+  namespace: openshift-cloud-credential-operator
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
@@ -23,8 +23,8 @@ spec:
 apiVersion: apps.openshift.io/v1
 kind: DeploymentConfig
 metadata:
-  name: cred-minter
-  namespace: openshift-cred-minter
+  name: cloud-credential-operator
+  namespace: openshift-cloud-credential-operator
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
@@ -53,7 +53,7 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      - image: cred-minter:latest
+      - image: cloud-credential-operator:latest
         imagePullPolicy: Never
         name: manager
         resources:

@@ -1,18 +1,18 @@
-apiVersion: credminter.openshift.io/v1beta1
+apiVersion: cloudcredential.openshift.io/v1beta1
 kind: CredentialsRequest
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: cred-minter-iam-ro
-  namespace: openshift-cred-minter
+  name: cloud-credential-operator-iam-ro
+  namespace: openshift-cloud-credential-operator
 spec:
   clusterName: mycluster
   clusterID: 97216809-bff7-4ea8-b07e-3dec2a0aa4d4
   secretRef:
-    name: cred-minter-iam-ro-creds
-    namespace: openshift-cred-minter
+    name: cloud-credential-operator-iam-ro-creds
+    namespace: openshift-cloud-credential-operator
   providerSpec:
-    apiVersion: credminter.openshift.io/v1beta1
+    apiVersion: cloudcredential.openshift.io/v1beta1
     kind: AWSProviderSpec
     statementEntries:
     - effect: Allow

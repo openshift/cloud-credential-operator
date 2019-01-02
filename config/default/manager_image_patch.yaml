@@ -1,8 +1,8 @@
 apiVersion: apps.openshift.io/v1
 kind: DeploymentConfig
 metadata:
-  name: cred-minter
-  namespace: openshift-cred-minter
+  name: cloud-credential-operator
+  namespace: openshift-cloud-credential-operator
 spec:
   template:
     spec:
@@ -10,5 +10,5 @@ spec:
       # Change the value of image field below to your controller image URL
       - name: manager
         # TODO something more formal
-        image: quay.io/dgoodwin/cred-minter:latest
+        image: quay.io/dgoodwin/cloud-credential-operator:latest
         imagePullPolicy: Always

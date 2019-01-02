@@ -24,10 +24,10 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
-	ccaws "github.com/openshift/cred-minter/pkg/aws"
-	minteraws "github.com/openshift/cred-minter/pkg/aws"
-	actuatoriface "github.com/openshift/cred-minter/pkg/controller/credentialsrequest/actuator"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
+	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -46,8 +46,8 @@ import (
 const (
 	rootAWSCredsSecretNamespace = "kube-system"
 	rootAWSCredsSecret          = "aws-creds"
-	roAWSCredsSecretNamespace   = "openshift-cred-minter"
-	roAWSCredsSecret            = "cred-minter-iam-ro-creds"
+	roAWSCredsSecretNamespace   = "openshift-cloud-credential-operator"
+	roAWSCredsSecret            = "cloud-credential-operator-iam-ro-creds"
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
@@ -403,7 +403,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 }
 
 // buildReadAWSCreds will return an AWS client using the the scaled down read only AWS creds
-// for cred minter, which are expected to live in openshift-cred-minter/cred-minter-iam-ro-creds.
+// for cred minter, which are expected to live in openshift-cloud-credential-operator/cloud-credential-operator-iam-ro-creds.
 // These creds would normally be created by cred minter itself, via a CredentialsRequest created
 // by the cred minter operator.
 //

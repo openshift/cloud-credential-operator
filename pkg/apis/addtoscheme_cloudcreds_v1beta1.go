@@ -17,7 +17,7 @@ limitations under the License.
 package apis
 
 import (
-	"github.com/openshift/cred-minter/pkg/apis/credminter/v1beta1"
+	"github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 )
 
 func init() {

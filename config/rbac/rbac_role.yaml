@@ -2,10 +2,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   creationTimestamp: null
-  name: cred-minter-role
+  name: cloud-credential-operator-role
 rules:
 - apiGroups:
-  - credminter.openshift.io
+  - cloudcredential.openshift.io
   resources:
   - credentialsrequests
   - credentialsrequests/status
@@ -30,3 +30,11 @@ rules:
   - update
   - patch
   - delete
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
+  - watch

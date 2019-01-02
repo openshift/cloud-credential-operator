@@ -25,17 +25,17 @@ import (
 const (
 	// FinalizerDeprovision is used on CredentialsRequests to ensure we delete the
 	// credentials in AWS before allowing the CredentialsRequest to be deleted in etcd.
-	FinalizerDeprovision string = "credminter.openshift.io/deprovision"
+	FinalizerDeprovision string = "cloudcredential.openshift.io/deprovision"
 
 	// AnnotationCredentialsRequest is used on Secrets created as a target of CredentailsRequests.
 	// The annotation value will map back to the namespace/name of the CredentialsRequest that created
 	// or adopted the secret.
-	AnnotationCredentialsRequest string = "credminter.openshift.io/credentials-request"
+	AnnotationCredentialsRequest string = "cloudcredential.openshift.io/credentials-request"
 
 	// AnnotationAWSPolicyLastApplied is added to target Secrets indicating the last AWS policy
 	// we successfully applied. It is used to compare if changes are necessary, without requiring
 	// AWS credentials to view the actual state.
-	AnnotationAWSPolicyLastApplied string = "credminter.openshift.io/aws-policy-last-applied"
+	AnnotationAWSPolicyLastApplied string = "cloudcredential.openshift.io/aws-policy-last-applied"
 )
 
 // NOTE: Run "make" to regenerate code after modifying this file
