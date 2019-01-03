@@ -565,8 +565,13 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 		UserName: aws.String(username),
 		Tags: []*iam.Tag{
 			{
-				Key:   aws.String("openshiftClusterID"),
+				Key:   aws.String(openshiftClusterIDKey),
 				Value: aws.String(clusterUUID),
+			},
+			// This is expected to be the future format:
+			{
+				Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterUUID)),
+				Value: aws.String("owned"),
 			},
 		},
 	})

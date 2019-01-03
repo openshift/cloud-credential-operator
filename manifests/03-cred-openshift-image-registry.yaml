@@ -3,21 +3,19 @@ kind: CredentialsRequest
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
-  name: cloud-credential-operator-iam-ro
+  name: openshift-image-registry
   namespace: openshift-cloud-credential-operator
 spec:
   secretRef:
-    name: cloud-credential-operator-iam-ro-creds
-    namespace: openshift-cloud-credential-operator
+    name: installer-cloud-credentials
+    namespace: openshift-image-registry
   providerSpec:
     apiVersion: cloudcredential.openshift.io/v1beta1
     kind: AWSProviderSpec
     statementEntries:
     - effect: Allow
       action:
-      - iam:GetUser
-      - iam:GetUserPolicy
-      - iam:ListAccessKeys
+      - s3:CreateBucket
+      - s3:DeleteBucket
       resource: "*"
 ---
-
