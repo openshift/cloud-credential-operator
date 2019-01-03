@@ -53,8 +53,8 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      - image: cloud-credential-operator:latest
-        imagePullPolicy: Never
+      - image: quay.io/openshift/origin-cloud-credential-operator
+        imagePullPolicy: Always
         name: manager
         resources:
           limits:

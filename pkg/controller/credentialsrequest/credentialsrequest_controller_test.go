@@ -653,6 +653,10 @@ func mockTagUser(mockAWSClient *mockaws.MockClient) {
 					Key:   aws.String("openshiftClusterID"),
 					Value: aws.String(testClusterID),
 				},
+				{
+					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testClusterID)),
+					Value: aws.String("owned"),
+				},
 			},
 		}).Return(&iam.TagUserOutput{}, nil)
 }

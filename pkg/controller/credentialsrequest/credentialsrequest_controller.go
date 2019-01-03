@@ -252,6 +252,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			// Ensure the finalizer is set on any not-deleted requests:
 			logger.Infof("adding finalizer: %s", minterv1.FinalizerDeprovision)
 			err = r.addDeprovisionFinalizer(cr)
+			if err != nil {
+				logger.WithError(err).Error("error adding finalizer")
+			}
 			return reconcile.Result{}, err
 		}
 	}
