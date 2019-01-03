@@ -19,7 +19,6 @@ package controller
 import (
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -38,7 +37,7 @@ func AddToManager(m manager.Manager) error {
 	}
 	for _, f := range AddToManagerWithActuatorFuncs {
 		// TODO: cleanup hard coded AWS instantiation here:
-		awsActuator, err := awsactuator.NewAWSActuator(m.GetClient(), scheme.Scheme)
+		awsActuator, err := awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme())
 		if err != nil {
 			return err
 		}
