@@ -183,6 +183,21 @@ func (mr *MockClientMockRecorder) GetUserPolicy(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserPolicy", reflect.TypeOf((*MockClient)(nil).GetUserPolicy), arg0)
 }
 
+// SimulatePrincipalPolicy mocks base method
+func (m *MockClient) SimulatePrincipalPolicy(arg0 *iam.SimulatePrincipalPolicyInput) (*iam.SimulatePolicyResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SimulatePrincipalPolicy", arg0)
+	ret0, _ := ret[0].(*iam.SimulatePolicyResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SimulatePrincipalPolicy indicates an expected call of SimulatePrincipalPolicy
+func (mr *MockClientMockRecorder) SimulatePrincipalPolicy(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SimulatePrincipalPolicy", reflect.TypeOf((*MockClient)(nil).SimulatePrincipalPolicy), arg0)
+}
+
 // TagUser mocks base method
 func (m *MockClient) TagUser(arg0 *iam.TagUserInput) (*iam.TagUserOutput, error) {
 	m.ctrl.T.Helper()
