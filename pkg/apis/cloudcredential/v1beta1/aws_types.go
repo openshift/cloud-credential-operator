@@ -46,4 +46,6 @@ type AWSProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
 	// User is the name of the User created in AWS for these credentials.
 	User string `json:"user"`
+	// Policy is the name of the policy attached to the user in AWS.
+	Policy string `json:"policy"`
 }
