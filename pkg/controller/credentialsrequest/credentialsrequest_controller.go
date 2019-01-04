@@ -274,6 +274,8 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		logger.Debug("found secret namespace")
 	}
 
+	// FIXME / TODO: check for proper secret annotation
+
 	// Hand over to the actuator:
 	exists, err := r.Actuator.Exists(context.TODO(), cr)
 	if err != nil {
