@@ -161,23 +161,24 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	// Generate a randomized User for the credentials:
 	// TODO: check if the generated name is free
 	if awsStatus.User == "" {
-
 		username, err := generateUserName(cr.Name)
 		if err != nil {
 			return err
 		}
 		awsStatus.User = username
+		awsStatus.Policy = getPolicyName(username)
 		logger.WithField("user", awsStatus.User).Debug("generated random name for AWS user and policy")
-
-		cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(awsStatus)
+		err = a.updateProviderStatus(ctx, logger, cr, awsStatus)
 		if err != nil {
-			logger.WithError(err).Error("error encoding provider status")
 			return err
 		}
 
-		err = a.Client.Status().Update(ctx, cr)
+	}
+
+	if awsStatus.Policy == "" && awsStatus.User != "" {
+		awsStatus.Policy = getPolicyName(awsStatus.User)
+		err = a.updateProviderStatus(ctx, logger, cr, awsStatus)
 		if err != nil {
-			logger.WithError(err).Error("error updating credentials request")
 			return err
 		}
 	}
@@ -246,7 +247,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	if err != nil {
 		return err
 	}
-	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User)
+	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User, awsStatus.Policy)
 	if err != nil {
 		return err
 	}
@@ -256,7 +257,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		}
-		err = a.setUserPolicy(logger, rootAWSClient, awsStatus.User, desiredUserPolicy)
+		err = a.setUserPolicy(logger, rootAWSClient, awsStatus.User, awsStatus.Policy, desiredUserPolicy)
 		if err != nil {
 			return err
 		}
@@ -319,6 +320,23 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	return nil
 }
 
+func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, awsStatus *minterv1.AWSProviderStatus) error {
+
+	var err error
+	cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(awsStatus)
+	if err != nil {
+		logger.WithError(err).Error("error encoding provider status")
+		return err
+	}
+
+	err = a.Client.Status().Update(ctx, cr)
+	if err != nil {
+		logger.WithError(err).Error("error updating credentials request")
+		return err
+	}
+	return nil
+}
+
 // Delete the credentials. If no error is returned, it is assumed that all dependent resources have been cleaned up.
 func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	logger := a.getLogger(cr)
@@ -342,7 +360,7 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	}
 	_, err = awsClient.DeleteUserPolicy(&iam.DeleteUserPolicyInput{
 		UserName:   aws.String(awsStatus.User),
-		PolicyName: aws.String(getPolicyName(awsStatus.User)),
+		PolicyName: aws.String(awsStatus.Policy),
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -592,10 +610,10 @@ func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry) (s
 	return string(b), nil
 }
 
-func (a *AWSActuator) getCurrentUserPolicy(logger log.FieldLogger, awsReadClient minteraws.Client, userName string) (string, error) {
+func (a *AWSActuator) getCurrentUserPolicy(logger log.FieldLogger, awsReadClient minteraws.Client, userName, policyName string) (string, error) {
 	cupOut, err := awsReadClient.GetUserPolicy(&iam.GetUserPolicyInput{
 		UserName:   aws.String(userName),
-		PolicyName: aws.String(getPolicyName(userName)),
+		PolicyName: aws.String(policyName),
 	})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
@@ -623,8 +641,7 @@ func (a *AWSActuator) getCurrentUserPolicy(logger log.FieldLogger, awsReadClient
 	return currentUserPolicy, err
 }
 
-func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.Client, userName, userPolicy string) error {
-	policyName := getPolicyName(userName)
+func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.Client, userName, policyName, userPolicy string) error {
 
 	// This call appears to be idempotent:
 	_, err := awsClient.PutUserPolicy(&iam.PutUserPolicyInput{
