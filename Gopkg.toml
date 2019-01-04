@@ -36,6 +36,10 @@ required = [
   name = "github.com/sirupsen/logrus"
   version = "1.0.6"
 
+[[constraint]]
+  branch = "master"
+  name = "github.com/openshift/api"
+
 # For dependency below: Refer to issue https://github.com/golang/dep/issues/1799
 [[override]]
 name = "gopkg.in/fsnotify.v1"

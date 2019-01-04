@@ -52,6 +52,7 @@ type Client interface {
 	ListUserPolicies(*iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error)
 	PutUserPolicy(*iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error)
 	GetUserPolicy(*iam.GetUserPolicyInput) (*iam.GetUserPolicyOutput, error)
+	TagUser(*iam.TagUserInput) (*iam.TagUserOutput, error)
 }
 
 type awsClient struct {
@@ -95,6 +96,10 @@ func (c *awsClient) PutUserPolicy(input *iam.PutUserPolicyInput) (*iam.PutUserPo
 
 func (c *awsClient) GetUserPolicy(input *iam.GetUserPolicyInput) (*iam.GetUserPolicyOutput, error) {
 	return c.iamClient.GetUserPolicy(input)
+}
+
+func (c *awsClient) TagUser(input *iam.TagUserInput) (*iam.TagUserOutput, error) {
+	return c.iamClient.TagUser(input)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.

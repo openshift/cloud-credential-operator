@@ -182,3 +182,18 @@ func (mr *MockClientMockRecorder) GetUserPolicy(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserPolicy", reflect.TypeOf((*MockClient)(nil).GetUserPolicy), arg0)
 }
+
+// TagUser mocks base method
+func (m *MockClient) TagUser(arg0 *iam.TagUserInput) (*iam.TagUserOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TagUser", arg0)
+	ret0, _ := ret[0].(*iam.TagUserOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TagUser indicates an expected call of TagUser
+func (mr *MockClientMockRecorder) TagUser(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagUser", reflect.TypeOf((*MockClient)(nil).TagUser), arg0)
+}

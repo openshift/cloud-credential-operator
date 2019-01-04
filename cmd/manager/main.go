@@ -29,6 +29,9 @@ import (
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	"github.com/openshift/cloud-credential-operator/pkg/controller"
+
+	openshiftapiv1 "github.com/openshift/api/config/v1"
+
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -81,6 +84,11 @@ func NewRootCommand() *cobra.Command {
 			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
 				log.Error(err, "unable add APIs to scheme")
 				os.Exit(1)
+			}
+
+			// Setup Openshift API scheme:
+			if err := openshiftapiv1.Install(mgr.GetScheme()); err != nil {
+				log.Fatal(err)
 			}
 
 			// Setup all Controllers
