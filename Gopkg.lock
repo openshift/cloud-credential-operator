@@ -351,6 +351,14 @@
   version = "v1.4.3"
 
 [[projects]]
+  branch = "master"
+  digest = "1:95a95a1b9df6f1578dd4dd00171e1d94f770951006f56a305b5b0bec16ec6839"
+  name = "github.com/openshift/api"
+  packages = ["config/v1"]
+  pruneopts = "T"
+  revision = "1a0ca44421509b47daf1e17f2e96025b3a314c3b"
+
+[[projects]]
   digest = "1:e5d0bd87abc2781d14e274807a470acd180f0499f8bf5bb18606e9ec22ad9de9"
   name = "github.com/pborman/uuid"
   packages = ["."]
@@ -931,6 +939,7 @@
     "github.com/golang/mock/gomock",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
+    "github.com/openshift/api/config/v1",
     "github.com/sirupsen/logrus",
     "github.com/spf13/cobra",
     "github.com/spf13/pflag",

@@ -6,8 +6,6 @@ metadata:
   name: cloud-credential-operator-iam-ro
   namespace: openshift-cloud-credential-operator
 spec:
-  clusterName: mycluster
-  clusterID: 97216809-bff7-4ea8-b07e-3dec2a0aa4d4
   secretRef:
     name: cloud-credential-operator-iam-ro-creds
     namespace: openshift-cloud-credential-operator
