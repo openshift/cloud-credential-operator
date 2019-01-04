@@ -9,8 +9,16 @@ all: test manager
 test: generate fmt vet manifests
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
+# Run tests without attempting any code generation. (CI)
+test-no-gen: fmt vet
+	go test ./pkg/... ./cmd/... -coverprofile cover.out
+
 # Build manager binary
 manager: generate fmt vet
+	go build -o bin/manager github.com/openshift/cloud-credential-operator/cmd/manager
+
+# Build without attempting any code generation. (CI)
+build-no-gen: fmt vet
 	go build -o bin/manager github.com/openshift/cloud-credential-operator/cmd/manager
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
