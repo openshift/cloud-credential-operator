@@ -29,6 +29,9 @@ metadata:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
 spec:
+  nodeSelector:
+    node-role.kubernetes.io/master: ""
+  priorityClassName: system-cluster-critical
   selector:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"

@@ -90,9 +90,9 @@ metadata:
   name: cloud-credential-operator
   namespace: openshift-cloud-credential-operator
 spec:
-  priorityClassName: system-cluster-critical
   nodeSelector:
     node-role.kubernetes.io/master: ""
+  priorityClassName: system-cluster-critical
   replicas: 1
   revisionHistoryLimit: 4
   selector:
@@ -107,7 +107,7 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      - image: quay.io/dgoodwin/cloud-credential-operator:latest
+      - image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: Always
         name: manager
       terminationGracePeriodSeconds: 10
