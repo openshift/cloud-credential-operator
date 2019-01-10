@@ -11,10 +11,6 @@ COPY pkg/    pkg/
 COPY cmd/    cmd/
 COPY vendor/ vendor/
 
-# Install gomock and mockgen for the mocks used in unit tests
-RUN go get -u github.com/golang/mock/gomock
-RUN go get -u github.com/golang/mock/mockgen
-
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/openshift/cloud-credential-operator/cmd/manager
 
