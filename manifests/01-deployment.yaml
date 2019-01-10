@@ -52,6 +52,13 @@ rules:
   - list
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - clusterversions
+  verbs:
+  - get
+  - list
+- apiGroups:
   - ""
   resources:
   - secrets
@@ -90,8 +97,8 @@ spec:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
 ---
-apiVersion: apps.openshift.io/v1
-kind: DeploymentConfig
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   labels:
     control-plane: controller-manager
@@ -102,10 +109,9 @@ spec:
   replicas: 1
   revisionHistoryLimit: 4
   selector:
-    control-plane: controller-manager
-    controller-tools.k8s.io: "1.0"
-  strategy:
-    type: Rolling
+    matchLabels:
+      control-plane: controller-manager
+      controller-tools.k8s.io: "1.0"
   template:
     metadata:
       labels:
@@ -113,9 +119,27 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      - image: quay.io/openshift/origin-cloud-credential-operator:latest
+      - command:
+        - /root/manager
+        - --log-level
+        - debug
+        image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: Always
         name: manager
+        ports:
+        - containerPort: 9876
+          name: webhook-server
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 100m
+            memory: 100Mi
+          requests:
+            cpu: 100m
+            memory: 70Mi
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       terminationGracePeriodSeconds: 10
-  triggers:
-  - type: ConfigChange
+      tolerations:
+      - operator: Exists
