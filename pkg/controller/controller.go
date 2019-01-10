@@ -17,9 +17,26 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+	"fmt"
+	"regexp"
+
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/tools/clientcmd"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
+
+	log "github.com/sirupsen/logrus"
+)
+
+const (
+	installConfigMap   = "cluster-config-v1"
+	installConfigMapNS = "kube-system"
 )
 
 // AddToManagerFuncs is a list of functions to add all Controllers to the Manager
@@ -36,14 +53,69 @@ func AddToManager(m manager.Manager) error {
 		}
 	}
 	for _, f := range AddToManagerWithActuatorFuncs {
-		// TODO: cleanup hard coded AWS instantiation here:
-		awsActuator, err := awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme())
+		// Check if this is an AWS cluster and if not, add a dummy actuator:
+		// TODO: Use infrastructure type to determine this in future, it's not being populated yet:
+		// https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L11
+		var err error
+		var a actuator.Actuator
+		isAWS, err := isAWSCluster(m)
 		if err != nil {
-			return err
+			log.Fatal(err)
 		}
-		if err := f(m, awsActuator); err != nil {
+		if isAWS {
+			log.Info("initializing AWS actuator")
+			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme())
+			if err != nil {
+				return err
+			}
+		} else {
+			log.Info("initializing no-op actuator (not an AWS cluster)")
+			a = &actuator.DummyActuator{}
+		}
+		if err := f(m, a); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func isAWSCluster(m manager.Manager) (bool, error) {
+	client, err := getClient()
+	if err != nil {
+		return false, err
+	}
+	cfgMapName := types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"}
+	installCfgMap := &corev1.ConfigMap{}
+	err = client.Get(context.Background(), cfgMapName, installCfgMap)
+	if err != nil {
+		return false, err
+	}
+	data, ok := installCfgMap.Data["install-config"]
+	if !ok {
+		return false, fmt.Errorf("cluster-config-v1 ConfigMap did not contain install-config data")
+	}
+	yamlStr := string(data)
+	log.Warn(yamlStr)
+	match, err := regexp.MatchString(`.*platform:\s*aws:.*`, yamlStr)
+	if err != nil {
+		return false, err
+	}
+	return match, nil
+}
+
+func getClient() (client.Client, error) {
+	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
+	cfg, err := kubeconfig.ClientConfig()
+	if err != nil {
+		return nil, err
+	}
+
+	//apis.AddToScheme(scheme.Scheme)
+	dynamicClient, err := client.New(cfg, client.Options{})
+	if err != nil {
+		return nil, err
+	}
+
+	return dynamicClient, nil
 }

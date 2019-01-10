@@ -33,3 +33,22 @@ type Actuator interface {
 	// Checks if the credentials currently exists.
 	Exists(context.Context, *minterv1.CredentialsRequest) (bool, error)
 }
+
+type DummyActuator struct {
+}
+
+func (a *DummyActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	return true, nil
+}
+
+func (a *DummyActuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return nil
+}
+
+func (a *DummyActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return nil
+}
+
+func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return nil
+}
