@@ -1,7 +1,0 @@
-kind: Namespace
-apiVersion: v1
-metadata:
-  name: openshift-cloud-credential-operator
-  labels:
-    # set value to avoid depending on kube admission that depends on openshift apis
-    openshift.io/run-level: "0"
