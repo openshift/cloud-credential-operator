@@ -20,8 +20,8 @@ spec:
   ports:
   - port: 443
 ---
-apiVersion: apps.openshift.io/v1
-kind: DeploymentConfig
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: cloud-credential-operator
   namespace: openshift-cloud-credential-operator
@@ -29,32 +29,23 @@ metadata:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
 spec:
-  nodeSelector:
-    node-role.kubernetes.io/master: ""
-  priorityClassName: system-cluster-critical
   selector:
-    control-plane: controller-manager
-    controller-tools.k8s.io: "1.0"
+    matchLabels:
+      control-plane: controller-manager
+      controller-tools.k8s.io: "1.0"
   replicas: 1
   revisionHistoryLimit: 4
-  strategy:
-    type: Rolling
-  triggers:
-    - type: "ConfigChange"
-    #- type: "ImageChange"
-      #imageChangeParams:
-        #automatic: true
-        #containerNames:
-          #- "manager"
-        #from:
-          #kind: "ImageStreamTag"
-          #name: "cluster-operator:latest"
   template:
     metadata:
       labels:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
+      priorityClassName: system-cluster-critical
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+      - operator: Exists
       containers:
       - image: quay.io/openshift/origin-cloud-credential-operator
         imagePullPolicy: Always
@@ -62,10 +53,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 30Mi
+            memory: 100Mi
           requests:
             cpu: 100m
-            memory: 20Mi
+            memory: 70Mi
         ports:
         - containerPort: 9876
           name: webhook-server
