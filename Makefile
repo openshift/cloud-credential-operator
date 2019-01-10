@@ -39,10 +39,9 @@ deploy: manifests
 manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name cloud-credential-operator
-	# Copy generated files to manifests dir with prefixes for ordering:
+	# kustomize and move to manifests dir for release image:
+	kustomize build config/default > manifests/01-deployment.yaml
 	cp config/crds/cloudcredential_v1beta1_credentialsrequest.yaml manifests/00-cloudcredential-crd.yaml
-	cp config/rbac/rbac_role.yaml manifests/01-rbac_role.yaml
-	cp config/rbac/rbac_role_binding.yaml manifests/01-rbac_role_binding.yaml
 
 # Run go fmt against code
 fmt:
