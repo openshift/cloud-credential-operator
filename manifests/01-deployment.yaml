@@ -40,6 +40,12 @@ rules:
 - apiGroups:
   - ""
   resources:
+  - configmaps
+  verbs:
+  - get
+- apiGroups:
+  - ""
+  resources:
   - namespaces
   verbs:
   - get
