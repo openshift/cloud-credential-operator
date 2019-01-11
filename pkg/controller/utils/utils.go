@@ -29,6 +29,7 @@ var (
 		"iam:ListAccessKeys",
 		"iam:PutUserPolicy",
 		"iam:TagUser",
+		"iam:SimulatePrincipalPolicy", // needed so we can verify the above list of course
 	}
 
 	credentailRequestScheme = runtime.NewScheme()
@@ -46,39 +47,36 @@ func CheckCloudCredCreation(awsClient ccaws.Client, logger log.FieldLogger) (boo
 	return checkCreateCredPermissions(awsClient, CredMintingActions, logger)
 }
 
-// checkPermissionsAgainstStatementList will test to see whether the list of actions in the provided
-// list of StatementEntries can work with the credentials used by the passed-in awsClient
-func checkPermissionsAgainstStatementList(awsClient ccaws.Client, statementEntries []ccv1beta1.StatementEntry, logger log.FieldLogger) (bool, error) {
-	currentUsername, err := awsClient.GetUser(nil)
+// CheckPermissionsUsingQueryClient will use queryClient to query whether the credentials in targetClient can perform the actions
+// listed in the statementEntries. queryClient will need iam:GetUser and iam:SimulatePrincipalPolicy
+func CheckPermissionsUsingQueryClient(queryClient, targetClient ccaws.Client, statementEntries []ccv1beta1.StatementEntry, logger log.FieldLogger) (bool, error) {
+	targetUsername, err := targetClient.GetUser(nil)
 	if err != nil {
 		return false, fmt.Errorf("error querying current username: %v", err)
 	}
 
 	allowList := []*string{}
-	// FIXME: Assuming only 'Allow's in the statement list
 	for _, statement := range statementEntries {
 		for _, action := range statement.Action {
 			allowList = append(allowList, aws.String(action))
 		}
 	}
 
-	// Check whether the current creds can perform the list of actions
-	// (assumes Resource: "*")
-	results, err := awsClient.SimulatePrincipalPolicy(&iam.SimulatePrincipalPolicyInput{
-		PolicySourceArn: currentUsername.User.Arn,
+	results, err := queryClient.SimulatePrincipalPolicy(&iam.SimulatePrincipalPolicyInput{
+		PolicySourceArn: targetUsername.User.Arn,
 		ActionNames:     allowList,
 	})
 	if err != nil {
 		return false, fmt.Errorf("error simulating policy: %v", err)
 	}
 
-	// Either they are all allowed and we return 'true', or it's a failure
+	// Either they are all allowed and we reutrn 'true', or it's a failure
 	allClear := true
 	for _, result := range results.EvaluationResults {
 		if *result.EvalDecision != "allowed" {
 			// Don't return on the first failure, so we can log the full list
 			// of failed/denied actions
-			logger.Warningf("Action not allowed with tested creds: %v", *result.EvalActionName)
+			logger.WithField("action", *result.EvalActionName).Warning("Action not allowed with tested creds")
 			allClear = false
 		}
 	}
@@ -89,6 +87,13 @@ func checkPermissionsAgainstStatementList(awsClient ccaws.Client, statementEntri
 	}
 
 	return true, nil
+
+}
+
+// CheckPermissionsAgainstStatementList will test to see whether the list of actions in the provided
+// list of StatementEntries can work with the credentials used by the passed-in awsClient
+func CheckPermissionsAgainstStatementList(awsClient ccaws.Client, statementEntries []ccv1beta1.StatementEntry, logger log.FieldLogger) (bool, error) {
+	return CheckPermissionsUsingQueryClient(awsClient, awsClient, statementEntries, logger)
 }
 
 // checkCreateCredPermissions will take the static list of Actions needed to run in
@@ -102,7 +107,7 @@ func checkCreateCredPermissions(awsClient ccaws.Client, actionList []string, log
 		},
 	}
 
-	return checkPermissionsAgainstStatementList(awsClient, statementList, logger)
+	return CheckPermissionsAgainstStatementList(awsClient, statementList, logger)
 }
 
 // CheckCloudCredPassthrough will see if the provided creds are good enough to pass through
@@ -127,7 +132,7 @@ func CheckCloudCredPassthrough(awsClient ccaws.Client, logger log.FieldLogger) (
 		statementList = append(statementList, statements...)
 	}
 
-	return checkPermissionsAgainstStatementList(awsClient, statementList, logger)
+	return CheckPermissionsAgainstStatementList(awsClient, statementList, logger)
 }
 
 func readCredentialRequest(cr []byte) (*ccv1beta1.CredentialsRequest, error) {

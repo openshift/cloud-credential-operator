@@ -74,7 +74,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 				return mockAWSClient
 			},
-			validateAnnotationValue: mintAnnotation,
+			validateAnnotationValue: MintAnnotation,
 		},
 		{
 			name:     "cred passthrough mode",
@@ -89,7 +89,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 				return mockAWSClient
 			},
-			validateAnnotationValue: passthroughAnnotation,
+			validateAnnotationValue: PassthroughAnnotation,
 		},
 		{
 			name:     "useless creds",
@@ -104,7 +104,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 				return mockAWSClient
 			},
-			validateAnnotationValue: insufficientAnnotation,
+			validateAnnotationValue: InsufficientAnnotation,
 		},
 		{
 			name:      "missing secret",
@@ -119,7 +119,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 					Namespace: testNamespace,
 				},
 				Data: map[string][]byte{
-					awsAccessKeyName:            []byte(testAWSAccessKeyID),
+					AwsAccessKeyName:            []byte(testAWSAccessKeyID),
 					"not_aws_secret_access_key": []byte(testAWSSecretAccessKey),
 				},
 			}},
@@ -171,8 +171,8 @@ func testSecret() *corev1.Secret {
 			Namespace: testNamespace,
 		},
 		Data: map[string][]byte{
-			awsAccessKeyName:       []byte(testAWSAccessKeyID),
-			awsSecretAccessKeyName: []byte(testAWSSecretAccessKey),
+			AwsAccessKeyName:       []byte(testAWSAccessKeyID),
+			AwsSecretAccessKeyName: []byte(testAWSSecretAccessKey),
 		},
 	}
 	return s
@@ -229,11 +229,11 @@ func validateSecretAnnotation(c client.Client, t *testing.T, value string) {
 	if secret.ObjectMeta.Annotations == nil {
 		t.Errorf("unexpected empty annotations on secret")
 	}
-	if _, ok := secret.ObjectMeta.Annotations[annotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[AnnotationKey]; !ok {
 		t.Errorf("missing annotation")
 	}
 
-	assert.Exactly(t, value, secret.ObjectMeta.Annotations[annotationKey])
+	assert.Exactly(t, value, secret.ObjectMeta.Annotations[AnnotationKey])
 }
 
 func getCredSecret(c client.Client) *corev1.Secret {
