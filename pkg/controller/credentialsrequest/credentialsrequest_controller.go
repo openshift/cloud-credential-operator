@@ -368,6 +368,9 @@ func (r *ReconcileCredentialsRequest) usePassthroughCreds(cr *minterv1.Credentia
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.SecretRef.Name,
 				Namespace: cr.Spec.SecretRef.Namespace,
+				Annotations: map[string]string{
+					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+				},
 			},
 			Data: map[string][]byte{
 				secretannotator.AwsAccessKeyName:       cloudCredSecret.Data[secretannotator.AwsAccessKeyName],

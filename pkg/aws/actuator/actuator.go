@@ -22,13 +22,14 @@ import (
 	"net/url"
 	"reflect"
 
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
+
 	log "github.com/sirupsen/logrus"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 
@@ -162,6 +163,7 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
 	}
 
+	// Minted-user-specific checks
 	if awsStatus.User != "" {
 		// If AWS user defined (ie minted creds instead of passthrough) check whether user is tagged
 		user, err := readAWSClient.GetUser(&iam.GetUserInput{
@@ -189,15 +191,31 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			// then we need an update
 			return true, nil
 		}
+
+		// Check whether the current policy attached to the creds match what is being requested
+		desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries, *user.User.Arn)
+		if err != nil {
+			return false, err
+		}
+
+		policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, user.User, readAWSClient, logger)
+		if !policyEqual {
+			return true, nil
+		}
+
+	} else {
+		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
+		goodEnough, err := utils.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, logger)
+		if err != nil {
+			return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
+		}
+		if !goodEnough {
+			return true, nil
+		}
 	}
 
-	// Check whether current creds already satisfy CredentialsRequest
-	goodEnough, err := utils.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, logger)
-	if err != nil {
-		return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
-	}
-
-	return !goodEnough, nil
+	// If we've made it this far, then there are no updates needed
+	return false, nil
 }
 
 // Create the credentials.
@@ -327,13 +345,8 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
-	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User, awsStatus.Policy)
-	if err != nil {
-		return err
-	}
-	logger.Debugf("desired user policy: %s", desiredUserPolicy)
-	logger.Debugf("current user policy: %s", currentUserPolicy)
-	if currentUserPolicy != desiredUserPolicy {
+	policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, userOut, readAWSClient, logger)
+	if !policyEqual {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		}
@@ -342,8 +355,6 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 			return err
 		}
 		logger.Info("successfully set user policy")
-	} else {
-		logger.Debug("no changes to user policy")
 	}
 
 	allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
@@ -398,6 +409,22 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 
 	return nil
+}
+
+func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, awsSpec *minterv1.AWSProviderSpec, awsStatus *minterv1.AWSProviderStatus, awsUser *iam.User, readAWSClient ccaws.Client, logger log.FieldLogger) (bool, error) {
+
+	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User, awsStatus.Policy)
+	if err != nil {
+		return false, err
+	}
+	logger.Debugf("desired user policy: %s", desiredUserPolicy)
+	logger.Debugf("current user policy: %s", currentUserPolicy)
+	if currentUserPolicy != desiredUserPolicy {
+		logger.Debug("policy differences detected")
+		return false, nil
+	}
+	logger.Debug("no changes to user policy")
+	return true, nil
 }
 
 func userHasClusterTag(user *iam.User, clusterUUID string) bool {

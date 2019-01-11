@@ -88,7 +88,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		mockSecretAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		validate            func(client.Client, *testing.T)
 	}{
-
 		{
 			name: "add finalizer",
 			existing: []runtime.Object{
@@ -225,12 +224,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
-				mockSimulatePrincipalPolicySuccess(mockAWSClient)
-				return mockAWSClient
-			},
-			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -301,12 +295,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
-				mockSimulatePrincipalPolicySuccess(mockAWSClient)
-				return mockAWSClient
-			},
-			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
