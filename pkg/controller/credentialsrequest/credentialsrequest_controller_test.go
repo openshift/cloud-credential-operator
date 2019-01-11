@@ -88,6 +88,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		mockSecretAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		validate            func(client.Client, *testing.T)
 	}{
+
 		{
 			name: "add finalizer",
 			existing: []runtime.Object{
@@ -223,15 +224,13 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
 				mockSimulatePrincipalPolicySuccess(mockAWSClient)
-				//mockGetUserPolicy(mockAWSClient, testPolicy1)
-				//mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
 				return mockAWSClient
 			},
 			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
-				//mockSimulatePrincipalPolicySuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -301,15 +300,13 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
 				mockSimulatePrincipalPolicySuccess(mockAWSClient)
-				////mockGetUserPolicy(mockAWSClient, testPolicy1)
-				////mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
 				return mockAWSClient
 			},
 			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
-				////mockSimulatePrincipalPolicySuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -359,50 +356,43 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.True(t, cr.Status.Provisioned)
 			},
 		},
-		/*
-			{
-				name: "cred exists access key missing",
-				existing: []runtime.Object{
-					createTestNamespace(testSecretNamespace),
-					testCredentialsRequest(t),
-					testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
-					testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-					testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
-					testClusterVersion(),
-				},
-				mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-					mockAWSClient := mockaws.NewMockClient(mockCtrl)
-					mockPutUserPolicy(mockAWSClient)
-					mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
-					return mockAWSClient
-				},
-				mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-					mockAWSClient := mockaws.NewMockClient(mockCtrl)
-					mockGetUser(mockAWSClient)
-					mockGetUserPolicyMissing(mockAWSClient)
-					mockListAccessKeysEmpty(mockAWSClient)
-					return mockAWSClient
-				},
-				mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-					mockAWSClient := mockaws.NewMockClient(mockCtrl)
-					mockGetUser(mockAWSClient)
-					mockSimulatePrincipalPolicySuccess(mockAWSClient)
-					return mockAWSClient
-				},
-				validate: func(c client.Client, t *testing.T) {
-					targetSecret := getSecret(c)
-					if assert.NotNil(t, targetSecret) {
-						assert.Equal(t, testAWSAccessKeyID2,
-							string(targetSecret.Data["aws_access_key_id"]))
-						assert.Equal(t, testAWSSecretAccessKey2,
-							string(targetSecret.Data["aws_secret_access_key"]))
-						assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
-					}
-					cr := getCR(c)
-					assert.True(t, cr.Status.Provisioned)
-				},
+		{
+			name: "cred exists access key missing",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
 			},
-		*/
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockListAccessKeysEmpty(mockAWSClient)
+				mockGetUser(mockAWSClient)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID2,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey2,
+						string(targetSecret.Data["aws_secret_access_key"]))
+					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
