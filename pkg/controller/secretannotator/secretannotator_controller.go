@@ -42,16 +42,27 @@ const (
 	controllerName = "secretannotator"
 
 	// TODO: dynamically detect which environment we're running on
-	cloudCredSecretName      = "aws-creds"
-	cloudCredSecretNamespace = "kube-system"
+	CloudCredSecretName      = "aws-creds"
+	CloudCredSecretNamespace = "kube-system"
 
-	annotationKey          = "cloudcredsvalidation"
-	mintAnnotation         = "mint"
-	passthroughAnnotation  = "passthrough"
-	insufficientAnnotation = "insufficient"
+	AnnotationKey = "cloudcredential.openshift.io/mode"
 
-	awsAccessKeyName       = "aws_access_key_id"
-	awsSecretAccessKeyName = "aws_secret_access_key"
+	// MintAnnottation is used whenever it is determined that the cloud creds
+	// are sufficient for minting new creds to satisfy a CredentialsRequest
+	MintAnnotation = "mint"
+
+	// PassthroughAnnotation is used whenever it is determined that the cloud creds
+	// are sufficient for passing through to satisfy a CredentialsRequest.
+	// This would be based on having creds that can satisfy the static list of creds
+	// found in this repo's manifests/ dir.
+	PassthroughAnnotation = "passthrough"
+
+	// InsufficientAnnotation is used to indicate that the creds do not have
+	// sufficient permissions for cluster runtime.
+	InsufficientAnnotation = "insufficient"
+
+	AwsAccessKeyName       = "aws_access_key_id"
+	AwsSecretAccessKeyName = "aws_secret_access_key"
 )
 
 func Add(mgr manager.Manager) error {
@@ -67,7 +78,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	if secret.GetNamespace() == cloudCredSecretNamespace && secret.GetName() == cloudCredSecretName {
+	if secret.GetNamespace() == CloudCredSecretNamespace && secret.GetName() == CloudCredSecretName {
 		return true
 	}
 	return false
@@ -134,23 +145,16 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 
 func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secret) error {
 
-	secretAnnotations := secret.GetAnnotations()
-	if secretAnnotations == nil {
-		secretAnnotations = map[string]string{}
-	}
-
-	accessKey, ok := secret.Data[awsAccessKeyName]
+	accessKey, ok := secret.Data[AwsAccessKeyName]
 	if !ok {
 		r.logger.Errorf("Couldn't fetch key containing AWS_ACCESS_KEY_ID from cloud cred secret")
-		secretAnnotations[annotationKey] = insufficientAnnotation
-		return r.updateSecretAnnotations(secret, secretAnnotations)
+		return r.updateSecretAnnotations(secret, InsufficientAnnotation)
 	}
 
-	secretKey, ok := secret.Data[awsSecretAccessKeyName]
+	secretKey, ok := secret.Data[AwsSecretAccessKeyName]
 	if !ok {
 		r.logger.Errorf("Couldn't fetch key containing AWS_SECRET_ACCESS_KEY from cloud cred secret")
-		secretAnnotations[annotationKey] = insufficientAnnotation
-		return r.updateSecretAnnotations(secret, secretAnnotations)
+		return r.updateSecretAnnotations(secret, InsufficientAnnotation)
 	}
 
 	awsClient, err := r.AWSClientBuilder(accessKey, secretKey)
@@ -161,34 +165,40 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	// Can we mint new creds?
 	cloudCheckResult, err := utils.CheckCloudCredCreation(awsClient, r.logger)
 	if err != nil {
+		r.updateSecretAnnotations(secret, InsufficientAnnotation)
 		return fmt.Errorf("failed checking create cloud creds: %v", err)
 	}
 
 	if cloudCheckResult {
 		r.logger.Info("Verified cloud creds can be used for minting new creds")
-		secretAnnotations[annotationKey] = mintAnnotation
-		return r.updateSecretAnnotations(secret, secretAnnotations)
+		return r.updateSecretAnnotations(secret, MintAnnotation)
 	}
 
 	// Else, can we just pass through the current creds?
 	cloudCheckResult, err = utils.CheckCloudCredPassthrough(awsClient, r.logger)
 	if err != nil {
+		r.updateSecretAnnotations(secret, InsufficientAnnotation)
 		return fmt.Errorf("failed checking passthrough cloud creds: %v", err)
 	}
 
 	if cloudCheckResult {
 		r.logger.Info("Verified cloud creds can be used as-is (passthrough)")
-		secretAnnotations[annotationKey] = passthroughAnnotation
-		return r.updateSecretAnnotations(secret, secretAnnotations)
+		return r.updateSecretAnnotations(secret, PassthroughAnnotation)
 	}
 
 	// Else, these creds aren't presently useful
 	r.logger.Warning("Cloud creds unable to be used for either minting or passthrough")
-	secretAnnotations[annotationKey] = insufficientAnnotation
-	return r.updateSecretAnnotations(secret, secretAnnotations)
+	return r.updateSecretAnnotations(secret, InsufficientAnnotation)
 }
 
-func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, annotations map[string]string) error {
-	secret.SetAnnotations(annotations)
+func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {
+	secretAnnotations := secret.GetAnnotations()
+	if secretAnnotations == nil {
+		secretAnnotations = map[string]string{}
+	}
+
+	secretAnnotations[AnnotationKey] = value
+	secret.SetAnnotations(secretAnnotations)
+
 	return r.Update(context.Background(), secret)
 }
