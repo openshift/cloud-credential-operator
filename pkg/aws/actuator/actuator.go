@@ -141,8 +141,7 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, nil
 	}
 
-	// Now check whether the creds in the secret are good enough to satisfy what being requested
-	// in the CredentialsRequest
+	// Various checks for the kinds of reasons that would trigger a needed update
 	_, accessKey, secretKey := a.loadExistingSecret(cr)
 	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey))
 	if err != nil {
@@ -153,7 +152,6 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, err
 	}
 
-	// If AWS user defined (ie minted creds instead of passthrough) check whether user is tagged
 	awsStatus, err := a.decodeProviderStatus(cr)
 	if err != nil {
 		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
@@ -163,15 +161,34 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 	if err != nil {
 		return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
 	}
-	user, err := readAWSClient.GetUser(&iam.GetUserInput{
-		UserName: aws.String(awsStatus.User),
-	})
-	if err != nil {
-		return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
-	}
-	clusterUUID, err := a.loadClusterUUID(logger)
-	if !userHasClusterTag(user.User, string(clusterUUID)) {
-		return true, nil
+
+	if awsStatus.User != "" {
+		// If AWS user defined (ie minted creds instead of passthrough) check whether user is tagged
+		user, err := readAWSClient.GetUser(&iam.GetUserInput{
+			UserName: aws.String(awsStatus.User),
+		})
+		if err != nil {
+			return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
+		}
+		clusterUUID, err := a.loadClusterUUID(logger)
+		if !userHasClusterTag(user.User, string(clusterUUID)) {
+			return true, nil
+		}
+
+		// Does the access key in the secret still exist?
+		allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
+		if err != nil {
+			logger.WithError(err).Error("error listing all access keys for user")
+			return false, err
+		}
+		accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, accessKey)
+		if err != nil {
+			logger.WithError(err).Error("error querying whether access key still valid")
+		}
+		if !accessKeyExists {
+			// then we need an update
+			return true, nil
+		}
 	}
 
 	// Check whether current creds already satisfy CredentialsRequest
