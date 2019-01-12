@@ -22,6 +22,8 @@ import (
 	"net/url"
 	"reflect"
 
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
+
 	log "github.com/sirupsen/logrus"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
@@ -127,6 +129,95 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 
 }
 
+// NeedsUpdate will return whether the current credentials satisfy what's being requested
+// in the CredentialsRequest
+func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	logger := a.getLogger(cr)
+	// If the secret simply doesn't exist, we definitely need an update
+	exists, err := a.Exists(ctx, cr)
+	if err != nil {
+		return true, err
+	}
+	if !exists {
+		return true, nil
+	}
+
+	// Various checks for the kinds of reasons that would trigger a needed update
+	_, accessKey, secretKey := a.loadExistingSecret(cr)
+	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey))
+	if err != nil {
+		return true, err
+	}
+	awsSpec, err := a.getProviderSpec(cr)
+	if err != nil {
+		return true, err
+	}
+
+	awsStatus, err := a.decodeProviderStatus(cr)
+	if err != nil {
+		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
+	}
+
+	readAWSClient, err := a.buildReadAWSClient(cr)
+	if err != nil {
+		return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
+	}
+
+	// Minted-user-specific checks
+	if awsStatus.User != "" {
+		// If AWS user defined (ie minted creds instead of passthrough) check whether user is tagged
+		user, err := readAWSClient.GetUser(&iam.GetUserInput{
+			UserName: aws.String(awsStatus.User),
+		})
+		if err != nil {
+			return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
+		}
+		clusterUUID, err := a.loadClusterUUID(logger)
+		if !userHasClusterTag(user.User, string(clusterUUID)) {
+			return true, nil
+		}
+
+		// Does the access key in the secret still exist?
+		allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
+		if err != nil {
+			logger.WithError(err).Error("error listing all access keys for user")
+			return false, err
+		}
+		accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, accessKey)
+		if err != nil {
+			logger.WithError(err).Error("error querying whether access key still valid")
+		}
+		if !accessKeyExists {
+			// then we need an update
+			return true, nil
+		}
+
+		// Check whether the current policy attached to the creds match what is being requested
+		desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries, *user.User.Arn)
+		if err != nil {
+			return false, err
+		}
+
+		policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, user.User, readAWSClient, logger)
+		if !policyEqual {
+			return true, nil
+		}
+
+	} else {
+		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
+		goodEnough, err := utils.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, logger)
+		if err != nil {
+			return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
+		}
+		if !goodEnough {
+			return true, nil
+		}
+	}
+
+	// If we've made it this far, then there are no updates needed
+	return false, nil
+}
+
 // Create the credentials.
 func (a *AWSActuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	return a.sync(ctx, cr)
@@ -137,20 +228,28 @@ func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsReques
 	return a.sync(ctx, cr)
 }
 
+func (a *AWSActuator) getProviderSpec(cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderSpec, error) {
+	if cr.Spec.ProviderSpec != nil {
+		awsSpec, err := a.Codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
+		if err != nil {
+			return nil, fmt.Errorf("error decoding provider spec: %v", err)
+		}
+		return awsSpec, nil
+	}
+
+	return nil, fmt.Errorf("no providerSpec defined")
+}
+
 // sync handles both create and update idempotently.
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
-	awsSpec := &minterv1.AWSProviderSpec{}
+
 	var err error
-	if cr.Spec.ProviderSpec != nil {
-		awsSpec, err = a.Codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
-		if err != nil {
-			logger.WithError(err).Error("error decoding provider spec")
-			return fmt.Errorf("error decoding provider spec: %v", err)
-		}
-	} else {
-		return fmt.Errorf("no providerSpec defined")
+
+	awsSpec, err := a.getProviderSpec(cr)
+	if err != nil {
+		return err
 	}
 
 	awsStatus, err := a.decodeProviderStatus(cr)
@@ -199,7 +298,8 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 
 	// Check if the user already exists:
-	userOut, err := readAWSClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
+	var userOut *iam.User
+	getUserOut, err := readAWSClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
@@ -209,16 +309,12 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 					return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 				}
 
-				err = a.createUser(logger, rootAWSClient, awsStatus.User)
+				createOut, err := a.createUser(logger, rootAWSClient, awsStatus.User)
 				if err != nil {
 					return err
 				}
 				logger.WithField("userName", awsStatus.User).Info("user created successfully")
-
-				err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID))
-				if err != nil {
-					return err
-				}
+				userOut = createOut.User
 
 			default:
 				return formatAWSErr(aerr)
@@ -228,10 +324,11 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	} else {
 		logger.WithField("userName", awsStatus.User).Info("user exists")
+		userOut = getUserOut.User
 	}
 
 	// Check if the user has the expected tags:
-	if userOut != nil && userOut.User != nil && !userHasTag(userOut.User, openshiftClusterIDKey, string(clusterUUID)) {
+	if !userHasClusterTag(userOut, string(clusterUUID)) {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		}
@@ -243,17 +340,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 
 	// TODO: check if user policy needs to be set? user generation and last set time.
-	desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries)
+	desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries, *userOut.Arn)
 	if err != nil {
 		return err
 	}
-	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User, awsStatus.Policy)
-	if err != nil {
-		return err
-	}
-	logger.Debugf("desired user policy: %s", desiredUserPolicy)
-	logger.Debugf("current user policy: %s", currentUserPolicy)
-	if currentUserPolicy != desiredUserPolicy {
+
+	policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, userOut, readAWSClient, logger)
+	if !policyEqual {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		}
@@ -262,8 +355,6 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 			return err
 		}
 		logger.Info("successfully set user policy")
-	} else {
-		logger.Debug("no changes to user policy")
 	}
 
 	allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
@@ -272,7 +363,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
-	existingSecret, existingAccessKeyID := a.loadExistingSecret(cr)
+	existingSecret, existingAccessKeyID, _ := a.loadExistingSecret(cr)
 
 	var accessKey *iam.AccessKey
 	// TODO: also check if the access key ID on the request is still valid in AWS
@@ -320,6 +411,33 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	return nil
 }
 
+func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, awsSpec *minterv1.AWSProviderSpec, awsStatus *minterv1.AWSProviderStatus, awsUser *iam.User, readAWSClient ccaws.Client, logger log.FieldLogger) (bool, error) {
+
+	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User, awsStatus.Policy)
+	if err != nil {
+		return false, err
+	}
+	logger.Debugf("desired user policy: %s", desiredUserPolicy)
+	logger.Debugf("current user policy: %s", currentUserPolicy)
+	if currentUserPolicy != desiredUserPolicy {
+		logger.Debug("policy differences detected")
+		return false, nil
+	}
+	logger.Debug("no changes to user policy")
+	return true, nil
+}
+
+func userHasClusterTag(user *iam.User, clusterUUID string) bool {
+	// Check if the user has the expected tags:
+	if user == nil {
+		return false
+	}
+	if userHasTag(user, openshiftClusterIDKey, clusterUUID) {
+		return true
+	}
+
+	return false
+}
 func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, awsStatus *minterv1.AWSProviderStatus) error {
 
 	var err error
@@ -348,7 +466,7 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	}
 
 	if awsStatus.User == "" {
-		logger.Warn("no user name set on credentials being deleted, most likely were never provisioned")
+		logger.Warn("no user name set on credentials being deleted, most likely were never provisioned or using passthrough creds")
 		return nil
 	}
 
@@ -407,9 +525,10 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	return nil
 }
 
-func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*corev1.Secret, string) {
+func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*corev1.Secret, string, string) {
 	logger := a.getLogger(cr)
 	var existingAccessKeyID string
+	var existingSecretAccessKey string
 
 	// Check if the credentials secret exists, if not we need to inform the syncer to generate a new one:
 	existingSecret := &corev1.Secret{}
@@ -429,8 +548,15 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 			logger.WithField("accessKeyID", existingAccessKeyID).Debug("found access key ID in target secret")
 
 		}
+
+		secretBytes, ok := existingSecret.Data["aws_secret_access_key"]
+		if !ok {
+			logger.Warning("secret did not have expected key: aws_secret_access_key")
+		} else {
+			existingSecretAccessKey = string(secretBytes)
+		}
 	}
-	return existingSecret, existingAccessKeyID
+	return existingSecret, existingAccessKeyID, existingSecretAccessKey
 }
 
 func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterUUID string) error {
@@ -605,7 +731,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	return nil
 }
 
-func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry) (string, error) {
+func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, userARN string) (string, error) {
 
 	policyDoc := PolicyDocument{
 		Version:   "2012-10-17",
@@ -618,11 +744,24 @@ func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry) (s
 			Resource: se.Resource,
 		})
 	}
+
+	// Always allow a statment that enables iam:GetUser on yourself (to allow access_key/awsClient to username lookups)
+	addGetUserStatement(&policyDoc, userARN)
+
 	b, err := json.Marshal(&policyDoc)
 	if err != nil {
 		return "", fmt.Errorf("error marshalling user policy: %v", err)
 	}
 	return string(b), nil
+}
+
+func addGetUserStatement(policyDoc *PolicyDocument, userARN string) {
+
+	policyDoc.Statement = append(policyDoc.Statement, StatementEntry{
+		Effect:   "Allow",
+		Action:   []string{"iam:GetUser"},
+		Resource: userARN,
+	})
 }
 
 func (a *AWSActuator) getCurrentUserPolicy(logger log.FieldLogger, awsReadClient minteraws.Client, userName, policyName string) (string, error) {
@@ -727,34 +866,34 @@ func userHasTag(user *iam.User, key, val string) bool {
 	return false
 }
 
-func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Client, username string) error {
+func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Client, username string) (*iam.CreateUserOutput, error) {
 	input := &iam.CreateUserInput{
 		UserName: aws.String(username),
 	}
 
 	uLog := logger.WithField("userName", username)
 	uLog.Info("creating user")
-	_, err := awsClient.CreateUser(input)
+	userOut, err := awsClient.CreateUser(input)
 
 	if err != nil {
 		if aerr, ok := err.(awserr.Error); ok {
 			switch aerr.Code() {
 			case iam.ErrCodeEntityAlreadyExistsException:
 				uLog.Warn("user already exist")
-				return nil
+				return nil, nil
 			default:
 				err = formatAWSErr(aerr)
 				uLog.WithError(err).Errorf("AWS error creating user")
-				return err
+				return nil, err
 			}
 		}
 		uLog.WithError(err).Errorf("unknown error creating user in AWS")
-		return fmt.Errorf("unknown error creating user in AWS: %v", err)
+		return nil, fmt.Errorf("unknown error creating user in AWS: %v", err)
 	} else {
 		uLog.Debug("user created successfully")
 	}
 
-	return nil
+	return userOut, nil
 }
 
 func formatAWSErr(aerr awserr.Error) error {

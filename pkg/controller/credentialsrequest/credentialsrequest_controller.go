@@ -25,16 +25,19 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -274,26 +277,45 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		logger.Debug("found secret namespace")
 	}
 
-	// Hand over to the actuator:
-	exists, err := r.Actuator.Exists(context.TODO(), cr)
+	// Now figure out whether we need to create new creds/secrets to satisfy the CredentialsRequest
+
+	updateNeeded, err := r.Actuator.NeedsUpdate(context.TODO(), cr)
 	if err != nil {
-		logger.WithError(err).Error("actuator error checking if credentials exist")
-		return reconcile.Result{}, err
+		return reconcile.Result{}, fmt.Errorf("error determining whether updated creds are needed: %v", err)
 	}
-	if !exists {
-		err = r.Actuator.Create(context.TODO(), cr)
-		if err != nil {
-			logger.WithError(err).Error("actuator error creating credentials")
-			return reconcile.Result{}, err
-		}
+	if !updateNeeded {
+		logger.Debug("creds already satisfy the CredentialsRequest")
 		cr.Status.Provisioned = true
 	} else {
-		err = r.Actuator.Update(context.TODO(), cr)
-		if err != nil {
-			logger.WithError(err).Error("actuator error updating credentials")
+
+		cloudCredSecret := &corev1.Secret{}
+		if err := r.Get(context.Background(), types.NamespacedName{Name: secretannotator.CloudCredSecretName, Namespace: secretannotator.CloudCredSecretNamespace}, cloudCredSecret); err != nil {
+			logger.WithError(err).Error("unable to fetch cloud cred secret")
 			return reconcile.Result{}, err
 		}
-		cr.Status.Provisioned = true
+
+		if !properlyAnnotatedSecret(cloudCredSecret) {
+			logger.WithField("secret", fmt.Sprintf("%s/%s", secretannotator.CloudCredSecretNamespace, secretannotator.CloudCredSecretName)).Info("cloud cred secret not yet annotated")
+			return reconcile.Result{}, fmt.Errorf("waiting for cloud cred secret annotation before proceeding")
+		}
+
+		if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.MintAnnotation {
+			cr, err = r.mintCredsWithActuator(cr, logger)
+			if err != nil {
+				logger.WithError(err).Errorf("error while minting credentials")
+				return reconcile.Result{}, err
+			}
+		} else if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.PassthroughAnnotation {
+			cr, err = r.usePassthroughCreds(cr, cloudCredSecret, logger)
+			if err != nil {
+				logger.WithError(err).Errorf("error while trying to use creds as passthrough")
+				return reconcile.Result{}, err
+			}
+		} else if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.InsufficientAnnotation {
+			// update status on credentialsrequest to indicate we can't satisfy the request
+			logger.Debug("DO STATUS/CONDITION UPDATE THINGS")
+			return reconcile.Result{}, fmt.Errorf("RETRY")
+		}
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
@@ -311,6 +333,104 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileCredentialsRequest) usePassthroughCreds(cr *minterv1.CredentialsRequest, cloudCredSecret *corev1.Secret, logger log.FieldLogger) (*minterv1.CredentialsRequest, error) {
+	secretAlreadyExists := true
+	existingSecret := &corev1.Secret{}
+	err := r.Get(context.Background(), types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}, existingSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Debug("existing secret not found. will create one.")
+			secretAlreadyExists = false
+		} else {
+			logger.WithError(err).Error("error checking if the secret satisfying the credentialsrequest already exists")
+			return nil, err
+		}
+	}
+
+	if secretAlreadyExists {
+		logger.Debug("Update if necessary")
+
+		if updateExistingSecret(existingSecret, cloudCredSecret) {
+			logger.Debugf("updating existing secret")
+
+			err = r.Update(context.Background(), existingSecret)
+			if err != nil {
+				logger.WithError(err).Error("error updating existing secret")
+				return nil, err
+			}
+		}
+	} else {
+		logger.Debug("Creating a secret")
+
+		newSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cr.Spec.SecretRef.Name,
+				Namespace: cr.Spec.SecretRef.Namespace,
+				Annotations: map[string]string{
+					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+				},
+			},
+			Data: map[string][]byte{
+				secretannotator.AwsAccessKeyName:       cloudCredSecret.Data[secretannotator.AwsAccessKeyName],
+				secretannotator.AwsSecretAccessKeyName: cloudCredSecret.Data[secretannotator.AwsSecretAccessKeyName],
+			},
+		}
+
+		// set controller reference
+		if err := controllerutil.SetControllerReference(cr, newSecret, scheme.Scheme); err != nil {
+			logger.WithError(err).Error("error setting controller reference on secret")
+			return nil, err
+		}
+
+		// create secret
+		if err := r.Create(context.Background(), newSecret); err != nil {
+			logger.WithError(err).Error("error creating secret")
+			return nil, err
+		}
+
+		logger.Debug("created secret successfully")
+		cr.Status.Provisioned = true
+	}
+
+	return cr, nil
+}
+
+func updateExistingSecret(existing, cloudCred *corev1.Secret) bool {
+	if string(existing.Data[secretannotator.AwsAccessKeyName]) != string(cloudCred.Data[secretannotator.AwsAccessKeyName]) ||
+		string(existing.Data[secretannotator.AwsSecretAccessKeyName]) != string(cloudCred.Data[secretannotator.AwsSecretAccessKeyName]) {
+		existing.Data[secretannotator.AwsAccessKeyName] = cloudCred.Data[secretannotator.AwsAccessKeyName]
+		existing.Data[secretannotator.AwsSecretAccessKeyName] = cloudCred.Data[secretannotator.AwsSecretAccessKeyName]
+		return true
+	}
+	return false
+}
+
+func (r *ReconcileCredentialsRequest) mintCredsWithActuator(cr *minterv1.CredentialsRequest, logger log.FieldLogger) (*minterv1.CredentialsRequest, error) {
+	// Hand over to the actuator:
+	exists, err := r.Actuator.Exists(context.TODO(), cr)
+	if err != nil {
+		logger.WithError(err).Error("actuator error checking if credentials exist")
+		return nil, err
+	}
+	if !exists {
+		err = r.Actuator.Create(context.TODO(), cr)
+		if err != nil {
+			logger.WithError(err).Error("actuator error creating credentials")
+			return nil, err
+		}
+		cr.Status.Provisioned = true
+	} else {
+		err = r.Actuator.Update(context.TODO(), cr)
+		if err != nil {
+			logger.WithError(err).Error("actuator error updating credentials")
+			return nil, err
+		}
+		cr.Status.Provisioned = true
+	}
+
+	return cr, nil
 }
 
 func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
@@ -363,4 +483,20 @@ func DeleteFinalizer(object metav1.Object, finalizer string) {
 	finalizers := sets.NewString(object.GetFinalizers()...)
 	finalizers.Delete(finalizer)
 	object.SetFinalizers(finalizers.List())
+}
+
+func properlyAnnotatedSecret(secret *corev1.Secret) bool {
+	if secret.ObjectMeta.Annotations == nil {
+		return false
+	}
+
+	if _, ok := secret.ObjectMeta.Annotations[secretannotator.AnnotationKey]; !ok {
+		return false
+	}
+
+	return true
+}
+
+func getCredCreationMode(cloudCredSecret *corev1.Secret) string {
+	return cloudCredSecret.Annotations[secretannotator.AnnotationKey]
 }

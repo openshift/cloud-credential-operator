@@ -32,4 +32,8 @@ type Actuator interface {
 	Update(context.Context, *minterv1.CredentialsRequest) error
 	// Checks if the credentials currently exists.
 	Exists(context.Context, *minterv1.CredentialsRequest) (bool, error)
+	// NeedsUpdate will answer the question whether there is a need to update credentials
+	// based on whether any creds exist, or whether the existing creds no longer
+	// satisfy the CredentialsRequest
+	NeedsUpdate(context.Context, *minterv1.CredentialsRequest) (bool, error)
 }
