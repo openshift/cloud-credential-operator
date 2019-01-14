@@ -45,6 +45,10 @@ func (a *DummyActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequ
 	return true, nil
 }
 
+func (a *DummyActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	return false, nil
+}
+
 func (a *DummyActuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	return nil
 }
