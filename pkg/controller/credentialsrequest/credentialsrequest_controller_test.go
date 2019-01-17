@@ -33,7 +33,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	installtypes "github.com/openshift/installer/pkg/types"
 	installtypesaws "github.com/openshift/installer/pkg/types/aws"
 
@@ -66,9 +66,15 @@ type ExpectedCondition struct {
 	status        corev1.ConditionStatus
 }
 
+type ExpectedCOCondition struct {
+	conditionType configv1.ClusterStatusConditionType
+	reason        string
+	status        corev1.ConditionStatus
+}
+
 func TestCredentialsRequestReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
-	openshiftapiv1.Install(scheme.Scheme)
+	configv1.Install(scheme.Scheme)
 
 	// Utility function to get the test credentials request from the fake client
 	getCR := func(c client.Client) *minterv1.CredentialsRequest {
@@ -89,6 +95,15 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		return nil
 	}
 
+	getClusterOperator := func(c client.Client) *configv1.ClusterOperator {
+		co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: "openshift-cloud-credential-operator"}}
+		err := c.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
+		if err == nil {
+			return co
+		}
+		return nil
+	}
+
 	tests := []struct {
 		name                string
 		existing            []runtime.Object
@@ -97,11 +112,15 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		mockReadAWSClient   func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		mockSecretAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		validate            func(client.Client, *testing.T)
-		expectedConditions  []ExpectedCondition
+		// Expected conditions on the credentials request:
+		expectedConditions []ExpectedCondition
+		// Expected conditions on the credentials cluster operator:
+		expectedCOConditions []ExpectedCOCondition
 	}{
 		{
 			name: "add finalizer",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequest(t)
@@ -126,6 +145,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "new credential",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
@@ -158,11 +178,26 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorFailing,
+					status:        corev1.ConditionFalse,
+				},
+			},
 		},
 		{
 			// This tests the case where we create our own read only creds initially:
 			name: "new credential no read-only creds available",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
@@ -191,11 +226,26 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorFailing,
+					status:        corev1.ConditionFalse,
+				},
+			},
 		},
 		{
 			// This indicates an error state.
 			name: "new credential no root creds available",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
@@ -216,15 +266,32 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.False(t, cr.Status.Provisioned)
 			},
 			expectErr: true,
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionTrue,
+				},
+				/* TODO: controller does not currently set any condition for this error
+				{
+					conditionType: configv1.OperatorFailing,
+					status:        corev1.ConditionTrue,
+				},
+				*/
+			},
 		},
 		{
 			name: "cred and secret exist user tagged",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -253,11 +320,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred and secret exist user missing tag",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -291,10 +359,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred and secret exist no root creds",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -319,10 +388,25 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorFailing,
+					status:        corev1.ConditionFalse,
+				},
+			},
 		},
 		{
 			name: "cred missing access key exists",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
@@ -358,11 +442,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred exists access key missing",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -394,11 +479,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequestWithDeletionTimestamp(t),
 				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 				testClusterVersion(),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -413,10 +499,25 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				targetSecret := getSecret(c)
 				assert.Nil(t, targetSecret)
 			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorFailing,
+					status:        corev1.ConditionFalse,
+				},
+			},
 		},
 		{
 			name: "new passthrough credential",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testPassthroughCredentialsRequest(t),
 				testPassthroughAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
@@ -445,11 +546,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "passthrough cred deletion",
 			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testPassthroughCredentialsRequestWithDeletionTimestamp(t),
 				testPassthroughAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-				testAWSCredsSecret(testNamespace, testSecretName, testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -623,13 +725,24 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.Exactly(t, condition.status, foundCondition.Status)
 				assert.Exactly(t, condition.reason, foundCondition.Reason)
 			}
+
+			for _, condition := range test.expectedCOConditions {
+				co := getClusterOperator(fakeClient)
+				assert.NotNil(t, co)
+				foundCondition := findClusterOperatorCondition(co.Status.Conditions, condition.conditionType)
+				assert.NotNil(t, foundCondition)
+				assert.Equal(t, string(condition.status), string(foundCondition.Status), "condition %s had unexpected status", condition.conditionType)
+				if condition.reason != "" {
+					assert.Exactly(t, condition.reason, foundCondition.Reason)
+				}
+			}
 		})
 	}
 }
 
 const (
 	testCRName                 = "openshift-component-a"
-	testNamespace              = "myproject"
+	testNamespace              = "openshift-cloud-credential-operator"
 	testClusterName            = "testcluster"
 	testClusterID              = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
 	testSecretName             = "test-secret"
@@ -662,6 +775,7 @@ func testCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.Credent
 	cr := testCredentialsRequest(t)
 	now := metav1.Now()
 	cr.DeletionTimestamp = &now
+	cr.Status.Provisioned = true
 	return cr
 }
 
@@ -974,12 +1088,12 @@ func mockGetUserPolicyMissing(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUserPolicy(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such policy", nil))
 }
 
-func testClusterVersion() *openshiftapiv1.ClusterVersion {
-	return &openshiftapiv1.ClusterVersion{
+func testClusterVersion() *configv1.ClusterVersion {
+	return &configv1.ClusterVersion{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "version",
 		},
-		Spec: openshiftapiv1.ClusterVersionSpec{
+		Spec: configv1.ClusterVersionSpec{
 			ClusterID: testClusterID,
 		},
 	}
