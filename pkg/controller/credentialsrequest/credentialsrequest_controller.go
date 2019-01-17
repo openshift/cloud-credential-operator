@@ -207,12 +207,16 @@ type ReconcileCredentialsRequest struct {
 // Automatically generate RBAC rules to allow the Controller to read and write required types.
 // +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests;credentialsrequests/status;credentialsrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
+// TODO: temporary
+// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
+// +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithFields(log.Fields{
 		"controller": "credreq",
 		"cr":         fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
 	})
+
 	logger.Info("syncing credentials request")
 	cr := &minterv1.CredentialsRequest{}
 	err := r.Get(context.TODO(), request.NamespacedName, cr)
@@ -255,6 +259,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			// Ensure the finalizer is set on any not-deleted requests:
 			logger.Infof("adding finalizer: %s", minterv1.FinalizerDeprovision)
 			err = r.addDeprovisionFinalizer(cr)
+			if err != nil {
+				logger.WithError(err).Error("error adding finalizer")
+			}
 			return reconcile.Result{}, err
 		}
 	}

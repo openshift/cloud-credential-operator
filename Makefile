@@ -30,6 +30,7 @@ install: manifests
 	kubectl apply -f config/crds
 
 # Deploy controller in the configured Kubernetes cluster in ~/.kube/config
+.PHONY: manifests
 deploy: manifests
 	kubectl apply -f config/crds
 	kustomize build config/default | kubectl apply -f -
@@ -38,6 +39,9 @@ deploy: manifests
 manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name cloud-credential-operator
+	# kustomize and move to manifests dir for release image:
+	kustomize build config/default > manifests/01-deployment.yaml
+	cp config/crds/cloudcredential_v1beta1_credentialsrequest.yaml manifests/00-cloudcredential-crd.yaml
 
 # Run go fmt against code
 fmt:

@@ -37,3 +37,26 @@ type Actuator interface {
 	// satisfy the CredentialsRequest
 	NeedsUpdate(context.Context, *minterv1.CredentialsRequest) (bool, error)
 }
+
+type DummyActuator struct {
+}
+
+func (a *DummyActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	return true, nil
+}
+
+func (a *DummyActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	return false, nil
+}
+
+func (a *DummyActuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return nil
+}
+
+func (a *DummyActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return nil
+}
+
+func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	return nil
+}
