@@ -123,7 +123,7 @@ const (
 	// CredentialsProvisionFailure is true whenver there has been an issue while trying
 	// to provision the credentials (either passthrough or minting). Error message will
 	// be stored directly in the condition message.
-	CredentialsProvisionFailure CredentialsRequestConditionType = "CredentialsGrantFailure"
+	CredentialsProvisionFailure CredentialsRequestConditionType = "CredentialsProvisionFailure"
 	// CredentialsDeprovisionFailure is true whenever there is an error when trying
 	// to clean up any previously-created cloud resources
 	CredentialsDeprovisionFailure CredentialsRequestConditionType = "CredentialsDeprovisionFailure"

@@ -62,6 +62,15 @@ rules:
   - list
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - clusteroperators
+  - clusteroperators/status
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
   - ""
   resources:
   - secrets
@@ -136,10 +145,10 @@ spec:
         resources:
           limits:
             cpu: 100m
-            memory: 100Mi
+            memory: 500Mi
           requests:
             cpu: 100m
-            memory: 70Mi
+            memory: 150Mi
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical

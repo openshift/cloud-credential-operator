@@ -55,6 +55,15 @@ rules:
   - list
   - watch
 - apiGroups:
+  - config.openshift.io
+  resources:
+  - clusteroperators
+  - clusteroperators/status
+  verbs:
+  - create
+  - get
+  - update
+- apiGroups:
   - ""
   resources:
   - secrets
