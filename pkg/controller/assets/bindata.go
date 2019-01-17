@@ -32,35 +32,6 @@ func config_samples_credminter_v1_credentialsrequest_yaml() ([]byte, error) {
 	return _config_samples_credminter_v1_credentialsrequest_yaml, nil
 }
 
-var _config_samples_credminter_v1_iam_read_only_yaml = []byte(`apiVersion: cloudcredential.openshift.io/v1beta1
-kind: CredentialsRequest
-metadata:
-  labels:
-    controller-tools.k8s.io: "1.0"
-  name: cloud-credential-operator-iam-ro
-  namespace: openshift-cloud-credential-operator
-spec:
-  secretRef:
-    name: cloud-credential-operator-iam-ro-creds
-    namespace: openshift-cloud-credential-operator
-  providerSpec:
-    apiVersion: cloudcredential.openshift.io/v1beta1
-    kind: AWSProviderSpec
-    statementEntries:
-    - effect: Allow
-      action:
-      - iam:GetUser
-      - iam:GetUserPolicy
-      - iam:ListAccessKeys
-      resource: "*"
----
-
-`)
-
-func config_samples_credminter_v1_iam_read_only_yaml() ([]byte, error) {
-	return _config_samples_credminter_v1_iam_read_only_yaml, nil
-}
-
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -84,7 +55,6 @@ func AssetNames() []string {
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() ([]byte, error){
 	"config/samples/credminter_v1_credentialsrequest.yaml": config_samples_credminter_v1_credentialsrequest_yaml,
-	"config/samples/credminter_v1_iam_read_only.yaml":      config_samples_credminter_v1_iam_read_only_yaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -131,7 +101,6 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 	"config": {nil, map[string]*_bintree_t{
 		"samples": {nil, map[string]*_bintree_t{
 			"credminter_v1_credentialsrequest.yaml": {config_samples_credminter_v1_credentialsrequest_yaml, map[string]*_bintree_t{}},
-			"credminter_v1_iam_read_only.yaml":      {config_samples_credminter_v1_iam_read_only_yaml, map[string]*_bintree_t{}},
 		}},
 	}},
 }}

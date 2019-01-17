@@ -13,7 +13,7 @@ namespace: openshift-cloud-credential-operator
 resources:
 - ../rbac/rbac_role.yaml
 - ../rbac/rbac_role_binding.yaml
-- ../manager/manager.yaml
+- ../manager/deployment.yaml
 
 patches:
 - manager_image_patch.yaml

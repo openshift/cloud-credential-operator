@@ -18,4 +18,7 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/open
 FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
 WORKDIR /root/
 COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/manager .
+ADD manifests/ /manifests
+
+LABEL io.openshift.release.operator=true
 ENTRYPOINT ["./manager"]

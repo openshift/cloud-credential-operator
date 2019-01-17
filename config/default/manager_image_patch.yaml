@@ -1,5 +1,5 @@
-apiVersion: apps.openshift.io/v1
-kind: DeploymentConfig
+apiVersion: apps/v1
+kind: Deployment
 metadata:
   name: cloud-credential-operator
   namespace: openshift-cloud-credential-operator
@@ -9,6 +9,5 @@ spec:
       containers:
       # Change the value of image field below to your controller image URL
       - name: manager
-        # TODO something more formal
-        image: quay.io/dgoodwin/cloud-credential-operator:latest
+        image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: Always
