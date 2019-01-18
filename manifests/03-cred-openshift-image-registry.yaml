@@ -17,5 +17,13 @@ spec:
       action:
       - s3:CreateBucket
       - s3:DeleteBucket
+      - s3:PutBucketTagging
+      - s3:GetBucketTagging
+      - s3:PutEncryptionConfiguration
+      - s3:GetEncryptionConfiguration
+      - s3:PutLifecycleConfiguration
+      - s3:GetLifecycleConfiguration
+      - s3:GetBucketLocation
+      - s3:ListBucket
       resource: "*"
 ---
