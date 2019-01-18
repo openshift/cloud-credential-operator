@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,6 +48,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+)
+
+const (
+	namespaceMissing = "NamespaceMissing"
+	namespaceExists  = "NamespaceExists"
+
+	cloudCredsInsufficient = "CloudCredsInsufficient"
+	cloudCredsSufficient   = "CloudCredsSufficient"
+
+	credentialsProvisionFailure = "CredentialsProvisionFailure"
+	credentialsProvisionSuccess = "CredentialsProvisionSuccess"
+
+	cloudCredDeprovisionFailure = "CloudCredDeprovisionFailure"
+	cloudCredDeprovisionSuccess = "CloudCredDeprovisionSuccess"
 )
 
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
@@ -268,8 +283,22 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			err = r.Actuator.Delete(context.TODO(), cr)
 			if err != nil {
 				logger.WithError(err).Error("actuator error deleting credentials exist")
+
+				setCredentialsDeprovisionFailureCondition(cr, true, err)
+				if err := r.updateStatus(origCR, cr, logger); err != nil {
+					logger.WithError(err).Error("failed to update condition")
+					return reconcile.Result{}, err
+				}
 				return reconcile.Result{}, err
+			} else {
+				setCredentialsDeprovisionFailureCondition(cr, false, nil)
+				if err := r.updateStatus(origCR, cr, logger); err != nil {
+					// Just a warning, since on deprovision we're just tearing down
+					// the CredentialsRequest object anyway
+					logger.Warnf("unable to update condition: %v", err)
+				}
 			}
+
 			logger.Info("actuator deletion complete, removing finalizer")
 			err = r.removeDeprovisionFinalizer(cr)
 			if err != nil {
@@ -302,6 +331,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			// TODO: technically we should deprovision if a credential was in this ns, but it
 			// was then deleted.
 			logger.Warn("secret namespace does not yet exist")
+			setMissingTargetNamespaceCondition(cr, true)
+			if err := r.updateStatus(origCR, cr, logger); err != nil {
+				logger.WithError(err).Error("error updating condition")
+				return reconcile.Result{}, err
+			}
 			// We will re-sync immediately when the namespace is created.
 			return reconcile.Result{}, nil
 		}
@@ -309,6 +343,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, err
 	} else {
 		logger.Debug("found secret namespace")
+		setMissingTargetNamespaceCondition(cr, false)
 	}
 
 	// Now figure out whether we need to create new creds/secrets to satisfy the CredentialsRequest
@@ -334,22 +369,41 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		}
 
 		if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.MintAnnotation {
-			cr, err = r.mintCredsWithActuator(cr, logger)
+			err = r.mintCredsWithActuator(cr, logger)
 			if err != nil {
 				logger.WithError(err).Errorf("error while minting credentials")
+				setFailedToProvisionCredentialsRequest(cr, true, err)
+				if err := r.updateStatus(origCR, cr, logger); err != nil {
+					logger.WithError(err).Error("failed to update condition")
+					return reconcile.Result{}, err
+				}
 				return reconcile.Result{}, err
 			}
 		} else if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.PassthroughAnnotation {
 			cr, err = r.usePassthroughCreds(cr, cloudCredSecret, logger)
 			if err != nil {
 				logger.WithError(err).Errorf("error while trying to use creds as passthrough")
+				setFailedToProvisionCredentialsRequest(cr, true, err)
+				if err := r.updateStatus(origCR, cr, logger); err != nil {
+					logger.WithError(err).Error("failed to update condition")
+				}
 				return reconcile.Result{}, err
 			}
 		} else if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.InsufficientAnnotation {
 			// update status on credentialsrequest to indicate we can't satisfy the request
-			logger.Debug("DO STATUS/CONDITION UPDATE THINGS")
-			return reconcile.Result{}, fmt.Errorf("RETRY")
+			logger.Debug("insufficient creds for passthrough or minting")
+			setInsufficientCredsCondition(cr, true)
+			if err := r.updateStatus(origCR, cr, logger); err != nil {
+				logger.WithError(err).Error("failed to update status")
+				return reconcile.Result{}, err
+			}
+			// Returning error, will retry with the expectation that someone will notice
+			// the bad condition(s) and fix
+			return reconcile.Result{}, fmt.Errorf("insufficient creds to satisfy CredentialsRequest: %v", cr.Name)
 		}
+
+		setInsufficientCredsCondition(cr, false)
+		setFailedToProvisionCredentialsRequest(cr, false, nil)
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
@@ -431,6 +485,90 @@ func (r *ReconcileCredentialsRequest) usePassthroughCreds(cr *minterv1.Credentia
 	return cr, nil
 }
 
+func setMissingTargetNamespaceCondition(cr *minterv1.CredentialsRequest, missing bool) {
+	var (
+		msg, reason string
+		status      corev1.ConditionStatus
+		updateCheck utils.UpdateConditionCheck
+	)
+	if missing {
+		msg = fmt.Sprintf("target namespace %v not found", cr.Spec.SecretRef.Namespace)
+		status = corev1.ConditionTrue
+		reason = namespaceMissing
+		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
+	} else {
+		msg = fmt.Sprintf("target namespace %v found", cr.Spec.SecretRef.Namespace)
+		status = corev1.ConditionFalse
+		reason = namespaceExists
+		updateCheck = utils.UpdateConditionNever
+	}
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.MissingTargetNamespace,
+		status, reason, msg, updateCheck)
+}
+
+func setInsufficientCredsCondition(cr *minterv1.CredentialsRequest, insufficient bool) {
+	var (
+		msg, reason string
+		status      corev1.ConditionStatus
+		updateCheck utils.UpdateConditionCheck
+	)
+	if insufficient {
+		msg = fmt.Sprintf("cloud creds are insufficient to satisfy CredentialsRequest")
+		status = corev1.ConditionTrue
+		reason = cloudCredsInsufficient
+		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
+	} else {
+		msg = fmt.Sprintf("cloud credentials sufficient for minting or passthrough")
+		status = corev1.ConditionFalse
+		reason = cloudCredsSufficient
+		updateCheck = utils.UpdateConditionNever
+	}
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.InsufficientCloudCredentials,
+		status, reason, msg, updateCheck)
+}
+
+func setFailedToProvisionCredentialsRequest(cr *minterv1.CredentialsRequest, failed bool, err error) {
+	var (
+		msg, reason string
+		status      corev1.ConditionStatus
+		updateCheck utils.UpdateConditionCheck
+	)
+	if failed {
+		msg = fmt.Sprintf("failed to grant creds: %v", err)
+		status = corev1.ConditionTrue
+		reason = credentialsProvisionFailure
+		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
+	} else {
+		msg = fmt.Sprintf("successfully granted credentials request")
+		status = corev1.ConditionFalse
+		reason = credentialsProvisionSuccess
+		updateCheck = utils.UpdateConditionNever
+	}
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.CredentialsProvisionFailure,
+		status, reason, msg, updateCheck)
+}
+
+func setCredentialsDeprovisionFailureCondition(cr *minterv1.CredentialsRequest, failed bool, err error) {
+	var (
+		msg, reason string
+		status      corev1.ConditionStatus
+		updateCheck utils.UpdateConditionCheck
+	)
+	if failed {
+		msg = fmt.Sprintf("failed to deprovision resource: %v", err)
+		status = corev1.ConditionTrue
+		reason = cloudCredDeprovisionFailure
+		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
+	} else {
+		msg = fmt.Sprintf("deprovisioned cloud credential resource(s)")
+		status = corev1.ConditionFalse
+		reason = cloudCredDeprovisionSuccess
+		updateCheck = utils.UpdateConditionNever
+	}
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.CredentialsDeprovisionFailure,
+		status, reason, msg, updateCheck)
+}
+
 func updateExistingSecret(existing, cloudCred *corev1.Secret) bool {
 	if string(existing.Data[secretannotator.AwsAccessKeyName]) != string(cloudCred.Data[secretannotator.AwsAccessKeyName]) ||
 		string(existing.Data[secretannotator.AwsSecretAccessKeyName]) != string(cloudCred.Data[secretannotator.AwsSecretAccessKeyName]) {
@@ -441,30 +579,30 @@ func updateExistingSecret(existing, cloudCred *corev1.Secret) bool {
 	return false
 }
 
-func (r *ReconcileCredentialsRequest) mintCredsWithActuator(cr *minterv1.CredentialsRequest, logger log.FieldLogger) (*minterv1.CredentialsRequest, error) {
+func (r *ReconcileCredentialsRequest) mintCredsWithActuator(cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	// Hand over to the actuator:
 	exists, err := r.Actuator.Exists(context.TODO(), cr)
 	if err != nil {
 		logger.WithError(err).Error("actuator error checking if credentials exist")
-		return nil, err
+		return err
 	}
 	if !exists {
 		err = r.Actuator.Create(context.TODO(), cr)
 		if err != nil {
 			logger.WithError(err).Error("actuator error creating credentials")
-			return nil, err
+			return err
 		}
 		cr.Status.Provisioned = true
 	} else {
 		err = r.Actuator.Update(context.TODO(), cr)
 		if err != nil {
 			logger.WithError(err).Error("actuator error updating credentials")
-			return nil, err
+			return err
 		}
 		cr.Status.Provisioned = true
 	}
 
-	return cr, nil
+	return nil
 }
 
 func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {

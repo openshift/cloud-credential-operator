@@ -64,6 +64,9 @@ type CredentialsRequestStatus struct {
 
 	// ProviderStatus contains cloud provider specific status.
 	ProviderStatus *runtime.RawExtension `json:"providerStatus,omitempty"`
+
+	// Conditions includes detailed status for the CredentialsRequest
+	Conditions []CredentialsRequestCondition `json:"conditions"`
 }
 
 // +genclient
@@ -88,6 +91,43 @@ type CredentialsRequestList struct {
 	metav1.ListMeta `json:"metadata,omitempty"`
 	Items           []CredentialsRequest `json:"items"`
 }
+
+// CredentialsRequestCondition contains details for any of the conditions on a CredentialsRequest object
+type CredentialsRequestCondition struct {
+	// Type is the specific type of the condition
+	Type CredentialsRequestConditionType `json:"type"`
+	// Status is the status of the condition
+	Status corev1.ConditionStatus `json:"status"`
+	// LastProbeTime is the last time we probed the condition
+	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
+	// LastTransitionTime is the last time the condition transitioned from one status to another.
+	LastTransitionTime metav1.Time `json:"lastTransitionTime,omitempty"`
+	// Reason is a unique, one-word, CamelCase reason for the condition's last transition
+	Reason string `json:"reason,omitempty"`
+	// Message is a human-readable message indicating details about the last transition
+	Message string `json:"message,omitempty"`
+}
+
+// CredentialsRequestConditionType are the valid condition types for a CredentialsRequest
+type CredentialsRequestConditionType string
+
+// These are valid conditions for a CredentialsRequest
+const (
+	// InsufficientCloudCredentials is true when the cloud credentials are deemed to be insufficient
+	// to either mint custom creds to satisfy the CredentialsRequest or insufficient to
+	// be able to be passed along as-is to satisfy the CredentialsRequest
+	InsufficientCloudCredentials CredentialsRequestConditionType = "InsufficientCloudCreds"
+	// MissingTargetNamespace is true when the namespace specified to hold the resulting
+	// credentials is not present
+	MissingTargetNamespace CredentialsRequestConditionType = "MissingTargetNamespace"
+	// CredentialsProvisionFailure is true whenver there has been an issue while trying
+	// to provision the credentials (either passthrough or minting). Error message will
+	// be stored directly in the condition message.
+	CredentialsProvisionFailure CredentialsRequestConditionType = "CredentialsGrantFailure"
+	// CredentialsDeprovisionFailure is true whenever there is an error when trying
+	// to clean up any previously-created cloud resources
+	CredentialsDeprovisionFailure CredentialsRequestConditionType = "CredentialsDeprovisionFailure"
+)
 
 func init() {
 	SchemeBuilder.Register(&CredentialsRequest{}, &CredentialsRequestList{}, &AWSProviderStatus{}, &AWSProviderSpec{})
