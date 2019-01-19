@@ -8,26 +8,16 @@ metadata:
 spec:
   secretRef:
     name: cloud-credentials
-    namespace: openshift-ingress
+    namespace: openshift-ingress-operator
   providerSpec:
     apiVersion: cloudcredential.openshift.io/v1beta1
     kind: AWSProviderSpec
     statementEntries:
     - effect: Allow
       action:
-      - s3:CreateBucket
-      - s3:DeleteBucket
-      - elasticloadbalancing:AddTags
-      - elasticloadbalancing:ApplySecurityGroupsToLoadBalancer
-      - elasticloadbalancing:ConfigureHealthCheck
-      - elasticloadbalancing:CreateLoadBalancer
-      - elasticloadbalancing:CreateLoadBalancerListeners
-      - elasticloadbalancing:DeleteLoadBalancer
-      - elasticloadbalancing:DeleteLoadBalancerListeners
-      - elasticloadbalancing:DescribeLoadBalancerAttributes
       - elasticloadbalancing:DescribeLoadBalancers
-      - elasticloadbalancing:DescribeTags
-      - elasticloadbalancing:ModifyLoadBalancerAttributes
-      - elasticloadbalancing:RegisterInstancesWithLoadBalancer
+      - route53:ListHostedZones
+      - route53:ChangeResourceRecordSets
+      - tag:GetResources
       resource: "*"
 ---
