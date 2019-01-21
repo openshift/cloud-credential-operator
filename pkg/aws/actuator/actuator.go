@@ -539,6 +539,16 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	logger.Debug("Delete ListAccessKeys")
 	allUserKeys, err := awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case iam.ErrCodeNoSuchEntityException:
+				logger.Warn("error listing access keys, user does not exist, returning success")
+				return nil
+			default:
+				logger.WithError(err).Error("error listing all access keys for user")
+				return formatAWSErr(aerr)
+			}
+		}
 		logger.WithError(err).Error("error listing all access keys for user")
 		return err
 	}
