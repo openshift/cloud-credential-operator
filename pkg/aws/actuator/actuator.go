@@ -164,6 +164,7 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	readAWSClient, err := a.buildReadAWSClient(cr)
 	if err != nil {
+		log.WithError(err).Error("error creating read-only AWS client")
 		return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
 	}
 
@@ -174,6 +175,7 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			UserName: aws.String(awsStatus.User),
 		})
 		if err != nil {
+			logger.WithError(err).Errorf("error getting user: %s", user)
 			return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
 		}
 		clusterUUID, err := a.loadClusterUUID(logger)
@@ -197,6 +199,7 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		}
 
 		// Does the access key in the secret still exist?
+		logger.Debug("NeedsUpdate ListAccessKeys")
 		allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
 		if err != nil {
 			logger.WithError(err).Error("error listing all access keys for user")
@@ -308,6 +311,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 
 	readAWSClient, err := a.buildReadAWSClient(cr)
 	if err != nil {
+		logger.WithError(err).Error("error building read-only AWS client")
 		return err
 	}
 
@@ -387,6 +391,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Info("successfully set user policy")
 	}
 
+	logger.Debug("sync ListAccessKeys")
 	allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		logger.WithError(err).Error("error listing all access keys for user")
@@ -531,6 +536,7 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	}
 	logger.Info("user policy deleted")
 
+	logger.Debug("Delete ListAccessKeys")
 	allUserKeys, err := awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
 	if err != nil {
 		logger.WithError(err).Error("error listing all access keys for user")
@@ -676,6 +682,8 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	}
 
 	logger.Debug("creating read AWS client")
+	//a.AWSClientBuilder(accessKeyID, secretAccessKey)
+	//return nil, fmt.Errorf("test")
 	return a.AWSClientBuilder(accessKeyID, secretAccessKey)
 }
 
