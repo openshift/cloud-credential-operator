@@ -22,16 +22,17 @@ import (
 	"net/url"
 	"reflect"
 
-	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
-
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v2"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+	installtypes "github.com/openshift/installer/pkg/types"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -54,6 +55,9 @@ const (
 	roAWSCredsSecret            = "cloud-credential-operator-iam-ro-creds"
 	clusterVersionObjectName    = "version"
 	openshiftClusterIDKey       = "openshiftClusterID"
+	clusterConfigName           = "cluster-config-v1"
+	clusterConfigNamespace      = "kube-system"
+	clusterConfigMapKey         = "install-config"
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
@@ -173,7 +177,22 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
 		}
 		clusterUUID, err := a.loadClusterUUID(logger)
-		if !userHasClusterTag(user.User, string(clusterUUID)) {
+		if err != nil {
+			return true, err
+		}
+
+		installConfig, err := a.loadClusterInstallConfig(logger)
+		if err != nil {
+			return true, err
+		}
+		userTags := map[string]string{}
+		if installConfig.Platform.AWS != nil {
+			userTags = installConfig.Platform.AWS.UserTags
+		} else {
+			log.Warn("no AWS platform set")
+		}
+
+		if !userHasExpectedTags(logger, user.User, string(clusterUUID), userTags) {
 			return true, nil
 		}
 
@@ -297,6 +316,17 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
+	installConfig, err := a.loadClusterInstallConfig(logger)
+	if err != nil {
+		return err
+	}
+	userTags := map[string]string{}
+	if installConfig.Platform.AWS != nil {
+		userTags = installConfig.Platform.AWS.UserTags
+	} else {
+		log.Warn("no AWS platform set")
+	}
+
 	// Check if the user already exists:
 	var userOut *iam.User
 	getUserOut, err := readAWSClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
@@ -328,12 +358,12 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 
 	// Check if the user has the expected tags:
-	if !userHasClusterTag(userOut, string(clusterUUID)) {
+	if !userHasExpectedTags(logger, userOut, string(clusterUUID), userTags) {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		}
 
-		err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID))
+		err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID), userTags)
 		if err != nil {
 			return err
 		}
@@ -427,16 +457,23 @@ func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, aws
 	return true, nil
 }
 
-func userHasClusterTag(user *iam.User, clusterUUID string) bool {
+func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterUUID string, userTags map[string]string) bool {
 	// Check if the user has the expected tags:
 	if user == nil {
 		return false
 	}
-	if userHasTag(user, openshiftClusterIDKey, clusterUUID) {
-		return true
+	if !userHasTag(user, openshiftClusterIDKey, clusterUUID) {
+		log.Warnf("user missing tag: %s=%s", openshiftClusterIDKey, clusterUUID)
+		return false
+	}
+	for k, v := range userTags {
+		if !userHasTag(user, k, v) {
+			log.Warnf("user missing tag: %s=%s", k, v)
+			return false
+		}
 	}
 
-	return false
+	return true
 }
 func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, awsStatus *minterv1.AWSProviderStatus) error {
 
@@ -559,7 +596,7 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	return existingSecret, existingAccessKeyID, existingSecretAccessKey
 }
 
-func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterUUID string) error {
+func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterUUID string, userTags map[string]string) error {
 	logger.WithField("clusterID", clusterUUID).Info("tagging user with cluster UUID")
 	_, err := awsClient.TagUser(&iam.TagUserInput{
 		UserName: aws.String(username),
@@ -662,6 +699,38 @@ func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (openshiftapiv1.Cl
 	}
 	logger.WithField("clusterID", clusterVer.Spec.ClusterID).Debug("found cluster ID")
 	return clusterVer.Spec.ClusterID, nil
+}
+
+// loadClusterInstallConfig loads kube-system/cluster-config-v1 and unmarshalls to an InstallConfig
+// type.
+// WARNING: this will be deprecated soon but for now it's our only way to get the info we need.
+// (cluster name, user tags etc)
+func (a *AWSActuator) loadClusterInstallConfig(logger log.FieldLogger) (*installtypes.InstallConfig, error) {
+	log.Debug("loading cluster install config")
+	ic := &installtypes.InstallConfig{}
+	clusterConfig := &corev1.ConfigMap{}
+	err := a.Client.Get(context.Background(),
+		types.NamespacedName{Name: clusterConfigName, Namespace: clusterConfigNamespace},
+		clusterConfig)
+	if err != nil {
+		logger.WithError(err).Errorf("error fetching configmap %s/%s", clusterConfigNamespace, clusterConfigName)
+		return ic, err
+	}
+
+	icStr, ok := clusterConfig.Data[clusterConfigMapKey]
+	if !ok {
+		err = fmt.Errorf("configmap %s/%s did not contain key: %s", clusterConfigNamespace, clusterConfigName, clusterConfigMapKey)
+		log.WithError(err).Error("error loading cluster config")
+		return ic, err
+	}
+
+	err = yaml.Unmarshal([]byte(icStr), ic)
+	if err != nil {
+		log.WithError(err).Error("error parsing install config yaml")
+		return ic, err
+	}
+	log.Debug("cluster install config loaded successfully")
+	return ic, nil
 }
 
 func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
