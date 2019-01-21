@@ -22,8 +22,8 @@ import (
 	"net/url"
 	"reflect"
 
+	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/yaml.v2"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
@@ -279,10 +279,26 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
+	installConfig, err := a.loadClusterInstallConfig(logger)
+	if err != nil {
+		return err
+	}
+	userTags := map[string]string{}
+	if installConfig.Platform.AWS != nil {
+		userTags = installConfig.Platform.AWS.UserTags
+	} else {
+		log.Warn("no AWS platform set")
+	}
+
+	if installConfig.ObjectMeta.Name == "" {
+		log.Error("cluster install-config has no name")
+		return fmt.Errorf("cluster install-config has no name")
+	}
+
 	// Generate a randomized User for the credentials:
 	// TODO: check if the generated name is free
 	if awsStatus.User == "" {
-		username, err := generateUserName(cr.Name)
+		username, err := generateUserName(installConfig.ObjectMeta.Name, cr.Name)
 		if err != nil {
 			return err
 		}
@@ -318,17 +334,6 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	clusterUUID, err := a.loadClusterUUID(logger)
 	if err != nil {
 		return err
-	}
-
-	installConfig, err := a.loadClusterInstallConfig(logger)
-	if err != nil {
-		return err
-	}
-	userTags := map[string]string{}
-	if installConfig.Platform.AWS != nil {
-		userTags = installConfig.Platform.AWS.UserTags
-	} else {
-		log.Warn("no AWS platform set")
 	}
 
 	// Check if the user already exists:
@@ -1007,15 +1012,20 @@ func formatAWSErr(aerr awserr.Error) error {
 
 // generateUserName generates a unique user name for AWS and will truncate the credential name
 // to fit within the AWS limit of 64 chars if necessary.
-func generateUserName(credentialName string) (string, error) {
-	// TODO: it would be nice to include the cluster name in the username, may be added to a openshiftapi type in future. (Infrastructure mentioned)
+func generateUserName(clusterName, credentialName string) (string, error) {
 	if credentialName == "" {
 		return "", fmt.Errorf("empty credential name")
 	}
-	if len(credentialName) > 58 {
-		credentialName = credentialName[0:58]
+	if clusterName == "" {
+		return "", fmt.Errorf("empty cluster name")
 	}
-	return fmt.Sprintf("%s-%s", credentialName, utilrand.String(5)), nil
+	if len(clusterName) > 20 {
+		clusterName = clusterName[0:20]
+	}
+	if len(credentialName) > 37 {
+		credentialName = credentialName[0:37]
+	}
+	return fmt.Sprintf("%s-%s-%s", clusterName, credentialName, utilrand.String(5)), nil
 }
 
 func getPolicyName(userName string) string {
