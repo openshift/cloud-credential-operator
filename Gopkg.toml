@@ -5,6 +5,7 @@ required = [
     "github.com/onsi/ginkgo", # for test framework
     "github.com/onsi/gomega", # for test matchers
     "github.com/stretchr/testify/assert",
+    "github.com/openshift/installer/pkg/types",
     "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
     "k8s.io/code-generator/cmd/client-gen", # for go generate
     "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
@@ -40,6 +41,10 @@ required = [
 [[constraint]]
   branch = "master"
   name = "github.com/openshift/api"
+
+[[constraint]]
+  name = "github.com/openshift/installer"
+  revision = "d1272424396f1d42faf239dc1b976db905d0b338"
 
 # For dependency below: Refer to issue https://github.com/golang/dep/issues/1799
 [[override]]
