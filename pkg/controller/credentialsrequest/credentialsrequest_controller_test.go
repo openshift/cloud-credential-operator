@@ -261,7 +261,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUserUntagged(mockAWSClient)
 				mockGetUserPolicy(mockAWSClient, testPolicy1)
-				mockGetUserUntagged(mockAWSClient)
 				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
 				return mockAWSClient
 			},
@@ -649,7 +648,8 @@ func testInstallConfigMap() (*corev1.ConfigMap, error) {
 		Platform: installtypes.Platform{
 			AWS: &installtypesaws.Platform{
 				UserTags: map[string]string{
-					//"foo": "bar",
+					"foo": "bar",
+					"a":   "b",
 				},
 			},
 		},
@@ -707,6 +707,14 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 					{
 						Key:   aws.String("openshiftClusterName"),
 						Value: aws.String(testClusterName),
+					},
+					{
+						Key:   aws.String("foo"),
+						Value: aws.String("bar"),
+					},
+					{
+						Key:   aws.String("a"),
+						Value: aws.String("b"),
 					},
 				},
 			},
@@ -802,6 +810,14 @@ func mockTagUser(mockAWSClient *mockaws.MockClient) {
 				{
 					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testClusterID)),
 					Value: aws.String("owned"),
+				},
+				{
+					Key:   aws.String("a"),
+					Value: aws.String("b"),
+				},
+				{
+					Key:   aws.String("foo"),
+					Value: aws.String("bar"),
 				},
 			},
 		}).Return(&iam.TagUserOutput{}, nil)
