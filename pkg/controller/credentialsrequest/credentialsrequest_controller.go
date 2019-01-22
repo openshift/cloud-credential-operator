@@ -20,11 +20,14 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"time"
 
 	log "github.com/sirupsen/logrus"
+	"golang.org/x/time/rate"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
 
 	corev1 "k8s.io/api/core/v1"
@@ -34,9 +37,9 @@ import (
 	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
+	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -63,16 +66,40 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator) reconcile.Re
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Create a new controller
-	c, err := controller.New("credentialsrequest-controller", mgr, controller.Options{Reconciler: r})
-	if err != nil {
+	// Inject dependencies into Reconciler
+	if err := mgr.SetFields(r); err != nil {
+		return err
+	}
+
+	name := "credentialsrequest-controller"
+
+	// Custom rateLimiter that sets minimum backoff to 2 seconds
+	rateLimiter := workqueue.NewMaxOfRateLimiter(
+		workqueue.NewItemExponentialFailureRateLimiter(2*time.Second, 1000*time.Second),
+		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	)
+
+	// Create controller with dependencies set
+	c := &internalcontroller.Controller{
+		Do:       r,
+		Cache:    mgr.GetCache(),
+		Config:   mgr.GetConfig(),
+		Scheme:   mgr.GetScheme(),
+		Client:   mgr.GetClient(),
+		Recorder: mgr.GetRecorder(name),
+		Queue:    workqueue.NewNamedRateLimitingQueue(rateLimiter, name),
+		MaxConcurrentReconciles: 1,
+		Name: name,
+	}
+
+	if err := mgr.Add(c); err != nil {
 		return err
 	}
 
 	// Watch for changes to CredentialsRequest
 	// TODO: we should limit the namespaces where we watch, we want all requests in one namespace so anyone with admin on a namespace cannot create
 	// a request for any credentials they want.
-	err = c.Watch(&source.Kind{Type: &minterv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
+	err := c.Watch(&source.Kind{Type: &minterv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
