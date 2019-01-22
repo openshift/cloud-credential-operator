@@ -367,7 +367,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				mockListAccessKeysEmpty(mockAWSClient)
-				mockGetUser(mockAWSClient)
 				mockGetUserPolicy(mockAWSClient, testPolicy1)
 				mockListAccessKeysEmpty(mockAWSClient)
 				return mockAWSClient
@@ -690,7 +689,7 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 }
 
 func mockGetUserNotFound(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil))
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil)).AnyTimes()
 }
 
 func mockGetUser(mockAWSClient *mockaws.MockClient) {
@@ -707,7 +706,7 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 					},
 				},
 			},
-		}, nil)
+		}, nil).AnyTimes()
 }
 
 func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
@@ -718,7 +717,7 @@ func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
 				UserName: aws.String(testAWSUser),
 				Arn:      aws.String(testAWSARN),
 			},
-		}, nil)
+		}, nil).AnyTimes()
 }
 
 func mockDeleteUser(mockAWSClient *mockaws.MockClient) {

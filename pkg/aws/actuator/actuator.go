@@ -516,6 +516,7 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 		logger.Warn("no user name set on credentials being deleted, most likely were never provisioned or using passthrough creds")
 		return nil
 	}
+	logger = logger.WithField("userName", awsStatus.User)
 
 	logger.Info("deleting credential from AWS")
 
@@ -674,10 +675,9 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	// Handle an edge case with management of our own RO creds using a credentials request.
 	// If we're operating on those credentials, just use the root creds.
 	if cr.Spec.SecretRef.Name == roAWSCredsSecret && cr.Spec.SecretRef.Namespace == roAWSCredsSecretNamespace {
-		log.Warn("operating our our RO creds, using root creds for all AWS client operations")
+		log.Debug("operating our our RO creds, using root creds for all AWS client operations")
 		accessKeyID, secretAccessKey, err = minteraws.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		if err != nil {
-			// We've failed to find either set of creds for this client.
 			return nil, err
 		}
 	} else {
@@ -686,12 +686,8 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 		accessKeyID, secretAccessKey, err = minteraws.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
 		if err != nil {
 			if errors.IsNotFound(err) {
-				logger.Warn("read-only creds not found, checking if root creds exist")
-				accessKeyID, secretAccessKey, err = minteraws.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
-				if err != nil {
-					// We've failed to find either set of creds for this client.
-					return nil, err
-				}
+				logger.Warn("read-only creds not found, using root creds client")
+				return a.buildRootAWSClient(cr)
 			}
 		}
 	}
@@ -699,7 +695,31 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	logger.Debug("creating read AWS client")
 	//a.AWSClientBuilder(accessKeyID, secretAccessKey)
 	//return nil, fmt.Errorf("test")
-	return a.AWSClientBuilder(accessKeyID, secretAccessKey)
+	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey)
+	if err != nil {
+		return nil, err
+	}
+
+	// Test if the read-only client is working, if any error here we will fall back to using
+	// the root client.
+	// and if our RO user is not yet live, we should just fall back to using the root user
+	// if possible.
+	awsStatus, err := a.decodeProviderStatus(cr)
+	if err != nil {
+		return nil, err
+	}
+	_, err = client.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
+	if err != nil {
+		if aerr, ok := err.(awserr.Error); ok {
+			switch aerr.Code() {
+			case "InvalidClientTokenId":
+				logger.Warn("InvalidClientTokenId for read-only AWS account, likely a propagation delay, falling back to root AWS client")
+				return a.buildRootAWSClient(cr)
+			}
+			// Any other error we just let following code sort out.
+		}
+	}
+	return client, nil
 }
 
 func (a *AWSActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
