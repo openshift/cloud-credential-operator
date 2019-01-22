@@ -55,6 +55,7 @@ const (
 	roAWSCredsSecret            = "cloud-credential-operator-iam-ro-creds"
 	clusterVersionObjectName    = "version"
 	openshiftClusterIDKey       = "openshiftClusterID"
+	openshiftClusterNameKey     = "openshiftClusterName"
 	clusterConfigName           = "cluster-config-v1"
 	clusterConfigNamespace      = "kube-system"
 	clusterConfigMapKey         = "install-config"
@@ -194,7 +195,7 @@ func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			log.Warn("no AWS platform set")
 		}
 
-		if !userHasExpectedTags(logger, user.User, string(clusterUUID), userTags) {
+		if !userHasExpectedTags(logger, user.User, installConfig.ObjectMeta.Name, string(clusterUUID), userTags) {
 			return true, nil
 		}
 
@@ -367,12 +368,12 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 
 	// Check if the user has the expected tags:
-	if !userHasExpectedTags(logger, userOut, string(clusterUUID), userTags) {
+	if !userHasExpectedTags(logger, userOut, installConfig.ObjectMeta.Name, string(clusterUUID), userTags) {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		}
 
-		err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID), userTags)
+		err = a.tagUser(logger, rootAWSClient, awsStatus.User, installConfig.ObjectMeta.Name, string(clusterUUID), userTags)
 		if err != nil {
 			return err
 		}
@@ -467,13 +468,17 @@ func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, aws
 	return true, nil
 }
 
-func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterUUID string, userTags map[string]string) bool {
+func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterName, clusterUUID string, userTags map[string]string) bool {
 	// Check if the user has the expected tags:
 	if user == nil {
 		return false
 	}
 	if !userHasTag(user, openshiftClusterIDKey, clusterUUID) {
 		log.Warnf("user missing tag: %s=%s", openshiftClusterIDKey, clusterUUID)
+		return false
+	}
+	if !userHasTag(user, openshiftClusterNameKey, clusterName) {
+		log.Warnf("user missing tag: %s=%s", openshiftClusterNameKey, clusterName)
 		return false
 	}
 	for k, v := range userTags {
@@ -618,7 +623,7 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	return existingSecret, existingAccessKeyID, existingSecretAccessKey
 }
 
-func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterUUID string, userTags map[string]string) error {
+func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterName, clusterUUID string, userTags map[string]string) error {
 	logger.WithField("clusterID", clusterUUID).Info("tagging user with cluster UUID")
 	_, err := awsClient.TagUser(&iam.TagUserInput{
 		UserName: aws.String(username),
@@ -626,6 +631,10 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 			{
 				Key:   aws.String(openshiftClusterIDKey),
 				Value: aws.String(clusterUUID),
+			},
+			{
+				Key:   aws.String(openshiftClusterNameKey),
+				Value: aws.String(clusterName),
 			},
 			// This is expected to be the future format:
 			{
@@ -693,8 +702,6 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	}
 
 	logger.Debug("creating read AWS client")
-	//a.AWSClientBuilder(accessKeyID, secretAccessKey)
-	//return nil, fmt.Errorf("test")
 	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey)
 	if err != nil {
 		return nil, err

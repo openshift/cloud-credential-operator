@@ -704,6 +704,10 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 						Key:   aws.String("openshiftClusterID"),
 						Value: aws.String(testClusterID),
 					},
+					{
+						Key:   aws.String("openshiftClusterName"),
+						Value: aws.String(testClusterName),
+					},
 				},
 			},
 		}, nil).AnyTimes()
@@ -790,6 +794,10 @@ func mockTagUser(mockAWSClient *mockaws.MockClient) {
 				{
 					Key:   aws.String("openshiftClusterID"),
 					Value: aws.String(testClusterID),
+				},
+				{
+					Key:   aws.String("openshiftClusterName"),
+					Value: aws.String(testClusterName),
 				},
 				{
 					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testClusterID)),
