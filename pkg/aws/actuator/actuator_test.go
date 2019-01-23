@@ -25,30 +25,46 @@ import (
 func TestGenerateUserName(t *testing.T) {
 	tests := []struct {
 		name           string
+		clusterName    string
 		credentialName string
 		expectedPrefix string // last part is random
 		expectedError  bool
 	}{
 		{
 			name:           "max size no truncating required",
-			credentialName: "this-cred-should-be-58-characters-long11111111111111111111",
-			expectedPrefix: "this-cred-should-be-58-characters-long11111111111111111111-",
+			clusterName:    "20charclustername111",                  // max 20 chars
+			credentialName: "openshift-cluster-ingress111111111111", // max 37 chars
+			expectedPrefix: "20charclustername111-openshift-cluster-ingress111111111111-",
 		},
 		{
-			name:           "credential name truncated to 45 chars",
-			credentialName: "this-cred-should-be-45-characters-long11111111111111111111222222222",
-			expectedPrefix: "this-cred-should-be-45-characters-long11111111111111111111-",
+			name:           "credential name truncated to 37 chars",
+			clusterName:    "shortcluster",
+			credentialName: "openshift-cluster-ingress111111111111333333333333333", // over 37 chars
+			expectedPrefix: "shortcluster-openshift-cluster-ingress111111111111-",
+		},
+		{
+			name:           "cluster name truncated to 20 chars",
+			clusterName:    "longclustername1111137492374923874928347928374", // over 20 chars
+			credentialName: "openshift-cluster-ingress",
+			expectedPrefix: "longclustername11111-openshift-cluster-ingress-",
 		},
 		{
 			name:           "empty credential name",
+			clusterName:    "shortcluster",
 			credentialName: "",
+			expectedError:  true,
+		},
+		{
+			name:           "empty cluster name",
+			clusterName:    "",
+			credentialName: "something",
 			expectedError:  true,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			userName, err := generateUserName(test.credentialName)
+			userName, err := generateUserName(test.clusterName, test.credentialName)
 			if err != nil && !test.expectedError {
 				t.Errorf("unexpected error: %v", err)
 			} else if err == nil {

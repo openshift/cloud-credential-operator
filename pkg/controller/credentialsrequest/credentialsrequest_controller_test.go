@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/ghodss/yaml"
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -33,6 +34,8 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
+	installtypes "github.com/openshift/installer/pkg/types"
+	installtypesaws "github.com/openshift/installer/pkg/types/aws"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -364,7 +367,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				mockListAccessKeysEmpty(mockAWSClient)
-				mockGetUser(mockAWSClient)
 				mockGetUserPolicy(mockAWSClient, testPolicy1)
 				mockListAccessKeysEmpty(mockAWSClient)
 				return mockAWSClient
@@ -461,7 +463,15 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockSecretAWSClient = test.mockSecretAWSClient(mockCtrl)
 			}
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			existing := test.existing
+			installConfigMap, err := testInstallConfigMap()
+			if err != nil {
+				fmt.Printf("error creating test install config map: %v", err)
+				t.FailNow()
+			}
+			existing = append(test.existing, installConfigMap)
+
+			fakeClient := fake.NewFakeClient(existing...)
 			codec, err := minterv1.NewCodec()
 			if err != nil {
 				fmt.Printf("error creating codec: %v", err)
@@ -626,6 +636,41 @@ func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey
 	return s
 }
 
+func testInstallConfigMap() (*corev1.ConfigMap, error) {
+	ic := installtypes.InstallConfig{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1beta1",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: testClusterName,
+		},
+		BaseDomain: "example.com",
+		PullSecret: "test",
+		Platform: installtypes.Platform{
+			AWS: &installtypesaws.Platform{
+				UserTags: map[string]string{
+					//"foo": "bar",
+				},
+			},
+		},
+	}
+	icBytes, err := yaml.Marshal(ic)
+	if err != nil {
+		return nil, err
+	}
+	fmt.Printf("serialized: %s", string(icBytes))
+	cfgMap := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cluster-config-v1",
+			Namespace: "kube-system",
+		},
+		Data: map[string]string{
+			"install-config": string(icBytes),
+		},
+	}
+	return cfgMap, nil
+}
+
 func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -644,7 +689,7 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 }
 
 func mockGetUserNotFound(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil))
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil)).AnyTimes()
 }
 
 func mockGetUser(mockAWSClient *mockaws.MockClient) {
@@ -659,9 +704,13 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 						Key:   aws.String("openshiftClusterID"),
 						Value: aws.String(testClusterID),
 					},
+					{
+						Key:   aws.String("openshiftClusterName"),
+						Value: aws.String(testClusterName),
+					},
 				},
 			},
-		}, nil)
+		}, nil).AnyTimes()
 }
 
 func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
@@ -672,7 +721,7 @@ func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
 				UserName: aws.String(testAWSUser),
 				Arn:      aws.String(testAWSARN),
 			},
-		}, nil)
+		}, nil).AnyTimes()
 }
 
 func mockDeleteUser(mockAWSClient *mockaws.MockClient) {
@@ -745,6 +794,10 @@ func mockTagUser(mockAWSClient *mockaws.MockClient) {
 				{
 					Key:   aws.String("openshiftClusterID"),
 					Value: aws.String(testClusterID),
+				},
+				{
+					Key:   aws.String("openshiftClusterName"),
+					Value: aws.String(testClusterName),
 				},
 				{
 					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testClusterID)),
