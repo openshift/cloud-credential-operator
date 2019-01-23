@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
+	"sort"
 
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
@@ -625,23 +626,34 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 
 func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterName, clusterUUID string, userTags map[string]string) error {
 	logger.WithField("clusterID", clusterUUID).Info("tagging user with cluster UUID")
+	tags := []*iam.Tag{
+		{
+			Key:   aws.String(openshiftClusterIDKey),
+			Value: aws.String(clusterUUID),
+		},
+		{
+			Key:   aws.String(openshiftClusterNameKey),
+			Value: aws.String(clusterName),
+		},
+		// This is expected to be the future format:
+		{
+			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterUUID)),
+			Value: aws.String("owned"),
+		},
+	}
+
+	// Sort the user tag keys for testability:
+	keys := []string{}
+	for k := range userTags {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		tags = append(tags, &iam.Tag{Key: aws.String(k), Value: aws.String(userTags[k])})
+	}
 	_, err := awsClient.TagUser(&iam.TagUserInput{
 		UserName: aws.String(username),
-		Tags: []*iam.Tag{
-			{
-				Key:   aws.String(openshiftClusterIDKey),
-				Value: aws.String(clusterUUID),
-			},
-			{
-				Key:   aws.String(openshiftClusterNameKey),
-				Value: aws.String(clusterName),
-			},
-			// This is expected to be the future format:
-			{
-				Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterUUID)),
-				Value: aws.String("owned"),
-			},
-		},
+		Tags:     tags,
 	})
 	if err != nil {
 		logger.WithError(err).Error("unable to tag user")
