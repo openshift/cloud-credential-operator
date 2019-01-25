@@ -47,6 +47,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -57,6 +58,12 @@ var c client.Client
 
 func init() {
 	log.SetLevel(log.DebugLevel)
+}
+
+type ExpectedCondition struct {
+	conditionType minterv1.CredentialsRequestConditionType
+	reason        string
+	status        corev1.ConditionStatus
 }
 
 func TestCredentialsRequestReconcile(t *testing.T) {
@@ -90,6 +97,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		mockReadAWSClient   func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		mockSecretAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		validate            func(client.Client, *testing.T)
+		expectedConditions  []ExpectedCondition
 	}{
 		{
 			name: "add finalizer",
@@ -444,6 +452,97 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				return mockAWSClient
 			},
 		},
+		{
+			name: "no namespace condition",
+			existing: []runtime.Object{
+				testCredentialsRequest(t),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.MissingTargetNamespace,
+					reason:        "NamespaceMissing",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "insufficient creds",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testInsufficientAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.InsufficientCloudCredentials,
+					reason:        "CloudCredsInsufficient",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "failed to mint condition",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockFailedGetUser(mockAWSClient)
+				return mockAWSClient
+			},
+			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        "CredentialsProvisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "cred deletion failure condition",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequestWithDeletionTimestamp(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				mockDeleteUserPolicy(mockAWSClient)
+				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
+				mockDeleteUserFailure(mockAWSClient)
+				return mockAWSClient
+			},
+			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsDeprovisionFailure,
+					reason:        "CloudCredDeprovisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -511,6 +610,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			}
 			if err == nil && test.expectErr {
 				t.Errorf("Expected error but got none")
+			}
+
+			cr := getCR(fakeClient)
+			for _, condition := range test.expectedConditions {
+				foundCondition := utils.FindCredentialsRequestCondition(cr.Status.Conditions, condition.conditionType)
+				assert.NotNil(t, foundCondition)
+				assert.Exactly(t, condition.status, foundCondition.Status)
+				assert.Exactly(t, condition.reason, foundCondition.Reason)
 			}
 		})
 	}
@@ -629,6 +736,12 @@ func createTestNamespace(namespace string) *corev1.Namespace {
 	}
 }
 
+func testInsufficientAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
+	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
+	s.Annotations[secretannotator.AnnotationKey] = secretannotator.InsufficientAnnotation
+	return s
+}
+
 func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
 	s.Annotations[secretannotator.AnnotationKey] = secretannotator.PassthroughAnnotation
@@ -688,6 +801,14 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 	return s
 }
 
+func genericAWSError() error {
+	return awserr.New("GenericFailure", "An error besides NotFound", fmt.Errorf("Just a generic AWS error for test purposes"))
+}
+
+func mockFailedGetUser(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, genericAWSError()).AnyTimes()
+}
+
 func mockGetUserNotFound(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil)).AnyTimes()
 }
@@ -730,6 +851,10 @@ func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
 				Arn:      aws.String(testAWSARN),
 			},
 		}, nil).AnyTimes()
+}
+
+func mockDeleteUserFailure(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().DeleteUser(gomock.Any()).Return(nil, genericAWSError())
 }
 
 func mockDeleteUser(mockAWSClient *mockaws.MockClient) {
