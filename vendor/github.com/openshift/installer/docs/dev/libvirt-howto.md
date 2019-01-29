@@ -12,7 +12,7 @@ Before you begin, install the [build dependencies](dependencies.md).
 Make sure you have KVM enabled by checking for the device:
 
 ```console
-$ ls -l /dev/kvm
+$ ls -l /dev/kvm 
 crw-rw-rw-+ 1 root kvm 10, 232 Oct 31 09:22 /dev/kvm
 ```
 
