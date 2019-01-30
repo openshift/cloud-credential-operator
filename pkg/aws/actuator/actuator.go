@@ -46,7 +46,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 const (
@@ -820,11 +819,6 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 				"aws_secret_access_key": []byte(*accessKey.SecretAccessKey),
 			},
 		}
-		// Ensure secrets are "owned" by the credentials request that created or adopted them:
-		if err := controllerutil.SetControllerReference(cr, secret, a.Scheme); err != nil {
-			sLog.WithError(err).Error("error setting controller reference on secret")
-			return err
-		}
 
 		err := a.Client.Create(context.TODO(), secret)
 		if err != nil {
@@ -846,11 +840,6 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	if accessKey != nil {
 		existingSecret.Data["aws_access_key_id"] = []byte(*accessKey.AccessKeyId)
 		existingSecret.Data["aws_secret_access_key"] = []byte(*accessKey.SecretAccessKey)
-	}
-	// Ensure secrets are "owned" by the credentials request that created or adopted them:
-	if err := controllerutil.SetControllerReference(cr, existingSecret, a.Scheme); err != nil {
-		sLog.WithError(err).Error("error setting controller reference on secret")
-		return err
 	}
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {

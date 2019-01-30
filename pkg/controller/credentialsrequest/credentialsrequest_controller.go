@@ -36,12 +36,10 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/sets"
-	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/tools/cache"
 	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -299,6 +297,28 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 				}
 			}
 
+			// Delete the target secret if it exists:
+			targetSecret := &corev1.Secret{}
+			err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, targetSecret)
+			sLog := logger.WithFields(log.Fields{
+				"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+			})
+			if err != nil {
+				if errors.IsNotFound(err) {
+					sLog.Debug("target secret does not exist")
+				}
+				sLog.WithError(err).Error("unexpected error getting target secret to delete")
+				return reconcile.Result{}, err
+			} else {
+				err := r.Client.Delete(context.TODO(), targetSecret)
+				if err != nil {
+					sLog.WithError(err).Error("error deleting target secret")
+					return reconcile.Result{}, err
+				} else {
+					sLog.Info("target secret deleted successfully")
+				}
+			}
+
 			logger.Info("actuator deletion complete, removing finalizer")
 			err = r.removeDeprovisionFinalizer(cr)
 			if err != nil {
@@ -464,12 +484,6 @@ func (r *ReconcileCredentialsRequest) usePassthroughCreds(cr *minterv1.Credentia
 				secretannotator.AwsAccessKeyName:       cloudCredSecret.Data[secretannotator.AwsAccessKeyName],
 				secretannotator.AwsSecretAccessKeyName: cloudCredSecret.Data[secretannotator.AwsSecretAccessKeyName],
 			},
-		}
-
-		// set controller reference
-		if err := controllerutil.SetControllerReference(cr, newSecret, scheme.Scheme); err != nil {
-			logger.WithError(err).Error("error setting controller reference on secret")
-			return nil, err
 		}
 
 		// create secret
