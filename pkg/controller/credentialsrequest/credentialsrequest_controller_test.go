@@ -409,6 +409,10 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
 				return mockAWSClient
 			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				assert.Nil(t, targetSecret)
+			},
 		},
 		{
 			name: "new passthrough credential",
