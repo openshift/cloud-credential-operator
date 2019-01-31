@@ -44,7 +44,7 @@ func init() {
 
 // CheckCloudCredCreation will see whether we have enough permissions to create new sub-creds
 func CheckCloudCredCreation(awsClient ccaws.Client, logger log.FieldLogger) (bool, error) {
-	return checkCreateCredPermissions(awsClient, CredMintingActions, logger)
+	return CheckPermissionsAgainstActions(awsClient, CredMintingActions, logger)
 }
 
 // CheckPermissionsUsingQueryClient will use queryClient to query whether the credentials in targetClient can perform the actions
@@ -96,9 +96,10 @@ func CheckPermissionsAgainstStatementList(awsClient ccaws.Client, statementEntri
 	return CheckPermissionsUsingQueryClient(awsClient, awsClient, statementEntries, logger)
 }
 
-// checkCreateCredPermissions will take the static list of Actions needed to run in
-// cred-minting mode and see if the provided awsClient creds
-func checkCreateCredPermissions(awsClient ccaws.Client, actionList []string, logger log.FieldLogger) (bool, error) {
+// CheckPermissionsAgainstActions will take the static list of Actions to check whether the provided
+// awsClient creds have sufficient permissions to perform the actions.
+// Will return true/false indicating whether the permissions are sufficient.
+func CheckPermissionsAgainstActions(awsClient ccaws.Client, actionList []string, logger log.FieldLogger) (bool, error) {
 	statementList := []ccv1beta1.StatementEntry{
 		{
 			Action:   actionList,
