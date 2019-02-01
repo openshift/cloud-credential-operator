@@ -95,7 +95,6 @@ func isAWSCluster(m manager.Manager) (bool, error) {
 		return false, fmt.Errorf("cluster-config-v1 ConfigMap did not contain install-config data")
 	}
 	yamlStr := string(data)
-	log.Warn(yamlStr)
 	match, err := regexp.MatchString(`.*platform:\s*aws:.*`, yamlStr)
 	if err != nil {
 		return false, err
