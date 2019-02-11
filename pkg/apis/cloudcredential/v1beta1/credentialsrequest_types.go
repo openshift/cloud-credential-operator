@@ -66,7 +66,8 @@ type CredentialsRequestStatus struct {
 	ProviderStatus *runtime.RawExtension `json:"providerStatus,omitempty"`
 
 	// Conditions includes detailed status for the CredentialsRequest
-	Conditions []CredentialsRequestCondition `json:"conditions"`
+	// +optional
+	Conditions []CredentialsRequestCondition `json:"conditions,omitempty"`
 }
 
 // +genclient

@@ -32,10 +32,6 @@ type Actuator interface {
 	Update(context.Context, *minterv1.CredentialsRequest) error
 	// Checks if the credentials currently exists.
 	Exists(context.Context, *minterv1.CredentialsRequest) (bool, error)
-	// NeedsUpdate will answer the question whether there is a need to update credentials
-	// based on whether any creds exist, or whether the existing creds no longer
-	// satisfy the CredentialsRequest
-	NeedsUpdate(context.Context, *minterv1.CredentialsRequest) (bool, error)
 }
 
 type DummyActuator struct {
@@ -43,10 +39,6 @@ type DummyActuator struct {
 
 func (a *DummyActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
 	return true, nil
-}
-
-func (a *DummyActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
-	return false, nil
 }
 
 func (a *DummyActuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
@@ -59,4 +51,21 @@ func (a *DummyActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequ
 
 func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	return nil
+}
+
+type ActuatorError struct {
+	ErrReason minterv1.CredentialsRequestConditionType
+	Message   string
+}
+
+type ActuatorStatus interface {
+	Reason() minterv1.CredentialsRequestConditionType
+}
+
+func (e *ActuatorError) Error() string {
+	return e.Message
+}
+
+func (e *ActuatorError) Reason() minterv1.CredentialsRequestConditionType {
+	return e.ErrReason
 }

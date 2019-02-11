@@ -28,7 +28,6 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/internalcontroller"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	corev1 "k8s.io/api/core/v1"
@@ -306,9 +305,10 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			if err != nil {
 				if errors.IsNotFound(err) {
 					sLog.Debug("target secret does not exist")
+				} else {
+					sLog.WithError(err).Error("unexpected error getting target secret to delete")
+					return reconcile.Result{}, err
 				}
-				sLog.WithError(err).Error("unexpected error getting target secret to delete")
-				return reconcile.Result{}, err
 			} else {
 				err := r.Client.Delete(context.TODO(), targetSecret)
 				if err != nil {
@@ -366,68 +366,41 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		setMissingTargetNamespaceCondition(cr, false)
 	}
 
-	// Now figure out whether we need to create new creds/secrets to satisfy the CredentialsRequest
-
-	updateNeeded, err := r.Actuator.NeedsUpdate(context.TODO(), cr)
+	credsExists, err := r.Actuator.Exists(context.TODO(), cr)
 	if err != nil {
-		return reconcile.Result{}, fmt.Errorf("error determining whether updated creds are needed: %v", err)
+		logger.Errorf("error checking whether credentials already exists: %v", err)
+		return reconcile.Result{}, err
 	}
-	if !updateNeeded {
-		logger.Debug("creds already satisfy the CredentialsRequest")
-		cr.Status.Provisioned = true
-	} else {
 
-		cloudCredSecret := &corev1.Secret{}
-		if err := r.Get(context.Background(), types.NamespacedName{Name: secretannotator.CloudCredSecretName, Namespace: secretannotator.CloudCredSecretNamespace}, cloudCredSecret); err != nil {
-			logger.WithError(err).Error("unable to fetch cloud cred secret")
+	var syncErr error
+	if !credsExists {
+		syncErr = r.Actuator.Create(context.TODO(), cr)
+	} else {
+		syncErr = r.Actuator.Update(context.TODO(), cr)
+	}
+	if syncErr != nil {
+		logger.Errorf("error syncing credentials: %v", err)
+
+		switch t := syncErr.(type) {
+		case actuator.ActuatorStatus:
+			logger.Errorf("errored with condition: %v", t.Reason())
+			r.updateActuatorConditions(cr, t.Reason(), syncErr)
+		default:
+			logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
 			return reconcile.Result{}, err
 		}
 
-		if !properlyAnnotatedSecret(cloudCredSecret) {
-			logger.WithField("secret", fmt.Sprintf("%s/%s", secretannotator.CloudCredSecretNamespace, secretannotator.CloudCredSecretName)).Info("cloud cred secret not yet annotated")
-			return reconcile.Result{}, fmt.Errorf("waiting for cloud cred secret annotation before proceeding")
-		}
+		cr.Status.Provisioned = false
+	} else {
+		// it worked so clear any actuator conditions if they exist
+		r.updateActuatorConditions(cr, "", nil)
 
-		if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.MintAnnotation {
-			err = r.mintCredsWithActuator(cr, logger)
-			if err != nil {
-				logger.WithError(err).Errorf("error while minting credentials")
-				setFailedToProvisionCredentialsRequest(cr, true, err)
-				if err := r.updateStatus(origCR, cr, logger); err != nil {
-					logger.WithError(err).Error("failed to update condition")
-					return reconcile.Result{}, err
-				}
-				return reconcile.Result{}, err
-			}
-		} else if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.PassthroughAnnotation {
-			cr, err = r.usePassthroughCreds(cr, cloudCredSecret, logger)
-			if err != nil {
-				logger.WithError(err).Errorf("error while trying to use creds as passthrough")
-				setFailedToProvisionCredentialsRequest(cr, true, err)
-				if err := r.updateStatus(origCR, cr, logger); err != nil {
-					logger.WithError(err).Error("failed to update condition")
-				}
-				return reconcile.Result{}, err
-			}
-		} else if cloudCredSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.InsufficientAnnotation {
-			// update status on credentialsrequest to indicate we can't satisfy the request
-			logger.Debug("insufficient creds for passthrough or minting")
-			setInsufficientCredsCondition(cr, true)
-			if err := r.updateStatus(origCR, cr, logger); err != nil {
-				logger.WithError(err).Error("failed to update status")
-				return reconcile.Result{}, err
-			}
-			// Returning error, will retry with the expectation that someone will notice
-			// the bad condition(s) and fix
-			return reconcile.Result{}, fmt.Errorf("insufficient creds to satisfy CredentialsRequest: %v", cr.Name)
-		}
-
-		setInsufficientCredsCondition(cr, false)
-		setFailedToProvisionCredentialsRequest(cr, false, nil)
+		cr.Status.Provisioned = true
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
 	if err != nil {
+		logger.Errorf("error updating status: %v", err)
 		return reconcile.Result{}, err
 	}
 
@@ -443,60 +416,20 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	return reconcile.Result{}, nil
 }
 
-func (r *ReconcileCredentialsRequest) usePassthroughCreds(cr *minterv1.CredentialsRequest, cloudCredSecret *corev1.Secret, logger log.FieldLogger) (*minterv1.CredentialsRequest, error) {
-	secretAlreadyExists := true
-	existingSecret := &corev1.Secret{}
-	err := r.Get(context.Background(), types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}, existingSecret)
-	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.Debug("existing secret not found. will create one.")
-			secretAlreadyExists = false
-		} else {
-			logger.WithError(err).Error("error checking if the secret satisfying the credentialsrequest already exists")
-			return nil, err
-		}
+func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
+
+	// first unset any previous conditions
+	setInsufficientCredsCondition(cr, false)
+	setFailedToProvisionCredentialsRequest(cr, false, nil)
+
+	// now set whatever specific condition the actuator is presently firing
+	if reason == minterv1.CredentialsProvisionFailure {
+		setFailedToProvisionCredentialsRequest(cr, true, conditionError)
+	} else if reason == minterv1.InsufficientCloudCredentials {
+		setInsufficientCredsCondition(cr, true)
 	}
 
-	if secretAlreadyExists {
-		logger.Debug("Update if necessary")
-
-		if updateExistingSecret(existingSecret, cloudCredSecret) {
-			logger.Debugf("updating existing secret")
-
-			err = r.Update(context.Background(), existingSecret)
-			if err != nil {
-				logger.WithError(err).Error("error updating existing secret")
-				return nil, err
-			}
-		}
-	} else {
-		logger.Debug("Creating a secret")
-
-		newSecret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Spec.SecretRef.Name,
-				Namespace: cr.Spec.SecretRef.Namespace,
-				Annotations: map[string]string{
-					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
-				},
-			},
-			Data: map[string][]byte{
-				secretannotator.AwsAccessKeyName:       cloudCredSecret.Data[secretannotator.AwsAccessKeyName],
-				secretannotator.AwsSecretAccessKeyName: cloudCredSecret.Data[secretannotator.AwsSecretAccessKeyName],
-			},
-		}
-
-		// create secret
-		if err := r.Create(context.Background(), newSecret); err != nil {
-			logger.WithError(err).Error("error creating secret")
-			return nil, err
-		}
-
-		logger.Debug("created secret successfully")
-		cr.Status.Provisioned = true
-	}
-
-	return cr, nil
+	return
 }
 
 func setMissingTargetNamespaceCondition(cr *minterv1.CredentialsRequest, missing bool) {
@@ -583,42 +516,6 @@ func setCredentialsDeprovisionFailureCondition(cr *minterv1.CredentialsRequest, 
 		status, reason, msg, updateCheck)
 }
 
-func updateExistingSecret(existing, cloudCred *corev1.Secret) bool {
-	if string(existing.Data[secretannotator.AwsAccessKeyName]) != string(cloudCred.Data[secretannotator.AwsAccessKeyName]) ||
-		string(existing.Data[secretannotator.AwsSecretAccessKeyName]) != string(cloudCred.Data[secretannotator.AwsSecretAccessKeyName]) {
-		existing.Data[secretannotator.AwsAccessKeyName] = cloudCred.Data[secretannotator.AwsAccessKeyName]
-		existing.Data[secretannotator.AwsSecretAccessKeyName] = cloudCred.Data[secretannotator.AwsSecretAccessKeyName]
-		return true
-	}
-	return false
-}
-
-func (r *ReconcileCredentialsRequest) mintCredsWithActuator(cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
-	// Hand over to the actuator:
-	exists, err := r.Actuator.Exists(context.TODO(), cr)
-	if err != nil {
-		logger.WithError(err).Error("actuator error checking if credentials exist")
-		return err
-	}
-	if !exists {
-		err = r.Actuator.Create(context.TODO(), cr)
-		if err != nil {
-			logger.WithError(err).Error("actuator error creating credentials")
-			return err
-		}
-		cr.Status.Provisioned = true
-	} else {
-		err = r.Actuator.Update(context.TODO(), cr)
-		if err != nil {
-			logger.WithError(err).Error("actuator error updating credentials")
-			return err
-		}
-		cr.Status.Provisioned = true
-	}
-
-	return nil
-}
-
 func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	logger.Debug("updating credentials request status")
 
@@ -669,20 +566,4 @@ func DeleteFinalizer(object metav1.Object, finalizer string) {
 	finalizers := sets.NewString(object.GetFinalizers()...)
 	finalizers.Delete(finalizer)
 	object.SetFinalizers(finalizers.List())
-}
-
-func properlyAnnotatedSecret(secret *corev1.Secret) bool {
-	if secret.ObjectMeta.Annotations == nil {
-		return false
-	}
-
-	if _, ok := secret.ObjectMeta.Annotations[secretannotator.AnnotationKey]; !ok {
-		return false
-	}
-
-	return true
-}
-
-func getCredCreationMode(cloudCredSecret *corev1.Secret) string {
-	return cloudCredSecret.Annotations[secretannotator.AnnotationKey]
 }

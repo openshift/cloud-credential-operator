@@ -26,6 +26,7 @@ var (
 		"iam:DeleteUser",
 		"iam:DeleteUserPolicy",
 		"iam:GetUser",
+		"iam:GetUserPolicy",
 		"iam:ListAccessKeys",
 		"iam:PutUserPolicy",
 		"iam:TagUser",
