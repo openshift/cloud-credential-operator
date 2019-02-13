@@ -39,6 +39,13 @@ $ make install
 $ make run
 ```
 
+NOTE: To keep the in-cluster versions of the code from conflicting with your local copy, you should scale down the deployments for cloud-credential-operator and cluster-version-operator
+
+```
+$ kubectl scale -n openshift-cloud-credential-operator deployment.v1.apps/cloud-credential-operator --replicas=0
+$ kubectl scale -n openshift-cluster-version deployment.v1.apps/cluster-version-operator --replicas=0
+```
+
 # Deploying in cluster
 
  1. export IMG=quay.io/dgoodwin/cloud-credential-operator:latest
