@@ -3,6 +3,7 @@ kind: Namespace
 metadata:
   labels:
     controller-tools.k8s.io: "1.0"
+    openshift.io/run-level: "1"
   name: openshift-cloud-credential-operator
 ---
 apiVersion: v1
