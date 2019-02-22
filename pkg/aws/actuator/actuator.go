@@ -30,6 +30,7 @@ import (
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
@@ -134,9 +135,9 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 
 }
 
-// NeedsUpdate will return whether the current credentials satisfy what's being requested
+// needsUpdate will return whether the current credentials satisfy what's being requested
 // in the CredentialsRequest
-func (a *AWSActuator) NeedsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
 	logger := a.getLogger(cr)
 	// If the secret simply doesn't exist, we definitely need an update
 	exists, err := a.Exists(ctx, cr)
@@ -263,11 +264,83 @@ func (a *AWSActuator) getProviderSpec(cr *minterv1.CredentialsRequest) (*minterv
 	return nil, fmt.Errorf("no providerSpec defined")
 }
 
-// sync handles both create and update idempotently.
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
+	// Should we update anything
+	needsUpdate, err := a.needsUpdate(ctx, cr)
+	if err != nil {
+		logger.WithError(err).Error("error determining whether a credentials update is needed")
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("error determining whether a credentials update is needed: %v", err),
+		}
+	}
+
+	if !needsUpdate {
+		logger.Debug("credentials already up to date")
+		return nil
+	}
+
+	cloudCredsSecret, err := a.getCloudCredentialsSecret(ctx, logger)
+	if err != nil {
+		logger.WithError(err).Error("issue with cloud credentials secret")
+		return err
+	}
+
+	if cloudCredsSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.InsufficientAnnotation {
+		msg := "cloud credentials insufficient to satisfy credentials request"
+		logger.Error(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.InsufficientCloudCredentials,
+			Message:   msg,
+		}
+	}
+
+	if cloudCredsSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.PassthroughAnnotation {
+		logger.Debugf("provisioning with passthrough")
+		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
+		if err != nil {
+			return err
+		}
+	} else if cloudCredsSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.MintAnnotation {
+		logger.Debugf("provisioning with cred minting")
+		err := a.syncMint(ctx, cr, logger)
+		if err != nil {
+			msg := "error syncing creds in mint-mode"
+			logger.WithError(err).Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v: %v", msg, err),
+			}
+		}
+	}
+
+	return nil
+}
+
+func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
+	existingSecret, _, _ := a.loadExistingSecret(cr)
+	accessKeyID := string(cloudCredsSecret.Data[secretannotator.AwsAccessKeyName])
+	secretAccessKey := string(cloudCredsSecret.Data[secretannotator.AwsSecretAccessKeyName])
+	// userPolicy param empty because in passthrough mode this doesn't really have any meaning
+	err := a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
+	if err != nil {
+		msg := "error creating/updating secret"
+		logger.WithError(err).Error(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("%v: %v", msg, err),
+		}
+	}
+
+	return nil
+}
+
+// syncMint handles both create and update idempotently.
+func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	var err error
 
 	awsSpec, err := a.getProviderSpec(cr)
@@ -443,7 +516,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	}
 
-	err = a.syncAccessKeySecret(cr, accessKey, existingSecret, desiredUserPolicy, logger)
+	accessKeyString := ""
+	secretAccessKeyString := ""
+	if accessKey != nil {
+		accessKeyString = *accessKey.AccessKeyId
+		secretAccessKeyString = *accessKey.SecretAccessKey
+	}
+	err = a.syncAccessKeySecret(cr, accessKeyString, secretAccessKeyString, existingSecret, desiredUserPolicy, logger)
 	if err != nil {
 		log.WithError(err).Error("error saving access key to secret")
 		return err
@@ -794,15 +873,20 @@ func (a *AWSActuator) loadClusterInstallConfig(logger log.FieldLogger) (*install
 	return ic, nil
 }
 
-func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKey *iam.AccessKey, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
+func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKeyID, secretAccessKey string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
 
 	if existingSecret == nil || existingSecret.Name == "" {
-		if accessKey == nil {
-			return fmt.Errorf("new access key secret needed but no key data provided")
+		if accessKeyID == "" || secretAccessKey == "" {
+			msg := "new access key secret needed but no key data provided"
+			sLog.Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   msg,
+			}
 		}
 		sLog.Info("creating secret")
 		secret := &corev1.Secret{
@@ -815,8 +899,8 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 				},
 			},
 			Data: map[string][]byte{
-				"aws_access_key_id":     []byte(*accessKey.AccessKeyId),
-				"aws_secret_access_key": []byte(*accessKey.SecretAccessKey),
+				"aws_access_key_id":     []byte(accessKeyID),
+				"aws_secret_access_key": []byte(secretAccessKey),
 			},
 		}
 
@@ -837,17 +921,21 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	}
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied] = userPolicy
-	if accessKey != nil {
-		existingSecret.Data["aws_access_key_id"] = []byte(*accessKey.AccessKeyId)
-		existingSecret.Data["aws_secret_access_key"] = []byte(*accessKey.SecretAccessKey)
+	if accessKeyID != "" && secretAccessKey != "" {
+		existingSecret.Data["aws_access_key_id"] = []byte(accessKeyID)
+		existingSecret.Data["aws_secret_access_key"] = []byte(secretAccessKey)
 	}
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
 		sLog.Info("target secret has changed, updating")
 		err := a.Client.Update(context.TODO(), existingSecret)
 		if err != nil {
-			sLog.WithError(err).Error("error updating secret")
-			return err
+			msg := "error updating secret"
+			sLog.WithError(err).Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   msg,
+			}
 		}
 	} else {
 		sLog.Debug("target secret unchanged")
@@ -878,6 +966,40 @@ func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, us
 		return "", fmt.Errorf("error marshalling user policy: %v", err)
 	}
 	return string(b), nil
+}
+
+func (a *AWSActuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
+	cloudCredSecret := &corev1.Secret{}
+	if err := a.Client.Get(ctx, types.NamespacedName{Name: rootAWSCredsSecret, Namespace: rootAWSCredsSecretNamespace}, cloudCredSecret); err != nil {
+		msg := "unable to fetch root cloud cred secret"
+		logger.WithError(err).Error(msg)
+		return nil, &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("%v: %v", msg, err),
+		}
+	}
+
+	if !isSecretAnnotated(cloudCredSecret) {
+		logger.WithField("secret", fmt.Sprintf("%s/%s", secretannotator.CloudCredSecretNamespace, secretannotator.CloudCredSecretName)).Error("cloud cred secret not yet annotated")
+		return nil, &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
+		}
+	}
+
+	return cloudCredSecret, nil
+}
+
+func isSecretAnnotated(secret *corev1.Secret) bool {
+	if secret.ObjectMeta.Annotations == nil {
+		return false
+	}
+
+	if _, ok := secret.ObjectMeta.Annotations[secretannotator.AnnotationKey]; !ok {
+		return false
+	}
+
+	return true
 }
 
 func addGetUserStatement(policyDoc *PolicyDocument, userARN string) {
