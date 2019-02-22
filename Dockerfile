@@ -10,6 +10,7 @@ WORKDIR /go/src/github.com/openshift/cloud-credential-operator
 COPY pkg/    pkg/
 COPY cmd/    cmd/
 COPY vendor/ vendor/
+COPY version/ version/
 
 # Build
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o manager github.com/openshift/cloud-credential-operator/cmd/manager

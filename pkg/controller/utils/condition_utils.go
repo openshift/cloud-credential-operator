@@ -46,8 +46,8 @@ func UpdateConditionNever(_, _, _, _ string) bool {
 	return false
 }
 
-// FindCredentialsRequestCondition finds in the cluster the condition that has the
-// specified condition type. If none exists, then returns nil.
+// FindCredentialsRequestCondition iterates all conditions on a CredentialsRequest looking for the
+// specified condition type. If none exists nil will be returned.
 func FindCredentialsRequestCondition(conditions []ccv1beta1.CredentialsRequestCondition, conditionType ccv1beta1.CredentialsRequestConditionType) *ccv1beta1.CredentialsRequestCondition {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
