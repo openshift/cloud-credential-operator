@@ -54,8 +54,6 @@ vet:
 # Generate code
 generate:
 	go generate ./pkg/... ./cmd/...
-	# generate static assets
-	hack/update-bindata.sh
 
 # Build the image with buildah
 .PHONY: buildah-build
