@@ -42,7 +42,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	minterv1beta1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
@@ -102,6 +103,19 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			return co
 		}
 		return nil
+	}
+
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		fmt.Printf("error creating codec: %v", err)
+		t.FailNow()
+		return
+	}
+	codecV1Beta1, err := minterv1beta1.NewCodec()
+	if err != nil {
+		fmt.Printf("error creating v1beta1 codec: %v", err)
+		t.FailNow()
+		return
 	}
 
 	tests := []struct {
@@ -649,6 +663,27 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "v1beta1 to v1 migration",
+			existing: []runtime.Object{
+				createTestNamespace(testSecretNamespace),
+				testV1Beta1CredentialsRequestProviderFields(t, codec, codecV1Beta1),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				// Validate that the raw extensions were upgraded to v1:
+				cr := getCR(c)
+				_, err := actuator.DecodeProviderSpec(codec, cr)
+				assert.NoError(t, err)
+				_, err = actuator.DecodeProviderStatus(codec, cr)
+				assert.NoError(t, err)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -676,18 +711,13 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			existing = append(test.existing, installConfigMap)
 
 			fakeClient := fake.NewFakeClient(existing...)
-			codec, err := minterv1.NewCodec()
-			if err != nil {
-				fmt.Printf("error creating codec: %v", err)
-				t.FailNow()
-				return
-			}
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 				Actuator: &actuator.AWSActuator{
-					Client: fakeClient,
-					Codec:  codec,
-					Scheme: scheme.Scheme,
+					Client:       fakeClient,
+					Codec:        codec,
+					CodecV1Beta1: codecV1Beta1,
+					Scheme:       scheme.Scheme,
 					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte) (minteraws.Client, error) {
 						if string(accessKeyID) == testRootAWSAccessKeyID {
 							return mockRootAWSClient, nil
@@ -834,6 +864,56 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 
 	awsStatus, err := codec.EncodeProviderStatus(
 		&minterv1.AWSProviderStatus{
+			User: testAWSUser,
+		})
+	if err != nil {
+		t.Logf("error encoding: %v", err)
+		t.FailNow()
+		return nil
+	}
+
+	cr.Status.ProviderStatus = awsStatus
+	return cr
+}
+
+func testV1Beta1CredentialsRequestProviderFields(t *testing.T, codecV1 *minterv1.AWSProviderCodec, codecV1Beta1 *minterv1beta1.AWSProviderCodec) *minterv1.CredentialsRequest {
+	awsProvSpec, err := codecV1Beta1.EncodeProviderSpec(
+		&minterv1beta1.AWSProviderSpec{
+			StatementEntries: []minterv1beta1.StatementEntry{
+				{
+					Effect: "Allow",
+					Action: []string{
+						"iam:GetUser",
+						"iam:GetUserPolicy",
+						"iam:ListAccessKeys",
+					},
+					Resource: "*",
+				},
+			},
+		})
+	if err != nil {
+		t.Logf("error encoding: %v", err)
+		t.FailNow()
+		return nil
+	}
+
+	// Leaving the CR as a v1 to mimic what Kube does with a no-op conversion:
+	cr := &minterv1.CredentialsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        testCRName,
+			Namespace:   testNamespace,
+			Finalizers:  []string{minterv1.FinalizerDeprovision},
+			UID:         types.UID("1234"),
+			Annotations: map[string]string{},
+		},
+		Spec: minterv1.CredentialsRequestSpec{
+			SecretRef:    corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
+			ProviderSpec: awsProvSpec,
+		},
+	}
+
+	awsStatus, err := codecV1Beta1.EncodeProviderStatus(
+		&minterv1beta1.AWSProviderStatus{
 			User: testAWSUser,
 		})
 	if err != nil {

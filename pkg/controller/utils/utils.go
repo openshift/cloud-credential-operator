@@ -5,7 +5,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	ccv1beta1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -97,7 +97,7 @@ var (
 )
 
 func init() {
-	if err := ccv1beta1.AddToScheme(credentailRequestScheme); err != nil {
+	if err := minterv1.AddToScheme(credentailRequestScheme); err != nil {
 		panic(err)
 	}
 }
@@ -109,7 +109,7 @@ func CheckCloudCredCreation(awsClient ccaws.Client, logger log.FieldLogger) (boo
 
 // CheckPermissionsUsingQueryClient will use queryClient to query whether the credentials in targetClient can perform the actions
 // listed in the statementEntries. queryClient will need iam:GetUser and iam:SimulatePrincipalPolicy
-func CheckPermissionsUsingQueryClient(queryClient, targetClient ccaws.Client, statementEntries []ccv1beta1.StatementEntry, logger log.FieldLogger) (bool, error) {
+func CheckPermissionsUsingQueryClient(queryClient, targetClient ccaws.Client, statementEntries []minterv1.StatementEntry, logger log.FieldLogger) (bool, error) {
 	targetUsername, err := targetClient.GetUser(nil)
 	if err != nil {
 		return false, fmt.Errorf("error querying current username: %v", err)
@@ -152,7 +152,7 @@ func CheckPermissionsUsingQueryClient(queryClient, targetClient ccaws.Client, st
 
 // CheckPermissionsAgainstStatementList will test to see whether the list of actions in the provided
 // list of StatementEntries can work with the credentials used by the passed-in awsClient
-func CheckPermissionsAgainstStatementList(awsClient ccaws.Client, statementEntries []ccv1beta1.StatementEntry, logger log.FieldLogger) (bool, error) {
+func CheckPermissionsAgainstStatementList(awsClient ccaws.Client, statementEntries []minterv1.StatementEntry, logger log.FieldLogger) (bool, error) {
 	return CheckPermissionsUsingQueryClient(awsClient, awsClient, statementEntries, logger)
 }
 
@@ -160,7 +160,7 @@ func CheckPermissionsAgainstStatementList(awsClient ccaws.Client, statementEntri
 // awsClient creds have sufficient permissions to perform the actions.
 // Will return true/false indicating whether the permissions are sufficient.
 func CheckPermissionsAgainstActions(awsClient ccaws.Client, actionList []string, logger log.FieldLogger) (bool, error) {
-	statementList := []ccv1beta1.StatementEntry{
+	statementList := []minterv1.StatementEntry{
 		{
 			Action:   actionList,
 			Resource: "*",
@@ -179,19 +179,19 @@ func CheckCloudCredPassthrough(awsClient ccaws.Client, logger log.FieldLogger) (
 	return CheckPermissionsAgainstActions(awsClient, credPassthroughActions, logger)
 }
 
-func readCredentialRequest(cr []byte) (*ccv1beta1.CredentialsRequest, error) {
+func readCredentialRequest(cr []byte) (*minterv1.CredentialsRequest, error) {
 
-	newObj, err := runtime.Decode(credentialRequestCodec.UniversalDecoder(ccv1beta1.SchemeGroupVersion), cr)
+	newObj, err := runtime.Decode(credentialRequestCodec.UniversalDecoder(minterv1.SchemeGroupVersion), cr)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding credentialrequest: %v", err)
 	}
-	return newObj.(*ccv1beta1.CredentialsRequest), nil
+	return newObj.(*minterv1.CredentialsRequest), nil
 }
 
-func getCredentialRequestStatements(crBytes []byte) ([]ccv1beta1.StatementEntry, error) {
-	statementList := []ccv1beta1.StatementEntry{}
+func getCredentialRequestStatements(crBytes []byte) ([]minterv1.StatementEntry, error) {
+	statementList := []minterv1.StatementEntry{}
 
-	awsCodec, err := ccv1beta1.NewCodec()
+	awsCodec, err := minterv1.NewCodec()
 	if err != nil {
 		return statementList, fmt.Errorf("error creating credentialrequest codec: %v", err)
 	}
@@ -201,7 +201,7 @@ func getCredentialRequestStatements(crBytes []byte) ([]ccv1beta1.StatementEntry,
 		return statementList, err
 	}
 
-	awsSpec, err := awsCodec.DecodeProviderSpec(cr.Spec.ProviderSpec, &ccv1beta1.AWSProviderSpec{})
+	awsSpec, err := awsCodec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
 	if err != nil {
 		return statementList, fmt.Errorf("error decoding spec.ProviderSpec: %v", err)
 	}
