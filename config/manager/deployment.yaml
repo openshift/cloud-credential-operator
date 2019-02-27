@@ -53,10 +53,9 @@ spec:
         name: manager
         resources:
           limits:
-            cpu: 100m
             memory: 500Mi
           requests:
-            cpu: 100m
+            cpu: 10m
             memory: 150Mi
         ports:
         - containerPort: 9876
