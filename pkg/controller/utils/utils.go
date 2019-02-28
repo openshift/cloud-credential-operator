@@ -130,7 +130,7 @@ func CheckPermissionsUsingQueryClient(queryClient, targetClient ccaws.Client, st
 		return false, fmt.Errorf("error simulating policy: %v", err)
 	}
 
-	// Either they are all allowed and we reutrn 'true', or it's a failure
+	// Either they are all allowed and we return 'true', or it's a failure
 	allClear := true
 	for _, result := range results.EvaluationResults {
 		if *result.EvalDecision != "allowed" {
