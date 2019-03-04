@@ -48,8 +48,8 @@ spec:
       tolerations:
       - operator: Exists
       containers:
-      - image: quay.io/openshift/origin-cloud-credential-operator
-        imagePullPolicy: Always
+      - image: quay.io/openshift/origin-cloud-credential-operator:latest
+        imagePullPolicy: IfNotPresent
         name: manager
         resources:
           limits:
