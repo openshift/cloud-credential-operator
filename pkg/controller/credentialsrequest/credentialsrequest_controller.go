@@ -25,7 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
@@ -374,6 +374,16 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	} else {
 		logger.Debug("found secret namespace")
 		setMissingTargetNamespaceCondition(cr, false)
+	}
+
+	migrationRequired, err := r.Actuator.Migrate(context.TODO(), cr)
+	if err != nil {
+		logger.WithError(err).Error("error migrating provider fields")
+		return reconcile.Result{}, err
+	}
+	if migrationRequired {
+		logger.Warn("data was migrated, resyncing")
+		return reconcile.Result{}, nil
 	}
 
 	credsExists, err := r.Actuator.Exists(context.TODO(), cr)
