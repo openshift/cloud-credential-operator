@@ -26,7 +26,8 @@ import (
 	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	minterv1beta1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1beta1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
@@ -68,6 +69,7 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 type AWSActuator struct {
 	Client           client.Client
 	Codec            *minterv1.AWSProviderCodec
+	CodecV1Beta1     *minterv1beta1.AWSProviderCodec
 	AWSClientBuilder func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error)
 	Scheme           *runtime.Scheme
 }
@@ -79,26 +81,139 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator,
 		log.WithError(err).Error("error creating AWS codec")
 		return nil, fmt.Errorf("error creating AWS codec: %v", err)
 	}
+
+	codecV1Beta1, err := minterv1beta1.NewCodec()
+	if err != nil {
+		log.WithError(err).Error("error creating AWS codec")
+		return nil, fmt.Errorf("error creating AWS codec: %v", err)
+	}
 	return &AWSActuator{
 		Codec:            codec,
+		CodecV1Beta1:     codecV1Beta1,
 		Client:           client,
 		AWSClientBuilder: ccaws.NewClient,
 		Scheme:           scheme,
 	}, nil
 }
 
-func (a *AWSActuator) decodeProviderStatus(cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderStatus, error) {
+// Migrate performs any migrations/upgrades required to get to the latest version of the provider fields.
+func (a *AWSActuator) Migrate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
 	logger := a.getLogger(cr)
-	awsStatus := &minterv1.AWSProviderStatus{}
-	var err error
-	if cr.Status.ProviderStatus != nil {
-		awsStatus, err = a.Codec.DecodeProviderStatus(cr.Status.ProviderStatus, &minterv1.AWSProviderStatus{})
+	logger.Debug("running Migrate")
+
+	migrationPerformed := false
+
+	// Check if this CredentialsRequest has either ProviderSpec or ProviderStatus that needs to
+	// be upgraded. If so modify it, re-encode, update and requeue.
+	legacyAWSSpec, err := decodeV1Beta1ProviderSpec(a.CodecV1Beta1, cr)
+	if err == nil {
+		// No error here implies we found a v1beta1 spec that needs upgrading.
+		logger.Warn("found legacy v1beta1 AWSProviderSpec, upgrading to v1")
+		migrationPerformed = true
+		err = a.upgradeV1Beta1ProviderSpec(ctx, logger, cr, legacyAWSSpec)
 		if err != nil {
-			logger.WithError(err).Error("error decoding provider status")
-			return nil, fmt.Errorf("error decoding provider status: %v", err)
+			return false, err
 		}
 	}
+	legacyAWSStatus, err := decodeV1Beta1ProviderStatus(a.CodecV1Beta1, cr)
+	if err == nil {
+		// No error here implies we found a v1beta1 status that needs upgrading.
+		logger.Warn("found legacy v1beta1 AWSProviderStatus, upgrading to v1")
+		err = a.upgradeV1Beta1ProviderStatus(ctx, logger, cr, legacyAWSStatus)
+		if err != nil {
+			return false, err
+		}
+	}
+
+	return migrationPerformed, nil
+}
+
+func DecodeProviderStatus(codec *minterv1.AWSProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderStatus, error) {
+	awsStatus := &minterv1.AWSProviderStatus{}
+	var err error
+	if cr.Status.ProviderStatus == nil {
+		return awsStatus, nil
+	}
+
+	awsStatus, err = codec.DecodeProviderStatus(cr.Status.ProviderStatus, &minterv1.AWSProviderStatus{})
+	if err != nil {
+		return nil, fmt.Errorf("error decoding v1 provider status: %v", err)
+	}
 	return awsStatus, nil
+}
+
+func decodeV1Beta1ProviderStatus(codec *minterv1beta1.AWSProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1beta1.AWSProviderStatus, error) {
+	if cr.Status.ProviderStatus == nil {
+		return nil, fmt.Errorf("no provider status to decode")
+	}
+	awsStatusV1B1 := &minterv1beta1.AWSProviderStatus{}
+	awsStatusV1B1, err := codec.DecodeProviderStatus(cr.Status.ProviderStatus, &minterv1beta1.AWSProviderStatus{})
+	if err != nil {
+		return nil, fmt.Errorf("error decoding v1beta1 provider status: %v", err)
+	}
+
+	return awsStatusV1B1, nil
+}
+
+func (a *AWSActuator) upgradeV1Beta1ProviderStatus(
+	ctx context.Context,
+	logger log.FieldLogger,
+	cr *minterv1.CredentialsRequest,
+	oldProviderStatus *minterv1beta1.AWSProviderStatus) error {
+
+	awsStatus := &minterv1.AWSProviderStatus{
+		User:   oldProviderStatus.User,
+		Policy: oldProviderStatus.Policy,
+	}
+	return a.updateProviderStatus(ctx, logger, cr, awsStatus)
+}
+
+func DecodeProviderSpec(codec *minterv1.AWSProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderSpec, error) {
+	if cr.Spec.ProviderSpec != nil {
+		awsSpec, err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
+		if err != nil {
+			return nil, fmt.Errorf("error decoding provider v1 spec: %v", err)
+		}
+		return awsSpec, nil
+	}
+
+	return nil, fmt.Errorf("no providerSpec defined")
+}
+
+func decodeV1Beta1ProviderSpec(codec *minterv1beta1.AWSProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1beta1.AWSProviderSpec, error) {
+	if cr.Spec.ProviderSpec != nil {
+		// TODO: remove this when we've gotten everyone switched to v1beta1
+		awsSpecV1B1 := &minterv1beta1.AWSProviderSpec{}
+		awsSpecV1B1, err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1beta1.AWSProviderSpec{})
+		if err != nil {
+			return nil, fmt.Errorf("error decoding provider v1beta1 provider spec: %v", err)
+		}
+
+		return awsSpecV1B1, nil
+	}
+
+	return nil, fmt.Errorf("no providerSpec defined")
+}
+
+func (a *AWSActuator) upgradeV1Beta1ProviderSpec(
+	ctx context.Context,
+	logger log.FieldLogger,
+	cr *minterv1.CredentialsRequest,
+	oldProviderSpec *minterv1beta1.AWSProviderSpec) error {
+
+	// Convert V1B1 status to V1:
+	awsSpec := &minterv1.AWSProviderSpec{
+		StatementEntries: []minterv1.StatementEntry{},
+	}
+	for _, e := range oldProviderSpec.StatementEntries {
+		awsSpec.StatementEntries = append(awsSpec.StatementEntries,
+			minterv1.StatementEntry{
+				Effect:   e.Effect,
+				Action:   e.Action,
+				Resource: e.Resource,
+			})
+	}
+	return a.updateProviderSpec(ctx, logger, cr, awsSpec)
 }
 
 // Checks if the credentials currently exist.
@@ -111,7 +226,7 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 	logger := a.getLogger(cr)
 	logger.Debug("running Exists")
 	var err error
-	awsStatus, err := a.decodeProviderStatus(cr)
+	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
 	if err != nil {
 		return false, err
 	}
@@ -154,12 +269,12 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 	if err != nil {
 		return true, err
 	}
-	awsSpec, err := a.getProviderSpec(cr)
+	awsSpec, err := DecodeProviderSpec(a.Codec, cr)
 	if err != nil {
 		return true, err
 	}
 
-	awsStatus, err := a.decodeProviderStatus(cr)
+	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
 	if err != nil {
 		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
@@ -252,18 +367,6 @@ func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsReques
 	return a.sync(ctx, cr)
 }
 
-func (a *AWSActuator) getProviderSpec(cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderSpec, error) {
-	if cr.Spec.ProviderSpec != nil {
-		awsSpec, err := a.Codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
-		if err != nil {
-			return nil, fmt.Errorf("error decoding provider spec: %v", err)
-		}
-		return awsSpec, nil
-	}
-
-	return nil, fmt.Errorf("no providerSpec defined")
-}
-
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 
 	logger := a.getLogger(cr)
@@ -343,12 +446,12 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	var err error
 
-	awsSpec, err := a.getProviderSpec(cr)
+	awsSpec, err := DecodeProviderSpec(a.Codec, cr)
 	if err != nil {
 		return err
 	}
 
-	awsStatus, err := a.decodeProviderStatus(cr)
+	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -578,7 +681,32 @@ func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.Field
 		return err
 	}
 
+	if cr.Status.Conditions == nil {
+		cr.Status.Conditions = []minterv1.CredentialsRequestCondition{}
+	}
+
 	err = a.Client.Status().Update(ctx, cr)
+	if err != nil {
+		logger.WithError(err).Error("error updating credentials request status")
+		return err
+	}
+	return nil
+}
+
+func (a *AWSActuator) updateProviderSpec(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, awsSpec *minterv1.AWSProviderSpec) error {
+
+	var err error
+	cr.Spec.ProviderSpec, err = a.Codec.EncodeProviderSpec(awsSpec)
+	if err != nil {
+		logger.WithError(err).Error("error encoding provider spec")
+		return err
+	}
+
+	if cr.Status.Conditions == nil {
+		cr.Status.Conditions = []minterv1.CredentialsRequestCondition{}
+	}
+
+	err = a.Client.Update(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("error updating credentials request")
 		return err
@@ -591,7 +719,7 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	logger := a.getLogger(cr)
 	logger.Debug("running Delete")
 	var err error
-	awsStatus, err := a.decodeProviderStatus(cr)
+	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -801,7 +929,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	// the root client.
 	// and if our RO user is not yet live, we should just fall back to using the root user
 	// if possible.
-	awsStatus, err := a.decodeProviderStatus(cr)
+	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
 	if err != nil {
 		return nil, err
 	}
