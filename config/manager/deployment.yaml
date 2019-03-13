@@ -48,7 +48,10 @@ spec:
       tolerations:
       - operator: Exists
       containers:
-      - image: quay.io/openshift/origin-cloud-credential-operator:latest
+      - env:
+        - name: RELEASE_VERSION
+          value: "0.0.1-snapshot"
+        image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: IfNotPresent
         name: manager
         resources:
