@@ -88,13 +88,18 @@ You can freely edit a CredentialsRequest to adjust permissions and the controlle
 
 ## For OpenShift Components
 
- 1. This repo is to be the central repository for the definition of all CredentialsRequests needed for OpenShift components.
- 1. YAML definitions live in the  manifests/ directory with the "03-cred-" prefix.
- 1. All OpenShift CredentialsRequests should be created in openshift-cloud-credential-operator namespace.
- 1. These will be deployed with the cloud-credential-operator via the release image payload.
+ 1. Add CredentialsRequests objects to your CVO manifests and deployed via the release payload. Please do not create them in operator code as we want to use the release manifest for auditing and dynamically checking permissions.
+ 1. The cred operator launches early (runlevel 30) so should be available when your component comes up and issues it's credentials request.
+ 1. Your CredentialsRequests should be created in the openshift-cloud-credential-operator namespace.
+ 1. Your component should tolerate the credentials secret not existing immediately.
 
-# Future Work
+# Adding A New Cloud Provider
 
-  1. Integration with the OpenShift Installer.
-  1. Cred Minter Operator.
-  1. CI + dist-git image publishing.
+Currently this repository only supports AWS, but uses an actuator pattern to allow plugging in additional cloud providers.
+
+The rough steps to add a new cloud provider would be:
+
+ 1. Update the API to cover how credentials/permissions are defined on the new provider. (see AWS types [here](https://github.com/openshift/cloud-credential-operator/blob/master/pkg/apis/cloudcredential/v1/aws_types.go)) These types are embedded into the main CredentialsRequest as a RawExtension.
+ 1. Implement the very simple [Actuator interface](https://github.com/openshift/cloud-credential-operator/blob/master/pkg/controller/credentialsrequest/actuator/actuator.go). ([AWS implementation](https://github.com/openshift/cloud-credential-operator/tree/master/pkg/aws/actuator))
+ 1. Instantiate your actuator when we detect we're running on that cloud provider, which happens in the [AddToManager](https://github.com/openshift/cloud-credential-operator/blob/master/pkg/controller/controller.go#L49) function.
+ 1. Coordinate with OpenShift teams who use and ship CredentialsRequests. (machine-api, registry, ingress)
