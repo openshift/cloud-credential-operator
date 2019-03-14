@@ -3,6 +3,8 @@ package credentialsrequest
 import (
 	"context"
 	"fmt"
+	"os"
+	"reflect"
 
 	log "github.com/sirupsen/logrus"
 
@@ -11,7 +13,6 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
-	operatorversion "github.com/openshift/cloud-credential-operator/version"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -47,23 +48,27 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	}
 
 	oldConditions := co.Status.Conditions
+	oldVersions := co.Status.Versions
 	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests)
+	co.Status.Versions = computeClusterOperatorVersions()
 
+	// ClusterOperator should already exist (from the manifests payload), but recreate it if needed
 	if isNotFound {
-		co.Status.Version = operatorversion.Version
 		if err := r.Client.Create(context.TODO(), co); err != nil {
 			return fmt.Errorf("failed to create clusteroperator %s: %v", co.Name, err)
 		}
 		log.Info("created clusteroperator")
-	} else {
-		if !clusteroperator.ConditionsEqual(oldConditions, co.Status.Conditions) {
-			err = r.Client.Status().Update(context.TODO(), co)
-			if err != nil {
-				return fmt.Errorf("failed to update clusteroperator %s: %v", co.Name, err)
-			}
-			log.Debug("cluster operator status updated")
-		}
 	}
+
+	// Update status fields if needed
+	if !clusteroperator.ConditionsEqual(oldConditions, co.Status.Conditions) || !reflect.DeepEqual(oldVersions, co.Status.Versions) {
+		err = r.Client.Status().Update(context.TODO(), co)
+		if err != nil {
+			return fmt.Errorf("failed to update clusteroperator %s: %v", co.Name, err)
+		}
+		log.Debug("cluster operator status updated")
+	}
+
 	return nil
 }
 
@@ -92,6 +97,17 @@ func (r *ReconcileCredentialsRequest) getOperatorState() (*corev1.Namespace, []m
 	}
 
 	return ns, credRequestList.Items, nil
+}
+
+func computeClusterOperatorVersions() []configv1.OperandVersion {
+	currentVersion := os.Getenv("RELEASE_VERSION")
+	versions := []configv1.OperandVersion{
+		{
+			Name:    "operator",
+			Version: currentVersion,
+		},
+	}
+	return versions
 }
 
 // computeStatusConditions computes the operator's current state.

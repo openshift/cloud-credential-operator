@@ -289,12 +289,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					conditionType: configv1.OperatorProgressing,
 					status:        corev1.ConditionTrue,
 				},
-				/* TODO: controller does not currently set any condition for this error
-				{
-					conditionType: configv1.OperatorFailing,
-					status:        corev1.ConditionTrue,
-				},
-				*/
+				//  TODO: controller does not currently set any condition for this error
+				// {
+				// 	conditionType: configv1.OperatorFailing,
+				// 	status:        corev1.ConditionTrue,
+				// },
+
 			},
 		},
 		{

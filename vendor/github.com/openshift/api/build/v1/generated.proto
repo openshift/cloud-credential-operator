@@ -7,9 +7,7 @@ package github.com.openshift.api.build.v1;
 
 import "k8s.io/api/core/v1/generated.proto";
 import "k8s.io/apimachinery/pkg/apis/meta/v1/generated.proto";
-import "k8s.io/apimachinery/pkg/runtime/generated.proto";
 import "k8s.io/apimachinery/pkg/runtime/schema/generated.proto";
-import "k8s.io/apimachinery/pkg/util/intstr/generated.proto";
 
 // Package-wide variables from generator "generated".
 option go_package = "v1";
@@ -716,7 +714,8 @@ message GitBuildSource {
   // ref is the branch/tag/ref to build.
   optional string ref = 2;
 
-  // proxyConfig defines the proxies to use for the git clone operation
+  // proxyConfig defines the proxies to use for the git clone operation. Values
+  // not set here are inherited from cluster-wide build git proxy settings.
   optional ProxyConfig proxyConfig = 3;
 }
 

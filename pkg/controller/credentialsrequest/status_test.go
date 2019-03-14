@@ -17,6 +17,8 @@ limitations under the License.
 package credentialsrequest
 
 import (
+	"context"
+	"os"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -26,6 +28,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -141,6 +145,52 @@ func TestClusterOperatorStatus(t *testing.T) {
 					assert.Equal(t, string(ec.Status), string(c.Status))
 					assert.Equal(t, ec.Reason, c.Reason)
 				}
+			}
+		})
+	}
+}
+
+func TestClusterOperatorVersion(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+	configv1.Install(scheme.Scheme)
+
+	tests := []struct {
+		name              string
+		releaseVersionEnv string
+	}{
+		{
+			name:              "test setting clusteroperator.status.version correctly",
+			releaseVersionEnv: "TESTVERSION",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient()
+			rcr := &ReconcileCredentialsRequest{
+				Client: fakeClient,
+			}
+
+			assert.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
+			err := rcr.syncOperatorStatus()
+
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+
+			clusterop := &configv1.ClusterOperator{}
+
+			if err := fakeClient.Get(context.TODO(), client.ObjectKey{Name: cloudCredOperatorNamespace}, clusterop); err != nil {
+				t.Errorf("error fetching clusteroperator object: %v", err)
+			} else {
+				foundVersion := false
+				for _, version := range clusterop.Status.Versions {
+					if version.Name == "operator" {
+						foundVersion = true
+						assert.Equal(t, test.releaseVersionEnv, version.Version)
+					}
+				}
+				assert.True(t, foundVersion, "didn't find an entry named 'operator' in the version list")
 			}
 		})
 	}
