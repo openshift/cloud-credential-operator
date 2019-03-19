@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"testing"
+	"time"
 
 	"github.com/ghodss/yaml"
 	"github.com/golang/mock/gomock"
@@ -191,6 +192,8 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				}
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
 			},
 			expectedCOConditions: []ExpectedCOCondition{
 				{
@@ -684,6 +687,56 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.NoError(t, err)
 			},
 		},
+		{
+			name: "skip AWS if recently synced",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequestWithRecentLastSync(t),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.Equal(t, testTwentyMinuteOldTimestamp.Unix(), cr.Status.LastSyncTimestamp.Time.Unix())
+			},
+		},
+		{
+			name: "recently synced but modified",
+			existing: func() []runtime.Object {
+				objects := []runtime.Object{}
+				objects = append(objects, createTestNamespace(testNamespace))
+				objects = append(objects, createTestNamespace(testSecretNamespace))
+
+				cr := testCredentialsRequestWithRecentLastSync(t)
+				cr.Generation = cr.Generation + 1 // rev the generation to trigger the sync
+				objects = append(objects, cr)
+
+				objects = append(objects, testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey))
+				objects = append(objects, testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey))
+				objects = append(objects, testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey))
+				objects = append(objects, testClusterVersion())
+
+				return objects
+			}(),
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.NotEqual(t, testTwentyMinuteOldTimestamp.Unix(), cr.Status.LastSyncTimestamp.Time.Unix())
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -771,6 +824,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 }
 
 const (
+	testCRGeneration           = 1 // just non-zero
 	testCRName                 = "openshift-component-a"
 	testNamespace              = "openshift-cloud-credential-operator"
 	testClusterName            = "testcluster"
@@ -791,13 +845,24 @@ const (
 )
 
 var (
-	testPolicy1 = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+	testPolicy1                  = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+	testTwentyMinuteOldTimestamp = time.Now().Add(-20 * time.Minute)
 )
 
 func testPassthroughCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testPassthroughCredentialsRequest(t)
 	now := metav1.Now()
 	cr.DeletionTimestamp = &now
+	return cr
+}
+
+func testCredentialsRequestWithRecentLastSync(t *testing.T) *minterv1.CredentialsRequest {
+	cr := testCredentialsRequest(t)
+	cr.Status.LastSyncGeneration = cr.Generation
+	cr.Status.LastSyncTimestamp = &metav1.Time{
+		// fake 20 minute old last sync
+		Time: testTwentyMinuteOldTimestamp,
+	}
 	return cr
 }
 
@@ -844,6 +909,7 @@ func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReques
 			Finalizers:  []string{minterv1.FinalizerDeprovision},
 			UID:         types.UID("1234"),
 			Annotations: map[string]string{},
+			Generation:  testCRGeneration,
 		},
 		Spec: minterv1.CredentialsRequestSpec{
 			SecretRef:    corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
