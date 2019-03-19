@@ -46,6 +46,7 @@ const (
 	testSecretName         = "testsecret"
 	testNamespace          = "testproject"
 	testAWSUser            = "credTestUser"
+	testAWSUserARN         = "arn:aws:iam::123456789012:user/credTestUser"
 	testAWSAccessKeyID     = "FAKEAWSACCESSKEYID"
 	testAWSSecretAccessKey = "KEEPITSECRET"
 )
@@ -75,6 +76,17 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				return mockAWSClient
 			},
 			validateAnnotationValue: MintAnnotation,
+		},
+		{
+			name:     "detect root user creds",
+			existing: []runtime.Object{testSecret()},
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetRootUser(mockAWSClient)
+
+				return mockAWSClient
+			},
+			expectErr: true,
 		},
 		{
 			name:     "cred passthrough mode",
@@ -178,10 +190,24 @@ func testSecret() *corev1.Secret {
 	return s
 }
 
+func mockGetRootUser(mockAWSClient *mockaws.MockClient) {
+	rootAcctNum := "123456789012"
+
+	mockAWSClient.EXPECT().GetUser(nil).Return(&iam.GetUserOutput{
+		User: &iam.User{
+			UserName: aws.String("name-of-aws-account"),
+			Arn:      aws.String("arn:aws:iam::" + rootAcctNum + ":root"),
+			UserId:   aws.String(rootAcctNum),
+		},
+	}, nil)
+}
+
 func mockGetUser(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUser(nil).Return(&iam.GetUserOutput{
 		User: &iam.User{
 			UserName: aws.String(testAWSUser),
+			Arn:      aws.String(testAWSUserARN),
+			UserId:   aws.String(testAWSAccessKeyID),
 		},
 	}, nil)
 }
