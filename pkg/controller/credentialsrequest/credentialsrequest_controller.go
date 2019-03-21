@@ -386,6 +386,14 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, nil
 	}
 
+	isStale := cr.Generation != cr.Status.LastSyncGeneration
+	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(time.Hour*1).After(time.Now())
+
+	if !isStale && hasRecentlySynced {
+		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
+		return reconcile.Result{}, nil
+	}
+
 	credsExists, err := r.Actuator.Exists(context.TODO(), cr)
 	if err != nil {
 		logger.Errorf("error checking whether credentials already exists: %v", err)
@@ -416,6 +424,10 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		r.updateActuatorConditions(cr, "", nil)
 
 		cr.Status.Provisioned = true
+		cr.Status.LastSyncTimestamp = &metav1.Time{
+			Time: time.Now(),
+		}
+		cr.Status.LastSyncGeneration = origCR.Generation
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
