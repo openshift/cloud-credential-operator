@@ -24,9 +24,6 @@ import (
 // Actuator controls credentials on a specific infrastructure. All
 // methods should be idempotent unless otherwise specified.
 type Actuator interface {
-	// Migrate performs any data migrations/upgrades required for the provider. Returns true if
-	// data migration was performed, indicating the controller should re-queue.
-	Migrate(context.Context, *minterv1.CredentialsRequest) (bool, error)
 	// Create the credentials.
 	Create(context.Context, *minterv1.CredentialsRequest) error
 	// Delete the credentials. If no error is returned, it is assumed that all dependent resources have been cleaned up.
@@ -38,10 +35,6 @@ type Actuator interface {
 }
 
 type DummyActuator struct {
-}
-
-func (a *DummyActuator) Migrate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
-	return false, nil
 }
 
 func (a *DummyActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
