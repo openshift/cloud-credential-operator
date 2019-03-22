@@ -376,16 +376,6 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		setMissingTargetNamespaceCondition(cr, false)
 	}
 
-	migrationRequired, err := r.Actuator.Migrate(context.TODO(), cr)
-	if err != nil {
-		logger.WithError(err).Error("error migrating provider fields")
-		return reconcile.Result{}, err
-	}
-	if migrationRequired {
-		logger.Warn("data was migrated, resyncing")
-		return reconcile.Result{}, nil
-	}
-
 	isStale := cr.Generation != cr.Status.LastSyncGeneration
 	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(time.Hour*1).After(time.Now())
 
