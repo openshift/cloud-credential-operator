@@ -180,7 +180,7 @@ func TestClusterOperatorVersion(t *testing.T) {
 
 			clusterop := &configv1.ClusterOperator{}
 
-			if err := fakeClient.Get(context.TODO(), client.ObjectKey{Name: cloudCredOperatorNamespace}, clusterop); err != nil {
+			if err := fakeClient.Get(context.TODO(), client.ObjectKey{Name: cloudCredClusterOperator}, clusterop); err != nil {
 				t.Errorf("error fetching clusteroperator object: %v", err)
 			} else {
 				foundVersion := false

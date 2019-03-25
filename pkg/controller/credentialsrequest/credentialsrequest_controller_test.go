@@ -97,7 +97,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 	}
 
 	getClusterOperator := func(c client.Client) *configv1.ClusterOperator {
-		co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: "openshift-cloud-credential-operator"}}
+		co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredClusterOperator}}
 		err := c.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
 		if err == nil {
 			return co
