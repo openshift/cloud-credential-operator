@@ -24,6 +24,7 @@ import (
 
 const (
 	cloudCredOperatorNamespace      = "openshift-cloud-credential-operator"
+	cloudCredClusterOperator        = "cloud-credential"
 	reasonCredentialsFailing        = "CredentialsFailing"
 	reasonNoCredentialsFailing      = "NoCredentialsFailing"
 	reasonReconciling               = "Reconciling"
@@ -35,7 +36,7 @@ const (
 // creates or updates the ClusterOperator resource for the operator accordingly.
 func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	log.Debug("syncing cluster operator status")
-	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredOperatorNamespace}}
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredClusterOperator}}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
 	isNotFound := errors.IsNotFound(err)
 	if err != nil && !isNotFound {
