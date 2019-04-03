@@ -11,7 +11,7 @@ OpenShift is transitioning to a model where components that require cloud creden
 The OpenShift installer will validate the users credentials, and the user has two options:
 
  1. Install with administrator credentials. (technically only the ability to grant additional credentials is required but administrator is likely the most logical way to grant this as if you can create credentials, you are an administrator) This is the recommended best path. These credentials can be removed from the cluster until changes to your credentials are required, likely for an upgrade, at which point they need to be restored.
- 1. Install with a set of credentials that has *all* permissions needed for *all* OpenShift components. If this path is taken, those credentials will be shared by all components, as the credential operator cannot mint new credentials. The master list of all required permissions is assembled from the credentials requests defined in the manifests/ dir in this repo, plus what the installer itself needs. (TBD and in progress)
+ 1. Install with a set of credentials that has *all* permissions needed for *all* OpenShift components. If this path is taken, those credentials will be shared by all components, as the credential operator cannot mint new credentials. The master list of all required permissions is assembled (manually) from the credentials requests defined in the various manifests/ dirs for the OpenShift components that depend on the credential operator.
 
 If the installer finds that the credentials in use fit neither of these two options, it will fail, as the cluster will not function.
 
