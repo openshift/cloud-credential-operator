@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -59,6 +60,17 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 			return fmt.Errorf("failed to create clusteroperator %s: %v", co.Name, err)
 		}
 		log.Info("created clusteroperator")
+	}
+
+	// Check if version changed, if so force a progressing last transition update:
+	if !reflect.DeepEqual(oldVersions, co.Status.Versions) {
+		log.WithFields(log.Fields{
+			"old": oldVersions,
+			"new": co.Status.Versions,
+		}).Info("version has changed, updating progressing condition lastTransitionTime")
+		progressing := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
+		// We know this should be there.
+		progressing.LastTransitionTime = metav1.Time{Time: time.Now()}
 	}
 
 	// Update status fields if needed
@@ -186,7 +198,6 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 	} else {
 		progressingCondition.Status = configv1.ConditionFalse
 		progressingCondition.Reason = reasonReconcilingComplete
-		progressingCondition.Message = "All credentials reconciled."
 		progressingCondition.Message = fmt.Sprintf(
 			"%d of %d credentials requests provisioned and reconciled.",
 			len(credRequests), len(credRequests))
@@ -217,4 +228,15 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 	}
 
 	return conditions
+}
+
+// findClusterOperatorCondition iterates all conditions on a ClusterOperator looking for the
+// specified condition type. If none exists nil will be returned.
+func findClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCondition, conditionType configv1.ClusterStatusConditionType) *configv1.ClusterOperatorStatusCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
 }
