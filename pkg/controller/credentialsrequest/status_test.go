@@ -20,12 +20,14 @@ import (
 	"context"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -154,19 +156,40 @@ func TestClusterOperatorVersion(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	configv1.Install(scheme.Scheme)
 
+	twentyHoursAgo := metav1.Time{
+		Time: time.Now().Add(-20 * time.Hour),
+	}
+
 	tests := []struct {
-		name              string
-		releaseVersionEnv string
+		name                             string
+		releaseVersionEnv                string
+		currentProgressingLastTransition metav1.Time
+		currentVersion                   string
+		expectProgressingTransition      bool
 	}{
 		{
-			name:              "test setting clusteroperator.status.version correctly",
-			releaseVersionEnv: "TESTVERSION",
+			name: "test version upgraded",
+			currentProgressingLastTransition: twentyHoursAgo,
+			currentVersion:                   "4.0.0-5",
+			releaseVersionEnv:                "4.0.0-10",
+			expectProgressingTransition:      true,
+		},
+		{
+			name: "test version constant",
+			currentProgressingLastTransition: twentyHoursAgo,
+			currentVersion:                   "4.0.0-5",
+			releaseVersionEnv:                "4.0.0-5",
+			expectProgressingTransition:      false,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient()
+
+			existingCO := testClusterOperator("4.0.0-5", twentyHoursAgo)
+			existing := []runtime.Object{existingCO}
+			fakeClient := fake.NewFakeClient(existing...)
+
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 			}
@@ -180,19 +203,55 @@ func TestClusterOperatorVersion(t *testing.T) {
 
 			clusterop := &configv1.ClusterOperator{}
 
-			if err := fakeClient.Get(context.TODO(), client.ObjectKey{Name: cloudCredClusterOperator}, clusterop); err != nil {
-				t.Errorf("error fetching clusteroperator object: %v", err)
-			} else {
-				foundVersion := false
-				for _, version := range clusterop.Status.Versions {
-					if version.Name == "operator" {
-						foundVersion = true
-						assert.Equal(t, test.releaseVersionEnv, version.Version)
-					}
+			err = fakeClient.Get(context.TODO(), client.ObjectKey{Name: cloudCredClusterOperator}, clusterop)
+			assert.NoError(t, err)
+
+			foundVersion := false
+			for _, version := range clusterop.Status.Versions {
+				if version.Name == "operator" {
+					foundVersion = true
+					assert.Equal(t, test.releaseVersionEnv, version.Version)
 				}
-				assert.True(t, foundVersion, "didn't find an entry named 'operator' in the version list")
+			}
+			assert.True(t, foundVersion, "didn't find an entry named 'operator' in the version list")
+
+			progCond := findClusterOperatorCondition(clusterop.Status.Conditions,
+				configv1.OperatorProgressing)
+			assert.NotNil(t, progCond)
+			if test.expectProgressingTransition {
+				assert.True(t, progCond.LastTransitionTime.Time.After(
+					test.currentProgressingLastTransition.Time))
+			} else {
+				assert.Equal(t, test.currentProgressingLastTransition.Time.Format(time.UnixDate),
+					progCond.LastTransitionTime.Time.Format(time.UnixDate))
 			}
 		})
+	}
+}
+
+func testClusterOperator(version string, progressingLastTransition metav1.Time) *configv1.ClusterOperator {
+	return &configv1.ClusterOperator{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: cloudCredClusterOperator,
+		},
+		Status: configv1.ClusterOperatorStatus{
+			Versions: []configv1.OperandVersion{
+				{
+					Name:    "operator",
+					Version: version,
+				},
+			},
+			Conditions: []configv1.ClusterOperatorStatusCondition{
+				{
+					Type:   configv1.OperatorProgressing,
+					Status: "False",
+					Reason: reasonReconcilingComplete,
+					// Warning: must match what the controller status would check, otherwise we might get a false positive on this test.
+					Message:            "0 of 0 credentials requests provisioned and reconciled.",
+					LastTransitionTime: progressingLastTransition,
+				},
+			},
+		},
 	}
 }
 
@@ -229,17 +288,6 @@ func testUnknownConditions() []configv1.ClusterOperatorStatusCondition {
 			Reason: "",
 		},
 	}
-}
-
-// findClusterOperatorCondition iterates all conditions on a ClusterOperator looking for the
-// specified condition type. If none exists nil will be returned.
-func findClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCondition, conditionType configv1.ClusterStatusConditionType) *configv1.ClusterOperatorStatusCondition {
-	for i, condition := range conditions {
-		if condition.Type == conditionType {
-			return &conditions[i]
-		}
-	}
-	return nil
 }
 
 func testCredentialsRequestWithStatus(name string, provisioned bool, conditions []minterv1.CredentialsRequestCondition) minterv1.CredentialsRequest {
