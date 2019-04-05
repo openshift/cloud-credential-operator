@@ -21,9 +21,7 @@ import (
 	"fmt"
 	"net/url"
 	"reflect"
-	"sort"
 
-	"github.com/ghodss/yaml"
 	log "github.com/sirupsen/logrus"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -33,8 +31,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
-	openshiftapiv1 "github.com/openshift/api/config/v1"
-	installtypes "github.com/openshift/installer/pkg/types"
+	configv1 "github.com/openshift/api/config/v1"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -54,12 +51,9 @@ const (
 	rootAWSCredsSecret          = "aws-creds"
 	roAWSCredsSecretNamespace   = "openshift-cloud-credential-operator"
 	roAWSCredsSecret            = "cloud-credential-operator-iam-ro-creds"
-	clusterVersionObjectName    = "version"
-	openshiftClusterIDKey       = "openshiftClusterID"
-	openshiftClusterNameKey     = "openshiftClusterName"
-	clusterConfigName           = "cluster-config-v1"
 	clusterConfigNamespace      = "kube-system"
-	clusterConfigMapKey         = "install-config"
+	openshiftClusterIDKey       = "openshiftClusterID"
+	clusterVersionObjectName    = "version"
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
@@ -150,7 +144,7 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 
 // needsUpdate will return whether the current credentials satisfy what's being requested
 // in the CredentialsRequest
-func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest, infraName string) (bool, error) {
 	logger := a.getLogger(cr)
 	// If the secret simply doesn't exist, we definitely need an update
 	exists, err := a.Exists(ctx, cr)
@@ -161,10 +155,6 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, nil
 	}
 
-	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
-	if err != nil {
-		return false, err
-	}
 	// Various checks for the kinds of reasons that would trigger a needed update
 	_, accessKey, secretKey := a.loadExistingSecret(cr)
 	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey), infraName)
@@ -181,7 +171,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
 
-	readAWSClient, err := a.buildReadAWSClient(cr)
+	readAWSClient, err := a.buildReadAWSClient(cr, infraName)
 	if err != nil {
 		log.WithError(err).Error("error creating read-only AWS client")
 		return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
@@ -197,23 +187,13 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			logger.WithError(err).Errorf("error getting user: %s", user)
 			return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
 		}
+
 		clusterUUID, err := a.loadClusterUUID(logger)
 		if err != nil {
 			return true, err
 		}
 
-		installConfig, err := a.loadClusterInstallConfig(logger)
-		if err != nil {
-			return true, err
-		}
-		userTags := map[string]string{}
-		if installConfig.Platform.AWS != nil {
-			userTags = installConfig.Platform.AWS.UserTags
-		} else {
-			log.Warn("no AWS platform set")
-		}
-
-		if !userHasExpectedTags(logger, user.User, installConfig.ObjectMeta.Name, string(clusterUUID), userTags) {
+		if !userHasExpectedTags(logger, user.User, infraName, string(clusterUUID)) {
 			return true, nil
 		}
 
@@ -274,8 +254,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
+	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+	if err != nil {
+		return err
+	}
+
 	// Should we update anything
-	needsUpdate, err := a.needsUpdate(ctx, cr)
+	needsUpdate, err := a.needsUpdate(ctx, cr, infraName)
 	if err != nil {
 		logger.WithError(err).Error("error determining whether a credentials update is needed")
 		return &actuatoriface.ActuatorError{
@@ -312,7 +297,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	} else if cloudCredsSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.MintAnnotation {
 		logger.Debugf("provisioning with cred minting")
-		err := a.syncMint(ctx, cr, logger)
+		err := a.syncMint(ctx, cr, infraName, logger)
 		if err != nil {
 			msg := "error syncing creds in mint-mode"
 			logger.WithError(err).Error(msg)
@@ -345,7 +330,7 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 }
 
 // syncMint handles both create and update idempotently.
-func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
+func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, infraName string, logger log.FieldLogger) error {
 	var err error
 
 	awsSpec, err := DecodeProviderSpec(a.Codec, cr)
@@ -358,26 +343,10 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		return err
 	}
 
-	installConfig, err := a.loadClusterInstallConfig(logger)
-	if err != nil {
-		return err
-	}
-	userTags := map[string]string{}
-	if installConfig.Platform.AWS != nil {
-		userTags = installConfig.Platform.AWS.UserTags
-	} else {
-		log.Warn("no AWS platform set")
-	}
-
-	if installConfig.ObjectMeta.Name == "" {
-		log.Error("cluster install-config has no name")
-		return fmt.Errorf("cluster install-config has no name")
-	}
-
 	// Generate a randomized User for the credentials:
 	// TODO: check if the generated name is free
 	if awsStatus.User == "" {
-		username, err := generateUserName(installConfig.ObjectMeta.Name, cr.Name)
+		username, err := generateUserName(infraName, cr.Name)
 		if err != nil {
 			return err
 		}
@@ -399,19 +368,14 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		}
 	}
 
-	rootAWSClient, err := a.buildRootAWSClient(cr)
+	rootAWSClient, err := a.buildRootAWSClient(cr, infraName)
 	if err != nil {
 		logger.WithError(err).Warn("error building root AWS client, will error if one must be used")
 	}
 
-	readAWSClient, err := a.buildReadAWSClient(cr)
+	readAWSClient, err := a.buildReadAWSClient(cr, infraName)
 	if err != nil {
 		logger.WithError(err).Error("error building read-only AWS client")
-		return err
-	}
-
-	clusterUUID, err := a.loadClusterUUID(logger)
-	if err != nil {
 		return err
 	}
 
@@ -445,13 +409,18 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		userOut = getUserOut.User
 	}
 
+	clusterUUID, err := a.loadClusterUUID(logger)
+	if err != nil {
+		return err
+	}
+
 	// Check if the user has the expected tags:
-	if !userHasExpectedTags(logger, userOut, installConfig.ObjectMeta.Name, string(clusterUUID), userTags) {
+	if !userHasExpectedTags(logger, userOut, infraName, string(clusterUUID)) {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		}
 
-		err = a.tagUser(logger, rootAWSClient, awsStatus.User, installConfig.ObjectMeta.Name, string(clusterUUID), userTags)
+		err = a.tagUser(logger, rootAWSClient, awsStatus.User, infraName, string(clusterUUID))
 		if err != nil {
 			return err
 		}
@@ -552,24 +521,28 @@ func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, aws
 	return true, nil
 }
 
-func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterName, clusterUUID string, userTags map[string]string) bool {
+func userHasExpectedTags(logger log.FieldLogger, user *iam.User, infraName, clusterUUID string) bool {
 	// Check if the user has the expected tags:
 	if user == nil {
 		return false
 	}
-	if !userHasTag(user, openshiftClusterIDKey, clusterUUID) {
-		log.Warnf("user missing tag: %s=%s", openshiftClusterIDKey, clusterUUID)
-		return false
-	}
-	if !userHasTag(user, openshiftClusterNameKey, clusterName) {
-		log.Warnf("user missing tag: %s=%s", openshiftClusterNameKey, clusterName)
-		return false
-	}
-	for k, v := range userTags {
-		if !userHasTag(user, k, v) {
-			log.Warnf("user missing tag: %s=%s", k, v)
+
+	if infraName != "" {
+		clusterTag := fmt.Sprintf("kubernetes.io/cluster/%s", infraName)
+		if !userHasTag(user, clusterTag, "owned") {
+			log.Warnf("user missing tag: %s=%s", clusterTag, "owned")
 			return false
 		}
+	} else {
+		logger.Warn("Infrastructure 'cluster' has no status.infrastructureName set. (likely beta3 cluster)")
+		// This is a legacy tag being kept for compatability with beta3, which would not have
+		// had any infrastructure name set. Deprovision code still searches for anything with this
+		// tag, so if no infra name is set we skip that tag and rely on this one for cleanup.
+		if !userHasTag(user, openshiftClusterIDKey, clusterUUID) {
+			log.Warnf("user missing tag: %s=%s", openshiftClusterIDKey, clusterUUID)
+			return false
+		}
+
 	}
 
 	return true
@@ -612,8 +585,12 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	logger = logger.WithField("userName", awsStatus.User)
 
 	logger.Info("deleting credential from AWS")
+	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+	if err != nil {
+		return err
+	}
 
-	awsClient, err := a.buildRootAWSClient(cr)
+	awsClient, err := a.buildRootAWSClient(cr, infraName)
 	if err != nil {
 		return err
 	}
@@ -711,33 +688,21 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	return existingSecret, existingAccessKeyID, existingSecretAccessKey
 }
 
-func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterName, clusterUUID string, userTags map[string]string) error {
-	logger.WithField("clusterID", clusterUUID).Info("tagging user with cluster UUID")
-	tags := []*iam.Tag{
-		{
+func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, infraName, clusterUUID string) error {
+	logger.WithField("infraName", infraName).Info("tagging user with infrastructure name")
+	tags := []*iam.Tag{}
+	if infraName != "" {
+		tags = append(tags, &iam.Tag{
+			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", infraName)),
+			Value: aws.String("owned"),
+		})
+	} else {
+		tags = append(tags, &iam.Tag{
 			Key:   aws.String(openshiftClusterIDKey),
 			Value: aws.String(clusterUUID),
-		},
-		{
-			Key:   aws.String(openshiftClusterNameKey),
-			Value: aws.String(clusterName),
-		},
-		// This is expected to be the future format:
-		{
-			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", clusterUUID)),
-			Value: aws.String("owned"),
-		},
+		})
 	}
 
-	// Sort the user tag keys for testability:
-	keys := []string{}
-	for k := range userTags {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		tags = append(tags, &iam.Tag{Key: aws.String(k), Value: aws.String(userTags[k])})
-	}
 	_, err := awsClient.TagUser(&iam.TagUserInput{
 		UserName: aws.String(username),
 		Tags:     tags,
@@ -751,7 +716,7 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 
 // buildRootAWSClient will return an AWS client using the "root" AWS creds which are expected to
 // live in kube-system/aws-creds.
-func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
+func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest, infraName string) (minteraws.Client, error) {
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret))
 
 	logger.Debug("loading AWS credentials from secret")
@@ -762,10 +727,6 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 		return nil, err
 	}
 
-	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
-	if err != nil {
-		return nil, err
-	}
 	logger.Debug("creating root AWS client")
 	return a.AWSClientBuilder(accessKeyID, secretAccessKey, infraName)
 }
@@ -777,7 +738,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 //
 // If these are not available but root creds are, we will use the root creds instead.
 // This allows us to create the read creds initially.
-func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
+func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, infraName string) (minteraws.Client, error) {
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", roAWSCredsSecretNamespace, roAWSCredsSecret))
 	logger.Debug("loading AWS credentials from secret")
 
@@ -799,16 +760,12 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 		if err != nil {
 			if errors.IsNotFound(err) {
 				logger.Warn("read-only creds not found, using root creds client")
-				return a.buildRootAWSClient(cr)
+				return a.buildRootAWSClient(cr, infraName)
 			}
 		}
 	}
 
 	logger.Debug("creating read AWS client")
-	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
-	if err != nil {
-		return nil, err
-	}
 	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey, infraName)
 	if err != nil {
 		return nil, err
@@ -828,7 +785,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 			switch aerr.Code() {
 			case "InvalidClientTokenId":
 				logger.Warn("InvalidClientTokenId for read-only AWS account, likely a propagation delay, falling back to root AWS client")
-				return a.buildRootAWSClient(cr)
+				return a.buildRootAWSClient(cr, infraName)
 			}
 			// Any other error we just let following code sort out.
 		}
@@ -841,53 +798,6 @@ func (a *AWSActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger
 		"actuator": "aws",
 		"cr":       fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
-}
-
-func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (openshiftapiv1.ClusterID, error) {
-	logger.Debug("loading cluster version to read clusterID")
-	// TODO: this process will need to change if running this controller in a root hive cluster
-	clusterVer := &openshiftapiv1.ClusterVersion{}
-	err := a.Client.Get(context.Background(),
-		types.NamespacedName{Name: clusterVersionObjectName},
-		clusterVer)
-	if err != nil {
-		logger.WithError(err).Error("error fetching clusterversion object")
-		return "", err
-	}
-	logger.WithField("clusterID", clusterVer.Spec.ClusterID).Debug("found cluster ID")
-	return clusterVer.Spec.ClusterID, nil
-}
-
-// loadClusterInstallConfig loads kube-system/cluster-config-v1 and unmarshalls to an InstallConfig
-// type.
-// WARNING: this will be deprecated soon but for now it's our only way to get the info we need.
-// (cluster name, user tags etc)
-func (a *AWSActuator) loadClusterInstallConfig(logger log.FieldLogger) (*installtypes.InstallConfig, error) {
-	log.Debug("loading cluster install config")
-	ic := &installtypes.InstallConfig{}
-	clusterConfig := &corev1.ConfigMap{}
-	err := a.Client.Get(context.Background(),
-		types.NamespacedName{Name: clusterConfigName, Namespace: clusterConfigNamespace},
-		clusterConfig)
-	if err != nil {
-		logger.WithError(err).Errorf("error fetching configmap %s/%s", clusterConfigNamespace, clusterConfigName)
-		return ic, err
-	}
-
-	icStr, ok := clusterConfig.Data[clusterConfigMapKey]
-	if !ok {
-		err = fmt.Errorf("configmap %s/%s did not contain key: %s", clusterConfigNamespace, clusterConfigName, clusterConfigMapKey)
-		log.WithError(err).Error("error loading cluster config")
-		return ic, err
-	}
-
-	err = yaml.Unmarshal([]byte(icStr), ic)
-	if err != nil {
-		log.WithError(err).Error("error parsing install config yaml")
-		return ic, err
-	}
-	log.Debug("cluster install config loaded successfully")
-	return ic, nil
 }
 
 func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKeyID, secretAccessKey string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
@@ -1179,20 +1089,20 @@ func formatAWSErr(aerr awserr.Error) error {
 
 // generateUserName generates a unique user name for AWS and will truncate the credential name
 // to fit within the AWS limit of 64 chars if necessary.
-func generateUserName(clusterName, credentialName string) (string, error) {
+func generateUserName(infraName, credentialName string) (string, error) {
 	if credentialName == "" {
 		return "", fmt.Errorf("empty credential name")
 	}
-	if clusterName == "" {
-		return "", fmt.Errorf("empty cluster name")
+	if infraName == "" {
+		return "", fmt.Errorf("empty infrastructure name")
 	}
-	if len(clusterName) > 20 {
-		clusterName = clusterName[0:20]
+	if len(infraName) > 20 {
+		infraName = infraName[0:20]
 	}
 	if len(credentialName) > 37 {
 		credentialName = credentialName[0:37]
 	}
-	return fmt.Sprintf("%s-%s-%s", clusterName, credentialName, utilrand.String(5)), nil
+	return fmt.Sprintf("%s-%s-%s", infraName, credentialName, utilrand.String(5)), nil
 }
 
 func getPolicyName(userName string) string {
@@ -1213,4 +1123,19 @@ type StatementEntry struct {
 	Effect   string
 	Action   []string
 	Resource string
+}
+
+func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (configv1.ClusterID, error) {
+	logger.Debug("loading cluster version to read clusterID")
+	// TODO: this process will need to change if running this controller in a root hive cluster
+	clusterVer := &configv1.ClusterVersion{}
+	err := a.Client.Get(context.Background(),
+		types.NamespacedName{Name: clusterVersionObjectName},
+		clusterVer)
+	if err != nil {
+		logger.WithError(err).Error("error fetching clusterversion object")
+		return "", err
+	}
+	logger.WithField("clusterID", clusterVer.Spec.ClusterID).Debug("found cluster ID")
+	return clusterVer.Spec.ClusterID, nil
 }
