@@ -122,6 +122,7 @@ func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, er
 		logger.WithError(err).Error("error loading Infrastructure config 'cluster'")
 		return "", err
 	}
+
 	logger.Debugf("Loaded infrastructure name: %s", infra.Status.InfrastructureName)
 	return infra.Status.InfrastructureName, nil
 
