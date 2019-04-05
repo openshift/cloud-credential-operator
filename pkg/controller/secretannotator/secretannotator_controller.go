@@ -115,7 +115,7 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	client.Client
 	logger           log.FieldLogger
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error)
+	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error)
 }
 
 // Reconcile will annotate the cloud cred secret to indicate the capabilities of the cred's capabilities:
@@ -124,7 +124,6 @@ type ReconcileCloudCredSecret struct {
 // 3) 'insufficient' for indicating that the creds are not usable for the cluster
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;update
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
-	////logger := log.WithField("controller", controllerName)
 	r.logger.Info("validating cloud cred secret")
 
 	secret := &corev1.Secret{}
@@ -157,7 +156,11 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 		return r.updateSecretAnnotations(secret, InsufficientAnnotation)
 	}
 
-	awsClient, err := r.AWSClientBuilder(accessKey, secretKey)
+	infraName, err := utils.LoadInfrastructureName(r.Client, r.logger)
+	if err != nil {
+		return err
+	}
+	awsClient, err := r.AWSClientBuilder(accessKey, secretKey, infraName)
 	if err != nil {
 		return fmt.Errorf("error creating aws client: %v", err)
 	}
