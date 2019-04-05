@@ -68,7 +68,7 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 type AWSActuator struct {
 	Client           client.Client
 	Codec            *minterv1.AWSProviderCodec
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error)
+	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error)
 	Scheme           *runtime.Scheme
 }
 
@@ -161,9 +161,13 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, nil
 	}
 
+	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+	if err != nil {
+		return false, err
+	}
 	// Various checks for the kinds of reasons that would trigger a needed update
 	_, accessKey, secretKey := a.loadExistingSecret(cr)
-	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey))
+	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey), infraName)
 	if err != nil {
 		return true, err
 	}
@@ -758,8 +762,12 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 		return nil, err
 	}
 
+	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+	if err != nil {
+		return nil, err
+	}
 	logger.Debug("creating root AWS client")
-	return a.AWSClientBuilder(accessKeyID, secretAccessKey)
+	return a.AWSClientBuilder(accessKeyID, secretAccessKey, infraName)
 }
 
 // buildReadAWSCreds will return an AWS client using the the scaled down read only AWS creds
@@ -797,7 +805,11 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	}
 
 	logger.Debug("creating read AWS client")
-	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey)
+	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+	if err != nil {
+		return nil, err
+	}
+	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey, infraName)
 	if err != nil {
 		return nil, err
 	}

@@ -110,7 +110,7 @@ func (c *awsClient) TagUser(input *iam.TagUserInput) (*iam.TagUserOutput, error)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
-func NewClient(accessKeyID, secretAccessKey []byte) (Client, error) {
+func NewClient(accessKeyID, secretAccessKey []byte, infraName string) (Client, error) {
 	awsConfig := &awssdk.Config{}
 
 	awsConfig.Credentials = credentials.NewStaticCredentials(
@@ -122,7 +122,7 @@ func NewClient(accessKeyID, secretAccessKey []byte) (Client, error) {
 	}
 	s.Handlers.Build.PushBackNamed(request.NamedHandler{
 		Name: "openshift.io/cloud-credential-operator",
-		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Version),
+		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Version, infraName),
 	})
 
 	return &awsClient{
