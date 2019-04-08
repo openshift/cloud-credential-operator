@@ -18,13 +18,12 @@ package controller
 
 import (
 	"context"
-	"fmt"
-	"regexp"
 
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 
-	corev1 "k8s.io/api/core/v1"
+	configv1 "github.com/openshift/api/config/v1"
+
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 
@@ -84,22 +83,13 @@ func isAWSCluster(m manager.Manager) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	cfgMapName := types.NamespacedName{Name: "cluster-config-v1", Namespace: "kube-system"}
-	installCfgMap := &corev1.ConfigMap{}
-	err = client.Get(context.Background(), cfgMapName, installCfgMap)
+	infraName := types.NamespacedName{Name: "cluster"}
+	infra := &configv1.Infrastructure{}
+	err = client.Get(context.Background(), infraName, infra)
 	if err != nil {
 		return false, err
 	}
-	data, ok := installCfgMap.Data["install-config"]
-	if !ok {
-		return false, fmt.Errorf("cluster-config-v1 ConfigMap did not contain install-config data")
-	}
-	yamlStr := string(data)
-	match, err := regexp.MatchString(`.*platform:\s*aws:.*`, yamlStr)
-	if err != nil {
-		return false, err
-	}
-	return match, nil
+	return infra.Status.Platform == configv1.AWSPlatformType, nil
 }
 
 func getClient() (client.Client, error) {

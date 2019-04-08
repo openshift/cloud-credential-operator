@@ -735,6 +735,17 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			}
 			existing = append(test.existing, installConfigMap)
 
+			infra := &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform:           configv1.AWSPlatformType,
+					InfrastructureName: testInfraName,
+				},
+			}
+			existing = append(existing, infra)
+
 			fakeClient := fake.NewFakeClient(existing...)
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
@@ -742,7 +753,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					Client: fakeClient,
 					Codec:  codec,
 					Scheme: scheme.Scheme,
-					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte) (minteraws.Client, error) {
+					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, infraName string) (minteraws.Client, error) {
 						if string(accessKeyID) == testRootAWSAccessKeyID {
 							return mockRootAWSClient, nil
 						} else if string(accessKeyID) == testAWSAccessKeyID {
@@ -800,6 +811,7 @@ const (
 	testNamespace              = "openshift-cloud-credential-operator"
 	testClusterName            = "testcluster"
 	testClusterID              = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
+	testInfraName              = "testcluster-abc123"
 	testSecretName             = "test-secret"
 	testSecretNamespace        = "myproject"
 	testAWSUser                = "mycluster-test-aws-user"
