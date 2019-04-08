@@ -30,6 +30,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
@@ -48,6 +50,7 @@ const (
 	testAWSUser            = "credTestUser"
 	testAWSUserARN         = "arn:aws:iam::123456789012:user/credTestUser"
 	testAWSAccessKeyID     = "FAKEAWSACCESSKEYID"
+	testInfraName          = "testcluster-abc123"
 	testAWSSecretAccessKey = "KEEPITSECRET"
 )
 
@@ -57,6 +60,7 @@ func init() {
 
 func TestSecretAnnotatorReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
+	configv1.Install(scheme.Scheme)
 
 	tests := []struct {
 		name                    string
@@ -143,7 +147,19 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			infra := &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					Platform:           configv1.AWSPlatformType,
+					InfrastructureName: testInfraName,
+				},
+			}
+
+			existing := append(test.existing, infra)
+
+			fakeClient := fake.NewFakeClient(existing...)
 
 			fakeAWSClient := mockaws.NewMockClient(mockCtrl)
 			if test.mockAWSClient != nil {
@@ -153,7 +169,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			rcc := &ReconcileCloudCredSecret{
 				Client: fakeClient,
 				logger: log.WithField("controller", "testController"),
-				AWSClientBuilder: func(accessKeyID, secretAccessKey []byte) (ccaws.Client, error) {
+				AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error) {
 					return fakeAWSClient, nil
 				},
 			}

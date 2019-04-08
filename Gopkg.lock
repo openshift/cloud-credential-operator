@@ -23,6 +23,7 @@
   packages = [
     ".",
     "aws",
+    "aws/arn",
     "aws/awserr",
     "aws/awsutil",
     "aws/client",
@@ -376,11 +377,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b586f7732b1cf625afa8afc9a3a78124bfc8c850536e09790173ce1219e241a9"
+  digest = "1:d3e9fbfc7bba1f6765ca139068a97828ebe4ebdcbff0d37aa3c42c162d7ca44d"
   name = "github.com/openshift/api"
   packages = ["config/v1"]
   pruneopts = "T"
-  revision = "7fa446eb33f1df4d5e4175a31591191368137f10"
+  revision = "1065f586bc7c919c401d5bcd334cb4a121b7314a"
 
 [[projects]]
   digest = "1:ccf387b1000d4864aaf832aae3524898c320263620f7e3162ded978fe2ea3ba4"
@@ -1044,6 +1045,7 @@
   input-imports = [
     "github.com/aws/aws-sdk-go",
     "github.com/aws/aws-sdk-go/aws",
+    "github.com/aws/aws-sdk-go/aws/arn",
     "github.com/aws/aws-sdk-go/aws/awserr",
     "github.com/aws/aws-sdk-go/aws/credentials",
     "github.com/aws/aws-sdk-go/aws/request",
