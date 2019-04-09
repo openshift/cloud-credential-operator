@@ -55,10 +55,10 @@ func TestGenerateUserName(t *testing.T) {
 			expectedError:  true,
 		},
 		{
-			name:           "empty cluster name",
+			name:           "empty infra name",
 			clusterName:    "",
 			credentialName: "something",
-			expectedError:  true,
+			expectedPrefix: "something-",
 		},
 	}
 
