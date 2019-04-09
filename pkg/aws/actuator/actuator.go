@@ -1093,16 +1093,17 @@ func generateUserName(infraName, credentialName string) (string, error) {
 	if credentialName == "" {
 		return "", fmt.Errorf("empty credential name")
 	}
-	if infraName == "" {
-		return "", fmt.Errorf("empty infrastructure name")
-	}
-	if len(infraName) > 20 {
-		infraName = infraName[0:20]
+	infraPrefix := ""
+	if infraName != "" {
+		if len(infraName) > 20 {
+			infraName = infraName[0:20]
+		}
+		infraPrefix = infraName + "-"
 	}
 	if len(credentialName) > 37 {
 		credentialName = credentialName[0:37]
 	}
-	return fmt.Sprintf("%s-%s-%s", infraName, credentialName, utilrand.String(5)), nil
+	return fmt.Sprintf("%s%s-%s", infraPrefix, credentialName, utilrand.String(5)), nil
 }
 
 func getPolicyName(userName string) string {
