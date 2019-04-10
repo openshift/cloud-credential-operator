@@ -398,7 +398,8 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		syncErr = r.Actuator.Update(context.TODO(), cr)
 	}
 	if syncErr != nil {
-		logger.Errorf("error syncing credentials: %v", err)
+		logger.Errorf("error syncing credentials: %v", syncErr)
+		cr.Status.Provisioned = false
 
 		switch t := syncErr.(type) {
 		case actuator.ActuatorStatus:
@@ -406,10 +407,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			r.updateActuatorConditions(cr, t.Reason(), syncErr)
 		default:
 			logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
-			return reconcile.Result{}, err
+			return reconcile.Result{}, syncErr
 		}
 
-		cr.Status.Provisioned = false
 	} else {
 		// it worked so clear any actuator conditions if they exist
 		r.updateActuatorConditions(cr, "", nil)
@@ -427,29 +427,23 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, err
 	}
 
-	// Ensure we have the controller reference set on the managed secret if it exists:
-	// TODO: we could refactor a bit so this is set when it's created, but it's done in sync.go which currently doesn't know about the full CR.
-	secret := &corev1.Secret{}
-	err = r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, secret)
-	if err != nil {
-		logger.WithError(err).Error("error looking up secret")
-		return reconcile.Result{}, err
-	}
-
-	return reconcile.Result{}, nil
+	return reconcile.Result{}, syncErr
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
 
-	// first unset any previous conditions
-	setInsufficientCredsCondition(cr, false)
-	setFailedToProvisionCredentialsRequest(cr, false, nil)
-
-	// now set whatever specific condition the actuator is presently firing
 	if reason == minterv1.CredentialsProvisionFailure {
 		setFailedToProvisionCredentialsRequest(cr, true, conditionError)
-	} else if reason == minterv1.InsufficientCloudCredentials {
+	} else {
+		// If this is not our error, ensure the condition is cleared.
+		setFailedToProvisionCredentialsRequest(cr, false, nil)
+	}
+
+	if reason == minterv1.InsufficientCloudCredentials {
 		setInsufficientCredsCondition(cr, true)
+	} else {
+		// If this is not our error, ensure the condition is cleared.
+		setInsufficientCredsCondition(cr, false)
 	}
 
 	return
