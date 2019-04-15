@@ -61,7 +61,7 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
 	Client           client.Client
-	Codec            *minterv1.AWSProviderCodec
+	Codec            *minterv1.ProviderCodec
 	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error)
 	Scheme           *runtime.Scheme
 }
@@ -82,27 +82,28 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator,
 	}, nil
 }
 
-func DecodeProviderStatus(codec *minterv1.AWSProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderStatus, error) {
-	awsStatus := &minterv1.AWSProviderStatus{}
+func DecodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderStatus, error) {
+	awsStatus := minterv1.AWSProviderStatus{}
 	var err error
 	if cr.Status.ProviderStatus == nil {
-		return awsStatus, nil
+		return &awsStatus, nil
 	}
 
-	awsStatus, err = codec.DecodeProviderStatus(cr.Status.ProviderStatus, &minterv1.AWSProviderStatus{})
+	err = codec.DecodeProviderStatus(cr.Status.ProviderStatus, &awsStatus)
 	if err != nil {
 		return nil, fmt.Errorf("error decoding v1 provider status: %v", err)
 	}
-	return awsStatus, nil
+	return &awsStatus, nil
 }
 
-func DecodeProviderSpec(codec *minterv1.AWSProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderSpec, error) {
+func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderSpec, error) {
 	if cr.Spec.ProviderSpec != nil {
-		awsSpec, err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &minterv1.AWSProviderSpec{})
+		awsSpec := minterv1.AWSProviderSpec{}
+		err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &awsSpec)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding provider v1 spec: %v", err)
 		}
-		return awsSpec, nil
+		return &awsSpec, nil
 	}
 
 	return nil, fmt.Errorf("no providerSpec defined")
