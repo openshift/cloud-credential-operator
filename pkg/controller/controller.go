@@ -20,6 +20,7 @@ import (
 	"context"
 
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -52,23 +53,30 @@ func AddToManager(m manager.Manager) error {
 		}
 	}
 	for _, f := range AddToManagerWithActuatorFuncs {
-		// Check if this is an AWS cluster and if not, add a dummy actuator:
+		// Check for supported platform types, dummy if not found:
 		// TODO: Use infrastructure type to determine this in future, it's not being populated yet:
 		// https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L11
 		var err error
 		var a actuator.Actuator
-		isAWS, err := isAWSCluster(m)
+		plat, err := platformType(m)
 		if err != nil {
 			log.Fatal(err)
 		}
-		if isAWS {
+		switch plat {
+		case configv1.AWSPlatformType:
 			log.Info("initializing AWS actuator")
 			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme())
 			if err != nil {
 				return err
 			}
-		} else {
-			log.Info("initializing no-op actuator (not an AWS cluster)")
+		case configv1.AzurePlatformType:
+			log.Info("initializing Azure actuator")
+			a, err = azure.NewActuator(m.GetClient())
+			if err != nil {
+				return err
+			}
+		default:
+			log.Info("initializing no-op actuator (unsupported platform)")
 			a = &actuator.DummyActuator{}
 		}
 		if err := f(m, a); err != nil {
@@ -78,18 +86,18 @@ func AddToManager(m manager.Manager) error {
 	return nil
 }
 
-func isAWSCluster(m manager.Manager) (bool, error) {
+func platformType(m manager.Manager) (configv1.PlatformType, error) {
 	client, err := getClient()
 	if err != nil {
-		return false, err
+		return configv1.NonePlatformType, err
 	}
 	infraName := types.NamespacedName{Name: "cluster"}
 	infra := &configv1.Infrastructure{}
 	err = client.Get(context.Background(), infraName, infra)
 	if err != nil {
-		return false, err
+		return configv1.NonePlatformType, err
 	}
-	return infra.Status.Platform == configv1.AWSPlatformType, nil
+	return infra.Status.Platform, nil
 }
 
 func getClient() (client.Client, error) {
