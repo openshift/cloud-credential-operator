@@ -68,4 +68,5 @@ spec:
           - /root/manager
           - --log-level
           - debug
+        terminationMessagePolicy: FallbackToLogsOnError
       terminationGracePeriodSeconds: 10

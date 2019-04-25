@@ -201,7 +201,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					status:        corev1.ConditionFalse,
 				},
 				{
-					conditionType: configv1.OperatorFailing,
+					conditionType: configv1.OperatorDegraded,
 					status:        corev1.ConditionFalse,
 				},
 			},
@@ -255,7 +255,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					status:        corev1.ConditionFalse,
 				},
 				{
-					conditionType: configv1.OperatorFailing,
+					conditionType: configv1.OperatorDegraded,
 					status:        corev1.ConditionFalse,
 				},
 			},
@@ -304,7 +304,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					status:        corev1.ConditionFalse,
 				},
 				{
-					conditionType: configv1.OperatorFailing,
+					conditionType: configv1.OperatorDegraded,
 					status:        corev1.ConditionFalse,
 				},
 			},
@@ -470,7 +470,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					status:        corev1.ConditionFalse,
 				},
 				{
-					conditionType: configv1.OperatorFailing,
+					conditionType: configv1.OperatorDegraded,
 					status:        corev1.ConditionFalse,
 				},
 			},
@@ -584,7 +584,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					status:        corev1.ConditionFalse,
 				},
 				{
-					conditionType: configv1.OperatorFailing,
+					conditionType: configv1.OperatorDegraded,
 					status:        corev1.ConditionFalse,
 				},
 			},
