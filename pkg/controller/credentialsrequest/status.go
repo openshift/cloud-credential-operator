@@ -126,10 +126,10 @@ func computeClusterOperatorVersions() []configv1.OperandVersion {
 // computeStatusConditions computes the operator's current state.
 func computeStatusConditions(conditions []configv1.ClusterOperatorStatusCondition, credRequests []minterv1.CredentialsRequest) []configv1.ClusterOperatorStatusCondition {
 
-	// Failing should be true if we are encountering errors. We consider any credentials request
-	// with either provision or deprovision failure conditions true, to be failing.
-	failingCondition := &configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorFailing,
+	// Degraded should be true if we are encountering errors. We consider any credentials request
+	// with either provision or deprovision failure conditions true, to be a degraded condition.
+	degradedCondition := &configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorDegraded,
 		Status: configv1.ConditionFalse,
 	}
 
@@ -160,19 +160,19 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 	}
 
 	if failingCredRequests > 0 {
-		failingCondition.Status = configv1.ConditionTrue
-		failingCondition.Reason = reasonCredentialsFailing
-		failingCondition.Message = fmt.Sprintf(
+		degradedCondition.Status = configv1.ConditionTrue
+		degradedCondition.Reason = reasonCredentialsFailing
+		degradedCondition.Message = fmt.Sprintf(
 			"%d of %d credentials requests are failing to sync.",
 			failingCredRequests, len(credRequests))
 	} else {
-		failingCondition.Status = configv1.ConditionFalse
-		failingCondition.Reason = reasonNoCredentialsFailing
-		failingCondition.Message = "No credentials requests reporting errors."
+		degradedCondition.Status = configv1.ConditionFalse
+		degradedCondition.Reason = reasonNoCredentialsFailing
+		degradedCondition.Message = "No credentials requests reporting errors."
 
 	}
 	conditions = clusteroperator.SetStatusCondition(conditions,
-		failingCondition)
+		degradedCondition)
 
 	// Progressing should be true if the operator is making changes to the operand. In this case
 	// we will set true if any CredentialsRequests are not provisioned, or have failure conditions,

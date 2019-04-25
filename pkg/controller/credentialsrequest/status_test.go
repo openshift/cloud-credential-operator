@@ -54,7 +54,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonReconcilingComplete),
-				testCondition(configv1.OperatorFailing, configv1.ConditionFalse, reasonNoCredentialsFailing),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
 			},
 		},
 		{
@@ -67,7 +67,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
-				testCondition(configv1.OperatorFailing, configv1.ConditionFalse, reasonNoCredentialsFailing),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
 			},
 		},
 		{
@@ -82,7 +82,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
-				testCondition(configv1.OperatorFailing, configv1.ConditionTrue, reasonCredentialsFailing),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonCredentialsFailing),
 			},
 		},
 		{
@@ -101,7 +101,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
-				testCondition(configv1.OperatorFailing, configv1.ConditionTrue, reasonCredentialsFailing),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonCredentialsFailing),
 			},
 		},
 		{
@@ -114,7 +114,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonReconcilingComplete),
-				testCondition(configv1.OperatorFailing, configv1.ConditionFalse, reasonNoCredentialsFailing),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
 			},
 		},
 		{
@@ -130,7 +130,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
-				testCondition(configv1.OperatorFailing, configv1.ConditionTrue, reasonCredentialsFailing),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonCredentialsFailing),
 			},
 		},
 	}
@@ -283,7 +283,7 @@ func testUnknownConditions() []configv1.ClusterOperatorStatusCondition {
 			Reason: "",
 		},
 		{
-			Type:   configv1.OperatorFailing,
+			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionUnknown,
 			Reason: "",
 		},
