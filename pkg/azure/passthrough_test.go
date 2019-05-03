@@ -38,8 +38,13 @@ const (
 	notFoundNamespace = "not-found-namespace"
 	notFoundName      = "not-found-name"
 
-	rootClientID     = "root_client_id"
-	rootClientSecret = "root_client_secret"
+	rootClientID       = "root_client_id"
+	rootClientSecret   = "root_client_secret"
+	rootRegion         = "root_region"
+	rootResourceGroup  = "root_resource_group"
+	rootResourcePrefix = "root_resource_prefix"
+	rootSubscriptionID = "root_subscription_id"
+	rootTenantID       = "root_tenant_id"
 )
 
 var (
@@ -73,8 +78,13 @@ var (
 			},
 		},
 		Data: map[string][]byte{
-			secretannotator.AzureClientID:     []byte(rootClientID),
-			secretannotator.AzureClientSecret: []byte(rootClientSecret),
+			secretannotator.AzureClientID:       []byte(rootClientID),
+			secretannotator.AzureClientSecret:   []byte(rootClientSecret),
+			secretannotator.AzureRegion:         []byte(rootRegion),
+			secretannotator.AzureResourceGroup:  []byte(rootResourceGroup),
+			secretannotator.AzureResourcePrefix: []byte(rootResourcePrefix),
+			secretannotator.AzureSubscriptionID: []byte(rootSubscriptionID),
+			secretannotator.AzureTenantID:       []byte(rootTenantID),
 		},
 	}
 
@@ -167,6 +177,11 @@ func TestPassthroughCreate(t *testing.T) {
 			assert.Nil(t, err)
 			assert.Equal(t, secret.Data[secretannotator.AzureClientID], []byte(rootClientID))
 			assert.Equal(t, secret.Data[secretannotator.AzureClientSecret], []byte(rootClientSecret))
+			assert.Equal(t, secret.Data[secretannotator.AzureRegion], []byte(rootRegion))
+			assert.Equal(t, secret.Data[secretannotator.AzureResourceGroup], []byte(rootResourceGroup))
+			assert.Equal(t, secret.Data[secretannotator.AzureResourcePrefix], []byte(rootResourcePrefix))
+			assert.Equal(t, secret.Data[secretannotator.AzureSubscriptionID], []byte(rootSubscriptionID))
+			assert.Equal(t, secret.Data[secretannotator.AzureTenantID], []byte(rootTenantID))
 		})
 	}
 }

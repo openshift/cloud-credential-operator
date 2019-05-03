@@ -83,7 +83,12 @@ func copySecret(cr *minterv1.CredentialsRequest, src *secret, dest *secret) {
 		},
 	}
 	dest.Data = map[string][]byte{
-		secretannotator.AzureClientID:     src.Data[secretannotator.AzureClientID],
-		secretannotator.AzureClientSecret: src.Data[secretannotator.AzureClientSecret],
+		secretannotator.AzureClientID:       src.Data[secretannotator.AzureClientID],
+		secretannotator.AzureClientSecret:   src.Data[secretannotator.AzureClientSecret],
+		secretannotator.AzureRegion:         src.Data[secretannotator.AzureRegion],
+		secretannotator.AzureResourceGroup:  src.Data[secretannotator.AzureResourceGroup],
+		secretannotator.AzureResourcePrefix: src.Data[secretannotator.AzureResourcePrefix],
+		secretannotator.AzureSubscriptionID: src.Data[secretannotator.AzureSubscriptionID],
+		secretannotator.AzureTenantID:       src.Data[secretannotator.AzureTenantID],
 	}
 }
