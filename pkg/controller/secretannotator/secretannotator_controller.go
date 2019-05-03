@@ -64,8 +64,13 @@ const (
 	AwsAccessKeyName       = "aws_access_key_id"
 	AwsSecretAccessKeyName = "aws_secret_access_key"
 
-	AzureClientID     = "azure_client_id"
-	AzureClientSecret = "azure_client_secret"
+	AzureClientID       = "azure_client_id"
+	AzureClientSecret   = "azure_client_secret"
+	AzureRegion         = "azure_region"
+	AzureResourceGroup  = "azure_resourcegroup"
+	AzureResourcePrefix = "azure_resource_prefix"
+	AzureSubscriptionID = "azure_subscription_id"
+	AzureTenantID       = "azure_tenant_id"
 )
 
 func Add(mgr manager.Manager) error {
