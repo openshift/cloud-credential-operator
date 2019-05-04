@@ -27,8 +27,8 @@ import (
 )
 
 const (
-	RootSecretNamespace = "openshift-config"
-	RootSecretName      = "azure-creds"
+	RootSecretNamespace = "kube-system"
+	RootSecretName      = "azure-credentials"
 )
 
 var RootSecretKey = client.ObjectKey{Name: RootSecretName, Namespace: RootSecretNamespace}
