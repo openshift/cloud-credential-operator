@@ -36,33 +36,52 @@ type Actuator struct {
 }
 
 func NewActuator(c client.Client) (*Actuator, error) {
-	cw := newClientWrapper(c)
-	mode, err := cw.Mode(context.Background())
+	client := newClientWrapper(c)
+	return &Actuator{
+		internal: newPassthrough(client),
+		client:   client,
+	}, nil
+}
+
+func (a *Actuator) IsValidMode() error {
+	mode, err := a.client.Mode(context.Background())
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	switch mode {
 	// TODO: case secretannotator.MintAnnotation:
 	case secretannotator.PassthroughAnnotation:
-		return &Actuator{internal: newPassthrough(newClientWrapper(c))}, nil
-	default:
-		return nil, errors.New("invalid mode")
+		return nil
 	}
+
+	return errors.New("invalid mode")
 }
 
 func (a *Actuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if err := a.IsValidMode(); err != nil {
+		return err
+	}
 	return a.internal.Create(ctx, cr)
 }
 
 func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if err := a.IsValidMode(); err != nil {
+		return err
+	}
 	return a.internal.Delete(ctx, cr)
 }
 
 func (a *Actuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if err := a.IsValidMode(); err != nil {
+		return err
+	}
 	return a.internal.Update(ctx, cr)
 }
 
 func (a *Actuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	if err := a.IsValidMode(); err != nil {
+		return false, err
+	}
 	return a.internal.Exists(ctx, cr)
 }

@@ -58,11 +58,11 @@ func (cw *clientWrapper) RootSecret(ctx context.Context) (*secret, error) {
 }
 
 func (cw *clientWrapper) Secret(ctx context.Context, key client.ObjectKey) (*secret, error) {
-	s := secret{}
+	s := &secret{}
 	if err := cw.Get(ctx, key, &s.Secret); err != nil {
 		return nil, err
 	}
-	return &s, nil
+	return s, nil
 }
 
 func (cw *clientWrapper) Mode(ctx context.Context) (string, error) {
