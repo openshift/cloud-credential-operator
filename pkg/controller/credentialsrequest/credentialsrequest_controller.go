@@ -93,15 +93,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Create controller with dependencies set
 	c := &internalcontroller.Controller{
-		Do:       r,
-		Cache:    mgr.GetCache(),
-		Config:   mgr.GetConfig(),
-		Scheme:   mgr.GetScheme(),
-		Client:   mgr.GetClient(),
-		Recorder: mgr.GetRecorder(name),
-		Queue:    workqueue.NewNamedRateLimitingQueue(rateLimiter, name),
+		Do:                      r,
+		Cache:                   mgr.GetCache(),
+		Config:                  mgr.GetConfig(),
+		Scheme:                  mgr.GetScheme(),
+		Client:                  mgr.GetClient(),
+		Recorder:                mgr.GetRecorder(name),
+		Queue:                   workqueue.NewNamedRateLimitingQueue(rateLimiter, name),
 		MaxConcurrentReconciles: 1,
-		Name: name,
+		Name:                    name,
 	}
 
 	if err := mgr.Add(c); err != nil {
