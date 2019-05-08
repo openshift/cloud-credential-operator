@@ -1,4 +1,4 @@
-package utils
+package platform
 
 import (
 	"context"
@@ -10,8 +10,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-// PlatformType queries the ku8s api for the infrastructure config map and retrieves the current platform.
-func PlatformType(m manager.Manager) (configv1.PlatformType, error) {
+// Get queries the ku8s api for the infrastructure config map and retrieves the current platform.
+func Get(m manager.Manager) (configv1.PlatformType, error) {
 	client, err := getClient()
 	if err != nil {
 		return configv1.NonePlatformType, err

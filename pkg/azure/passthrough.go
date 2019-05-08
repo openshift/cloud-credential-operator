@@ -24,7 +24,6 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -83,12 +82,12 @@ func copySecret(cr *minterv1.CredentialsRequest, src *secret, dest *secret) {
 		},
 	}
 	dest.Data = map[string][]byte{
-		secretannotator.AzureClientID:       src.Data[secretannotator.AzureClientID],
-		secretannotator.AzureClientSecret:   src.Data[secretannotator.AzureClientSecret],
-		secretannotator.AzureRegion:         src.Data[secretannotator.AzureRegion],
-		secretannotator.AzureResourceGroup:  src.Data[secretannotator.AzureResourceGroup],
-		secretannotator.AzureResourcePrefix: src.Data[secretannotator.AzureResourcePrefix],
-		secretannotator.AzureSubscriptionID: src.Data[secretannotator.AzureSubscriptionID],
-		secretannotator.AzureTenantID:       src.Data[secretannotator.AzureTenantID],
+		AzureClientID:       src.Data[AzureClientID],
+		AzureClientSecret:   src.Data[AzureClientSecret],
+		AzureRegion:         src.Data[AzureRegion],
+		AzureResourceGroup:  src.Data[AzureResourceGroup],
+		AzureResourcePrefix: src.Data[AzureResourcePrefix],
+		AzureSubscriptionID: src.Data[AzureSubscriptionID],
+		AzureTenantID:       src.Data[AzureTenantID],
 	}
 }

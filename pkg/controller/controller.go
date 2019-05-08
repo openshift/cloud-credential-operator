@@ -20,12 +20,12 @@ import (
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/platform"
 
 	configv1 "github.com/openshift/api/config/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	utils "github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -53,7 +53,7 @@ func AddToManager(m manager.Manager) error {
 		// https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L11
 		var err error
 		var a actuator.Actuator
-		plat, err := utils.PlatformType(m)
+		plat, err := platform.Get(m)
 		if err != nil {
 			log.Fatal(err)
 		}

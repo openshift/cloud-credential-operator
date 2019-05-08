@@ -22,7 +22,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -51,7 +51,7 @@ func (a *Actuator) IsValidMode() error {
 
 	switch mode {
 	// TODO: case secretannotator.MintAnnotation:
-	case secretannotator.PassthroughAnnotation:
+	case annotatorconst.PassthroughAnnotation:
 		return nil
 	}
 
