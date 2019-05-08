@@ -17,7 +17,7 @@ limitations under the License.
 package azure
 
 import (
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
@@ -30,7 +30,7 @@ func (s *secret) HasAnnotation() bool {
 		return false
 	}
 
-	if _, ok := s.ObjectMeta.Annotations[secretannotator.AnnotationKey]; !ok {
+	if _, ok := s.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
 		return false
 	}
 

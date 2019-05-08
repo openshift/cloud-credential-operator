@@ -44,7 +44,7 @@ import (
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -989,13 +989,13 @@ func createTestNamespace(namespace string) *corev1.Namespace {
 
 func testInsufficientAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
-	s.Annotations[secretannotator.AnnotationKey] = secretannotator.InsufficientAnnotation
+	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.InsufficientAnnotation
 	return s
 }
 
 func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
-	s.Annotations[secretannotator.AnnotationKey] = secretannotator.PassthroughAnnotation
+	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
 	return s
 }
 
@@ -1005,7 +1005,7 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				secretannotator.AnnotationKey: secretannotator.MintAnnotation,
+				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
 			},
 		},
 		Data: map[string][]byte{

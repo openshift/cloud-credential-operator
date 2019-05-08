@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package secretannotator
+package aws_test
 
 import (
 	"context"
@@ -42,6 +42,9 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+
+	annaws "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 )
 
 const (
@@ -79,7 +82,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 				return mockAWSClient
 			},
-			validateAnnotationValue: MintAnnotation,
+			validateAnnotationValue: constants.MintAnnotation,
 		},
 		{
 			name:     "detect root user creds",
@@ -105,7 +108,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 				return mockAWSClient
 			},
-			validateAnnotationValue: PassthroughAnnotation,
+			validateAnnotationValue: constants.PassthroughAnnotation,
 		},
 		{
 			name:     "useless creds",
@@ -120,7 +123,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 				return mockAWSClient
 			},
-			validateAnnotationValue: InsufficientAnnotation,
+			validateAnnotationValue: constants.InsufficientAnnotation,
 		},
 		{
 			name:      "missing secret",
@@ -135,7 +138,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 					Namespace: testNamespace,
 				},
 				Data: map[string][]byte{
-					AwsAccessKeyName:            []byte(testAWSAccessKeyID),
+					annaws.AwsAccessKeyName:     []byte(testAWSAccessKeyID),
 					"not_aws_secret_access_key": []byte(testAWSSecretAccessKey),
 				},
 			}},
@@ -166,9 +169,9 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				fakeAWSClient = test.mockAWSClient(mockCtrl)
 			}
 
-			rcc := &ReconcileCloudCredSecret{
+			rcc := &annaws.ReconcileCloudCredSecret{
 				Client: fakeClient,
-				logger: log.WithField("controller", "testController"),
+				Logger: log.WithField("controller", "testController"),
 				AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error) {
 					return fakeAWSClient, nil
 				},
@@ -199,8 +202,8 @@ func testSecret() *corev1.Secret {
 			Namespace: testNamespace,
 		},
 		Data: map[string][]byte{
-			AwsAccessKeyName:       []byte(testAWSAccessKeyID),
-			AwsSecretAccessKeyName: []byte(testAWSSecretAccessKey),
+			annaws.AwsAccessKeyName:       []byte(testAWSAccessKeyID),
+			annaws.AwsSecretAccessKeyName: []byte(testAWSSecretAccessKey),
 		},
 	}
 	return s
@@ -268,14 +271,18 @@ func mockSimulatePrincipalPolicyCredPassthroughFail(mockAWSClient *mockaws.MockC
 
 func validateSecretAnnotation(c client.Client, t *testing.T, value string) {
 	secret := getCredSecret(c)
+	validateAnnotation(t, secret, value)
+}
+
+func validateAnnotation(t *testing.T, secret *corev1.Secret, annotation string) {
 	if secret.ObjectMeta.Annotations == nil {
 		t.Errorf("unexpected empty annotations on secret")
 	}
-	if _, ok := secret.ObjectMeta.Annotations[AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		t.Errorf("missing annotation")
 	}
 
-	assert.Exactly(t, value, secret.ObjectMeta.Annotations[AnnotationKey])
+	assert.Exactly(t, annotation, secret.ObjectMeta.Annotations[constants.AnnotationKey])
 }
 
 func getCredSecret(c client.Client) *corev1.Secret {
