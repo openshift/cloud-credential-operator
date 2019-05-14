@@ -34,6 +34,9 @@ func (a *base) Delete(context.Context, *minterv1.CredentialsRequest) error {
 }
 
 func (a *base) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	if isAzure, err := isAzureCredentials(cr.Spec.ProviderSpec); !isAzure {
+		return false, err
+	}
 	req, err := newRequest(cr)
 	if err != nil {
 		return false, err
