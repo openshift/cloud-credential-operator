@@ -18,7 +18,6 @@ package secretannotator
 
 import (
 	"fmt"
-	"log"
 
 	configv1 "github.com/openshift/api/config/v1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -26,10 +25,12 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/controller/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/azure"
+	log "github.com/sirupsen/logrus"
 )
 
 func Add(mgr manager.Manager) error {
 	platformType, err := platform.Get(mgr)
+	log.Infof("Setting up secret annotator. Platform Type is %s", platformType)
 	if err != nil {
 		log.Fatal(err)
 	}
