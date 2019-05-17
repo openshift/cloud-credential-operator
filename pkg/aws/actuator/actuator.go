@@ -120,6 +120,9 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 	logger := a.getLogger(cr)
 	logger.Debug("running Exists")
 	var err error
+	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
+		return false, err
+	}
 	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
 	if err != nil {
 		return false, err
@@ -252,7 +255,9 @@ func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsReques
 }
 
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
-
+	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
+		return err
+	}
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
@@ -572,6 +577,9 @@ func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.Field
 
 // Delete the credentials. If no error is returned, it is assumed that all dependent resources have been cleaned up.
 func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
+		return err
+	}
 	logger := a.getLogger(cr)
 	logger.Debug("running Delete")
 	var err error
@@ -909,7 +917,7 @@ func (a *AWSActuator) getCloudCredentialsSecret(ctx context.Context, logger log.
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", annotatorconst.CloudCredSecretNamespace, annotatorconst.CloudCredSecretName)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
