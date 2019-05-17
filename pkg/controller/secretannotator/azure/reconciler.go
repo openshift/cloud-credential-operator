@@ -19,8 +19,7 @@ import (
 )
 
 const (
-	cloudCredSecretName      = "azure-credentials"
-	cloudCredSecretNamespace = "kube-system"
+	cloudCredSecretName = "azure-credentials"
 )
 
 var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
@@ -64,7 +63,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == cloudCredSecretNamespace && secret.GetName() == cloudCredSecretName
+	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == cloudCredSecretName
 }
 
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {

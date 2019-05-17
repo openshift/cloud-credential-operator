@@ -3,8 +3,6 @@ package constants
 const (
 	ControllerName = "secretannotator"
 
-	// TODO: dynamically detect which environment we're running on
-	CloudCredSecretName      = "aws-creds"
 	CloudCredSecretNamespace = "kube-system"
 
 	AnnotationKey = "cloudcredential.openshift.io/mode"

@@ -17,8 +17,6 @@ limitations under the License.
 package secretannotator
 
 import (
-	"fmt"
-
 	configv1 "github.com/openshift/api/config/v1"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -39,10 +37,8 @@ func Add(mgr manager.Manager) error {
 	case configv1.AzurePlatformType:
 		return azure.Add(mgr, azure.NewReconciler(mgr))
 	case configv1.AWSPlatformType:
+		return aws.Add(mgr, aws.NewReconciler(mgr))
 	default: // returning the AWS implementation for default to avoid changing any behavior
 		return aws.Add(mgr, aws.NewReconciler(mgr))
 	}
-
-	// this should never be reached, as we have a default handling in the above switch
-	return fmt.Errorf("platform not supported")
 }
