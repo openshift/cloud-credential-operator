@@ -25,8 +25,7 @@ import (
 
 const (
 	// TODO: dynamically detect which environment we're running on
-	AWSCloudCredSecretName   = "aws-creds"
-	CloudCredSecretNamespace = "kube-system"
+	AWSCloudCredSecretName = "aws-creds"
 
 	AwsAccessKeyName       = "aws_access_key_id"
 	AwsSecretAccessKeyName = "aws_secret_access_key"
@@ -41,7 +40,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == CloudCredSecretNamespace && secret.GetName() == AWSCloudCredSecretName
+	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == AWSCloudCredSecretName
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {

@@ -1142,3 +1142,21 @@ func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (configv1.ClusterI
 	logger.WithField("clusterID", clusterVer.Spec.ClusterID).Debug("found cluster ID")
 	return clusterVer.Spec.ClusterID, nil
 }
+
+func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		return false, err
+	}
+	unknown := runtime.Unknown{}
+	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	if err != nil {
+		return false, err
+	}
+	isAWS := unknown.Kind == reflect.TypeOf(minterv1.AWSProviderSpec{}).Name()
+	if !isAWS {
+		log.WithField("kind", unknown.Kind).
+			Info("actuator handles only azure credentials")
+	}
+	return isAWS, nil
+}
