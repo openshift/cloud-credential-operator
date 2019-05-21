@@ -22,7 +22,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -74,17 +74,17 @@ var (
 			Name:      azure.RootSecretName,
 			Namespace: azure.RootSecretNamespace,
 			Annotations: map[string]string{
-				secretannotator.AnnotationKey: secretannotator.PassthroughAnnotation,
+				annotatorconst.AnnotationKey: annotatorconst.PassthroughAnnotation,
 			},
 		},
 		Data: map[string][]byte{
-			secretannotator.AzureClientID:       []byte(rootClientID),
-			secretannotator.AzureClientSecret:   []byte(rootClientSecret),
-			secretannotator.AzureRegion:         []byte(rootRegion),
-			secretannotator.AzureResourceGroup:  []byte(rootResourceGroup),
-			secretannotator.AzureResourcePrefix: []byte(rootResourcePrefix),
-			secretannotator.AzureSubscriptionID: []byte(rootSubscriptionID),
-			secretannotator.AzureTenantID:       []byte(rootTenantID),
+			azure.AzureClientID:       []byte(rootClientID),
+			azure.AzureClientSecret:   []byte(rootClientSecret),
+			azure.AzureRegion:         []byte(rootRegion),
+			azure.AzureResourceGroup:  []byte(rootResourceGroup),
+			azure.AzureResourcePrefix: []byte(rootResourcePrefix),
+			azure.AzureSubscriptionID: []byte(rootSubscriptionID),
+			azure.AzureTenantID:       []byte(rootTenantID),
 		},
 	}
 
@@ -93,7 +93,7 @@ var (
 			Name:      azure.RootSecretName,
 			Namespace: azure.RootSecretNamespace,
 			Annotations: map[string]string{
-				secretannotator.AnnotationKey: "blah",
+				annotatorconst.AnnotationKey: "blah",
 			},
 		},
 	}
@@ -175,13 +175,13 @@ func TestPassthroughCreate(t *testing.T) {
 			key := client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
 			err = f.Get(context.TODO(), key, &secret)
 			assert.Nil(t, err)
-			assert.Equal(t, secret.Data[secretannotator.AzureClientID], []byte(rootClientID))
-			assert.Equal(t, secret.Data[secretannotator.AzureClientSecret], []byte(rootClientSecret))
-			assert.Equal(t, secret.Data[secretannotator.AzureRegion], []byte(rootRegion))
-			assert.Equal(t, secret.Data[secretannotator.AzureResourceGroup], []byte(rootResourceGroup))
-			assert.Equal(t, secret.Data[secretannotator.AzureResourcePrefix], []byte(rootResourcePrefix))
-			assert.Equal(t, secret.Data[secretannotator.AzureSubscriptionID], []byte(rootSubscriptionID))
-			assert.Equal(t, secret.Data[secretannotator.AzureTenantID], []byte(rootTenantID))
+			assert.Equal(t, secret.Data[azure.AzureClientID], []byte(rootClientID))
+			assert.Equal(t, secret.Data[azure.AzureClientSecret], []byte(rootClientSecret))
+			assert.Equal(t, secret.Data[azure.AzureRegion], []byte(rootRegion))
+			assert.Equal(t, secret.Data[azure.AzureResourceGroup], []byte(rootResourceGroup))
+			assert.Equal(t, secret.Data[azure.AzureResourcePrefix], []byte(rootResourcePrefix))
+			assert.Equal(t, secret.Data[azure.AzureSubscriptionID], []byte(rootSubscriptionID))
+			assert.Equal(t, secret.Data[azure.AzureTenantID], []byte(rootTenantID))
 		})
 	}
 }
@@ -212,8 +212,8 @@ func TestPassthroughUpdate(t *testing.T) {
 			key := client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
 			err = f.Get(context.TODO(), key, &secret)
 			assert.Nil(t, err)
-			assert.Equal(t, secret.Data[secretannotator.AzureClientID], []byte(rootClientID))
-			assert.Equal(t, secret.Data[secretannotator.AzureClientSecret], []byte(rootClientSecret))
+			assert.Equal(t, secret.Data[azure.AzureClientID], []byte(rootClientID))
+			assert.Equal(t, secret.Data[azure.AzureClientSecret], []byte(rootClientSecret))
 		})
 	}
 }

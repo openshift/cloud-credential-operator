@@ -19,10 +19,14 @@ package azure
 import (
 	"context"
 	"errors"
+	"reflect"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
+	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -51,14 +55,35 @@ func (a *Actuator) IsValidMode() error {
 
 	switch mode {
 	// TODO: case secretannotator.MintAnnotation:
-	case secretannotator.PassthroughAnnotation:
+	case annotatorconst.PassthroughAnnotation:
 		return nil
 	}
 
 	return errors.New("invalid mode")
 }
 
+func isAzureCredentials(providerSpec *runtime.RawExtension) (bool, error) {
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		return false, err
+	}
+	unknown := runtime.Unknown{}
+	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	if err != nil {
+		return false, err
+	}
+	isAzure := unknown.Kind == reflect.TypeOf(minterv1.AzureProviderSpec{}).Name()
+	if !isAzure {
+		log.WithField("kind", unknown.Kind).
+			Info("actuator handles only azure credentials")
+	}
+	return isAzure, nil
+}
+
 func (a *Actuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if isAzure, err := isAzureCredentials(cr.Spec.ProviderSpec); !isAzure {
+		return err
+	}
 	if err := a.IsValidMode(); err != nil {
 		return err
 	}
@@ -66,6 +91,9 @@ func (a *Actuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) 
 }
 
 func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if isAzure, err := isAzureCredentials(cr.Spec.ProviderSpec); !isAzure {
+		return err
+	}
 	if err := a.IsValidMode(); err != nil {
 		return err
 	}
@@ -73,6 +101,9 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 }
 
 func (a *Actuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if isAzure, err := isAzureCredentials(cr.Spec.ProviderSpec); !isAzure {
+		return err
+	}
 	if err := a.IsValidMode(); err != nil {
 		return err
 	}
@@ -80,6 +111,9 @@ func (a *Actuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) 
 }
 
 func (a *Actuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	if isAzure, err := isAzureCredentials(cr.Spec.ProviderSpec); !isAzure {
+		return false, err
+	}
 	if err := a.IsValidMode(); err != nil {
 		return false, err
 	}
