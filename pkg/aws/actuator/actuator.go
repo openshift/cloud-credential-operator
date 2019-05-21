@@ -28,7 +28,8 @@ import (
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator"
+	awsannotator "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/aws"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -119,6 +120,9 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 	logger := a.getLogger(cr)
 	logger.Debug("running Exists")
 	var err error
+	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
+		return false, err
+	}
 	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
 	if err != nil {
 		return false, err
@@ -251,7 +255,9 @@ func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsReques
 }
 
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
-
+	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
+		return err
+	}
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
@@ -281,7 +287,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.InsufficientAnnotation {
+	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.InsufficientAnnotation {
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
@@ -290,13 +296,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	}
 
-	if cloudCredsSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.PassthroughAnnotation {
+	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
 		logger.Debugf("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
 			return err
 		}
-	} else if cloudCredsSecret.Annotations[secretannotator.AnnotationKey] == secretannotator.MintAnnotation {
+	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.MintAnnotation {
 		logger.Debugf("provisioning with cred minting")
 		err := a.syncMint(ctx, cr, infraName, logger)
 		if err != nil {
@@ -314,8 +320,8 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 
 func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
 	existingSecret, _, _ := a.loadExistingSecret(cr)
-	accessKeyID := string(cloudCredsSecret.Data[secretannotator.AwsAccessKeyName])
-	secretAccessKey := string(cloudCredsSecret.Data[secretannotator.AwsSecretAccessKeyName])
+	accessKeyID := string(cloudCredsSecret.Data[awsannotator.AwsAccessKeyName])
+	secretAccessKey := string(cloudCredsSecret.Data[awsannotator.AwsSecretAccessKeyName])
 	// userPolicy param empty because in passthrough mode this doesn't really have any meaning
 	err := a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
 	if err != nil {
@@ -571,6 +577,9 @@ func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.Field
 
 // Delete the credentials. If no error is returned, it is assumed that all dependent resources have been cleaned up.
 func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
+		return err
+	}
 	logger := a.getLogger(cr)
 	logger.Debug("running Delete")
 	var err error
@@ -908,7 +917,7 @@ func (a *AWSActuator) getCloudCredentialsSecret(ctx context.Context, logger log.
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", secretannotator.CloudCredSecretNamespace, secretannotator.CloudCredSecretName)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
@@ -923,7 +932,7 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 		return false
 	}
 
-	if _, ok := secret.ObjectMeta.Annotations[secretannotator.AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
 		return false
 	}
 
@@ -1140,4 +1149,22 @@ func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (configv1.ClusterI
 	}
 	logger.WithField("clusterID", clusterVer.Spec.ClusterID).Debug("found cluster ID")
 	return clusterVer.Spec.ClusterID, nil
+}
+
+func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		return false, err
+	}
+	unknown := runtime.Unknown{}
+	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	if err != nil {
+		return false, err
+	}
+	isAWS := unknown.Kind == reflect.TypeOf(minterv1.AWSProviderSpec{}).Name()
+	if !isAWS {
+		log.WithField("kind", unknown.Kind).
+			Info("actuator handles only azure credentials")
+	}
+	return isAWS, nil
 }

@@ -17,18 +17,13 @@ limitations under the License.
 package controller
 
 import (
-	"context"
-
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/platform"
 
 	configv1 "github.com/openshift/api/config/v1"
 
-	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/clientcmd"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	log "github.com/sirupsen/logrus"
@@ -58,7 +53,7 @@ func AddToManager(m manager.Manager) error {
 		// https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L11
 		var err error
 		var a actuator.Actuator
-		plat, err := platformType(m)
+		plat, err := platform.Get(m)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -84,35 +79,4 @@ func AddToManager(m manager.Manager) error {
 		}
 	}
 	return nil
-}
-
-func platformType(m manager.Manager) (configv1.PlatformType, error) {
-	client, err := getClient()
-	if err != nil {
-		return configv1.NonePlatformType, err
-	}
-	infraName := types.NamespacedName{Name: "cluster"}
-	infra := &configv1.Infrastructure{}
-	err = client.Get(context.Background(), infraName, infra)
-	if err != nil {
-		return configv1.NonePlatformType, err
-	}
-	return infra.Status.Platform, nil
-}
-
-func getClient() (client.Client, error) {
-	rules := clientcmd.NewDefaultClientConfigLoadingRules()
-	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
-	cfg, err := kubeconfig.ClientConfig()
-	if err != nil {
-		return nil, err
-	}
-
-	//apis.AddToScheme(scheme.Scheme)
-	dynamicClient, err := client.New(cfg, client.Options{})
-	if err != nil {
-		return nil, err
-	}
-
-	return dynamicClient, nil
 }
