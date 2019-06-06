@@ -21,6 +21,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/platform"
+	"github.com/openshift/cloud-credential-operator/pkg/openstack"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -67,6 +68,12 @@ func AddToManager(m manager.Manager) error {
 		case configv1.AzurePlatformType:
 			log.Info("initializing Azure actuator")
 			a, err = azure.NewActuator(m.GetClient())
+			if err != nil {
+				return err
+			}
+		case configv1.OpenStackPlatformType:
+			log.Info("initializing OpenStack actuator")
+			a, err = openstack.NewOpenStackActuator(m.GetClient())
 			if err != nil {
 				return err
 			}
