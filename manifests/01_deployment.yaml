@@ -159,8 +159,6 @@ spec:
           name: webhook-server
           protocol: TCP
         resources:
-          limits:
-            memory: 500Mi
           requests:
             cpu: 10m
             memory: 150Mi
@@ -170,14 +168,14 @@ spec:
       priorityClassName: system-cluster-critical
       terminationGracePeriodSeconds: 10
       tolerations:
-      - key: "node-role.kubernetes.io/master"
-        operator: "Exists"
-        effect: "NoSchedule"
-      - key: "node.kubernetes.io/unreachable"
-        operator: "Exists"
-        effect: "NoExecute"
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
         tolerationSeconds: 120
-      - key: "node.kubernetes.io/not-ready"
-        operator: "Exists"
-        effect: "NoExecute"
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
         tolerationSeconds: 120
