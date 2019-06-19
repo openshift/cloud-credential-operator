@@ -83,7 +83,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	name := "credentialsrequest-controller"
+	name := "credentialsrequest_controller"
 
 	// Custom rateLimiter that sets minimum backoff to 2 seconds
 	rateLimiter := workqueue.NewMaxOfRateLimiter(
@@ -98,7 +98,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		Config:                  mgr.GetConfig(),
 		Scheme:                  mgr.GetScheme(),
 		Client:                  mgr.GetClient(),
-		Recorder:                mgr.GetRecorder(name),
+		Recorder:                mgr.GetEventRecorderFor(name),
 		Queue:                   workqueue.NewNamedRateLimitingQueue(rateLimiter, name),
 		MaxConcurrentReconciles: 1,
 		Name:                    name,
@@ -187,7 +187,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			newNamespace := a.Meta.GetName()
 			log.WithField("namespace", newNamespace).Debug("checking for credentials requests targeting namespace")
 			crs := &minterv1.CredentialsRequestList{}
-			mgr.GetClient().List(context.TODO(), &client.ListOptions{}, crs)
+			mgr.GetClient().List(context.TODO(), crs)
 			requests := []reconcile.Request{}
 			for _, cr := range crs.Items {
 				if !cr.Status.Provisioned && cr.Spec.SecretRef.Namespace == newNamespace {
