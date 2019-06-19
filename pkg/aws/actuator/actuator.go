@@ -231,7 +231,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	} else {
 		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
-		goodEnough, err := utils.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, logger)
+		goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, logger)
 		if err != nil {
 			return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
 		}
@@ -732,7 +732,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest, infraN
 	logger.Debug("loading AWS credentials from secret")
 	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 	// cluster, we need to load different secrets for each cluster.
-	accessKeyID, secretAccessKey, err := minteraws.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 	if err != nil {
 		return nil, err
 	}
@@ -759,14 +759,14 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, infraN
 	// If we're operating on those credentials, just use the root creds.
 	if cr.Spec.SecretRef.Name == roAWSCredsSecret && cr.Spec.SecretRef.Namespace == roAWSCredsSecretNamespace {
 		log.Debug("operating our our RO creds, using root creds for all AWS client operations")
-		accessKeyID, secretAccessKey, err = minteraws.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+		accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 		// cluster, we need to load different secrets for each cluster.
-		accessKeyID, secretAccessKey, err = minteraws.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
+		accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				logger.Warn("read-only creds not found, using root creds client")
