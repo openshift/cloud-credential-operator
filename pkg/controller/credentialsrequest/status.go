@@ -103,7 +103,7 @@ func (r *ReconcileCredentialsRequest) getOperatorState() (*corev1.Namespace, []m
 	// central list to live. Other credentials requests in other namespaces will not affect status,
 	// but they will still work fine.
 	credRequestList := &minterv1.CredentialsRequestList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{Namespace: cloudCredOperatorNamespace}, credRequestList)
+	err := r.Client.List(context.TODO(), credRequestList, client.InNamespace(cloudCredOperatorNamespace))
 	if err != nil {
 		return nil, nil, fmt.Errorf(
 			"failed to list CredentialsRequests: %v", err)
