@@ -124,7 +124,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	}
 
 	// Can we mint new creds?
-	cloudCheckResult, err := utils.CheckCloudCredCreation(awsClient, r.Logger)
+	cloudCheckResult, err := ccaws.CheckCloudCredCreation(awsClient, r.Logger)
 	if err != nil {
 		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 		return fmt.Errorf("failed checking create cloud creds: %v", err)
@@ -136,7 +136,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	}
 
 	// Else, can we just pass through the current creds?
-	cloudCheckResult, err = utils.CheckCloudCredPassthrough(awsClient, r.Logger)
+	cloudCheckResult, err = ccaws.CheckCloudCredPassthrough(awsClient, r.Logger)
 	if err != nil {
 		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 		return fmt.Errorf("failed checking passthrough cloud creds: %v", err)
