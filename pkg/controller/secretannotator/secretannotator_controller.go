@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/controller/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/azure"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/gcp"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -38,6 +39,8 @@ func Add(mgr manager.Manager) error {
 		return azure.Add(mgr, azure.NewReconciler(mgr))
 	case configv1.AWSPlatformType:
 		return aws.Add(mgr, aws.NewReconciler(mgr))
+	case configv1.GCPPlatformType:
+		return gcp.Add(mgr, gcp.NewReconciler(mgr))
 	default: // returning the AWS implementation for default to avoid changing any behavior
 		return aws.Add(mgr, aws.NewReconciler(mgr))
 	}
