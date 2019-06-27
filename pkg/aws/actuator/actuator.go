@@ -1164,7 +1164,7 @@ func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	isAWS := unknown.Kind == reflect.TypeOf(minterv1.AWSProviderSpec{}).Name()
 	if !isAWS {
 		log.WithField("kind", unknown.Kind).
-			Info("actuator handles only azure credentials")
+			Info("actuator handles only aws credentials")
 	}
 	return isAWS, nil
 }
