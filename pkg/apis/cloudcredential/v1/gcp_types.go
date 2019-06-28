@@ -26,6 +26,8 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type GCPProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
+	// PredefinedRoles is the list of GCP pre-defined roles
+	// that the CredentialsRequest requires.
 	PredefinedRoles []string `json:"predefinedRoles"`
 }
 
