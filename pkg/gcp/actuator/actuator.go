@@ -182,7 +182,7 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return nil
 	}
 
-	cloudCredsSecret, err := a.getCloudCredentialsSecret(ctx, logger)
+	cloudCredsSecret, err := a.getRootCloudCredentialsSecret(ctx, logger)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
@@ -236,12 +236,15 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	}
 
 	if gcpStatus.ServiceAccountID == "" {
-		svcAcctID, err := generateNameWithFieldLimits(infraName, 12, cr.Name, 11)
+		// The service account id has a max length of 30 chars
+		// split it into 12-11-5 where the resuling string becomes:
+		// <infraName chopped to 12 chars>-<crName chopped to 11 chars>-<random 5 chars>
+		svcAcctID, err := generateUniqueNameWithFieldLimits(infraName, 12, cr.Name, 11)
 		if err != nil {
 			return fmt.Errorf("error generating service account ID: %v", err)
 		}
 		gcpStatus.ServiceAccountID = svcAcctID
-		logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Debug("generated random name for GCP service account")
+		logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Info("generated random name for GCP service account")
 		err = a.updateProviderStatus(ctx, logger, cr, gcpStatus)
 		if err != nil {
 			return err
@@ -268,6 +271,8 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 			return fmt.Errorf("error checking for existing service account: %v", err)
 		}
 
+		// The service account name field has a 100 char max, so generate a name consisting of the
+		// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
 		svcAcctName, err := generateNameWithFieldLimits(infraName, 50, cr.Name, 49) // 100 total char limit
 		if err != nil {
 			return fmt.Errorf("error generating service acocunt name: %v", err)
@@ -444,8 +449,8 @@ func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLog
 	return nil
 }
 
-// getCloudCredentialsSecret will return the cluster's GCP cloud cred secret if it exists and is properly annotated
-func (a *Actuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
+// getRootCloudCredentialsSecret will return the cluster's root GCP cloud cred secret if it exists and is properly annotated
+func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.Client.Get(ctx, types.NamespacedName{Name: rootGCPCredsSecret, Namespace: rootGCPCredsSecretNamespace}, cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
@@ -492,7 +497,7 @@ func isGCPCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	isGCP := unknown.Kind == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name()
 	if !isGCP {
 		log.WithField("kind", unknown.Kind).
-			Info("actuator handles only gcp credentials")
+			Debug("actuator handles only gcp credentials")
 	}
 	return isGCP, nil
 }
