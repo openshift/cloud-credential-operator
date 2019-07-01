@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -12,6 +13,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 )
 
 const (
@@ -57,4 +60,19 @@ func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, er
 	logger.Debugf("Loaded infrastructure name: %s", infra.Status.InfrastructureName)
 	return infra.Status.InfrastructureName, nil
 
+}
+
+// GetCredentialsRequestCloudType decodes a Spec.ProviderSpec and returns the kind
+// field.
+func GetCredentialsRequestCloudType(providerSpec *runtime.RawExtension) (string, error) {
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		return "", err
+	}
+	unknown := runtime.Unknown{}
+	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	if err != nil {
+		return "", err
+	}
+	return unknown.Kind, nil
 }

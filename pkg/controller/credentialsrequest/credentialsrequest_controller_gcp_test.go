@@ -386,6 +386,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 						return mockRootGCPClient, nil
 					},
 				},
+				platformType: configv1.GCPPlatformType,
 			}
 
 			_, err := rcr.Reconcile(reconcile.Request{
@@ -440,6 +441,9 @@ func testGCPCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 
 	gcpStatus, err := codec.EncodeProviderStatus(
 		&minterv1.GCPProviderStatus{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "GCPProviderSpec",
+			},
 			ServiceAccountID: testGCPServiceAccountID,
 		},
 	)
@@ -470,6 +474,9 @@ func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReq
 	}
 	gcpProvSpec, err := codec.EncodeProviderSpec(
 		&minterv1.GCPProviderSpec{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "GCPProviderSpec",
+			},
 			PredefinedRoles: []string{
 				testRoleName,
 			},
