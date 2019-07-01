@@ -782,6 +782,26 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.NotEqual(t, testTwentyMinuteOldTimestamp.Unix(), cr.Status.LastSyncTimestamp.Time.Unix())
 			},
 		},
+		{
+			name: "skip nonAWS credreq",
+			existing: []runtime.Object{
+				testGCPCredentialsRequest(t),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				return mockaws.NewMockClient(mockCtrl)
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.False(t, cr.Status.Provisioned, "CRs for wrong cloud should be unprovisioned")
+			},
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.Ignored,
+					reason:        "InfrastructureMismatch",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -817,6 +837,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						}
 					},
 				},
+				platformType: configv1.AWSPlatformType,
 			}
 
 			_, err = rcr.Reconcile(reconcile.Request{
@@ -921,6 +942,9 @@ func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReques
 	}
 	awsProvSpec, err := codec.EncodeProviderSpec(
 		&minterv1.AWSProviderSpec{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "AWSProviderSpec",
+			},
 			StatementEntries: []minterv1.StatementEntry{
 				{
 					Effect: "Allow",
