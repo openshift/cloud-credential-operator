@@ -135,5 +135,6 @@ func init() {
 		&CredentialsRequest{}, &CredentialsRequestList{},
 		&AWSProviderStatus{}, &AWSProviderSpec{},
 		&AzureProviderStatus{}, &AzureProviderSpec{},
+		&GCPProviderStatus{}, &GCPProviderSpec{},
 	)
 }
