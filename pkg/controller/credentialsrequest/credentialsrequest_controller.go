@@ -245,9 +245,8 @@ type ReconcileCredentialsRequest struct {
 // makes changes based on the state read and what is in the CredentialsRequest.Spec
 // Automatically generate RBAC rules to allow the Controller to read and write required types.
 // +kubebuilder:rbac:groups=cloudcredential.openshift.io,resources=credentialsrequests;credentialsrequests/status;credentialsrequests/finalizers,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;create;update;patch;delete
-// TODO: temporary, used for cluster-config-v1, no way to limit by namespace+name today.
-// +kubebuilder:rbac:groups=core,resources=configmaps,verbs=get;list;watch
+// Configmaps required for leader election:
+// +kubebuilder:rbac:groups=core,resources=secrets;configmaps;events,verbs=get;list;watch;create;update;patch;delete
 // +kubebuilder:rbac:groups=core,resources=namespaces,verbs=get;list;watch
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusterversions,verbs=get;list;watch
 // +kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures,verbs=get;list;watch

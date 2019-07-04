@@ -24,8 +24,8 @@ import (
 )
 
 const (
-	cloudCredOperatorNamespace      = "openshift-cloud-credential-operator"
 	cloudCredClusterOperator        = "cloud-credential"
+	cloudCredOperatorNamespace      = "openshift-cloud-credential-operator"
 	reasonCredentialsFailing        = "CredentialsFailing"
 	reasonNoCredentialsFailing      = "NoCredentialsFailing"
 	reasonReconciling               = "Reconciling"
@@ -90,20 +90,20 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 func (r *ReconcileCredentialsRequest) getOperatorState() (*corev1.Namespace, []minterv1.CredentialsRequest, error) {
 
 	ns := &corev1.Namespace{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: cloudCredOperatorNamespace}, ns); err != nil {
+	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: minterv1.CloudCredOperatorNamespace}, ns); err != nil {
 		if errors.IsNotFound(err) {
 			return nil, nil, nil
 		}
 
 		return nil, nil, fmt.Errorf(
-			"error getting Namespace %s: %v", cloudCredOperatorNamespace, err)
+			"error getting Namespace %s: %v", minterv1.CloudCredOperatorNamespace, err)
 	}
 
 	// NOTE: we're only looking at cred requests in our namespace, which is where we expect the
 	// central list to live. Other credentials requests in other namespaces will not affect status,
 	// but they will still work fine.
 	credRequestList := &minterv1.CredentialsRequestList{}
-	err := r.Client.List(context.TODO(), &client.ListOptions{Namespace: cloudCredOperatorNamespace}, credRequestList)
+	err := r.Client.List(context.TODO(), &client.ListOptions{Namespace: minterv1.CloudCredOperatorNamespace}, credRequestList)
 	if err != nil {
 		return nil, nil, fmt.Errorf(
 			"failed to list CredentialsRequests: %v", err)
