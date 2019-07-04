@@ -28,6 +28,7 @@ import (
 	"github.com/spf13/pflag"
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller"
 
 	openshiftapiv1 "github.com/openshift/api/config/v1"
@@ -40,7 +41,8 @@ import (
 )
 
 const (
-	defaultLogLevel = "info"
+	defaultLogLevel         = "info"
+	leaderElectionConfigMap = "cloud-credential-operator-leader"
 )
 
 type ControllerManagerOptions struct {
@@ -71,7 +73,11 @@ func NewRootCommand() *cobra.Command {
 
 			// Create a new Cmd to provide shared dependencies and start components
 			log.Info("setting up manager")
-			mgr, err := manager.New(cfg, manager.Options{})
+			mgr, err := manager.New(cfg, manager.Options{
+				LeaderElection:          true,
+				LeaderElectionNamespace: minterv1.CloudCredOperatorNamespace,
+				LeaderElectionID:        leaderElectionConfigMap,
+			})
 			if err != nil {
 				log.Error(err, "unable to set up overall controller manager")
 				os.Exit(1)
