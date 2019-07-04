@@ -13,6 +13,11 @@ test: generate fmt vet manifests
 test-no-gen: fmt vet
 	go test ./pkg/... ./cmd/... -coverprofile cover.out
 
+.PHONY: test-sec
+test-sec:
+	@which gosec 2> /dev/null >&1 || { echo "gosec must be installed to lint code";  exit 1; }
+	gosec -severity medium --confidence medium -quiet ./...
+
 # Build manager binary
 manager: generate fmt vet
 	go build -o bin/manager github.com/openshift/cloud-credential-operator/cmd/manager
