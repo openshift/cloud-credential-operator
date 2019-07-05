@@ -51,8 +51,10 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 
 	oldConditions := co.Status.Conditions
 	oldVersions := co.Status.Versions
+	oldRelatedObjects := co.Status.RelatedObjects
 	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests)
 	co.Status.Versions = computeClusterOperatorVersions()
+	co.Status.RelatedObjects = buildExpectedRelatedObjects()
 
 	// ClusterOperator should already exist (from the manifests payload), but recreate it if needed
 	if isNotFound {
@@ -74,7 +76,10 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	}
 
 	// Update status fields if needed
-	if !clusteroperator.ConditionsEqual(oldConditions, co.Status.Conditions) || !reflect.DeepEqual(oldVersions, co.Status.Versions) {
+	if !clusteroperator.ConditionsEqual(oldConditions, co.Status.Conditions) ||
+		!reflect.DeepEqual(oldVersions, co.Status.Versions) ||
+		!reflect.DeepEqual(oldRelatedObjects, co.Status.RelatedObjects) {
+
 		err = r.Client.Status().Update(context.TODO(), co)
 		if err != nil {
 			return fmt.Errorf("failed to update clusteroperator %s: %v", co.Name, err)
@@ -239,4 +244,16 @@ func findClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCon
 		}
 	}
 	return nil
+}
+
+// buildExpectedRelatedObjects returns the list of expected related objects, used
+// by the oc must-gather command to fetch resource yaml for debugging purposes.
+// Keeping this up to date across versions via the code seems like the safest option.
+func buildExpectedRelatedObjects() []configv1.ObjectReference {
+	return []configv1.ObjectReference{
+		{
+			Resource: "namespaces",
+			Name:     cloudCredOperatorNamespace,
+		},
+	}
 }
