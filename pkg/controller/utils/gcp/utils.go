@@ -29,6 +29,7 @@ import (
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
+	"k8s.io/apimachinery/pkg/util/sets"
 )
 
 var (
@@ -52,14 +53,26 @@ var (
 		"resourcemanager.projects.setIamPolicy",
 	}
 
+	// CredPassthroughPermissions is a list of GCP permissions needed to run in passthrough mode.
 	CredPassthroughPermissions = []string{
 		// Query API availability
 		"serviceusage.services.list",
+		// Query getting current project details
 		"resourcemanager.projects.get",
+		// Query role existence and permissions attached to roles
+		"iam.roles.get",
 	}
 
 	credentailRequestScheme = runtime.NewScheme()
 	credentialRequestCodec  = serializer.NewCodecFactory(credentailRequestScheme)
+
+	invalidPermsForProjectScopedPermissionsTesting = []string{
+		// checking whether we have permissions resourcemanager.projects.list returns an error
+		// (as it is invalid when checking against a project resource),
+		// but listing projects is always allowed (it simply returns a list of projects you
+		// have projects.get permissions for)
+		"resourcemanager.projects.list",
+	}
 )
 
 const (
@@ -110,14 +123,36 @@ func checkServicesAndPermissions(gcpClient ccgcp.Client, permissionsList []strin
 	return servicesEnabled, nil
 }
 
+// filterOutPermissions will take a list of GCP permissions and return a list of permissions with any matching the filterOutList removed
+func filterOutPermissions(permList, filterOutList []string) []string {
+	filteredPerms := []string{}
+	for _, perm := range permList {
+		filterOut := false
+		for _, filterPerm := range filterOutList {
+			if perm == filterPerm {
+				filterOut = true
+				break
+			}
+		}
+
+		if filterOut {
+			continue
+		}
+		filteredPerms = append(filteredPerms, perm)
+	}
+	return filteredPerms
+}
+
 // CheckPermissionsAgainstPermissionList will take the passsed-in list of permissions to check whether the provided
 // gcpClient creds have sufficient permissions to perform the actions.
 // Will return true/false indicating whether the permissions are sufficient.
 func CheckPermissionsAgainstPermissionList(gcpClient ccgcp.Client, permList []string, logger log.FieldLogger) (bool, error) {
 	projectName := gcpClient.GetProjectName()
 
+	filteredPermList := filterOutPermissions(permList, invalidPermsForProjectScopedPermissionsTesting)
+
 	permRequest := &cloudresourcemanager.TestIamPermissionsRequest{
-		Permissions: permList,
+		Permissions: filteredPermList,
 	}
 	permResponse, err := gcpClient.TestIamPermissions(projectName, permRequest)
 	if err != nil {
@@ -130,15 +165,15 @@ func CheckPermissionsAgainstPermissionList(gcpClient ccgcp.Client, permList []st
 		permMap[perm] = true
 	}
 
-	disallowedPerms := []string{}
-	for _, perm := range permList {
+	disallowedPerms := sets.NewString()
+	for _, perm := range filteredPermList {
 		if _, ok := permMap[perm]; !ok {
-			disallowedPerms = append(disallowedPerms, perm)
+			disallowedPerms.Insert(perm)
 		}
 	}
 
 	if len(disallowedPerms) > 0 {
-		logger.Warn("Detected some unallowed permissions: %s", disallowedPerms)
+		logger.Warnf("Detected some unallowed permissions: %s", disallowedPerms.List())
 	}
 
 	return len(disallowedPerms) == 0, nil
@@ -153,20 +188,20 @@ func CheckServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 		return false, fmt.Errorf("error retrieving list of enabled APIs: %v", err)
 	}
 
-	disabledAPIs := []string{}
+	disabledAPIs := sets.NewString()
 
 	for _, perm := range permList {
 		apiName := permToAPIRegexp.ReplaceAllString(perm, "$1.googleapis.com")
 		if enabled, ok := enabledServices[apiName]; !ok {
-			// the lack of an entry in the enabledServices map means the API isnt' enabled
-			disabledAPIs = append(disabledAPIs, apiName)
+			// the lack of an entry in the enabledServices map means the API isn't enabled
+			disabledAPIs.Insert(apiName)
 		} else if !enabled {
-			disabledAPIs = append(disabledAPIs, apiName)
+			disabledAPIs.Insert(apiName)
 		}
 	}
 
 	if len(disabledAPIs) > 0 {
-		logger.Warn("Detected required APIs that are disabled: %s", disabledAPIs)
+		logger.Warnf("Detected required APIs that are disabled: %s", disabledAPIs.List())
 		return false, nil
 	}
 

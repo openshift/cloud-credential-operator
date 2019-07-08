@@ -420,6 +420,8 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	}
 	if syncErr != nil {
 		logger.Errorf("error syncing credentials: %v", syncErr)
+		// TODO: set condition if previously satisfied credrequest can now
+		// not be satisfied (but keeping provisioned==True).
 		cr.Status.Provisioned = false
 
 		switch t := syncErr.(type) {

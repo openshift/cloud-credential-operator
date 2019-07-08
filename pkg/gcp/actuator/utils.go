@@ -122,7 +122,7 @@ func loadCredsFromSecret(kubeClient client.Client, namespace, secretName string)
 
 	jsonBytes, ok := secret.Data[gcpSecretJSONKey]
 	if !ok {
-		return nil, fmt.Errorf("GCP credentials secret %s did not container key %s",
+		return nil, fmt.Errorf("GCP credentials secret %s did not contain key %s",
 			secretName, gcpSecretJSONKey)
 	}
 
