@@ -17,13 +17,10 @@ limitations under the License.
 package actuator
 
 import (
-	"context"
 	"fmt"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
@@ -42,20 +39,10 @@ func ensurePolicyBindings(rootClient ccgcp.Client, roles []string, svcAcct *iama
 
 	// Validate that each role exists, and add the policy binding as needed
 	for _, definedRole := range roles {
-		// Check it exists
-		role, err := rootClient.GetRole(context.TODO(), &iamadminpb.GetRoleRequest{
-			Name: definedRole,
-		})
-		if err != nil {
-			if status.Code(err) == codes.NotFound {
-				return fmt.Errorf("role %s not found: %v", role, err)
-			} else {
-				return fmt.Errorf("error checking if role exists: %v", err)
-			}
-		}
+		// Earlier we've verified that the requested roles already exist.
 
 		// Add policy binding
-		modified := addPolicyBinding(policy, role, svcAcct)
+		modified := addPolicyBinding(policy, definedRole, svcAcct)
 		if modified {
 			needPolicyUpdate = true
 		}
@@ -112,24 +99,24 @@ func purgeExtraPolicyBindings(policy *cloudresourcemanager.Policy, roleList []st
 	return modifiedPolicy
 }
 
-func addPolicyBinding(policy *cloudresourcemanager.Policy, role *iamadminpb.Role, svcAcct *iamadminpb.ServiceAccount) bool {
+func addPolicyBinding(policy *cloudresourcemanager.Policy, roleName string, svcAcct *iamadminpb.ServiceAccount) bool {
 	for i, binding := range policy.Bindings {
-		if binding.Role == role.Name {
+		if binding.Role == roleName {
 			return addServiceAccountToBinding(svcAcct, policy.Bindings[i])
 		}
 	}
 
 	// if we didn't find an existing binding entry, then make one
-	createServiceAccountRoleBinding(policy, role, svcAcct)
+	createServiceAccountRoleBinding(policy, roleName, svcAcct)
 
 	return true
 }
 
-func createServiceAccountRoleBinding(policy *cloudresourcemanager.Policy, role *iamadminpb.Role, svcAcct *iamadminpb.ServiceAccount) {
+func createServiceAccountRoleBinding(policy *cloudresourcemanager.Policy, roleName string, svcAcct *iamadminpb.ServiceAccount) {
 	svcAcctBindingName := serviceAccountBindingName(svcAcct)
 	policy.Bindings = append(policy.Bindings, &cloudresourcemanager.Binding{
 		Members: []string{svcAcctBindingName},
-		Role:    role.Name,
+		Role:    roleName,
 	})
 }
 

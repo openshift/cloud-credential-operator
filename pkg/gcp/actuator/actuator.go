@@ -16,6 +16,7 @@ limitations under the License.
 package actuator
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"reflect"
@@ -28,6 +29,7 @@ import (
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
+	gcputils "github.com/openshift/cloud-credential-operator/pkg/controller/utils/gcp"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 
 	// GCP packages
@@ -156,7 +158,7 @@ func (a *Actuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) 
 }
 
 func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
-	if isGCP, err := isGCPCredentials(cr.Spec.ProviderSpec); !isGCP {
+	if isGCP, err := isGCPCredentials(cr.Spec.ProviderSpec); !isGCP || err != nil {
 		return err
 	}
 	logger := a.getLogger(cr)
@@ -167,13 +169,22 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return err
 	}
 
-	// First, should we update anything at all
-	needsUpdate, err := a.needsUpdate(ctx, cr)
+	// Now, should we proceed
+	servicesAPIsEnabled, needsUpdate, err := a.needsUpdate(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("error determining whether a credentials update is needed")
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("error determining whether a credentials update is needed: %v", err),
+		}
+	}
+
+	if !servicesAPIsEnabled {
+		msg := "not all required service APIs are enabled"
+		logger.Error(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   msg,
 		}
 	}
 
@@ -220,7 +231,46 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 }
 
 func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
-	return fmt.Errorf("PASSTHROUGH ON GCP NOT YET IMPLEMENTED")
+
+	rootAuthJSONByes := cloudCredsSecret.Data[gcpSecretJSONKey]
+	rootClient, err := a.buildRootGCPClient(cr)
+	if err != nil {
+		return err
+	}
+
+	provSpec, err := decodeProviderSpec(a.Codec, cr)
+	if err != nil {
+		return err
+	}
+
+	permList, err := getPermissionsFromRoles(rootClient, provSpec.PredefinedRoles)
+	if err != nil {
+		return fmt.Errorf("error gathering permissions for each role: %v", err)
+	}
+
+	enoughPerms, err := gcputils.CheckPermissionsAgainstPermissionList(rootClient, permList, logger)
+	if err != nil {
+		return fmt.Errorf("error checking whether GCP client has sufficient permissions: %v", err)
+	}
+
+	if !enoughPerms {
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "cloud root creds do not have enough permissions to be used as-is",
+		}
+	}
+
+	err = a.syncSecret(cr, rootAuthJSONByes, logger)
+	if err != nil {
+		msg := "error creating/updating secret"
+		logger.WithError(err).Error(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("%s: %v", msg, err),
+		}
+	}
+
+	return nil
 }
 
 // syncMint handles both create and update idempotently.
@@ -255,6 +305,21 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	if err != nil {
 		logger.WithError(err).Error("error building root GCP client")
 		return err
+	}
+
+	permList, err := getPermissionsFromRoles(rootGCPClient, gcpSpec.PredefinedRoles)
+	if err != nil {
+		return fmt.Errorf("error gathering permissions for each role: %v", err)
+	}
+
+	// check that service APIs are enabled before we bother to make a
+	// new serviceaccount
+	serviceAPIsEnabled, err := checkServicesEnabled(rootGCPClient, permList, logger)
+	if err != nil {
+		return err
+	}
+	if !serviceAPIsEnabled {
+		return fmt.Errorf("not all required service APIs are enabled")
 	}
 
 	// Create service account if necessary
@@ -308,38 +373,57 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 	// Save key into secret
 	if key != nil {
-		err = a.syncSecret(cr, key, logger)
+		err = a.syncSecret(cr, key.PrivateKeyData, logger)
 	}
 
 	return err
 }
 
-func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+// needsUpdate will return a bool indicated that all the applicable service APIs are enabled,
+// a bool indicat whether any update to existing perms are needed, and any error encountered.
+func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, bool, error) {
 	logger := a.getLogger(cr)
-	// If the secret simply doesn't exist, we definitely need an update
-	exists, err := a.Exists(ctx, cr)
-	if err != nil {
-		return true, err
-	}
-	if !exists {
-		return true, nil
-	}
 
 	gcpSpec, err := decodeProviderSpec(a.Codec, cr)
 	if err != nil {
-		return true, fmt.Errorf("unable to decode ProviderSpec: %v", err)
+		return true, false, fmt.Errorf("unable to decode ProviderSpec: %v", err)
 	}
 
 	gcpStatus, err := decodeProviderStatus(a.Codec, cr)
 	if err != nil {
-		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
+		return true, false, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
 
 	// TODO: change to a real read-only client once we have ro-creds solution
 	readClient, err := a.buildRootGCPClient(cr)
 	if err != nil {
 		log.WithError(err).Error("error creating GCP client")
-		return true, fmt.Errorf("unable to check whether credentialsRequest needs update")
+		return false, true, fmt.Errorf("unable to check whether credentialsRequest needs update")
+	}
+
+	// gather the individual permissions from each role
+	permList, err := getPermissionsFromRoles(readClient, gcpSpec.PredefinedRoles)
+	if err != nil {
+		return false, true, fmt.Errorf("error gathering permissions for each role: %v", err)
+	}
+
+	// Are the service APIs enabled
+	serviceAPIsEnabled, err := checkServicesEnabled(readClient, permList, logger)
+	if err != nil {
+		return false, true, fmt.Errorf("error checking whether service APIs are enabled: %v", err)
+	}
+
+	if !serviceAPIsEnabled {
+		return serviceAPIsEnabled, true, nil
+	}
+
+	// If the secret simply doesn't exist, we definitely need an update
+	exists, err := a.Exists(ctx, cr)
+	if err != nil {
+		return serviceAPIsEnabled, true, err
+	}
+	if !exists {
+		return serviceAPIsEnabled, true, nil
 	}
 
 	if gcpStatus.ServiceAccountID != "" {
@@ -348,16 +432,16 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		// check if service account key in secret is still available
 		keyID, err := a.loadExistingSecretKeyAuthID(cr)
 		if err != nil {
-			return true, err
+			return serviceAPIsEnabled, true, err
 		}
 
 		keyExists, err := serviceAccountKeyExists(readClient, gcpStatus.ServiceAccountID, keyID, logger)
 		if err != nil {
 			logger.WithError(err).Error("error checking whether service account keys exists")
-			return true, err
+			return serviceAPIsEnabled, true, err
 		}
 		if !keyExists {
-			return true, nil
+			return serviceAPIsEnabled, true, nil
 		}
 
 		// TODO: add tagging check once we decide on tagging scheme
@@ -365,20 +449,38 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		// check that the current permissions match what is being requested
 		needPermissionsUpdate, err := serviceAccountNeedsPermissionsUpdate(readClient, gcpStatus.ServiceAccountID, gcpSpec.PredefinedRoles)
 		if err != nil {
-			return true, fmt.Errorf("error determining whether policy binding update is needed: %v", err)
+			return serviceAPIsEnabled, true, fmt.Errorf("error determining whether policy binding update is needed: %v", err)
 		}
 		if needPermissionsUpdate {
 			logger.Debug("detected need for policy update")
-			return true, nil
+			return serviceAPIsEnabled, true, nil
 		}
 
 	} else {
 		// passthrough-specifc check here
-		return true, fmt.Errorf("PASSTHROUGH NOT IMPLEMENTED")
+
+		allowed, err := gcputils.CheckPermissionsAgainstPermissionList(readClient, permList, logger)
+		if err != nil {
+			return serviceAPIsEnabled, true, fmt.Errorf("error checking whether GCP client has sufficient permissions: %v", err)
+		}
+		if !allowed {
+			return serviceAPIsEnabled, true, nil
+		}
+
+		// is the target secret synced with the latest content
+		secretSynced, err := a.secretAlreadySynced(cr)
+		if err != nil {
+			logger.WithError(err).Error("error checking if target secret content already up-to-date")
+			return serviceAPIsEnabled, true, err
+		}
+		if !secretSynced {
+			return serviceAPIsEnabled, true, nil
+		}
+
 	}
 
 	// If we've made it this far, then there are no updates needed
-	return false, nil
+	return serviceAPIsEnabled, false, nil
 }
 
 func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Client, error) {
@@ -509,7 +611,39 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 	})
 }
 
-func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, key *iamadminpb.ServiceAccountKey, logger log.FieldLogger) error {
+func (a *Actuator) secretAlreadySynced(cr *minterv1.CredentialsRequest) (bool, error) {
+	logger := log.WithFields(log.Fields{
+		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+	})
+
+	targetSecret := &corev1.Secret{}
+	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, targetSecret)
+	if err != nil {
+		logger.WithError(err).Error("error retrieving existing secret")
+		return false, err
+	}
+
+	rootSecret, err := a.getRootCloudCredentialsSecret(context.TODO(), logger)
+	if err != nil {
+		logger.WithError(err).Error("error retrieving cluster cloud creds")
+		return false, err
+	}
+
+	rootJSON, ok := rootSecret.Data[gcpSecretJSONKey]
+	if !ok {
+		return false, fmt.Errorf("did not find expected key in cloud cred secret")
+	}
+
+	targetJSON := targetSecret.Data[gcpSecretJSONKey]
+	if !bytes.Equal(targetJSON, rootJSON) {
+		return false, nil
+	}
+
+	return true, nil
+}
+
+func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, privateKeyData []byte, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -530,7 +664,7 @@ func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, key *iamadminpb.S
 					},
 				},
 				Data: map[string][]byte{
-					gcpSecretJSONKey: key.PrivateKeyData,
+					gcpSecretJSONKey: privateKeyData,
 				},
 			}
 
@@ -554,7 +688,7 @@ func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, key *iamadminpb.S
 		existingSecret.Annotations = map[string]string{}
 	}
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-	existingSecret.Data[gcpSecretJSONKey] = key.PrivateKeyData
+	existingSecret.Data[gcpSecretJSONKey] = privateKeyData
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
 		sLog.Info("secret changed, updating")
@@ -575,14 +709,13 @@ func (a *Actuator) loadExistingSecretKeyAuthID(cr *minterv1.CredentialsRequest) 
 	logger := a.getLogger(cr)
 	var authJSON *gcpAuthJSON
 
-	existingSecret := &corev1.Secret{}
-	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
+	existingSecret, err := a.loadExistingSecret(cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debug("secret does not exist")
 			return "", nil
 		}
-		return "", fmt.Errorf("error checking if secret already exists: %v", err)
+		return "", err
 	} else {
 		authJSONBytes, ok := existingSecret.Data[gcpSecretJSONKey]
 		if !ok {
@@ -599,4 +732,25 @@ func (a *Actuator) loadExistingSecretKeyAuthID(cr *minterv1.CredentialsRequest) 
 	}
 
 	return authJSON.PrivateKeyID, nil
+}
+
+func (a *Actuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	secret := &corev1.Secret{}
+	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return nil, err
+		}
+		return nil, fmt.Errorf("error checking if secret already exists: %v", err)
+	}
+	return secret, nil
+}
+
+func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.FieldLogger) (bool, error) {
+	serviceAPIsEnabled, err := gcputils.CheckServicesEnabled(gcpClient, permList, logger)
+	if err != nil {
+		return false, fmt.Errorf("error checking whether service APIs are enabled: %v", err)
+	}
+
+	return serviceAPIsEnabled, nil
 }
