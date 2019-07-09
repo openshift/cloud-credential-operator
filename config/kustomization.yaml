@@ -11,8 +11,8 @@ namespace: openshift-cloud-credential-operator
 # YAML string, with resources separated by document
 # markers ("---").
 resources:
-- rbac/rbac_role.yaml
-- rbac/rbac_role_binding.yaml
+- rbac/cloud-credential-operator_role.yaml
+- rbac/cloud-credential-operator_role_binding.yaml
 - manager/deployment.yaml
 
 
