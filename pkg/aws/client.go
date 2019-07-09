@@ -98,10 +98,15 @@ func (c *awsClient) TagUser(input *iam.TagUserInput) (*iam.TagUserOutput, error)
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
 func NewClient(accessKeyID, secretAccessKey []byte, infraName string) (Client, error) {
+	return NewClientSession(accessKeyID, secretAccessKey, "", infraName)
+}
+
+// NewClientSession allows for clients with session tokens to connect
+func NewClientSession(accessKeyID, secretAccessKey []byte, sessionToken string, infraName string) (Client, error) {
 	awsConfig := &awssdk.Config{}
 
 	awsConfig.Credentials = credentials.NewStaticCredentials(
-		string(accessKeyID), string(secretAccessKey), "")
+		string(accessKeyID), string(secretAccessKey), sessionToken)
 
 	s, err := session.NewSession(awsConfig)
 	if err != nil {
