@@ -102,11 +102,11 @@ func NewClient(accessKeyID, secretAccessKey []byte, infraName string) (Client, e
 }
 
 // NewClientSession allows for clients with session tokens to connect
-func NewClientWithSessionToken(accessKeyID, secretAccessKey []byte, sessionToken string, infraName string) (Client, error) {
+func NewClientWithSessionToken(accessKeyID, secretAccessKey []byte, sessionToken, infraName string) (Client, error) {
 	awsConfig := &awssdk.Config{}
 
 	awsConfig.Credentials = credentials.NewStaticCredentials(
-		string(accessKeyID), string(secretAccessKey), sessionToken)
+		string(accessKeyID), string(secretAccessKey), string(sessionToken))
 
 	s, err := session.NewSession(awsConfig)
 	if err != nil {
