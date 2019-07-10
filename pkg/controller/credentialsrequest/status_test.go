@@ -200,6 +200,13 @@ func TestClusterOperatorStatus(t *testing.T) {
 				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
 			},
 		},
+		{
+			name:         "set upgradeable condition",
+			credRequests: []minterv1.CredentialsRequest{},
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{
+				testCondition(configv1.OperatorUpgradeable, configv1.ConditionTrue, ""),
+			},
+		},
 	}
 
 	for _, test := range tests {

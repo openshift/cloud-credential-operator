@@ -237,6 +237,15 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 	conditions = clusteroperator.SetStatusCondition(conditions,
 		availableCondition)
 
+	// CCO doesn't have the idea of upgradeable vs not-upgradeable, but should report that condition nevertheless.
+	// Always be upgradeable.
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	conditions = clusteroperator.SetStatusCondition(conditions,
+		upgradeableCondition)
+
 	// Log all conditions we set:
 	for _, c := range conditions {
 		log.WithFields(log.Fields{
