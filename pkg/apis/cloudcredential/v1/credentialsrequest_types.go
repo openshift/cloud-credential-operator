@@ -131,6 +131,12 @@ const (
 	// CredentialsDeprovisionFailure is true whenever there is an error when trying
 	// to clean up any previously-created cloud resources
 	CredentialsDeprovisionFailure CredentialsRequestConditionType = "CredentialsDeprovisionFailure"
+	// Ignored is true when the CredentialsRequest's ProviderSpec is for
+	// a different infrastructure platform than what the cluster has been
+	// deployed to. This is normal as the release image contains CredentialsRequests for all
+	// possible clouds/infrastructure, and cloud-credential-operator will only act on the
+	// CredentialsRequests where the cloud/infra matches.
+	Ignored CredentialsRequestConditionType = "Ignored"
 )
 
 func init() {
