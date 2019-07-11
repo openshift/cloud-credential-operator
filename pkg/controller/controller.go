@@ -40,7 +40,7 @@ const (
 var AddToManagerFuncs []func(manager.Manager) error
 
 // AddToManagerWithActuatorFuncs is a list of functions to add all Controllers with Actuators to the Manager
-var AddToManagerWithActuatorFuncs []func(manager.Manager, actuator.Actuator) error
+var AddToManagerWithActuatorFuncs []func(manager.Manager, actuator.Actuator, configv1.PlatformType) error
 
 // AddToManager adds all Controllers to the Manager
 func AddToManager(m manager.Manager) error {
@@ -88,7 +88,7 @@ func AddToManager(m manager.Manager) error {
 			log.Info("initializing no-op actuator (unsupported platform)")
 			a = &actuator.DummyActuator{}
 		}
-		if err := f(m, a); err != nil {
+		if err := f(m, a, plat); err != nil {
 			return err
 		}
 	}

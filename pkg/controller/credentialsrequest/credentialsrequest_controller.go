@@ -30,6 +30,8 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/controller/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -59,20 +61,23 @@ const (
 
 	cloudCredDeprovisionFailure = "CloudCredDeprovisionFailure"
 	cloudCredDeprovisionSuccess = "CloudCredDeprovisionSuccess"
+
+	credentialsRequestInfraMismatch = "InfrastructureMismatch"
 )
 
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
 // default RBAC. The Manager will set fields on the Controller and Start it when
 // the Manager is Started.
-func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator) error {
-	return add(mgr, newReconciler(mgr, actuator))
+func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) error {
+	return add(mgr, newReconciler(mgr, actuator, platType))
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, actuator actuator.Actuator) reconcile.Reconciler {
+func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) reconcile.Reconciler {
 	return &ReconcileCredentialsRequest{
-		Client:   mgr.GetClient(),
-		Actuator: actuator,
+		Client:       mgr.GetClient(),
+		Actuator:     actuator,
+		platformType: platType,
 	}
 }
 
@@ -238,7 +243,8 @@ var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
 // ReconcileCredentialsRequest reconciles a CredentialsRequest object
 type ReconcileCredentialsRequest struct {
 	client.Client
-	Actuator actuator.Actuator
+	Actuator     actuator.Actuator
+	platformType configv1.PlatformType
 }
 
 // Reconcile reads that state of the cluster for a CredentialsRequest object and
@@ -283,6 +289,22 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	// Maintain a copy, but work on a copy of the credentials request:
 	origCR := cr
 	cr = cr.DeepCopy()
+
+	// Ignore CR if it's for a different cloud/infra
+	infraMatch, err := crInfraMatches(cr, r.platformType)
+	if err != nil {
+		logger.WithError(err).Error("failed to determine cloud platform type")
+		return reconcile.Result{}, err
+	}
+	if !infraMatch {
+		logger.Debug("ignoring cr as it is for a different cloud")
+		setIgnoredCondition(cr, true, r.platformType)
+		err := r.updateStatus(origCR, cr, logger)
+		if err != nil {
+			logger.WithError(err).Error("failed to update conditions")
+		}
+		return reconcile.Result{}, err
+	}
 
 	// Handle deletion and the deprovision finalizer:
 	if cr.DeletionTimestamp != nil {
@@ -532,6 +554,17 @@ func setCredentialsDeprovisionFailureCondition(cr *minterv1.CredentialsRequest, 
 		status, reason, msg, updateCheck)
 }
 
+func setIgnoredCondition(cr *minterv1.CredentialsRequest, failed bool, clusterPlatform configv1.PlatformType) {
+	// Only supporting the ability to set the condition
+	msg := fmt.Sprintf("CredentialsRequest is not for platform %s", clusterPlatform)
+	reason := credentialsRequestInfraMismatch
+	updateCheck := utils.UpdateConditionIfReasonOrMessageChange
+	status := corev1.ConditionTrue
+
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.Ignored,
+		status, reason, msg, updateCheck)
+}
+
 func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	logger.Debug("updating credentials request status")
 
@@ -582,4 +615,24 @@ func DeleteFinalizer(object metav1.Object, finalizer string) {
 	finalizers := sets.NewString(object.GetFinalizers()...)
 	finalizers.Delete(finalizer)
 	object.SetFinalizers(finalizers.List())
+}
+
+func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform configv1.PlatformType) (bool, error) {
+	cloudType, err := utils.GetCredentialsRequestCloudType(cr.Spec.ProviderSpec)
+	if err != nil {
+		return true, fmt.Errorf("error determining cloud type for CredentialsRequest: %v", err)
+	}
+
+	switch clusterCloudPlatform {
+	case configv1.AWSPlatformType:
+		return cloudType == reflect.TypeOf(minterv1.AWSProviderSpec{}).Name(), nil
+	case configv1.AzurePlatformType:
+		return cloudType == reflect.TypeOf(minterv1.AzureProviderSpec{}).Name(), nil
+	case configv1.GCPPlatformType:
+		return cloudType == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name(), nil
+	case configv1.OpenStackPlatformType:
+		return cloudType == reflect.TypeOf(minterv1.OpenStackProviderSpec{}).Name(), nil
+	default:
+		return false, fmt.Errorf("unsupported platorm type: %v", clusterCloudPlatform)
+	}
 }
