@@ -6,6 +6,7 @@ package mock
 
 import (
 	iam "github.com/aws/aws-sdk-go/service/iam"
+	sts "github.com/aws/aws-sdk-go/service/sts"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -106,6 +107,21 @@ func (m *MockClient) DeleteUserPolicy(arg0 *iam.DeleteUserPolicyInput) (*iam.Del
 func (mr *MockClientMockRecorder) DeleteUserPolicy(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserPolicy", reflect.TypeOf((*MockClient)(nil).DeleteUserPolicy), arg0)
+}
+
+// GetCallerIdentity mocks base method
+func (m *MockClient) GetCallerIdentity(arg0 *sts.GetCallerIdentityInput) (*sts.GetCallerIdentityOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCallerIdentity", arg0)
+	ret0, _ := ret[0].(*sts.GetCallerIdentityOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCallerIdentity indicates an expected call of GetCallerIdentity
+func (mr *MockClientMockRecorder) GetCallerIdentity(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCallerIdentity", reflect.TypeOf((*MockClient)(nil).GetCallerIdentity), arg0)
 }
 
 // GetUser mocks base method

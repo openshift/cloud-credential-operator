@@ -36,6 +36,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/iam"
 
 	corev1 "k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 type AWSActuator struct {
 	Client           client.Client
 	Codec            *minterv1.ProviderCodec
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error)
+	AWSClientBuilder func(creds *credentials.Value, infraName string) (ccaws.Client, error)
 	Scheme           *runtime.Scheme
 }
 
@@ -161,8 +162,8 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 	}
 
 	// Various checks for the kinds of reasons that would trigger a needed update
-	_, accessKey, secretKey := a.loadExistingSecret(cr)
-	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey), infraName)
+	_, creds := a.loadExistingSecret(cr)
+	awsClient, err := a.AWSClientBuilder(creds, infraName)
 	if err != nil {
 		return true, err
 	}
@@ -209,7 +210,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			logger.WithError(err).Error("error listing all access keys for user")
 			return false, err
 		}
-		accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, accessKey)
+		accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, creds.AccessKeyID)
 		if err != nil {
 			logger.WithError(err).Error("error querying whether access key still valid")
 		}
@@ -319,7 +320,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 }
 
 func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
-	existingSecret, _, _ := a.loadExistingSecret(cr)
+	existingSecret, _ := a.loadExistingSecret(cr)
 	accessKeyID := string(cloudCredsSecret.Data[awsannotator.AwsAccessKeyName])
 	secretAccessKey := string(cloudCredsSecret.Data[awsannotator.AwsSecretAccessKeyName])
 	// userPolicy param empty because in passthrough mode this doesn't really have any meaning
@@ -458,15 +459,15 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		return err
 	}
 
-	existingSecret, existingAccessKeyID, _ := a.loadExistingSecret(cr)
+	existingSecret, existingCreds := a.loadExistingSecret(cr)
 
 	var accessKey *iam.AccessKey
 	// TODO: also check if the access key ID on the request is still valid in AWS
-	accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, existingAccessKeyID)
+	accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, existingCreds.AccessKeyID)
 	if err != nil {
 		return err
 	}
-	logger.WithField("accessKeyID", existingAccessKeyID).Debugf("access key exists? %v", accessKeyExists)
+	logger.WithField("accessKeyID", existingCreds.AccessKeyID).Debugf("access key exists? %v", accessKeyExists)
 
 	if existingSecret != nil && existingSecret.Name != "" {
 		_, ok := existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied]
@@ -475,7 +476,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		}
 	}
 
-	genNewAccessKey := existingSecret == nil || existingSecret.Name == "" || existingAccessKeyID == "" || !accessKeyExists
+	genNewAccessKey := existingSecret == nil || existingSecret.Name == "" || existingCreds.AccessKeyID == "" || !accessKeyExists
 	if genNewAccessKey {
 		logger.Info("generating new AWS access key")
 
@@ -664,7 +665,7 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	return nil
 }
 
-func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*corev1.Secret, string, string) {
+func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*corev1.Secret, *credentials.Value) {
 	logger := a.getLogger(cr)
 	var existingAccessKeyID string
 	var existingSecretAccessKey string
@@ -695,7 +696,11 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 			existingSecretAccessKey = string(secretBytes)
 		}
 	}
-	return existingSecret, existingAccessKeyID, existingSecretAccessKey
+	creds := &credentials.Value{
+		AccessKeyID:     existingAccessKeyID,
+		SecretAccessKey: existingSecretAccessKey,
+	}
+	return existingSecret, creds
 }
 
 func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, infraName, clusterUUID string) error {
@@ -732,13 +737,13 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest, infraN
 	logger.Debug("loading AWS credentials from secret")
 	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 	// cluster, we need to load different secrets for each cluster.
-	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+	creds, err := utils.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 	if err != nil {
 		return nil, err
 	}
 
 	logger.Debug("creating root AWS client")
-	return a.AWSClientBuilder(accessKeyID, secretAccessKey, infraName)
+	return a.AWSClientBuilder(creds, infraName)
 }
 
 // buildReadAWSCreds will return an AWS client using the the scaled down read only AWS creds
@@ -752,21 +757,21 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, infraN
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", roAWSCredsSecretNamespace, roAWSCredsSecret))
 	logger.Debug("loading AWS credentials from secret")
 
-	var accessKeyID, secretAccessKey []byte
+	var creds *credentials.Value
 	var err error
 
 	// Handle an edge case with management of our own RO creds using a credentials request.
 	// If we're operating on those credentials, just use the root creds.
 	if cr.Spec.SecretRef.Name == roAWSCredsSecret && cr.Spec.SecretRef.Namespace == roAWSCredsSecretNamespace {
 		log.Debug("operating our our RO creds, using root creds for all AWS client operations")
-		accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
+		creds, err = utils.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
 		if err != nil {
 			return nil, err
 		}
 	} else {
 		// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 		// cluster, we need to load different secrets for each cluster.
-		accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
+		creds, err = utils.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
 		if err != nil {
 			if errors.IsNotFound(err) {
 				logger.Warn("read-only creds not found, using root creds client")
@@ -776,7 +781,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, infraN
 	}
 
 	logger.Debug("creating read AWS client")
-	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey, infraName)
+	client, err := a.AWSClientBuilder(creds, infraName)
 	if err != nil {
 		return nil, err
 	}

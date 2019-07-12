@@ -49,6 +49,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/iam"
 )
 
@@ -827,10 +828,10 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					Client: fakeClient,
 					Codec:  codec,
 					Scheme: scheme.Scheme,
-					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, infraName string) (minteraws.Client, error) {
-						if string(accessKeyID) == testRootAWSAccessKeyID {
+					AWSClientBuilder: func(creds *credentials.Value, infraName string) (minteraws.Client, error) {
+						if creds.AccessKeyID == testRootAWSAccessKeyID {
 							return mockRootAWSClient, nil
-						} else if string(accessKeyID) == testAWSAccessKeyID {
+						} else if creds.AccessKeyID == testAWSAccessKeyID {
 							return mockSecretAWSClient, nil
 						} else {
 							return mockReadAWSClient, nil

@@ -37,7 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go/service/sts"
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
@@ -51,6 +53,7 @@ const (
 	testSecretName         = "testsecret"
 	testNamespace          = "testproject"
 	testAWSUser            = "credTestUser"
+	testAWSAccount         = "123456789012"
 	testAWSUserARN         = "arn:aws:iam::123456789012:user/credTestUser"
 	testAWSAccessKeyID     = "FAKEAWSACCESSKEYID"
 	testInfraName          = "testcluster-abc123"
@@ -77,7 +80,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing: []runtime.Object{testSecret()},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
+				mockGetCallerIdentity(mockAWSClient)
 				mockSimulatePrincipalPolicyCredMinterSuccess(mockAWSClient)
 
 				return mockAWSClient
@@ -89,7 +92,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing: []runtime.Object{testSecret()},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetRootUser(mockAWSClient)
+				mockGetCallerIdentityRoot(mockAWSClient)
 
 				return mockAWSClient
 			},
@@ -100,10 +103,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing: []runtime.Object{testSecret()},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
+				mockGetCallerIdentity(mockAWSClient)
 				mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient)
 
-				mockGetUser(mockAWSClient)
+				mockGetCallerIdentity(mockAWSClient)
 				mockSimulatePrincipalPolicyCredPassthroughSuccess(mockAWSClient)
 
 				return mockAWSClient
@@ -115,10 +118,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing: []runtime.Object{testSecret()},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
+				mockGetCallerIdentity(mockAWSClient)
 				mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient)
 
-				mockGetUser(mockAWSClient)
+				mockGetCallerIdentity(mockAWSClient)
 				mockSimulatePrincipalPolicyCredPassthroughFail(mockAWSClient)
 
 				return mockAWSClient
@@ -172,7 +175,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			rcc := &annaws.ReconcileCloudCredSecret{
 				Client: fakeClient,
 				Logger: log.WithField("controller", "testController"),
-				AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error) {
+				AWSClientBuilder: func(creds *credentials.Value, infraName string) (ccaws.Client, error) {
 					return fakeAWSClient, nil
 				},
 			}
@@ -228,6 +231,22 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 			Arn:      aws.String(testAWSUserARN),
 			UserId:   aws.String(testAWSAccessKeyID),
 		},
+	}, nil)
+}
+
+func mockGetCallerIdentity(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetCallerIdentity(nil).Return(&sts.GetCallerIdentityOutput{
+		Account: aws.String(testAWSAccount),
+		Arn:     aws.String(testAWSUserARN),
+		UserId:  aws.String(testAWSUser),
+	}, nil)
+}
+
+func mockGetCallerIdentityRoot(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetCallerIdentity(nil).Return(&sts.GetCallerIdentityOutput{
+		Account: aws.String(testAWSAccount),
+		Arn:     aws.String("arn:aws:iam::" + testAWSAccount + ":root"),
+		UserId:  aws.String(testAWSAccount),
 	}, nil)
 }
 

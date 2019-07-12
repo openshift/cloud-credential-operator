@@ -18,6 +18,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/aws/aws-sdk-go/aws/credentials"
+
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
@@ -74,7 +76,7 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	client.Client
 	Logger           log.FieldLogger
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error)
+	AWSClientBuilder func(creds *credentials.Value, infraName string) (ccaws.Client, error)
 }
 
 // Reconcile will annotate the cloud cred secret to indicate the capabilities of the cred's capabilities:
@@ -118,7 +120,11 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	if err != nil {
 		return err
 	}
-	awsClient, err := r.AWSClientBuilder(accessKey, secretKey, infraName)
+	creds := &credentials.Value{
+		AccessKeyID:     string(accessKey),
+		SecretAccessKey: string(secretKey),
+	}
+	awsClient, err := r.AWSClientBuilder(creds, infraName)
 	if err != nil {
 		return fmt.Errorf("error creating aws client: %v", err)
 	}
