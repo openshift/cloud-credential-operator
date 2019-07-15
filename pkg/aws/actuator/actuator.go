@@ -79,7 +79,7 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator,
 	return &AWSActuator{
 		Codec:            codec,
 		Client:           client,
-		AWSClientBuilder: ccaws.NewClient,
+		AWSClientBuilder: ccaws.NewClientWithCreds,
 		Scheme:           scheme,
 	}, nil
 }

@@ -37,7 +37,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client:           mgr.GetClient(),
 		Logger:           log.WithField("controller", constants.ControllerName),
-		AWSClientBuilder: ccaws.NewClient,
+		AWSClientBuilder: ccaws.NewClientWithCreds,
 	}
 }
 
