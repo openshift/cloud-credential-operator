@@ -147,7 +147,7 @@ func CheckPermissionsUsingQueryClient(queryClient, targetClient Client, statemen
 		return false, fmt.Errorf("error checking arn: %v", err)
 	}
 	if assumedRole {
-		logger.Warn("Using assumed role %s, cannot validate permissions beforehand.", arn)
+		logger.Warnf("Using assumed role %s, cannot validate permissions beforehand.", *arn)
 		return true, nil
 	}
 
