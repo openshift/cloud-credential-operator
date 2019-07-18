@@ -10,9 +10,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-// GetInfraStatus queries the k8s api for the infrastructure CR and retrieves the current status.
-func GetInfraStatus(m manager.Manager) (*configv1.InfrastructureStatus, error) {
-	c, err := getClient()
+// GetInfraStatusUsingKubeconfig queries the k8s api for the infrastructure CR using the kubeconfig file
+// pointed to by the passed in kubeconfig (pass in empty string to use default k8s client configurations)
+func GetInfraStatusUsingKubeconfig(m manager.Manager, kubeconfig string) (*configv1.InfrastructureStatus, error) {
+	c, err := getClient(kubeconfig)
 	if err != nil {
 		return nil, err
 	}
@@ -35,8 +36,9 @@ func GetType(infraStatus *configv1.InfrastructureStatus) configv1.PlatformType {
 	return infraStatus.Platform
 }
 
-func getClient() (client.Client, error) {
+func getClient(explicitKubeconfig string) (client.Client, error) {
 	rules := clientcmd.NewDefaultClientConfigLoadingRules()
+	rules.ExplicitPath = explicitKubeconfig
 	kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
 	cfg, err := kubeconfig.ClientConfig()
 	if err != nil {
