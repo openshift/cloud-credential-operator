@@ -36,16 +36,17 @@ const (
 	installConfigMapNS = "kube-system"
 )
 
-// AddToManagerFuncs is a list of functions to add all Controllers to the Manager
-var AddToManagerFuncs []func(manager.Manager) error
+// AddToManagerFuncs is a list of functions to add all Controllers to the Manager.
+// String parameter is to pass in any specific override for the kubeconfig file to use.
+var AddToManagerFuncs []func(manager.Manager, string) error
 
 // AddToManagerWithActuatorFuncs is a list of functions to add all Controllers with Actuators to the Manager
 var AddToManagerWithActuatorFuncs []func(manager.Manager, actuator.Actuator, configv1.PlatformType) error
 
 // AddToManager adds all Controllers to the Manager
-func AddToManager(m manager.Manager) error {
+func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 	for _, f := range AddToManagerFuncs {
-		if err := f(m); err != nil {
+		if err := f(m, explicitKubeconfig); err != nil {
 			return err
 		}
 	}
@@ -55,7 +56,7 @@ func AddToManager(m manager.Manager) error {
 		// https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L11
 		var err error
 		var a actuator.Actuator
-		infraStatus, err := platform.GetInfraStatus(m)
+		infraStatus, err := platform.GetInfraStatusUsingKubeconfig(m, explicitKubeconfig)
 		if err != nil {
 			log.Fatal(err)
 		}
