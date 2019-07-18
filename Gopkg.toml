@@ -1,6 +1,7 @@
 required = [
     "github.com/aws/aws-sdk-go",
     "github.com/emicklei/go-restful",
+    "github.com/jteeuwen/go-bindata",
     "github.com/onsi/ginkgo", # for test framework
     "github.com/onsi/gomega", # for test matchers
     "github.com/stretchr/testify/assert",
@@ -22,6 +23,9 @@ required = [
 [prune]
   go-tests = true
 
+  [[prune.project]]
+    name = "github.com/jteeuwen/go-bindata"
+    unused-packages = false
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
