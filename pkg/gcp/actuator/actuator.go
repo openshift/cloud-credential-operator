@@ -46,11 +46,11 @@ import (
 
 const (
 	rootGCPCredsSecretNamespace = "kube-system"
-	rootGCPCredsSecret          = "gcp-creds"
+	rootGCPCredsSecret          = "gcp-credentials"
 	roGCPCredsSecretNamespace   = "openshift-cloud-credential-operator"
 	roGCPCredsSecret            = "cloud-credential-operator-iam-ro-creds"
 
-	gcpSecretJSONKey = "serviceaccount.json"
+	gcpSecretJSONKey = "service_account.json"
 )
 
 var _ actuatoriface.Actuator = (*Actuator)(nil)

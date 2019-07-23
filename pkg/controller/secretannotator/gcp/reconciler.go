@@ -25,11 +25,11 @@ import (
 
 const (
 	// GCPCloudCredSecretName is the name of the secret created by installer containing cloud creds.
-	GCPCloudCredSecretName = "gcp-creds"
+	GCPCloudCredSecretName = "gcp-credentials"
 
 	// GCPAuthJSONKey is the key name in GCP credentials secrets where the json auth
 	// contents will be stored.
-	GCPAuthJSONKey = "serviceaccount.json"
+	GCPAuthJSONKey = "service_account.json"
 )
 
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
