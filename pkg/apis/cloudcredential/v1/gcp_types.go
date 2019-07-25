@@ -29,6 +29,10 @@ type GCPProviderSpec struct {
 	// PredefinedRoles is the list of GCP pre-defined roles
 	// that the CredentialsRequest requires.
 	PredefinedRoles []string `json:"predefinedRoles"`
+	// SkipServiceCheck can be set to true to skip the check whether the requested roles
+	// have the necessary services enabled
+	// +optional
+	SkipServiceCheck bool `json:"skipServiceCheck,omitempty"`
 }
 
 // GCPProviderStatus contains the status of the GCP credentials request.
