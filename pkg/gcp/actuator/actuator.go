@@ -318,9 +318,10 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	if err != nil {
 		return err
 	}
-	if !serviceAPIsEnabled {
+	if !gcpSpec.SkipServiceCheck && !serviceAPIsEnabled {
 		return fmt.Errorf("not all required service APIs are enabled")
 	}
+	serviceAPIsEnabled = true
 
 	// Create service account if necessary
 	var serviceAccount *iamadminpb.ServiceAccount
@@ -413,9 +414,10 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		return false, true, fmt.Errorf("error checking whether service APIs are enabled: %v", err)
 	}
 
-	if !serviceAPIsEnabled {
+	if !gcpSpec.SkipServiceCheck && !serviceAPIsEnabled {
 		return serviceAPIsEnabled, true, nil
 	}
+	serviceAPIsEnabled = true
 
 	// If the secret simply doesn't exist, we definitely need an update
 	exists, err := a.Exists(ctx, cr)
