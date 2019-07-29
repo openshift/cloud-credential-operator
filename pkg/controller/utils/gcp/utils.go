@@ -147,37 +147,40 @@ func filterOutPermissions(permList, filterOutList []string) []string {
 // gcpClient creds have sufficient permissions to perform the actions.
 // Will return true/false indicating whether the permissions are sufficient.
 func CheckPermissionsAgainstPermissionList(gcpClient ccgcp.Client, permList []string, logger log.FieldLogger) (bool, error) {
+
 	projectName := gcpClient.GetProjectName()
 
 	filteredPermList := filterOutPermissions(permList, invalidPermsForProjectScopedPermissionsTesting)
 
-	permRequest := &cloudresourcemanager.TestIamPermissionsRequest{
-		Permissions: filteredPermList,
-	}
-	permResponse, err := gcpClient.TestIamPermissions(projectName, permRequest)
-	if err != nil {
-		return false, fmt.Errorf("error testing permissions: %v", err)
+	if len(filteredPermList) == 0 {
+		return true, nil
 	}
 
-	// check that each perm in our list is actually available
-	permMap := map[string]bool{}
-	for _, perm := range permResponse.Permissions {
-		permMap[perm] = true
-	}
-
-	disallowedPerms := sets.NewString()
-	for _, perm := range filteredPermList {
-		if _, ok := permMap[perm]; !ok {
-			disallowedPerms.Insert(perm)
+	// Split list to only check 100 permissions at a time
+	allowedPerms := sets.NewString()
+	chunkSize := 100
+	permLen := len(filteredPermList)
+	for i := 0; i < permLen; i += chunkSize {
+		end := i + chunkSize
+		if end > permLen {
+			end = permLen
 		}
+		req := &cloudresourcemanager.TestIamPermissionsRequest{Permissions: filteredPermList[i:end]}
+		resp, err := gcpClient.TestIamPermissions(projectName, req)
+		if err != nil {
+			return false, fmt.Errorf("error testing permissions: %v", err)
+		}
+		allowedPerms.Insert(resp.Permissions...)
 	}
 
-	if len(disallowedPerms) > 0 {
-		logger.Warnf("Detected some unallowed permissions: %s", disallowedPerms.List())
+	requestedPerms := sets.NewString(filteredPermList...)
+	disallowedPerms := requestedPerms.Difference(allowedPerms)
+
+	if disallowedPerms.Len() > 0 {
+		logger.Warnf("Detected some unallowed permissions: %v", disallowedPerms.List())
 	}
 
-	return len(disallowedPerms) == 0, nil
-
+	return disallowedPerms.Len() == 0, nil
 }
 
 // CheckServicesEnabled will take a list of GCP permissions, and see whether each permissions'
