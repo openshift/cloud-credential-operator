@@ -57,6 +57,7 @@ type Client interface {
 }
 
 type gcpClient struct {
+	projectName                string
 	creds                      *google.Credentials
 	cloudResourceManagerClient *cloudresourcemanager.Service
 	iamClient                  *iamadmin.IamClient
@@ -98,7 +99,7 @@ func (c *gcpClient) GetProjectIamPolicy(projectName string, request *cloudresour
 }
 
 func (c *gcpClient) GetProjectName() string {
-	return c.creds.ProjectID
+	return c.projectName
 }
 
 func (c *gcpClient) SetProjectIamPolicy(projectName string, request *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
@@ -165,7 +166,7 @@ func fixupServiceMap(serviceMap map[string]bool) {
 }
 
 // NewClient creates our client wrapper object for interacting with GCP.
-func NewClient(authJSON []byte) (Client, error) {
+func NewClient(projectName string, authJSON []byte) (Client, error) {
 	ctx := context.TODO()
 
 	// since we're using a single creds var, we should specify all the required scopes when initializing
@@ -190,6 +191,7 @@ func NewClient(authJSON []byte) (Client, error) {
 	}
 
 	return &gcpClient{
+		projectName:                projectName,
 		creds:                      creds,
 		cloudResourceManagerClient: cloudResourceManagerClient,
 		iamClient:                  iamClient,

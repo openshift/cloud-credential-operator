@@ -173,7 +173,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			rcc := &anngcp.ReconcileCloudCredSecret{
 				Client: fakeClient,
 				Logger: log.WithField("controller", "testController"),
-				GCPClientBuilder: func(authJSON []byte) (ccgcp.Client, error) {
+				GCPClientBuilder: func(projectName string, authJSON []byte) (ccgcp.Client, error) {
 					return fakeGCPClient, nil
 				},
 			}
