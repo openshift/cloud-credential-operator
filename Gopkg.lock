@@ -372,11 +372,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:3e554a371de761331f42da50882de3627ae80c12de6e55b77f5f53527e8bfc20"
+  digest = "1:31a625a6b154e00d2031365c024ce921e7a25e3ce6ad6e73b7ab91ed8fdfdf56"
   name = "github.com/openshift/api"
   packages = ["config/v1"]
   pruneopts = "T"
-  revision = "de5ca909c7322bb8d06fa5a9e5604491b373da52"
+  revision = "0922aa5a655be314e20a3e0e94f4f2b105100154"
 
 [[projects]]
   digest = "1:ccf387b1000d4864aaf832aae3524898c320263620f7e3162ded978fe2ea3ba4"
