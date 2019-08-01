@@ -246,14 +246,14 @@ func TestClusterOperatorVersion(t *testing.T) {
 		expectProgressingTransition      bool
 	}{
 		{
-			name:                             "test version upgraded",
+			name: "test version upgraded",
 			currentProgressingLastTransition: twentyHoursAgo,
 			currentVersion:                   "4.0.0-5",
 			releaseVersionEnv:                "4.0.0-10",
 			expectProgressingTransition:      true,
 		},
 		{
-			name:                             "test version constant",
+			name: "test version constant",
 			currentProgressingLastTransition: twentyHoursAgo,
 			currentVersion:                   "4.0.0-5",
 			releaseVersionEnv:                "4.0.0-5",
@@ -443,8 +443,7 @@ func testAzureProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtensi
 			},
 			RoleBindings: []minterv1.RoleBinding{
 				{
-					Role:  "testRole",
-					Scope: "testScope",
+					Role: "testRole",
 				},
 			},
 		})
