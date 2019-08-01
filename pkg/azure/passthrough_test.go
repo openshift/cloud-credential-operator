@@ -20,6 +20,7 @@ import (
 	"context"
 	"testing"
 
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
@@ -27,6 +28,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 )
@@ -112,6 +114,19 @@ var (
 			Namespace: validNamespace,
 		},
 	}
+
+	clusterInfra = openshiftapiv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Status: openshiftapiv1.InfrastructureStatus{
+			PlatformStatus: &openshiftapiv1.PlatformStatus{
+				Azure: &openshiftapiv1.AzurePlatformStatus{
+					ResourceGroupName: "testRG",
+				},
+			},
+		},
+	}
 )
 
 type testInput struct {
@@ -159,9 +174,13 @@ func TestPassthroughCreate(t *testing.T) {
 		{"TestPassthroughCreateExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, nil},
 	}
 
+	if err := openshiftapiv1.Install(scheme.Scheme); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := fake.NewFakeClient(&validRootSecret, &validSecret)
+			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra)
 			actuator, err := azure.NewActuator(f)
 			assert.Nil(t, err)
 
@@ -169,7 +188,7 @@ func TestPassthroughCreate(t *testing.T) {
 			assert.Nil(t, err)
 
 			err = actuator.Create(context.TODO(), cr)
-			assert.Equal(t, err, tt.err)
+			assert.Equal(t, tt.err, err)
 
 			secret := corev1.Secret{}
 			key := client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
@@ -196,9 +215,13 @@ func TestPassthroughUpdate(t *testing.T) {
 		{"TestPassthroughUpdateExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, nil},
 	}
 
+	if err := openshiftapiv1.Install(scheme.Scheme); err != nil {
+		t.Fatal(err)
+	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := fake.NewFakeClient(&validRootSecret, &validSecret)
+			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra)
 			actuator, err := azure.NewActuator(f)
 			assert.Nil(t, err)
 
