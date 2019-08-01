@@ -1053,7 +1053,7 @@ func userHasTag(user *iam.User, key, val string) bool {
 func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Client, username string) (*iam.CreateUserOutput, error) {
 	userInput := &iam.GetUserInput{}
 	currentUser, err := awsClient.GetUser(userInput)
-	
+
 	var input *iam.CreateUserInput
 	if currentUser != nil && currentUser.User.PermissionsBoundary != nil {
 		input = &iam.CreateUserInput{

@@ -32,11 +32,12 @@ const (
 	GCPAuthJSONKey = "service_account.json"
 )
 
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client:           mgr.GetClient(),
 		Logger:           log.WithField("controller", constants.ControllerName),
 		GCPClientBuilder: ccgcp.NewClient,
+		ProjectName:      projectName,
 	}
 }
 
@@ -74,8 +75,9 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 
 type ReconcileCloudCredSecret struct {
 	client.Client
+	ProjectName      string
 	Logger           log.FieldLogger
-	GCPClientBuilder func(authJSON []byte) (ccgcp.Client, error)
+	GCPClientBuilder func(projectName string, authJSON []byte) (ccgcp.Client, error)
 }
 
 // Reconcile will annotate the cloud cred secret to indicate the capabilities of the cloud credentials:
@@ -109,7 +111,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 	}
 
-	gcpClient, err := r.GCPClientBuilder(authJSON)
+	gcpClient, err := r.GCPClientBuilder(r.ProjectName, authJSON)
 	if err != nil {
 		return fmt.Errorf("error creating gcp client: %v", err)
 	}

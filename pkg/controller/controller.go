@@ -55,11 +55,11 @@ func AddToManager(m manager.Manager) error {
 		// https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L11
 		var err error
 		var a actuator.Actuator
-		plat, err := platform.Get(m)
+		plat, err := platform.GetStatus(m)
 		if err != nil {
 			log.Fatal(err)
 		}
-		switch plat {
+		switch plat.Type {
 		case configv1.AWSPlatformType:
 			log.Info("initializing AWS actuator")
 			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme())
@@ -80,7 +80,10 @@ func AddToManager(m manager.Manager) error {
 			}
 		case configv1.GCPPlatformType:
 			log.Info("initializing GCP actuator")
-			a, err = gcpactuator.NewActuator(m.GetClient())
+			if plat.GCP == nil {
+				log.Fatalf("missing GCP configuration in platform status")
+			}
+			a, err = gcpactuator.NewActuator(m.GetClient(), plat.GCP.ProjectID)
 			if err != nil {
 				return err
 			}
@@ -88,7 +91,7 @@ func AddToManager(m manager.Manager) error {
 			log.Info("initializing no-op actuator (unsupported platform)")
 			a = &actuator.DummyActuator{}
 		}
-		if err := f(m, a, plat); err != nil {
+		if err := f(m, a, plat.Type); err != nil {
 			return err
 		}
 	}
