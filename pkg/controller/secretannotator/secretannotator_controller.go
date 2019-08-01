@@ -28,19 +28,22 @@ import (
 )
 
 func Add(mgr manager.Manager) error {
-	platformType, err := platform.Get(mgr)
-	log.Infof("Setting up secret annotator. Platform Type is %s", platformType)
+	platformStatus, err := platform.GetStatus(mgr)
+	log.Infof("Setting up secret annotator. Platform Type is %s", platformStatus.Type)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	switch platformType {
+	switch platformStatus.Type {
 	case configv1.AzurePlatformType:
 		return azure.Add(mgr, azure.NewReconciler(mgr))
 	case configv1.AWSPlatformType:
 		return aws.Add(mgr, aws.NewReconciler(mgr))
 	case configv1.GCPPlatformType:
-		return gcp.Add(mgr, gcp.NewReconciler(mgr))
+		if platformStatus.GCP == nil {
+			log.Fatalf("Missing GCP configuration in infrastructure platform status")
+		}
+		return gcp.Add(mgr, gcp.NewReconciler(mgr, platformStatus.GCP.ProjectID))
 	default: // returning the AWS implementation for default to avoid changing any behavior
 		return aws.Add(mgr, aws.NewReconciler(mgr))
 	}

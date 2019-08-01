@@ -569,7 +569,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				Actuator: &actuator.Actuator{
 					Client: fakeClient,
 					Codec:  codec,
-					GCPClientBuilder: func(jsonAUTH []byte) (mintergcp.Client, error) {
+					GCPClientBuilder: func(name string, jsonAUTH []byte) (mintergcp.Client, error) {
 						if string(jsonAUTH) == testRootGCPAuth {
 							return mockRootGCPClient, nil
 						} else {

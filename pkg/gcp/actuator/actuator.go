@@ -57,13 +57,14 @@ var _ actuatoriface.Actuator = (*Actuator)(nil)
 
 // Actuator implements the CredentialsRequest Actuator interface to create credentials for GCP.
 type Actuator struct {
+	ProjectName      string
 	Client           client.Client
 	Codec            *minterv1.ProviderCodec
-	GCPClientBuilder func([]byte) (ccgcp.Client, error)
+	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
 }
 
 // NewActuator initializes and returns a new Actuator for GCP.
-func NewActuator(c client.Client) (*Actuator, error) {
+func NewActuator(c client.Client, projectName string) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating GCP codec")
@@ -71,6 +72,7 @@ func NewActuator(c client.Client) (*Actuator, error) {
 	}
 
 	return &Actuator{
+		ProjectName:      projectName,
 		Client:           c,
 		Codec:            codec,
 		GCPClientBuilder: ccgcp.NewClient,
@@ -495,7 +497,7 @@ func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating root GCP client")
-	return a.GCPClientBuilder(jsonBytes)
+	return a.GCPClientBuilder(a.ProjectName, jsonBytes)
 }
 
 func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Client, error) {
@@ -525,7 +527,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating read GCP client")
-	client, err := a.GCPClientBuilder(jsonBytes)
+	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
 	if err != nil {
 		return nil, err
 	}
