@@ -11,18 +11,18 @@ import (
 )
 
 // Get queries the ku8s api for the infrastructure config map and retrieves the current platform.
-func Get(m manager.Manager) (configv1.PlatformType, error) {
-	client, err := getClient()
+func GetStatus(m manager.Manager) (*configv1.PlatformStatus, error) {
+	c, err := getClient()
 	if err != nil {
-		return configv1.NonePlatformType, err
+		return nil, err
 	}
 	infraName := types.NamespacedName{Name: "cluster"}
 	infra := &configv1.Infrastructure{}
-	err = client.Get(context.Background(), infraName, infra)
+	err = c.Get(context.Background(), infraName, infra)
 	if err != nil {
-		return configv1.NonePlatformType, err
+		return nil, err
 	}
-	return infra.Status.Platform, nil
+	return infra.Status.PlatformStatus, nil
 }
 
 func getClient() (client.Client, error) {
