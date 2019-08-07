@@ -10,8 +10,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
-// Get queries the ku8s api for the infrastructure config map and retrieves the current platform.
-func GetStatus(m manager.Manager) (*configv1.PlatformStatus, error) {
+// GetInfraStatus queries the k8s api for the infrastructure CR and retrieves the current status.
+func GetInfraStatus(m manager.Manager) (*configv1.InfrastructureStatus, error) {
 	c, err := getClient()
 	if err != nil {
 		return nil, err
@@ -22,7 +22,17 @@ func GetStatus(m manager.Manager) (*configv1.PlatformStatus, error) {
 	if err != nil {
 		return nil, err
 	}
-	return infra.Status.PlatformStatus, nil
+	return &infra.Status, nil
+}
+
+// GetType returns the platform type given an infrastructure status. If PlatformStatus is set,
+// it will get the platform type from it, otherwise it will get it from InfraStatus.Platform which
+// is deprecated in 4.2
+func GetType(infraStatus *configv1.InfrastructureStatus) configv1.PlatformType {
+	if infraStatus.PlatformStatus != nil && len(infraStatus.PlatformStatus.Type) > 0 {
+		return infraStatus.PlatformStatus.Type
+	}
+	return infraStatus.Platform
 }
 
 func getClient() (client.Client, error) {
