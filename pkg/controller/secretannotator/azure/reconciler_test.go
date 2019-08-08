@@ -68,7 +68,7 @@ func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 	}
 	secret := &corev1.Secret{}
 	fakeClient.Get(context.TODO(), client.ObjectKey{Name: "azure-credentials", Namespace: testNamespace}, secret)
-	validateAnnotation(t, secret, annotatorconst.PassthroughAnnotation)
+	validateAnnotation(t, secret, annotatorconst.MintAnnotation)
 }
 
 func validateAnnotation(t *testing.T, secret *corev1.Secret, annotation string) {
