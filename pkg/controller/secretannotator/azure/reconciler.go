@@ -20,6 +20,10 @@ import (
 
 const (
 	cloudCredSecretName = "azure-credentials"
+	azureClientID       = "azure_client_id"
+	azureClientSecret   = "azure_client_secret"
+	azureSubscriptionID = "azure_subscription_id"
+	azureTenantID       = "azure_tenant_id"
 )
 
 var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
@@ -76,14 +80,46 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, err
 	}
 
-	r.Logger.Info("Platform is azure: using passthrough")
-	err = r.updateSecretAnnotations(secret, constants.PassthroughAnnotation)
+	err = r.validateCloudCredsSecret(secret)
 	if err != nil {
 		r.Logger.Errorf("error while validating cloud credentials: %v", err)
 		return reconcile.Result{}, err
 	}
 
 	return reconcile.Result{}, nil
+}
+
+func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secret) error {
+
+	if _, ok := secret.Data[azureClientID]; !ok {
+		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureClientID)
+		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+	}
+
+	if _, ok := secret.Data[azureClientSecret]; !ok {
+		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureClientSecret)
+		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+	}
+
+	if _, ok := secret.Data[azureTenantID]; !ok {
+		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureTenantID)
+		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+	}
+
+	if _, ok := secret.Data[azureSubscriptionID]; !ok {
+		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureSubscriptionID)
+		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+	}
+
+	// TODO(jchaloup): find a way to dynamically check whether these creds really
+	// can be used for minting (or passthrough) or whether they are useless (i.e. InsufficientAnnotation)
+	r.Logger.Info("Platform is azure: allowing to mint new credentials")
+	if err := r.updateSecretAnnotations(secret, constants.MintAnnotation); err != nil {
+		r.Logger.Errorf("error while validating cloud credentials: %v", err)
+		return err
+	}
+
+	return nil
 }
 
 func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {
