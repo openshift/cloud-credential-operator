@@ -45,8 +45,9 @@ var _ actuator.Actuator = (*Actuator)(nil)
 
 // Actuator implements the CredentialsRequest Actuator interface to create credentials for Azure.
 type Actuator struct {
-	client *clientWrapper
-	codec  *minterv1.ProviderCodec
+	client                  *clientWrapper
+	codec                   *minterv1.ProviderCodec
+	credentialMinterBuilder credentialMinterBuilder
 }
 
 func NewActuator(c client.Client) (*Actuator, error) {
@@ -60,7 +61,16 @@ func NewActuator(c client.Client) (*Actuator, error) {
 	return &Actuator{
 		client: client,
 		codec:  codec,
+		credentialMinterBuilder: NewAzureCredentialsMinter,
 	}, nil
+}
+
+func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec, credentialMinterBuilder credentialMinterBuilder) *Actuator {
+	return &Actuator{
+		client: newClientWrapper(c),
+		codec:  codec,
+		credentialMinterBuilder: credentialMinterBuilder,
+	}
 }
 
 func (a *Actuator) IsValidMode() error {
@@ -144,7 +154,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		}
 	}
 
-	azureCredentialsMinter, err := newAzureCredentialsMinter(
+	azureCredentialsMinter, err := a.credentialMinterBuilder(
 		logger,
 		string(cloudCredsSecret.Data[AzureClientID]),
 		string(cloudCredsSecret.Data[AzureClientSecret]),
@@ -324,7 +334,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		azureStatus.ServicePrincipalName = spName
 	}
 
-	azureCredentialsMinter, err := newAzureCredentialsMinter(
+	azureCredentialsMinter, err := a.credentialMinterBuilder(
 		logger,
 		string(cloudCredsSecret.Data[AzureClientID]),
 		string(cloudCredsSecret.Data[AzureClientSecret]),
