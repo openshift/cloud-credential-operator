@@ -17,15 +17,48 @@ limitations under the License.
 package azure_test
 
 import (
+	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
+	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
+	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
+	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/golang/mock/gomock"
+	openshiftapiv1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
+	azuremock "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
+	uuid "github.com/satori/go.uuid"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+)
+
+var (
+	rootSecretMintAnnotation = corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      azure.RootSecretName,
+			Namespace: azure.RootSecretNamespace,
+			Annotations: map[string]string{
+				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+			},
+		},
+	}
+
+	azureSpec = &minterv1.AzureProviderSpec{
+		RoleBindings: []minterv1.RoleBinding{
+			{
+				Role: "Contributor",
+			},
+		},
+	}
 )
 
 func TestDecodeToUnknown(t *testing.T) {
@@ -71,6 +104,171 @@ func TestAnnotations(t *testing.T) {
 			}
 			assert.Nil(t, err)
 			assert.NotNil(t, actuator)
+		})
+	}
+}
+
+func TestActuatorCreateUpdateDelete(t *testing.T) {
+	if err := openshiftapiv1.Install(scheme.Scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := minterv1.AddToScheme(scheme.Scheme); err != nil {
+		t.Fatal(err)
+	}
+
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		t.Fatalf("error creating Azure codec: %v", err)
+	}
+
+	rawObj, err := codec.EncodeProviderSpec(azureSpec)
+	if err != nil {
+		t.Fatalf("error decoding provider v1 spec: %v", err)
+	}
+
+	testAADApplication := graphrbac.Application{
+		AppID:    to.StringPtr(uuid.NewV4().String()),
+		ObjectID: to.StringPtr(uuid.NewV4().String()),
+	}
+
+	testAADApplicationList := []graphrbac.Application{testAADApplication}
+
+	testCredentialRequest := &minterv1.CredentialsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: "default",
+			Name:      "CCrequest",
+		},
+		Spec: minterv1.CredentialsRequestSpec{
+			SecretRef:    corev1.ObjectReference{Namespace: "default", Name: "credentials"},
+			ProviderSpec: rawObj,
+		},
+	}
+
+	testCredentialRequestDifferentName := testCredentialRequest.DeepCopy()
+	testCredentialRequestDifferentName.Name = "differentCCrequestName"
+
+	testServicePrincipal := graphrbac.ServicePrincipal{
+		AppID:       testAADApplication.AppID,
+		ObjectID:    to.StringPtr(uuid.NewV4().String()),
+		DisplayName: to.StringPtr(testCredentialRequest.Name),
+	}
+
+	roleDefinitionList := []authorization.RoleDefinition{
+		{
+			ID: to.StringPtr(uuid.NewV4().String()),
+		},
+	}
+
+	tests := []struct {
+		name                 string
+		application          graphrbac.Application
+		applicationList      []graphrbac.Application
+		servicePrincipal     graphrbac.ServicePrincipal
+		servicePrincipalList []graphrbac.ServicePrincipal
+		roleDefinitionList   []authorization.RoleDefinition
+		roleAssignment       authorization.RoleAssignment
+		credentialRequest    *minterv1.CredentialsRequest
+		op                   func(*azure.Actuator, *minterv1.CredentialsRequest) error
+		err                  error
+	}{
+		{
+			name:               "Create SP",
+			application:        testAADApplication,
+			servicePrincipal:   testServicePrincipal,
+			roleDefinitionList: roleDefinitionList,
+			credentialRequest:  testCredentialRequest,
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Create(context.TODO(), cr)
+			},
+		},
+		{
+			name:               "Create SP (service principal display name different from expected)",
+			application:        testAADApplication,
+			servicePrincipal:   testServicePrincipal,
+			roleDefinitionList: roleDefinitionList,
+			credentialRequest:  testCredentialRequestDifferentName,
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Create(context.TODO(), cr)
+			},
+			err: fmt.Errorf("error syncing creds in mint-mode: service principal name \"%v\" retrieved from Azure is different from the name \"%v\" that was requested", *testServicePrincipal.DisplayName, testCredentialRequestDifferentName.Name),
+		},
+		{
+			name:               "Update SP",
+			application:        testAADApplication,
+			servicePrincipal:   testServicePrincipal,
+			roleDefinitionList: roleDefinitionList,
+			credentialRequest:  testCredentialRequest,
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Update(context.TODO(), cr)
+			},
+		},
+		{
+			name:              "Delete SP (no AAD application found)",
+			application:       testAADApplication,
+			credentialRequest: testCredentialRequest,
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Delete(context.TODO(), cr)
+			},
+		},
+		{
+			name:              "Delete SP (AAD application found)",
+			applicationList:   testAADApplicationList,
+			credentialRequest: testCredentialRequest,
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Delete(context.TODO(), cr)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(&clusterInfra, &rootSecretMintAnnotation, test.credentialRequest)
+
+			mockCtrl := gomock.NewController(t)
+
+			mockAppClient := azuremock.NewMockAppClient(mockCtrl)
+			mockSpClient := azuremock.NewMockServicePrincipalClient(mockCtrl)
+			mockRoleAssignmentsClient := azuremock.NewMockRoleAssignmentsClient(mockCtrl)
+			mockRoleDefinitionClient := azuremock.NewMockRoleDefinitionClient(mockCtrl)
+
+			mockAppClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(test.applicationList, nil).AnyTimes()
+			mockAppClient.EXPECT().Create(gomock.Any(), gomock.Any()).Return(test.application, nil).AnyTimes()
+			mockAppClient.EXPECT().Delete(gomock.Any(), gomock.Any()).Return(nil).AnyTimes()
+			mockSpClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(test.servicePrincipalList, nil).AnyTimes()
+			mockSpClient.EXPECT().Create(gomock.Any(), gomock.Any()).Return(test.servicePrincipal, nil).AnyTimes()
+			mockRoleDefinitionClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Return(test.roleDefinitionList, nil).AnyTimes()
+			mockRoleAssignmentsClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(test.roleAssignment, nil).AnyTimes()
+
+			actuator := azure.NewFakeActuator(
+				fakeClient,
+				codec,
+				func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*azure.AzureCredentialsMinter, error) {
+					return azure.NewFakeAzureCredentialsMinter(logger,
+						clientID,
+						clientSecret,
+						tenantID,
+						subscriptionID,
+						mockAppClient,
+						mockSpClient,
+						mockRoleAssignmentsClient,
+						mockRoleDefinitionClient,
+					)
+				},
+			)
+
+			err = test.op(actuator, test.credentialRequest)
+			if err == nil && test.err != nil {
+				t.Errorf("Expected error %q, got nil", test.err)
+			}
+			if err != nil && test.err == nil {
+				t.Errorf("Unexpected error %q, expected nil", err)
+			}
+			if err != nil && test.err != nil {
+				if err.Error() != test.err.Error() {
+					t.Errorf("Unexpected error %q, expected %q", err, test.err)
+				}
+			}
 		})
 	}
 }
