@@ -25,42 +25,21 @@ func getAuthorizer(clientID, clientSecret, tenantID, resourceEndpoint string) (a
 	return config.Authorizer()
 }
 
-// AzureCredentialsMinter mints new resource scoped service principals
+type credentialMinterBuilder func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error)
+
 type AzureCredentialsMinter struct {
-	appClient             graphrbac.ApplicationsClient
-	spClient              graphrbac.ServicePrincipalsClient
-	roleAssignmentsClient authorization.RoleAssignmentsClient
-	roleDefinitionClient  authorization.RoleDefinitionsClient
+	appClient             AppClient
+	spClient              ServicePrincipalClient
+	roleAssignmentsClient RoleAssignmentsClient
+	roleDefinitionClient  RoleDefinitionClient
 	tenantID              string
 	subscriptionID        string
 	logger                log.FieldLogger
 }
 
-func newAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
-	graphAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, azure.PublicCloud.GraphEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to construct GraphEndpoint authorizer: %v", err)
-	}
-
-	addapclient := graphrbac.NewApplicationsClient(tenantID)
-	addapclient.Authorizer = graphAuthorizer
-
-	spClient := graphrbac.NewServicePrincipalsClient(tenantID)
-	spClient.Authorizer = graphAuthorizer
-
-	rmAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, azure.PublicCloud.ResourceManagerEndpoint)
-	if err != nil {
-		return nil, fmt.Errorf("Unable to construct ResourceManagerEndpoint authorizer: %v", err)
-	}
-
-	roleAssignmentsClient := authorization.NewRoleAssignmentsClient(subscriptionID)
-	roleAssignmentsClient.Authorizer = rmAuthorizer
-
-	roleDefinitionClient := authorization.NewRoleDefinitionsClient(subscriptionID)
-	roleDefinitionClient.Authorizer = rmAuthorizer
-
+func NewFakeAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string, appClient AppClient, spClient ServicePrincipalClient, roleAssignmentsClient RoleAssignmentsClient, roleDefinitionClient RoleDefinitionClient) (*AzureCredentialsMinter, error) {
 	return &AzureCredentialsMinter{
-		appClient:             addapclient,
+		appClient:             appClient,
 		spClient:              spClient,
 		tenantID:              tenantID,
 		subscriptionID:        subscriptionID,
@@ -70,15 +49,36 @@ func newAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, t
 	}, nil
 }
 
+func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
+	graphAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, azure.PublicCloud.GraphEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to construct GraphEndpoint authorizer: %v", err)
+	}
+
+	rmAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, azure.PublicCloud.ResourceManagerEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to construct ResourceManagerEndpoint authorizer: %v", err)
+	}
+
+	return &AzureCredentialsMinter{
+		appClient:             NewAppClient(tenantID, graphAuthorizer),
+		spClient:              NewServicePrincipalClient(tenantID, graphAuthorizer),
+		roleAssignmentsClient: NewRoleAssignmentsClient(subscriptionID, rmAuthorizer),
+		roleDefinitionClient:  NewRoleDefinitionClient(subscriptionID, rmAuthorizer),
+		tenantID:              tenantID,
+		subscriptionID:        subscriptionID,
+		logger:                logger,
+	}, nil
+}
+
 // CreateOrUpdateAADApplication creates a new AAD application. If the application
 // already exist, new client secret is generated if requested.
 func (credMinter *AzureCredentialsMinter) CreateOrUpdateAADApplication(ctx context.Context, aadAppName string, regenClientSecret bool) (*graphrbac.Application, string, error) {
-	appResp, err := credMinter.appClient.List(ctx, fmt.Sprintf("displayName eq '%v'", aadAppName))
+	appItems, err := credMinter.appClient.List(ctx, fmt.Sprintf("displayName eq '%v'", aadAppName))
 	if err != nil {
 		return nil, "", fmt.Errorf("unable to list AAD applications: %v", err)
 	}
 
-	appItems := appResp.Values()
 	switch len(appItems) {
 	case 0:
 		credMinter.logger.Infof("Creating AAD application %q", aadAppName)
@@ -104,7 +104,7 @@ func (credMinter *AzureCredentialsMinter) CreateOrUpdateAADApplication(ctx conte
 		clientSecret := ""
 		if regenClientSecret {
 			secret := uuid.NewV4().String()
-			_, err := credMinter.appClient.UpdatePasswordCredentials(ctx, *appItems[0].ObjectID, graphrbac.PasswordCredentialsUpdateParameters{
+			err := credMinter.appClient.UpdatePasswordCredentials(ctx, *appItems[0].ObjectID, graphrbac.PasswordCredentialsUpdateParameters{
 				Value: &[]graphrbac.PasswordCredential{
 					{
 						Value:   &secret,
@@ -125,13 +125,13 @@ func (credMinter *AzureCredentialsMinter) CreateOrUpdateAADApplication(ctx conte
 
 // CreateOrGetServicePrincipal creates a new SP and returns it.
 // Service principal that already exist is returned.
+
 func (credMinter *AzureCredentialsMinter) CreateOrGetServicePrincipal(ctx context.Context, appID string) (*graphrbac.ServicePrincipal, error) {
-	spResp, err := credMinter.spClient.List(ctx, fmt.Sprintf("appId eq '%v'", appID))
+	spItems, err := credMinter.spClient.List(ctx, fmt.Sprintf("appId eq '%v'", appID))
 	if err != nil {
 		return nil, err
 	}
 
-	spItems := spResp.Values()
 	switch len(spItems) {
 	case 0:
 		credMinter.logger.Infof("Creating service principal for AAD application %q", appID)
@@ -164,14 +164,14 @@ func (credMinter *AzureCredentialsMinter) CreateOrGetServicePrincipal(ctx contex
 }
 
 // AssignResourceScopedRole assigns a resource scoped role to a service principal
+
 func (credMinter *AzureCredentialsMinter) AssignResourceScopedRole(ctx context.Context, resourceGroups []string, principalID, principalName, targetRole string) error {
-	roleDefResp, err := credMinter.roleDefinitionClient.List(ctx, "/", fmt.Sprintf("roleName eq '%v'", targetRole))
+	roleDefItems, err := credMinter.roleDefinitionClient.List(ctx, "/", fmt.Sprintf("roleName eq '%v'", targetRole))
 	if err != nil {
 		return err
 	}
 
 	var roleDefinition *authorization.RoleDefinition
-	roleDefItems := roleDefResp.Values()
 	switch len(roleDefItems) {
 	case 0:
 		return fmt.Errorf("find no role %q", targetRole)
@@ -222,19 +222,18 @@ func (credMinter *AzureCredentialsMinter) AssignResourceScopedRole(ctx context.C
 // DeleteAADApplication deletes an AAD application.
 // If the application does not exist, it's no-op.
 func (credMinter *AzureCredentialsMinter) DeleteAADApplication(ctx context.Context, aadAppName string) error {
-	appResp, err := credMinter.appClient.List(ctx, fmt.Sprintf("displayName eq '%v'", aadAppName))
+	appItems, err := credMinter.appClient.List(ctx, fmt.Sprintf("displayName eq '%v'", aadAppName))
 	if err != nil {
 		return fmt.Errorf("unable to list AAD applications: %v", err)
 	}
 
-	appItems := appResp.Values()
 	switch len(appItems) {
 	case 0:
 		credMinter.logger.Infof("No AAD application %q found, doing nothing", aadAppName)
 		return nil
 	case 1:
 		credMinter.logger.Infof("Deleting AAD application %q", aadAppName)
-		if _, err := credMinter.appClient.Delete(ctx, *appItems[0].ObjectID); err != nil {
+		if err := credMinter.appClient.Delete(ctx, *appItems[0].ObjectID); err != nil {
 			if appItems[0].DisplayName != nil {
 				return fmt.Errorf("unable to delete AAD application %v (%v): %v", *appItems[0].DisplayName, *appItems[0].ObjectID, err)
 			}
