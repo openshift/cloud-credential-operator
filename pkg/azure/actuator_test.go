@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
@@ -148,6 +149,10 @@ func TestActuatorCreateUpdateDelete(t *testing.T) {
 	testCredentialRequestDifferentName := testCredentialRequest.DeepCopy()
 	testCredentialRequestDifferentName.Name = "differentCCrequestName"
 
+	// names with more than 93 characters are invalid
+	testCredentialRequestNameTooLong := testCredentialRequest.DeepCopy()
+	testCredentialRequestNameTooLong.Name = strings.Repeat("0123456789", 10)
+
 	testServicePrincipal := graphrbac.ServicePrincipal{
 		AppID:       testAADApplication.AppID,
 		ObjectID:    to.StringPtr(uuid.NewV4().String()),
@@ -192,6 +197,17 @@ func TestActuatorCreateUpdateDelete(t *testing.T) {
 				return actuator.Create(context.TODO(), cr)
 			},
 			err: fmt.Errorf("error syncing creds in mint-mode: service principal name \"%v\" retrieved from Azure is different from the name \"%v\" that was requested", *testServicePrincipal.DisplayName, testCredentialRequestDifferentName.Name),
+		},
+		{
+			name:               "Create SP (service principal name too long)",
+			application:        testAADApplication,
+			servicePrincipal:   testServicePrincipal,
+			roleDefinitionList: roleDefinitionList,
+			credentialRequest:  testCredentialRequestNameTooLong,
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Create(context.TODO(), cr)
+			},
+			err: fmt.Errorf("error syncing creds in mint-mode: generated name \"%v\" is longer than 93 characters", strings.Repeat("0123456789", 10)),
 		},
 		{
 			name:               "Update SP",

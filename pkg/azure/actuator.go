@@ -457,7 +457,12 @@ func generateServicePrincipalName(infraName, credentialName string) (string, err
 		}
 		infraPrefix = infraName + "-"
 	}
-	return fmt.Sprintf("%s%s", infraPrefix, credentialName), nil
+
+	name := fmt.Sprintf("%s%s", infraPrefix, credentialName)
+	if len(name) > 93 {
+		return "", fmt.Errorf("generated name %q is longer than 93 characters", name)
+	}
+	return name, nil
 }
 
 func copyCredentialsSecret(cr *minterv1.CredentialsRequest, src, dest *corev1.Secret) {
