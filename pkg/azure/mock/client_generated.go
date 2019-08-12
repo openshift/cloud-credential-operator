@@ -184,6 +184,35 @@ func (mr *MockRoleAssignmentsClientMockRecorder) Create(ctx, scope, roleAssignme
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).Create), ctx, scope, roleAssignmentName, parameters)
 }
 
+// List mocks base method
+func (m *MockRoleAssignmentsClient) List(ctx context.Context, filter string) ([]authorization.RoleAssignment, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "List", ctx, filter)
+	ret0, _ := ret[0].([]authorization.RoleAssignment)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// List indicates an expected call of List
+func (mr *MockRoleAssignmentsClientMockRecorder) List(ctx, filter interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).List), ctx, filter)
+}
+
+// DeleteByID mocks base method
+func (m *MockRoleAssignmentsClient) DeleteByID(ctx context.Context, roleAssignmentID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteByID", ctx, roleAssignmentID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteByID indicates an expected call of DeleteByID
+func (mr *MockRoleAssignmentsClientMockRecorder) DeleteByID(ctx, roleAssignmentID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteByID", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).DeleteByID), ctx, roleAssignmentID)
+}
+
 // MockRoleDefinitionClient is a mock of RoleDefinitionClient interface
 type MockRoleDefinitionClient struct {
 	ctrl     *gomock.Controller

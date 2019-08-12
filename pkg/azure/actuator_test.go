@@ -173,6 +173,7 @@ func TestActuatorCreateUpdateDelete(t *testing.T) {
 		servicePrincipalList []graphrbac.ServicePrincipal
 		roleDefinitionList   []authorization.RoleDefinition
 		roleAssignment       authorization.RoleAssignment
+		roleAssignmentList   []authorization.RoleAssignment
 		credentialRequest    *minterv1.CredentialsRequest
 		op                   func(*azure.Actuator, *minterv1.CredentialsRequest) error
 		err                  error
@@ -255,6 +256,7 @@ func TestActuatorCreateUpdateDelete(t *testing.T) {
 			mockSpClient.EXPECT().Create(gomock.Any(), gomock.Any()).Return(test.servicePrincipal, nil).AnyTimes()
 			mockRoleDefinitionClient.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Return(test.roleDefinitionList, nil).AnyTimes()
 			mockRoleAssignmentsClient.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(test.roleAssignment, nil).AnyTimes()
+			mockRoleAssignmentsClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(test.roleAssignmentList, nil).AnyTimes()
 
 			actuator := azure.NewFakeActuator(
 				fakeClient,
