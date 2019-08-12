@@ -248,7 +248,7 @@ func TestPassthroughDelete(t *testing.T) {
 		expected string
 	}{
 		{"TestPassthroughDeleteNotFound", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, `secrets "not-found-name" not found`},
-		{"TestPassthroughDeleteExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, ""},
+		{"TestPassthroughDeleteExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, `secrets "valid-name" not found`},
 	}
 
 	for _, tt := range tests {
