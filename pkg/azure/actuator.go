@@ -132,6 +132,26 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return err
 	}
 
+	// When a service principal is deleted, it's corresponding credentials becomes invalid.
+	// Pass-through credentials are not created through crafted service principal.
+	// When a request is deleted, there is no service principal to delete.
+	// Thus, corresponding secret still provides valid credentials.
+	// For that reason, existing secret object needs to be deleted as well to avoid
+	// credentials leaking.
+	//
+	// Also, there is no harm in deleting the secret in general. Every component consuming
+	// the secret will be forbidden to talk to Azure API once the service principal is destroyed.
+	existingSecret := &corev1.Secret{}
+	err = a.client.Get(ctx, client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
+	if err == nil {
+		logger.Infof("Deleting secret %v/%v", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
+		if err := a.client.Delete(ctx, existingSecret); err != nil {
+			return fmt.Errorf("unable to delete secret %v/%v: %v", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name, err)
+		}
+	} else if !kerrors.IsNotFound(err) {
+		return fmt.Errorf("unable to get secret %v/%v: %v", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name, err)
+	}
+
 	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
 		return nil
 	}
