@@ -90,9 +90,9 @@ func (credMinter *AzureCredentialsMinter) CreateOrUpdateAADApplication(ctx conte
 			PasswordCredentials: &[]graphrbac.PasswordCredential{
 				{
 					Value: &secret,
-					// INFO(jchaloup): Is one year enough?
-					// Should we also prolong the end date or generate new password in case it's outdated?
-					EndDate: &date.Time{Time: time.Now().AddDate(1, 0, 0)},
+					// INFO(jchaloup): end date can be completely omitted
+					// 1k years should be sufficient for a while
+					EndDate: &date.Time{Time: time.Now().AddDate(1000, 0, 0)},
 				},
 			},
 		})
