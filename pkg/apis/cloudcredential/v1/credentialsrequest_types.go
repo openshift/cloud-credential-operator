@@ -36,6 +36,9 @@ const (
 	// we successfully applied. It is used to compare if changes are necessary, without requiring
 	// AWS credentials to view the actual state.
 	AnnotationAWSPolicyLastApplied string = "cloudcredential.openshift.io/aws-policy-last-applied"
+
+	// CloudCredOperatorNamespace is the namespace where the credentials operator runs.
+	CloudCredOperatorNamespace = "openshift-cloud-credential-operator"
 )
 
 // NOTE: Run "make" to regenerate code after modifying this file
