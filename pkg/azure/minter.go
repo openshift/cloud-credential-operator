@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"path"
 	"strings"
 	"time"
 
@@ -163,8 +164,57 @@ func (credMinter *AzureCredentialsMinter) CreateOrGetServicePrincipal(ctx contex
 	}
 }
 
-// AssignResourceScopedRole assigns a resource scoped role to a service principal
+// CleanseResourceScopedRoleAssignments deletes any role assignment of service principal not covered by (resourceGroups, targetRole) combinations
+func (credMinter *AzureCredentialsMinter) CleanseResourceScopedRoleAssignments(ctx context.Context, resourceGroups []string, principalID, principalName string, targetRoles []string) error {
+	assignments, err := credMinter.roleAssignmentsClient.List(ctx, fmt.Sprintf("principalId eq '%v'", principalID))
+	if err != nil {
+		return fmt.Errorf("unable to list role assignments for service principal %q: %v", principalName, err)
+	}
 
+	roleIDs := make(map[string]struct{})
+	for _, targetRole := range targetRoles {
+		roleDefItems, err := credMinter.roleDefinitionClient.List(ctx, "/", fmt.Sprintf("roleName eq '%v'", targetRole))
+		if err != nil {
+			return fmt.Errorf("unable to list role definition for %q: %v", targetRole, err)
+		}
+		switch len(roleDefItems) {
+		case 0:
+			return fmt.Errorf("no role found for name %q", targetRole)
+		case 1:
+			roleIDs[path.Base(*roleDefItems[0].ID)] = struct{}{}
+		default:
+			return fmt.Errorf("found %q role definitions for %q, expected one", len(roleDefItems), targetRole)
+		}
+	}
+
+	groups := make(map[string]struct{})
+	for _, rg := range resourceGroups {
+		groups[rg] = struct{}{}
+	}
+
+	var toDelete []string
+	for _, item := range assignments {
+		if _, ok := roleIDs[path.Base(*item.Properties.RoleDefinitionID)]; !ok {
+			toDelete = append(toDelete, *item.ID)
+			continue
+		}
+		if _, ok := groups[path.Base(*item.Properties.Scope)]; !ok {
+			toDelete = append(toDelete, *item.ID)
+			continue
+		}
+	}
+
+	for _, item := range toDelete {
+		credMinter.logger.Infof("Deleting role assignment %q", item)
+		if err := credMinter.roleAssignmentsClient.DeleteByID(ctx, item); err != nil {
+			return fmt.Errorf("failed to delete role assignment %q: %v", item, err)
+		}
+	}
+
+	return nil
+}
+
+// AssignResourceScopedRole assigns a resource scoped role to a service principal
 func (credMinter *AzureCredentialsMinter) AssignResourceScopedRole(ctx context.Context, resourceGroups []string, principalID, principalName, targetRole string) error {
 	roleDefItems, err := credMinter.roleDefinitionClient.List(ctx, "/", fmt.Sprintf("roleName eq '%v'", targetRole))
 	if err != nil {

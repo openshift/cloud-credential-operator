@@ -91,6 +91,8 @@ func NewServicePrincipalClient(tenantID string, authorizer autorest.Authorizer) 
 // RoleAssignmentsClient is a wrapper object for actual Azure SDK to allow for easier testing.
 type RoleAssignmentsClient interface {
 	Create(ctx context.Context, scope string, roleAssignmentName string, parameters authorization.RoleAssignmentCreateParameters) (authorization.RoleAssignment, error)
+	List(ctx context.Context, filter string) ([]authorization.RoleAssignment, error)
+	DeleteByID(ctx context.Context, roleAssignmentID string) error
 }
 
 type roleAssignmentsClient struct {
@@ -99,6 +101,20 @@ type roleAssignmentsClient struct {
 
 func (raClient *roleAssignmentsClient) Create(ctx context.Context, scope string, roleAssignmentName string, parameters authorization.RoleAssignmentCreateParameters) (authorization.RoleAssignment, error) {
 	return raClient.client.Create(ctx, scope, roleAssignmentName, parameters)
+}
+
+func (raClient *roleAssignmentsClient) List(ctx context.Context, filter string) ([]authorization.RoleAssignment, error) {
+	roleAssignmentsResp, err := raClient.client.List(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return roleAssignmentsResp.Values(), nil
+}
+
+func (raClient *roleAssignmentsClient) DeleteByID(ctx context.Context, roleAssignmentID string) error {
+	_, err := raClient.client.DeleteByID(ctx, roleAssignmentID)
+	return err
 }
 
 var _ RoleAssignmentsClient = &roleAssignmentsClient{}

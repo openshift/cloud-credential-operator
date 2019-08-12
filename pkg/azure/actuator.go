@@ -392,10 +392,16 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		return err
 	}
 
+	var targetRoles []string
 	for _, role := range azureSpec.RoleBindings {
+		targetRoles = append(targetRoles, role.Role)
 		if err := azureCredentialsMinter.AssignResourceScopedRole(ctx, infraResourceGroups, *servicePrincipal.ObjectID, *servicePrincipal.DisplayName, role.Role); err != nil {
 			return err
 		}
+	}
+
+	if err := azureCredentialsMinter.CleanseResourceScopedRoleAssignments(ctx, infraResourceGroups, *servicePrincipal.ObjectID, *servicePrincipal.DisplayName, targetRoles); err != nil {
+		return err
 	}
 
 	newSecret := &corev1.Secret{
