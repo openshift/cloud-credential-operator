@@ -60,7 +60,7 @@ Cred Minter should now be running in openshift-cloud-credential-operator.
 A sample credentials request looks like:
 
 ```yaml
-apiVersion: cloudcredential.openshift.io/v1beta1
+apiVersion: cloudcredential.openshift.io/v1
 kind: CredentialsRequest
 metadata:
   name: openshift-image-registry
@@ -70,7 +70,7 @@ spec:
     name: installer-cloud-credentials
     namespace: openshift-image-registry
   providerSpec:
-    apiVersion: cloudcredential.openshift.io/v1beta1
+    apiVersion: cloudcredential.openshift.io/v1
     kind: AWSProviderSpec
     statementEntries:
     - effect: Allow
