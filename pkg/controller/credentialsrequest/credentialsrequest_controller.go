@@ -298,7 +298,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	}
 	if !infraMatch {
 		logger.Debug("ignoring cr as it is for a different cloud")
-		setIgnoredCondition(cr, true, r.platformType)
+		setIgnoredCondition(cr, r.platformType)
 		err := r.updateStatus(origCR, cr, logger)
 		if err != nil {
 			logger.WithError(err).Error("failed to update conditions")
@@ -556,7 +556,7 @@ func setCredentialsDeprovisionFailureCondition(cr *minterv1.CredentialsRequest, 
 		status, reason, msg, updateCheck)
 }
 
-func setIgnoredCondition(cr *minterv1.CredentialsRequest, failed bool, clusterPlatform configv1.PlatformType) {
+func setIgnoredCondition(cr *minterv1.CredentialsRequest, clusterPlatform configv1.PlatformType) {
 	// Only supporting the ability to set the condition
 	msg := fmt.Sprintf("CredentialsRequest is not for platform %s", clusterPlatform)
 	reason := credentialsRequestInfraMismatch
@@ -565,6 +565,13 @@ func setIgnoredCondition(cr *minterv1.CredentialsRequest, failed bool, clusterPl
 
 	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.Ignored,
 		status, reason, msg, updateCheck)
+
+	// Also clear any other conditions since we are ignoring this cred request,
+	// and we don't want to be in a degraded state b/c of cred requests that we're ignoring.
+	for _, cond := range failureConditionTypes {
+		cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, cond,
+			corev1.ConditionFalse, reason, msg, updateCheck)
+	}
 }
 
 func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {

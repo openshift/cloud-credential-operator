@@ -805,6 +805,35 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "clear conditions when ignoring cred request",
+			existing: []runtime.Object{
+				func() runtime.Object {
+					cr := testGCPCredentialsRequest(t)
+					for _, cond := range failureConditionTypes {
+						cr.Status.Conditions = append(cr.Status.Conditions, minterv1.CredentialsRequestCondition{
+							Type:   cond,
+							Status: corev1.ConditionTrue,
+						})
+					}
+
+					return cr
+				}(),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				return mockaws.NewMockClient(mockCtrl)
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+
+				// verify all the other conditions that would put CCO in a failed state are cleared
+				for _, cond := range cr.Status.Conditions {
+					if cond.Type != minterv1.Ignored {
+						assert.Equal(t, corev1.ConditionFalse, cond.Status, "ignored CR should have other condition cleared")
+					}
+				}
+			},
+		},
+		{
 			name: "pass along any existing permissions boundary",
 			existing: []runtime.Object{
 				createTestNamespace(testNamespace),
