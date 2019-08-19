@@ -33,6 +33,16 @@ const (
 	reasonCredentialsNotProvisioned = "CredentialsNotProvisioned"
 )
 
+var (
+	// If any of these conditions are present and true, we consider it a failing credential:
+	failureConditionTypes = []minterv1.CredentialsRequestConditionType{
+		minterv1.InsufficientCloudCredentials,
+		minterv1.MissingTargetNamespace,
+		minterv1.CredentialsProvisionFailure,
+		minterv1.CredentialsDeprovisionFailure,
+	}
+)
+
 // syncOperatorStatus computes the operator's current status and
 // creates or updates the ClusterOperator resource for the operator accordingly.
 func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
@@ -138,13 +148,6 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 		Status: configv1.ConditionFalse,
 	}
 
-	// If any of these conditions are present and true, we consider it a failing credential:
-	failureConditionTypes := []minterv1.CredentialsRequestConditionType{
-		minterv1.InsufficientCloudCredentials,
-		minterv1.MissingTargetNamespace,
-		minterv1.CredentialsProvisionFailure,
-		minterv1.CredentialsDeprovisionFailure,
-	}
 	failingCredRequests := 0
 
 	validCredRequests := []minterv1.CredentialsRequest{}
