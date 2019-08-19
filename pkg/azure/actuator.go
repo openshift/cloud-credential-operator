@@ -59,16 +59,16 @@ func NewActuator(c client.Client) (*Actuator, error) {
 
 	client := newClientWrapper(c)
 	return &Actuator{
-		client: client,
-		codec:  codec,
+		client:                  client,
+		codec:                   codec,
 		credentialMinterBuilder: NewAzureCredentialsMinter,
 	}, nil
 }
 
 func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec, credentialMinterBuilder credentialMinterBuilder) *Actuator {
 	return &Actuator{
-		client: newClientWrapper(c),
-		codec:  codec,
+		client:                  newClientWrapper(c),
+		codec:                   codec,
 		credentialMinterBuilder: credentialMinterBuilder,
 	}
 }
@@ -410,7 +410,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		return err
 	}
 
-	servicePrincipal, err := azureCredentialsMinter.CreateOrGetServicePrincipal(ctx, *aadApp.AppID)
+	servicePrincipal, err := azureCredentialsMinter.CreateOrGetServicePrincipal(ctx, *aadApp.AppID, infraName)
 	if err != nil {
 		return err
 	}
