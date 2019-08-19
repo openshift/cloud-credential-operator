@@ -47,6 +47,9 @@ const (
 	rootResourcePrefix = "root_resource_prefix"
 	rootSubscriptionID = "root_subscription_id"
 	rootTenantID       = "root_tenant_id"
+
+	testResourceGroupName  = "Test Resource Group"
+	testInfrastructureName = "test-cluster-abcd"
 )
 
 var (
@@ -120,9 +123,10 @@ var (
 			Name: "cluster",
 		},
 		Status: openshiftapiv1.InfrastructureStatus{
+			InfrastructureName: testInfrastructureName,
 			PlatformStatus: &openshiftapiv1.PlatformStatus{
 				Azure: &openshiftapiv1.AzurePlatformStatus{
-					ResourceGroupName: "testRG",
+					ResourceGroupName: testResourceGroupName,
 				},
 			},
 		},

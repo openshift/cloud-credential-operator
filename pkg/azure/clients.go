@@ -5,6 +5,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
+	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2015-11-01/resources"
 	"github.com/Azure/go-autorest/autorest"
 )
 
@@ -151,6 +152,36 @@ func NewRoleDefinitionClient(subscriptionID string, authorizer autorest.Authoriz
 	client := authorization.NewRoleDefinitionsClient(subscriptionID)
 	client.Authorizer = authorizer
 	return &roleDefinitionClient{
+		client: client,
+	}
+}
+
+// ResourceGroupsClient is a wrapper object for actual Azure SDK to allow for easier testing.
+type ResourceGroupsClient interface {
+	Get(context.Context, string) (resources.Group, error)
+	CreateOrUpdate(context.Context, string, resources.Group) (resources.Group, error)
+}
+
+type resourceGroupsClient struct {
+	client resources.GroupsClient
+}
+
+func (rgClient *resourceGroupsClient) Get(ctx context.Context, rgName string) (resources.Group, error) {
+	return rgClient.client.Get(ctx, rgName)
+}
+
+func (rgClient *resourceGroupsClient) CreateOrUpdate(ctx context.Context, rgName string, rg resources.Group) (resources.Group, error) {
+	return rgClient.client.CreateOrUpdate(ctx, rgName, rg)
+}
+
+var _ ResourceGroupsClient = &resourceGroupsClient{}
+
+// NewResourceGroupClient will return a resourceGroupClient pointing to the given subscriptionID
+// and using the provided authorizer.
+func NewResourceGroupClient(subscriptionID string, authorizer autorest.Authorizer) *resourceGroupsClient {
+	client := resources.NewGroupsClient(subscriptionID)
+	client.Authorizer = authorizer
+	return &resourceGroupsClient{
 		client: client,
 	}
 }

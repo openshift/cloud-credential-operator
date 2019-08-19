@@ -59,16 +59,16 @@ func NewActuator(c client.Client) (*Actuator, error) {
 
 	client := newClientWrapper(c)
 	return &Actuator{
-		client: client,
-		codec:  codec,
+		client:                  client,
+		codec:                   codec,
 		credentialMinterBuilder: NewAzureCredentialsMinter,
 	}, nil
 }
 
 func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec, credentialMinterBuilder credentialMinterBuilder) *Actuator {
 	return &Actuator{
-		client: newClientWrapper(c),
-		codec:  codec,
+		client:                  newClientWrapper(c),
+		codec:                   codec,
 		credentialMinterBuilder: credentialMinterBuilder,
 	}
 }
@@ -188,6 +188,15 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 	// Deleting AAD application results in deleting its service principal
 	// and all roles assigned
 	if err := azureCredentialsMinter.DeleteAADApplication(ctx, spName); err != nil {
+		return err
+	}
+
+	infraResourceGroups, err := loadAzureInfrastructureResourceGroups(a.client.Client, logger)
+	if err != nil {
+		return err
+	}
+
+	if err = azureCredentialsMinter.UntagResourceGroups(ctx, infraResourceGroups, azureStatus.AppID); err != nil {
 		return err
 	}
 
@@ -390,6 +399,11 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 	azureStatus.AppID = *aadApp.AppID
 	err = a.updateProviderStatus(ctx, logger, cr, azureStatus)
+	if err != nil {
+		return err
+	}
+
+	err = azureCredentialsMinter.TagResourceGroups(ctx, infraResourceGroups, *aadApp.AppID, *aadApp.DisplayName)
 	if err != nil {
 		return err
 	}

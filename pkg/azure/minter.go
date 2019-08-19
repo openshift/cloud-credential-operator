@@ -33,12 +33,13 @@ type AzureCredentialsMinter struct {
 	spClient              ServicePrincipalClient
 	roleAssignmentsClient RoleAssignmentsClient
 	roleDefinitionClient  RoleDefinitionClient
+	resourceGroupsClient  ResourceGroupsClient
 	tenantID              string
 	subscriptionID        string
 	logger                log.FieldLogger
 }
 
-func NewFakeAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string, appClient AppClient, spClient ServicePrincipalClient, roleAssignmentsClient RoleAssignmentsClient, roleDefinitionClient RoleDefinitionClient) (*AzureCredentialsMinter, error) {
+func NewFakeAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string, appClient AppClient, spClient ServicePrincipalClient, roleAssignmentsClient RoleAssignmentsClient, roleDefinitionClient RoleDefinitionClient, resourceGroupsClient ResourceGroupsClient) (*AzureCredentialsMinter, error) {
 	return &AzureCredentialsMinter{
 		appClient:             appClient,
 		spClient:              spClient,
@@ -46,6 +47,7 @@ func NewFakeAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecre
 		subscriptionID:        subscriptionID,
 		roleAssignmentsClient: roleAssignmentsClient,
 		roleDefinitionClient:  roleDefinitionClient,
+		resourceGroupsClient:  resourceGroupsClient,
 		logger:                logger,
 	}, nil
 }
@@ -66,6 +68,7 @@ func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, t
 		spClient:              NewServicePrincipalClient(tenantID, graphAuthorizer),
 		roleAssignmentsClient: NewRoleAssignmentsClient(subscriptionID, rmAuthorizer),
 		roleDefinitionClient:  NewRoleDefinitionClient(subscriptionID, rmAuthorizer),
+		resourceGroupsClient:  NewResourceGroupClient(subscriptionID, rmAuthorizer),
 		tenantID:              tenantID,
 		subscriptionID:        subscriptionID,
 		logger:                logger,
@@ -293,4 +296,57 @@ func (credMinter *AzureCredentialsMinter) DeleteAADApplication(ctx context.Conte
 	default:
 		return fmt.Errorf("found more than 1 AAD application with %q name, will do nothing", aadAppName)
 	}
+}
+
+// TagResourceGroups will apply the provided tagKey and tagValue to the list of resource groups
+func (credMinter *AzureCredentialsMinter) TagResourceGroups(ctx context.Context, resourceGroups []string, tagKey, tagValue string) error {
+	for _, rgName := range resourceGroups {
+		rg, err := credMinter.resourceGroupsClient.Get(ctx, rgName)
+		if err != nil {
+			credMinter.logger.WithError(err).Errorf("error retrieving Resource Group %s", rgName)
+			return err
+		}
+
+		if _, ok := rg.Tags[tagKey]; ok {
+			// already tagged
+			continue
+		}
+
+		rg.Tags[tagKey] = &tagValue
+
+		// Cannot send a populated Properties.ProvisioningState when doing creates/updates
+		// so clear it out.
+		rg.Properties = nil
+		_, err = credMinter.resourceGroupsClient.CreateOrUpdate(ctx, *rg.Name, rg)
+		if err != nil {
+			credMinter.logger.WithError(err).Errorf("error updating tags on resource group %s", *rg.Name)
+			return err
+		}
+	}
+
+	return nil
+}
+
+// UntagResourceGroups will remove any tags with the provided tagKey from the list of resource groups
+func (credMinter *AzureCredentialsMinter) UntagResourceGroups(ctx context.Context, resourceGroups []string, tagKey string) error {
+	for _, rgName := range resourceGroups {
+		rg, err := credMinter.resourceGroupsClient.Get(ctx, rgName)
+		if err != nil {
+			credMinter.logger.WithError(err).Errorf("error retrieving Resource Group %s", rgName)
+			return err
+		}
+
+		if _, ok := rg.Tags[tagKey]; ok {
+			// Need to clear out Properties.ProvisioningState when doing updates
+			rg.Properties = nil
+			delete(rg.Tags, tagKey)
+			_, err = credMinter.resourceGroupsClient.CreateOrUpdate(ctx, rgName, rg)
+			if err != nil {
+				credMinter.logger.WithError(err).Errorf("error updating tags on resource group %s", rgName)
+				return err
+			}
+		}
+	}
+
+	return nil
 }

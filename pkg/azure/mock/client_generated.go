@@ -8,6 +8,7 @@ import (
 	context "context"
 	authorization "github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
 	graphrbac "github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
+	resources "github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2015-11-01/resources"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -249,4 +250,57 @@ func (m *MockRoleDefinitionClient) List(ctx context.Context, scope, filter strin
 func (mr *MockRoleDefinitionClientMockRecorder) List(ctx, scope, filter interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockRoleDefinitionClient)(nil).List), ctx, scope, filter)
+}
+
+// MockResourceGroupsClient is a mock of ResourceGroupsClient interface
+type MockResourceGroupsClient struct {
+	ctrl     *gomock.Controller
+	recorder *MockResourceGroupsClientMockRecorder
+}
+
+// MockResourceGroupsClientMockRecorder is the mock recorder for MockResourceGroupsClient
+type MockResourceGroupsClientMockRecorder struct {
+	mock *MockResourceGroupsClient
+}
+
+// NewMockResourceGroupsClient creates a new mock instance
+func NewMockResourceGroupsClient(ctrl *gomock.Controller) *MockResourceGroupsClient {
+	mock := &MockResourceGroupsClient{ctrl: ctrl}
+	mock.recorder = &MockResourceGroupsClientMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MockResourceGroupsClient) EXPECT() *MockResourceGroupsClientMockRecorder {
+	return m.recorder
+}
+
+// Get mocks base method
+func (m *MockResourceGroupsClient) Get(arg0 context.Context, arg1 string) (resources.Group, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Get", arg0, arg1)
+	ret0, _ := ret[0].(resources.Group)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Get indicates an expected call of Get
+func (mr *MockResourceGroupsClientMockRecorder) Get(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockResourceGroupsClient)(nil).Get), arg0, arg1)
+}
+
+// CreateOrUpdate mocks base method
+func (m *MockResourceGroupsClient) CreateOrUpdate(arg0 context.Context, arg1 string, arg2 resources.Group) (resources.Group, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateOrUpdate", arg0, arg1, arg2)
+	ret0, _ := ret[0].(resources.Group)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateOrUpdate indicates an expected call of CreateOrUpdate
+func (mr *MockResourceGroupsClientMockRecorder) CreateOrUpdate(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockResourceGroupsClient)(nil).CreateOrUpdate), arg0, arg1, arg2)
 }
