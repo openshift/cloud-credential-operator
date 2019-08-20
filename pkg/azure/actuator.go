@@ -273,6 +273,22 @@ func loadAzureInfrastructureResourceGroups(c client.Client, logger log.FieldLogg
 
 	resourceGroups := []string{infra.Status.PlatformStatus.Azure.ResourceGroupName}
 
+	dns := &configv1.DNS{}
+	err = c.Get(context.Background(), types.NamespacedName{Name: "cluster"}, dns)
+	if err != nil {
+		logger.Error("error loading DNS config 'cluster'")
+		return nil, err
+	}
+
+	if pzone := dns.Spec.PublicZone; pzone != nil {
+		id, err := parseAzureResourceID(pzone.ID)
+		if err != nil {
+			logger.Error("failed to parse ID for public zone")
+			return nil, err
+		}
+		resourceGroups = append(resourceGroups, id.ResourceGroup)
+	}
+
 	logger.Infof("Loaded azure infrastructure resource groups: %s", resourceGroups)
 	return resourceGroups, nil
 
