@@ -64,7 +64,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	oldRelatedObjects := co.Status.RelatedObjects
 	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType)
 	co.Status.Versions = computeClusterOperatorVersions()
-	co.Status.RelatedObjects = buildExpectedRelatedObjects()
+	co.Status.RelatedObjects = buildExpectedRelatedObjects(credRequests)
 
 	// ClusterOperator should already exist (from the manifests payload), but recreate it if needed
 	if isNotFound {
@@ -276,11 +276,20 @@ func findClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCon
 // buildExpectedRelatedObjects returns the list of expected related objects, used
 // by the oc must-gather command to fetch resource yaml for debugging purposes.
 // Keeping this up to date across versions via the code seems like the safest option.
-func buildExpectedRelatedObjects() []configv1.ObjectReference {
-	return []configv1.ObjectReference{
+func buildExpectedRelatedObjects(credRequests []minterv1.CredentialsRequest) []configv1.ObjectReference {
+	related := []configv1.ObjectReference{
 		{
 			Resource: "namespaces",
 			Name:     cloudCredOperatorNamespace,
 		},
 	}
+	for _, cr := range credRequests {
+		related = append(related, configv1.ObjectReference{
+			Group:     minterv1.SchemeGroupVersion.Group,
+			Resource:  "CredentialsRequest",
+			Namespace: cr.Namespace,
+			Name:      cr.Name,
+		})
+	}
+	return related
 }
