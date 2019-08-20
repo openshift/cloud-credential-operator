@@ -240,7 +240,7 @@ func TestActuatorCreateUpdateDelete(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(&clusterInfra, &rootSecretMintAnnotation, test.credentialRequest)
+			fakeClient := fake.NewFakeClient(&clusterInfra, &clusterDNS, &rootSecretMintAnnotation, test.credentialRequest)
 
 			mockCtrl := gomock.NewController(t)
 
