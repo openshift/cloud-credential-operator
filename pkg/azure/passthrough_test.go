@@ -127,6 +127,17 @@ var (
 			},
 		},
 	}
+
+	clusterDNS = openshiftapiv1.DNS{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: openshiftapiv1.DNSSpec{
+			PublicZone: &openshiftapiv1.DNSZone{
+				ID: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/os4-common/providers/Microsoft.Network/dnszones/devcluster.openshift.com",
+			},
+		},
+	}
 )
 
 type testInput struct {
@@ -180,7 +191,7 @@ func TestPassthroughCreate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra)
+			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra, &clusterDNS)
 			actuator, err := azure.NewActuator(f)
 			assert.Nil(t, err)
 
@@ -221,7 +232,7 @@ func TestPassthroughUpdate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra)
+			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra, &clusterDNS)
 			actuator, err := azure.NewActuator(f)
 			assert.Nil(t, err)
 
