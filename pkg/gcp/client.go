@@ -19,6 +19,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	// GCP auth
 	"golang.org/x/oauth2/google"
@@ -64,38 +65,61 @@ type gcpClient struct {
 	serviceUsageClient         *serviceusage.Service
 }
 
+const (
+	defaultCallTimeout = 2 * time.Minute
+)
+
+func contextWithTimeout(ctx context.Context) (context.Context, context.CancelFunc) {
+	return context.WithTimeout(ctx, defaultCallTimeout)
+}
+
 func (c *gcpClient) CreateServiceAccount(ctx context.Context, request *iamadminpb.CreateServiceAccountRequest) (*iamadminpb.ServiceAccount, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
 	svcAcct, err := c.iamClient.CreateServiceAccount(ctx, request)
 	return svcAcct, err
 }
 
 func (c *gcpClient) CreateServiceAccountKey(ctx context.Context, request *iamadminpb.CreateServiceAccountKeyRequest) (*iamadminpb.ServiceAccountKey, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
 	return c.iamClient.CreateServiceAccountKey(ctx, request)
 }
 
 func (c *gcpClient) DeleteServiceAccount(ctx context.Context, request *iamadminpb.DeleteServiceAccountRequest) error {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
 	return c.iamClient.DeleteServiceAccount(ctx, request)
 }
 
 func (c *gcpClient) DeleteServiceAccountKey(ctx context.Context, request *iamadminpb.DeleteServiceAccountKeyRequest) error {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
 	return c.iamClient.DeleteServiceAccountKey(ctx, request)
 }
 
 func (c *gcpClient) GetRole(ctx context.Context, request *iamadminpb.GetRoleRequest) (*iamadminpb.Role, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
 	return c.iamClient.GetRole(ctx, request)
 }
 
 func (c *gcpClient) GetServiceAccount(ctx context.Context, request *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error) {
-	svcAcct, err := c.iamClient.GetServiceAccount(ctx, request)
-	return svcAcct, err
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamClient.GetServiceAccount(ctx, request)
 }
 
 func (c *gcpClient) ListServiceAccountKeys(ctx context.Context, request *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
 	return c.iamClient.ListServiceAccountKeys(ctx, request)
 }
 
 func (c *gcpClient) GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
-	return c.cloudResourceManagerClient.Projects.GetIamPolicy(projectName, request).Do()
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+	return c.cloudResourceManagerClient.Projects.GetIamPolicy(projectName, request).Context(ctx).Do()
 }
 
 func (c *gcpClient) GetProjectName() string {
@@ -103,11 +127,15 @@ func (c *gcpClient) GetProjectName() string {
 }
 
 func (c *gcpClient) SetProjectIamPolicy(projectName string, request *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
-	return c.cloudResourceManagerClient.Projects.SetIamPolicy(projectName, request).Do()
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+	return c.cloudResourceManagerClient.Projects.SetIamPolicy(projectName, request).Context(ctx).Do()
 }
 
 func (c *gcpClient) TestIamPermissions(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
-	response, err := c.cloudResourceManagerClient.Projects.TestIamPermissions(projectName, permRequest).Do()
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+	response, err := c.cloudResourceManagerClient.Projects.TestIamPermissions(projectName, permRequest).Context(ctx).Do()
 	if err != nil {
 		return nil, err
 	}
@@ -117,7 +145,9 @@ func (c *gcpClient) TestIamPermissions(projectName string, permRequest *cloudres
 func (c *gcpClient) ListServicesEnabled() (map[string]bool, error) {
 	serviceMap := map[string]bool{}
 
-	proj, err := c.cloudResourceManagerClient.Projects.Get(c.GetProjectName()).Do()
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+	proj, err := c.cloudResourceManagerClient.Projects.Get(c.GetProjectName()).Context(ctx).Do()
 	if err != nil {
 		return serviceMap, fmt.Errorf("error getting project number: %v", err)
 	}
@@ -127,25 +157,18 @@ func (c *gcpClient) ListServicesEnabled() (map[string]bool, error) {
 	// where {parent=*/*} should be the object type and it's name/ID (in our case 'projects' and
 	// the project number)
 	listQueryString := fmt.Sprintf("projects/%d", proj.ProjectNumber)
-
-	pageToken := ""
-	for {
-		listResponse, err := c.serviceUsageClient.Services.List(listQueryString).Filter("state:ENABLED").PageToken(pageToken).Do()
-		if err != nil {
-			return serviceMap, fmt.Errorf("error listing services: %v", err)
-		}
-
+	listSvcCtx, listSvcCancel := contextWithTimeout(context.TODO())
+	defer listSvcCancel()
+	req := c.serviceUsageClient.Services.List(listQueryString).Filter("state:ENABLED")
+	err = req.Pages(listSvcCtx, func(listResponse *serviceusage.ListServicesResponse) error {
 		for _, service := range listResponse.Services {
 			serviceMap[service.Config.Name] = true
 		}
-
-		if listResponse.NextPageToken != "" {
-			pageToken = listResponse.NextPageToken
-		} else {
-			break
-		}
+		return nil
+	})
+	if err != nil {
+		return serviceMap, fmt.Errorf("error listing services: %v", err)
 	}
-
 	fixupServiceMap(serviceMap)
 
 	return serviceMap, nil
