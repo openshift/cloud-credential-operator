@@ -126,8 +126,7 @@ func (credMinter *AzureCredentialsMinter) CreateOrUpdateAADApplication(ctx conte
 
 // CreateOrGetServicePrincipal creates a new SP and returns it.
 // Service principal that already exist is returned.
-
-func (credMinter *AzureCredentialsMinter) CreateOrGetServicePrincipal(ctx context.Context, appID string) (*graphrbac.ServicePrincipal, error) {
+func (credMinter *AzureCredentialsMinter) CreateOrGetServicePrincipal(ctx context.Context, appID, infraName string) (*graphrbac.ServicePrincipal, error) {
 	spItems, err := credMinter.spClient.List(ctx, fmt.Sprintf("appId eq '%v'", appID))
 	if err != nil {
 		return nil, err
@@ -137,10 +136,13 @@ func (credMinter *AzureCredentialsMinter) CreateOrGetServicePrincipal(ctx contex
 	case 0:
 		credMinter.logger.Infof("Creating service principal for AAD application %q", appID)
 		var servicePrincipal *graphrbac.ServicePrincipal
+		ownedTag := fmt.Sprintf("kubernetes.io_cluster.%s=owned", infraName)
+
 		err := wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
 			sp, err := credMinter.spClient.Create(ctx, graphrbac.ServicePrincipalCreateParameters{
 				AppID:          to.StringPtr(appID),
 				AccountEnabled: to.BoolPtr(true),
+				Tags:           &[]string{ownedTag},
 			})
 			// ugh: Azure client library doesn't have the types registered to
 			// unmarshal all the way down to this error code natively :-(
