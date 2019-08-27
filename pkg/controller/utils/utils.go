@@ -7,6 +7,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	utilrand "k8s.io/apimachinery/pkg/util/rand"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -75,4 +76,40 @@ func GetCredentialsRequestCloudType(providerSpec *runtime.RawExtension) (string,
 		return "", err
 	}
 	return unknown.Kind, nil
+}
+
+// GenerateUniqueNameWithFieldLimits will take infraName and crName and shorten them if necessary to no longer
+// than their respective MaxLen argument. it will then add a unique ending to the resulting name
+// by appending '-<5 random chars>' to the resulting string.
+// Example: passing "thisIsInfraName", 8, "thisIsCrName", 8 will return:
+//		'thisIsIn-thisIsCr-<5 random chars>'
+func GenerateUniqueNameWithFieldLimits(infraName string, infraNameMaxLen int, crName string, crNameMaxlen int) (string, error) {
+	genName, err := GenerateNameWithFieldLimits(infraName, infraNameMaxLen, crName, crNameMaxlen)
+	if err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("%s-%s", genName, utilrand.String(5)), nil
+}
+
+// GenerateNameWithFieldLimits lets you pass in two strings which will be clipped to their respective
+// maximum lengths.
+// Example: passing "thisIsInfraName", 8, "thisIsCrName", 8 will return:
+//      'thisIsIn-thisIsCr'
+func GenerateNameWithFieldLimits(infraName string, infraNameMaxLen int, crName string, crNameLen int) (string, error) {
+	if crName == "" {
+		return "", fmt.Errorf("empty credential request name")
+	}
+
+	infraPrefix := ""
+	if infraName != "" {
+		if len(infraName) > infraNameMaxLen {
+			infraName = infraName[0:infraNameMaxLen]
+		}
+		infraPrefix = infraName + "-"
+	}
+	if len(crName) > crNameLen {
+		crName = crName[0:crNameLen]
+	}
+	return fmt.Sprintf("%s%s", infraPrefix, crName), nil
 }
