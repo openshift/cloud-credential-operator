@@ -43,11 +43,16 @@ import (
 
 var _ actuator.Actuator = (*Actuator)(nil)
 
+type servicePrincipalNameBuilder func(string, string) (string, error)
+
 // Actuator implements the CredentialsRequest Actuator interface to create credentials for Azure.
 type Actuator struct {
 	client                  *clientWrapper
 	codec                   *minterv1.ProviderCodec
 	credentialMinterBuilder credentialMinterBuilder
+
+	// Allow mocking the random string generation
+	generateServicePrincipalName servicePrincipalNameBuilder
 }
 
 func NewActuator(c client.Client) (*Actuator, error) {
@@ -59,17 +64,21 @@ func NewActuator(c client.Client) (*Actuator, error) {
 
 	client := newClientWrapper(c)
 	return &Actuator{
-		client:                  client,
-		codec:                   codec,
-		credentialMinterBuilder: NewAzureCredentialsMinter,
+		client:                       client,
+		codec:                        codec,
+		credentialMinterBuilder:      NewAzureCredentialsMinter,
+		generateServicePrincipalName: generateServicePrincipalName,
 	}, nil
 }
 
-func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec, credentialMinterBuilder credentialMinterBuilder) *Actuator {
+func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec,
+	credentialMinterBuilder credentialMinterBuilder,
+	servicePrincipalNameBuilder servicePrincipalNameBuilder) *Actuator {
 	return &Actuator{
-		client:                  newClientWrapper(c),
-		codec:                   codec,
-		credentialMinterBuilder: credentialMinterBuilder,
+		client:                       newClientWrapper(c),
+		codec:                        codec,
+		credentialMinterBuilder:      credentialMinterBuilder,
+		generateServicePrincipalName: servicePrincipalNameBuilder,
 	}
 }
 
@@ -168,7 +177,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 
 	spName := azureStatus.ServicePrincipalName
 	if spName == "" {
-		spName, err = generateServicePrincipalName(infraName, cr.Name)
+		spName, err = a.generateServicePrincipalName(infraName, cr.Name)
 		if err != nil {
 			return err
 		}
@@ -363,11 +372,19 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 	spName := azureStatus.ServicePrincipalName
 	if spName == "" {
-		spName, err = generateServicePrincipalName(infraName, cr.Name)
+		spName, err = a.generateServicePrincipalName(infraName, cr.Name)
 		if err != nil {
 			return err
 		}
 		azureStatus.ServicePrincipalName = spName
+
+		// Save status immediately in case we successfully create the AppRegistration and
+		// then fail to update credReq status causing us to leak the created AppRegistration
+		// because we can't find it by name anymore.
+		err = a.updateProviderStatus(ctx, logger, cr, azureStatus)
+		if err != nil {
+			return err
+		}
 	}
 
 	azureCredentialsMinter, err := a.credentialMinterBuilder(
@@ -489,22 +506,11 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 // generateServicePrincipalName generates a unique service principal name for Azure
 func generateServicePrincipalName(infraName, credentialName string) (string, error) {
-	if credentialName == "" {
-		return "", fmt.Errorf("empty credential name")
-	}
-	infraPrefix := ""
-	if infraName != "" {
-		if len(infraName) > 20 {
-			infraName = infraName[0:20]
-		}
-		infraPrefix = infraName + "-"
-	}
+	// Azure allows a 93 character name field
+	// allow 32 chars for infraName and 54 for the credName
+	// 32Infra dash 54CredName dash 5random = 93 characters
 
-	name := fmt.Sprintf("%s%s", infraPrefix, credentialName)
-	if len(name) > 93 {
-		return "", fmt.Errorf("generated name %q is longer than 93 characters", name)
-	}
-	return name, nil
+	return utils.GenerateUniqueNameWithFieldLimits(infraName, 32, credentialName, 54)
 }
 
 func copyCredentialsSecret(cr *minterv1.CredentialsRequest, src, dest *corev1.Secret) {

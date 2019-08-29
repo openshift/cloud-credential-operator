@@ -291,7 +291,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		// The service account id has a max length of 30 chars
 		// split it into 12-11-5 where the resuling string becomes:
 		// <infraName chopped to 12 chars>-<crName chopped to 11 chars>-<random 5 chars>
-		svcAcctID, err := generateUniqueNameWithFieldLimits(infraName, 12, cr.Name, 11)
+		svcAcctID, err := utils.GenerateUniqueNameWithFieldLimits(infraName, 12, cr.Name, 11)
 		if err != nil {
 			return fmt.Errorf("error generating service account ID: %v", err)
 		}
@@ -341,7 +341,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 		// The service account name field has a 100 char max, so generate a name consisting of the
 		// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
-		svcAcctName, err := generateNameWithFieldLimits(infraName, 50, cr.Name, 49) // 100 total char limit
+		svcAcctName, err := utils.GenerateNameWithFieldLimits(infraName, 50, cr.Name, 49)
 		if err != nil {
 			return fmt.Errorf("error generating service acocunt name: %v", err)
 		}

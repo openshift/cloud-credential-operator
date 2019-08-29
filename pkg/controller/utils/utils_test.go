@@ -1,4 +1,4 @@
-package actuator
+package utils
 
 import (
 	"regexp"
@@ -43,7 +43,7 @@ func TestGenerateName(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			generatedName, err := generateUniqueNameWithFieldLimits(test.infraName, test.infraNameMaxLen, test.credentialName, test.credentialNameMaxLen)
+			generatedName, err := GenerateUniqueNameWithFieldLimits(test.infraName, test.infraNameMaxLen, test.credentialName, test.credentialNameMaxLen)
 			if test.expectedError {
 				assert.Error(t, err, "Expected error returned")
 			} else {
