@@ -20,7 +20,6 @@ import (
 	"context"
 	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
@@ -43,6 +42,8 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 )
 
 const (
@@ -51,6 +52,7 @@ const (
 	testAppRegID        = "some-unique-app-id"
 	testAppRegObjID     = "some-unique-app-obj-id"
 	testCredRequestName = "testCredRequest"
+	testRandomSuffix    = "rando"
 	testRoleName        = "Contributor"
 )
 
@@ -178,7 +180,7 @@ func TestActuator(t *testing.T) {
 				azStatus := getProviderStatus(t, cr)
 				assert.Equal(t, testAppRegID, azStatus.AppID)
 
-				expectedSPName := fmt.Sprintf("%s-%s", testInfrastructureName, testCredRequestName)
+				expectedSPName := generateDisplayName()
 				assert.Equal(t, expectedSPName, azStatus.ServicePrincipalName)
 			},
 		},
@@ -194,23 +196,7 @@ func TestActuator(t *testing.T) {
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Create(context.TODO(), cr)
 			},
-			expectedErr: fmt.Errorf("error syncing creds in mint-mode: service principal name \"%v\" retrieved from Azure is different from the name \"%v\" that was requested", generateDisplayName(), testInfrastructureName+"-differentname"),
-		},
-		{
-			name:     "Create SP (service principal name too long)",
-			existing: defaultExistingObjects(),
-			credentialsRequest: func() *minterv1.CredentialsRequest {
-				cr := testCredentialsRequest(t)
-				cr.Name = strings.Repeat("0123456789", 10)
-				return cr
-			}(),
-			mockRoleAssignmentsClient:  mockRoleAssignmentClientNoCalls,
-			mockServicePrincipalClient: mockServicePrincipalClientNoCalls,
-			mockAppClient:              mockAppClientNoCalls,
-			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
-				return actuator.Create(context.TODO(), cr)
-			},
-			expectedErr: fmt.Errorf("error syncing creds in mint-mode: generated name \"%v\" is longer than 93 characters", testInfrastructureName+"-"+strings.Repeat("0123456789", 10)),
+			expectedErr: fmt.Errorf("error syncing creds in mint-mode: service principal name \"%v\" retrieved from Azure is different from the name \"%v\" that was requested", generateDisplayName(), testInfrastructureName+"-differentname"+"-"+testRandomSuffix),
 		},
 		{
 			name:               "Update SP",
@@ -225,7 +211,7 @@ func TestActuator(t *testing.T) {
 				azStatus := getProviderStatus(t, cr)
 				assert.Equal(t, testAppRegID, azStatus.AppID)
 
-				expectedSPName := fmt.Sprintf("%s-%s", testInfrastructureName, testCredRequestName)
+				expectedSPName := generateDisplayName()
 				assert.Equal(t, expectedSPName, azStatus.ServicePrincipalName)
 			},
 		},
@@ -314,6 +300,7 @@ func TestActuator(t *testing.T) {
 				return actuator.Create(context.TODO(), cr)
 			},
 			validate: func(t *testing.T, c client.Client) {
+				// validation done in gomock.EXEPCT()
 			},
 		},
 	}
@@ -361,6 +348,7 @@ func TestActuator(t *testing.T) {
 						rdClient,
 					)
 				},
+				testGenerateServicePrincipalName,
 			)
 
 			testErr := test.op(actuator, test.credentialsRequest)
@@ -403,7 +391,8 @@ func testServicePrincipal() graphrbac.ServicePrincipal {
 }
 
 func generateDisplayName() string {
-	return fmt.Sprintf("%s-%s", clusterInfra.Status.InfrastructureName, testCredRequestName)
+	name, _ := testGenerateServicePrincipalName(testInfrastructureName, testCredRequestName)
+	return name
 }
 
 func testResourceGroup() resources.Group {
@@ -529,4 +518,13 @@ func defaultExistingObjects() []runtime.Object {
 		&clusterDNS,
 	}
 	return objs
+}
+
+func testGenerateServicePrincipalName(infraName string, credName string) (string, error) {
+	generated, err := utils.GenerateNameWithFieldLimits(infraName, 32, credName, 54)
+	if err != nil {
+		panic(fmt.Sprintf("test case input causing name generation errors: %v", err))
+	}
+	generated = generated + "-" + testRandomSuffix
+	return generated, nil
 }
