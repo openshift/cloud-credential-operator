@@ -57,6 +57,17 @@ const (
 	testAWSSecretAccessKey = "KEEPITSECRET"
 )
 
+var (
+	failedSimulationResponse = &iam.SimulatePolicyResponse{
+		EvaluationResults: []*iam.EvaluationResult{
+			{
+				EvalDecision:   aws.String("notallowed"),
+				EvalActionName: aws.String("SomeAWSAction"),
+			},
+		},
+	}
+)
+
 func init() {
 	log.SetLevel(log.DebugLevel)
 }
@@ -232,41 +243,27 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 }
 
 func mockSimulatePrincipalPolicyCredMinterSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any()).Return(&iam.SimulatePolicyResponse{
-		EvaluationResults: []*iam.EvaluationResult{
-			{EvalDecision: aws.String("allowed")},
-		},
-	}, nil)
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
 }
 
 func mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any()).Return(&iam.SimulatePolicyResponse{
-		EvaluationResults: []*iam.EvaluationResult{
-			{
-				EvalDecision:   aws.String("notallowed"),
-				EvalActionName: aws.String("SomeAWSAction"),
-			},
-		},
-	}, nil)
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
+		// Now in the Do() receive the lambda function f() so we can send it the failed result
+		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
+			f(failedSimulationResponse, true)
+		})
 }
 
 func mockSimulatePrincipalPolicyCredPassthroughSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any()).Return(&iam.SimulatePolicyResponse{
-		EvaluationResults: []*iam.EvaluationResult{
-			{EvalDecision: aws.String("allowed")},
-		},
-	}, nil)
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
 }
 
 func mockSimulatePrincipalPolicyCredPassthroughFail(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any()).Return(&iam.SimulatePolicyResponse{
-		EvaluationResults: []*iam.EvaluationResult{
-			{
-				EvalDecision:   aws.String("notallowed"),
-				EvalActionName: aws.String("SomeAWSAction"),
-			},
-		},
-	}, nil)
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
+		// Now in the Do() receive the lambda function f() so we can send it the failed result
+		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
+			f(failedSimulationResponse, true)
+		})
 }
 
 func validateSecretAnnotation(c client.Client, t *testing.T, value string) {
