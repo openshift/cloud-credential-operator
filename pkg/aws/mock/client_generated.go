@@ -198,6 +198,20 @@ func (mr *MockClientMockRecorder) SimulatePrincipalPolicy(arg0 interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SimulatePrincipalPolicy", reflect.TypeOf((*MockClient)(nil).SimulatePrincipalPolicy), arg0)
 }
 
+// SimulatePrincipalPolicyPages mocks base method
+func (m *MockClient) SimulatePrincipalPolicyPages(arg0 *iam.SimulatePrincipalPolicyInput, arg1 func(*iam.SimulatePolicyResponse, bool) bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SimulatePrincipalPolicyPages", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SimulatePrincipalPolicyPages indicates an expected call of SimulatePrincipalPolicyPages
+func (mr *MockClientMockRecorder) SimulatePrincipalPolicyPages(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SimulatePrincipalPolicyPages", reflect.TypeOf((*MockClient)(nil).SimulatePrincipalPolicyPages), arg0, arg1)
+}
+
 // TagUser mocks base method
 func (m *MockClient) TagUser(arg0 *iam.TagUserInput) (*iam.TagUserOutput, error) {
 	m.ctrl.T.Helper()
