@@ -66,6 +66,14 @@ var (
 			},
 		},
 	}
+	successfulSimulateResponse = &iam.SimulatePolicyResponse{
+		EvaluationResults: []*iam.EvaluationResult{
+			{
+				EvalDecision:   aws.String("allowed"),
+				EvalActionName: aws.String("SomeAWSAction"),
+			},
+		},
+	}
 )
 
 func init() {
@@ -243,7 +251,10 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 }
 
 func mockSimulatePrincipalPolicyCredMinterSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
+		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
+			f(successfulSimulateResponse, true)
+		})
 }
 
 func mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient *mockaws.MockClient) {
@@ -255,7 +266,10 @@ func mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient *mockaws.MockClient
 }
 
 func mockSimulatePrincipalPolicyCredPassthroughSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
+		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
+			f(successfulSimulateResponse, true)
+		})
 }
 
 func mockSimulatePrincipalPolicyCredPassthroughFail(mockAWSClient *mockaws.MockClient) {
