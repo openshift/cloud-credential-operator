@@ -112,6 +112,14 @@ subjects:
   namespace: openshift-cloud-credential-operator
 ---
 apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    config.openshift.io/inject-trusted-cabundle: "true"
+  name: cco-trusted-ca
+  namespace: openshift-cloud-credential-operator
+---
+apiVersion: v1
 kind: Service
 metadata:
   labels:
@@ -129,6 +137,8 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
+  annotations:
+    config.openshift.io/inject-proxy: manager
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
@@ -167,6 +177,9 @@ spec:
             cpu: 10m
             memory: 150Mi
         terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - mountPath: /etc/pki/ca-trust/extracted/pem/
+          name: cco-trusted-ca
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
@@ -183,3 +196,11 @@ spec:
         key: node.kubernetes.io/not-ready
         operator: Exists
         tolerationSeconds: 120
+      volumes:
+      - configMap:
+          items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
+          name: cco-trusted-ca
+          optional: true
+        name: cco-trusted-ca
