@@ -31,6 +31,8 @@ metadata:
   labels:
     control-plane: controller-manager
     controller-tools.k8s.io: "1.0"
+  annotations:
+    config.openshift.io/inject-proxy: "manager"
 spec:
   selector:
     matchLabels:
@@ -79,4 +81,25 @@ spec:
           - --log-level
           - debug
         terminationMessagePolicy: FallbackToLogsOnError
+        volumeMounts:
+        - name: cco-trusted-ca
+          mountPath: /etc/pki/ca-trust/extracted/pem/
       terminationGracePeriodSeconds: 10
+      volumes:
+      - name: cco-trusted-ca
+        configMap:
+          optional: true
+          name: cco-trusted-ca
+          items:
+          - key: ca-bundle.crt
+            path: tls-ca-bundle.pem
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  labels:
+    # This label ensures that the OpenShift Certificate Authority bundle
+    # is added to the ConfigMap.
+    config.openshift.io/inject-trusted-cabundle: "true"
+  name: cco-trusted-ca
+  namespace: openshift-cloud-credential-operator
