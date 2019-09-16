@@ -1,7 +1,15 @@
 
 # Image URL to use all building/pushing image targets
 IMG ?= cloud-credential-operator:latest
-DOCKER_CMD ?= docker
+
+DISTRO ?= $(shell if which lsb_release &> /dev/null; then lsb_release -si; else echo "Unknown"; fi)
+
+# Default fedora to not using sudo since it's not needed
+ifeq ($(DISTRO),Fedora)
+	SUDO_CMD =
+else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
+	SUDO_CMD = sudo
+endif
 
 all: test manager
 
@@ -63,8 +71,8 @@ generate:
 # Build the image with buildah
 .PHONY: buildah-build
 buildah-build: test
-	BUILDAH_ISOLATION=chroot sudo buildah bud --tag ${IMG} .
+	BUILDAH_ISOLATION=chroot $(SUDO_CMD) buildah bud --tag ${IMG} .
 
 .PHONY: buildah-push
 buildah-push: buildah-build
-	sudo buildah push --authfile=~/.docker/config.json ${IMG}
+	$(SUDO_CMD) buildah push ${IMG}
