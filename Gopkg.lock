@@ -369,6 +369,14 @@
   version = "v1.1.5"
 
 [[projects]]
+  digest = "1:9f45b3f05c749a97b1423b5e7874cd19ae0452db5d107468e2d7d9c805435df0"
+  name = "github.com/jteeuwen/go-bindata"
+  packages = ["."]
+  pruneopts = "T"
+  revision = "bbd0c6e271208dce66d8fda4bc536453cd27fc4a"
+  version = "v3.0.7"
+
+[[projects]]
   digest = "1:0a69a1c0db3591fcefb47f115b224592c8dfa4368b7ba9fae509d5e16cdc95c8"
   name = "github.com/konsorten/go-windows-terminal-sequences"
   packages = ["."]
@@ -1302,6 +1310,7 @@
     "github.com/emicklei/go-restful",
     "github.com/golang/glog",
     "github.com/golang/mock/gomock",
+    "github.com/jteeuwen/go-bindata",
     "github.com/onsi/ginkgo",
     "github.com/onsi/gomega",
     "github.com/openshift/api/config/v1",

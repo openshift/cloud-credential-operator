@@ -27,8 +27,8 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func Add(mgr manager.Manager) error {
-	infraStatus, err := platform.GetInfraStatus(mgr)
+func Add(mgr manager.Manager, kubeconfig string) error {
+	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(mgr, kubeconfig)
 	if err != nil {
 		log.Fatal(err)
 	}

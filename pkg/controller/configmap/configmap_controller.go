@@ -45,7 +45,8 @@ const (
 )
 
 // Add creates a new ConfigMap controller and adds it to the manager.
-func Add(mgr manager.Manager) error {
+// Ignore the kubeconfigPath parameter as it is not needed for this controller.
+func Add(mgr manager.Manager, kubeconfigPath string) error {
 	return AddToManager(mgr, NewReconciler(mgr))
 }
 

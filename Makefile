@@ -36,7 +36,7 @@ build-no-gen: fmt vet
 
 # Run against the configured Kubernetes cluster in ~/.kube/config
 run: generate fmt vet
-	go run ./cmd/manager/main.go --log-level=debug
+	go run ./cmd/manager --log-level=debug
 
 # Install CRDs into a cluster
 install: manifests
@@ -67,6 +67,7 @@ vet:
 # Generate code
 generate:
 	go generate ./pkg/... ./cmd/...
+	hack/update-bindata.sh
 
 # Build the image with buildah
 .PHONY: buildah-build

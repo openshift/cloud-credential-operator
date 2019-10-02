@@ -99,7 +99,8 @@ func NewRootCommand() *cobra.Command {
 
 			// Setup all Controllers
 			log.Info("setting up controller")
-			if err := controller.AddToManager(mgr); err != nil {
+			kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
+			if err := controller.AddToManager(mgr, kubeconfigCommandLinePath); err != nil {
 				log.Error(err, "unable to register controllers to the manager")
 				os.Exit(1)
 			}
@@ -141,6 +142,7 @@ func (writer glogWriter) Write(data []byte) (n int, err error) {
 func main() {
 	defer glog.Flush()
 	cmd := NewRootCommand()
+	cmd.AddCommand(newRenderCommand())
 	err := cmd.Execute()
 	if err != nil {
 		log.Fatal(err)
