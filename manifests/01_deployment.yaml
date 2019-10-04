@@ -158,10 +158,16 @@ spec:
         controller-tools.k8s.io: "1.0"
     spec:
       containers:
-      - command:
-        - /root/manager
-        - --log-level
-        - debug
+      - args:
+        - |
+          if [ -s /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem ]; then
+              echo "Copying system trust bundle"
+              cp -f /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          fi
+          exec /root/manager --log-level=debug
+        command:
+        - /bin/bash
+        - -ec
         env:
         - name: RELEASE_VERSION
           value: 0.0.1-snapshot
@@ -178,7 +184,7 @@ spec:
             memory: 150Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - mountPath: /etc/pki/ca-trust/extracted/pem/
+        - mountPath: /var/run/configmaps/trusted-ca-bundle
           name: cco-trusted-ca
       nodeSelector:
         node-role.kubernetes.io/master: ""
