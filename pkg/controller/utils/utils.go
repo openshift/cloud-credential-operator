@@ -3,8 +3,10 @@ package utils
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -19,8 +21,9 @@ import (
 )
 
 const (
-	awsCredsSecretIDKey     = "aws_access_key_id"
-	awsCredsSecretAccessKey = "aws_secret_access_key"
+	awsCredsSecretIDKey          = "aws_access_key_id"
+	awsCredsSecretAccessKey      = "aws_secret_access_key"
+	operatorConfigMapDisabledKey = "disabled"
 )
 
 func LoadCredsFromSecret(kubeClient client.Client, namespace, secretName string) ([]byte, []byte, error) {
@@ -112,4 +115,31 @@ func GenerateNameWithFieldLimits(infraName string, infraNameMaxLen int, crName s
 		crName = crName[0:crNameLen]
 	}
 	return fmt.Sprintf("%s%s", infraPrefix, crName), nil
+}
+
+// IsOperatorDisabled checks the cloud-credential-operator-config ConfigMap for a
+// "disabled" property set to true. If the configmap or property do not exist, we assume
+// false and continue normal operation. This should be used in all controllers to shutdown
+// functionality in environments where admins want to manage their credentials themselves.
+func IsOperatorDisabled(kubeClient client.Client, logger log.FieldLogger) (bool, error) {
+	cm := &corev1.ConfigMap{}
+	err := kubeClient.Get(context.TODO(),
+		types.NamespacedName{
+			Namespace: minterv1.CloudCredOperatorNamespace,
+			Name:      minterv1.CloudCredOperatorConfigMap,
+		}, cm)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Debugf("%s ConfigMap does not exist, assuming default behavior", minterv1.CloudCredOperatorConfigMap)
+			return false, nil
+		}
+		return false, err
+	}
+
+	disabled, ok := cm.Data[operatorConfigMapDisabledKey]
+	if !ok {
+		logger.Debugf("%s ConfigMap has no %s key, assuming default behavior", minterv1.CloudCredOperatorConfigMap, operatorConfigMapDisabledKey)
+		return false, nil
+	}
+	return strconv.ParseBool(disabled)
 }

@@ -875,6 +875,39 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.NotNil(t, cr.Status.LastSyncTimestamp)
 			},
 		},
+		{
+			name: "new credential but operator disabled",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testOperatorConfigMap("true"),
+				testCredentialsRequest(t),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorDegraded,
+					status:        corev1.ConditionFalse,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1328,6 +1361,18 @@ func testInfrastructure(infraName string) *configv1.Infrastructure {
 		Status: configv1.InfrastructureStatus{
 			Platform:           configv1.AWSPlatformType,
 			InfrastructureName: infraName,
+		},
+	}
+}
+
+func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      minterv1.CloudCredOperatorConfigMap,
+			Namespace: minterv1.CloudCredOperatorNamespace,
+		},
+		Data: map[string]string{
+			"disabled": disabled,
 		},
 	}
 }
