@@ -51,14 +51,18 @@ spec:
         - containerPort: 9876
           name: webhook-server
           protocol: TCP
-        command:
-          - /root/manager
-          - --log-level
-          - debug
+        command: ["/bin/bash", "-ec"]
+        args:
+        - |
+          if [ -s /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem ]; then
+              echo "Copying system trust bundle"
+              cp -f /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
+          fi
+          exec /root/manager --log-level=debug
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: cco-trusted-ca
-          mountPath: /etc/pki/ca-trust/extracted/pem/
+          mountPath: /var/run/configmaps/trusted-ca-bundle
       terminationGracePeriodSeconds: 10
       volumes:
       - name: cco-trusted-ca
