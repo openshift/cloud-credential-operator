@@ -37,6 +37,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 
@@ -95,6 +96,14 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				return mockGCPClient
 			},
 			validateAnnotationValue: constants.MintAnnotation,
+		},
+		{
+			name:     "operator disabled",
+			existing: []runtime.Object{testSecret(), testOperatorConfigMap("true")},
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				return mockGCPClient
+			},
 		},
 		{
 			name:     "cred passthrough mode",
@@ -226,6 +235,18 @@ func testSecret() *corev1.Secret {
 		},
 	}
 	return s
+}
+
+func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      minterv1.CloudCredOperatorConfigMap,
+			Namespace: minterv1.CloudCredOperatorNamespace,
+		},
+		Data: map[string]string{
+			"disabled": disabled,
+		},
+	}
 }
 
 func mockGetProjectName(mockGCPClient *mockgcp.MockClient) {

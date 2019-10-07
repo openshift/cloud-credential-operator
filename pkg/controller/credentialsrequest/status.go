@@ -31,6 +31,7 @@ const (
 	reasonReconciling               = "Reconciling"
 	reasonReconcilingComplete       = "ReconcilingComplete"
 	reasonCredentialsNotProvisioned = "CredentialsNotProvisioned"
+	reasonOperatorDisabled          = "OperatorDisabledByAdmin"
 )
 
 var (
@@ -46,7 +47,8 @@ var (
 // syncOperatorStatus computes the operator's current status and
 // creates or updates the ClusterOperator resource for the operator accordingly.
 func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
-	log.Debug("syncing cluster operator status")
+	logger := log.WithField("controller", "credreq_status")
+	logger.Debug("syncing cluster operator status")
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredClusterOperator}}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
 	isNotFound := errors.IsNotFound(err)
@@ -54,7 +56,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 		return fmt.Errorf("failed to get clusteroperator %s: %v", co.Name, err)
 	}
 
-	_, credRequests, err := r.getOperatorState()
+	_, credRequests, operatorIsDisabled, err := r.getOperatorState(logger)
 	if err != nil {
 		return fmt.Errorf("failed to get operator state: %v", err)
 	}
@@ -62,7 +64,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	oldConditions := co.Status.Conditions
 	oldVersions := co.Status.Versions
 	oldRelatedObjects := co.Status.RelatedObjects
-	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType)
+	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType, operatorIsDisabled, logger)
 	co.Status.Versions = computeClusterOperatorVersions()
 	co.Status.RelatedObjects = buildExpectedRelatedObjects(credRequests)
 
@@ -71,12 +73,12 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 		if err := r.Client.Create(context.TODO(), co); err != nil {
 			return fmt.Errorf("failed to create clusteroperator %s: %v", co.Name, err)
 		}
-		log.Info("created clusteroperator")
+		logger.Info("created clusteroperator")
 	}
 
 	// Check if version changed, if so force a progressing last transition update:
 	if !reflect.DeepEqual(oldVersions, co.Status.Versions) {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"old": oldVersions,
 			"new": co.Status.Versions,
 		}).Info("version has changed, updating progressing condition lastTransitionTime")
@@ -94,7 +96,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 		if err != nil {
 			return fmt.Errorf("failed to update clusteroperator %s: %v", co.Name, err)
 		}
-		log.Debug("cluster operator status updated")
+		logger.Debug("cluster operator status updated")
 	}
 
 	return nil
@@ -102,15 +104,15 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 
 // getOperatorState gets and returns the resources necessary to compute the
 // operator's current state.
-func (r *ReconcileCredentialsRequest) getOperatorState() (*corev1.Namespace, []minterv1.CredentialsRequest, error) {
+func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest, bool, error) {
 
 	ns := &corev1.Namespace{}
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: minterv1.CloudCredOperatorNamespace}, ns); err != nil {
 		if errors.IsNotFound(err) {
-			return nil, nil, nil
+			return nil, nil, false, nil
 		}
 
-		return nil, nil, fmt.Errorf(
+		return nil, nil, false, fmt.Errorf(
 			"error getting Namespace %s: %v", minterv1.CloudCredOperatorNamespace, err)
 	}
 
@@ -120,11 +122,16 @@ func (r *ReconcileCredentialsRequest) getOperatorState() (*corev1.Namespace, []m
 	credRequestList := &minterv1.CredentialsRequestList{}
 	err := r.Client.List(context.TODO(), credRequestList, client.InNamespace(minterv1.CloudCredOperatorNamespace))
 	if err != nil {
-		return nil, nil, fmt.Errorf(
+		return nil, nil, false, fmt.Errorf(
 			"failed to list CredentialsRequests: %v", err)
 	}
 
-	return ns, credRequestList.Items, nil
+	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, logger)
+	if err != nil {
+		return nil, nil, false, fmt.Errorf("error checking if operator is disabled: %v", err)
+	}
+
+	return ns, credRequestList.Items, operatorIsDisabled, nil
 }
 
 func computeClusterOperatorVersions() []configv1.OperandVersion {
@@ -139,7 +146,12 @@ func computeClusterOperatorVersions() []configv1.OperandVersion {
 }
 
 // computeStatusConditions computes the operator's current state.
-func computeStatusConditions(conditions []configv1.ClusterOperatorStatusCondition, credRequests []minterv1.CredentialsRequest, clusterCloudPlatform configv1.PlatformType) []configv1.ClusterOperatorStatusCondition {
+func computeStatusConditions(
+	conditions []configv1.ClusterOperatorStatusCondition,
+	credRequests []minterv1.CredentialsRequest,
+	clusterCloudPlatform configv1.PlatformType,
+	operatorIsDisabled bool,
+	logger log.FieldLogger) []configv1.ClusterOperatorStatusCondition {
 
 	// Degraded should be true if we are encountering errors. We consider any credentials request
 	// with either provision or deprovision failure conditions true, to be a degraded condition.
@@ -156,7 +168,7 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 		infraMatches, err := crInfraMatches(&cr, clusterCloudPlatform)
 		if err != nil {
 			// couldn't decode the providerspec (bad spec data?)
-			log.WithField("credentialsRequest", cr.Name).WithError(err).Warning("ignoring for status condition because could not decode provider spec")
+			logger.WithField("credentialsRequest", cr.Name).WithError(err).Warning("ignoring for status condition because could not decode provider spec")
 			continue
 		}
 		if !infraMatches {
@@ -182,17 +194,22 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 
 	}
 
-	if failingCredRequests > 0 {
-		degradedCondition.Status = configv1.ConditionTrue
-		degradedCondition.Reason = reasonCredentialsFailing
-		degradedCondition.Message = fmt.Sprintf(
-			"%d of %d credentials requests are failing to sync.",
-			failingCredRequests, len(validCredRequests))
-	} else {
+	if operatorIsDisabled {
 		degradedCondition.Status = configv1.ConditionFalse
-		degradedCondition.Reason = reasonNoCredentialsFailing
-		degradedCondition.Message = "No credentials requests reporting errors."
+		degradedCondition.Reason = reasonOperatorDisabled
+	} else {
+		if failingCredRequests > 0 {
+			degradedCondition.Status = configv1.ConditionTrue
+			degradedCondition.Reason = reasonCredentialsFailing
+			degradedCondition.Message = fmt.Sprintf(
+				"%d of %d credentials requests are failing to sync.",
+				failingCredRequests, len(validCredRequests))
+		} else {
+			degradedCondition.Status = configv1.ConditionFalse
+			degradedCondition.Reason = reasonNoCredentialsFailing
+			degradedCondition.Message = "No credentials requests reporting errors."
 
+		}
 	}
 	conditions = clusteroperator.SetStatusCondition(conditions,
 		degradedCondition)
@@ -204,26 +221,32 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 		Type:   configv1.OperatorProgressing,
 		Status: configv1.ConditionUnknown,
 	}
-	credRequestsNotProvisioned := 0
-	log.Debugf("%d cred requests", len(validCredRequests))
 
-	for _, cr := range validCredRequests {
-		if !cr.Status.Provisioned {
-			credRequestsNotProvisioned = credRequestsNotProvisioned + 1
-		}
-	}
-	if credRequestsNotProvisioned > 0 || failingCredRequests > 0 {
-		progressingCondition.Status = configv1.ConditionTrue
-		progressingCondition.Reason = reasonReconciling
-		progressingCondition.Message = fmt.Sprintf(
-			"%d of %d credentials requests provisioned, %d reporting errors.",
-			len(validCredRequests)-credRequestsNotProvisioned, len(validCredRequests), failingCredRequests)
-	} else {
+	if operatorIsDisabled {
 		progressingCondition.Status = configv1.ConditionFalse
-		progressingCondition.Reason = reasonReconcilingComplete
-		progressingCondition.Message = fmt.Sprintf(
-			"%d of %d credentials requests provisioned and reconciled.",
-			len(validCredRequests), len(validCredRequests))
+		progressingCondition.Reason = reasonOperatorDisabled
+	} else {
+		credRequestsNotProvisioned := 0
+		logger.Debugf("%d cred requests", len(validCredRequests))
+
+		for _, cr := range validCredRequests {
+			if !cr.Status.Provisioned {
+				credRequestsNotProvisioned = credRequestsNotProvisioned + 1
+			}
+		}
+		if credRequestsNotProvisioned > 0 || failingCredRequests > 0 {
+			progressingCondition.Status = configv1.ConditionTrue
+			progressingCondition.Reason = reasonReconciling
+			progressingCondition.Message = fmt.Sprintf(
+				"%d of %d credentials requests provisioned, %d reporting errors.",
+				len(validCredRequests)-credRequestsNotProvisioned, len(validCredRequests), failingCredRequests)
+		} else {
+			progressingCondition.Status = configv1.ConditionFalse
+			progressingCondition.Reason = reasonReconcilingComplete
+			progressingCondition.Message = fmt.Sprintf(
+				"%d of %d credentials requests provisioned and reconciled.",
+				len(validCredRequests), len(validCredRequests))
+		}
 	}
 	conditions = clusteroperator.SetStatusCondition(conditions,
 		progressingCondition)
@@ -236,6 +259,9 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 	availableCondition := &configv1.ClusterOperatorStatusCondition{
 		Status: configv1.ConditionTrue,
 		Type:   configv1.OperatorAvailable,
+	}
+	if operatorIsDisabled {
+		availableCondition.Reason = reasonOperatorDisabled
 	}
 	conditions = clusteroperator.SetStatusCondition(conditions,
 		availableCondition)
@@ -251,7 +277,7 @@ func computeStatusConditions(conditions []configv1.ClusterOperatorStatusConditio
 
 	// Log all conditions we set:
 	for _, c := range conditions {
-		log.WithFields(log.Fields{
+		logger.WithFields(log.Fields{
 			"type":    c.Type,
 			"status":  c.Status,
 			"reason":  c.Reason,
