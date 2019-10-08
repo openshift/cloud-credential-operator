@@ -40,6 +40,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 
@@ -102,6 +103,14 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				return mockAWSClient
 			},
 			validateAnnotationValue: constants.MintAnnotation,
+		},
+		{
+			name:     "operator disabled",
+			existing: []runtime.Object{testSecret(), testOperatorConfigMap("true")},
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
 		},
 		{
 			name:     "detect root user creds",
@@ -226,6 +235,18 @@ func testSecret() *corev1.Secret {
 		},
 	}
 	return s
+}
+
+func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      minterv1.CloudCredOperatorConfigMap,
+			Namespace: minterv1.CloudCredOperatorNamespace,
+		},
+		Data: map[string]string{
+			"disabled": disabled,
+		},
+	}
 }
 
 func mockGetRootUser(mockAWSClient *mockaws.MockClient) {

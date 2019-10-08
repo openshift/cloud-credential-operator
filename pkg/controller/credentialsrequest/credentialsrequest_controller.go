@@ -272,9 +272,18 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		}
 	}()
 
+	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, logger)
+	if err != nil {
+		logger.WithError(err).Error("error checking if operator is disabled")
+		return reconcile.Result{}, err
+	} else if operatorIsDisabled {
+		logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
+		return reconcile.Result{}, err
+	}
+
 	logger.Info("syncing credentials request")
 	cr := &minterv1.CredentialsRequest{}
-	err := r.Get(context.TODO(), request.NamespacedName, cr)
+	err = r.Get(context.TODO(), request.NamespacedName, cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debug("credentials request no longer exists")
