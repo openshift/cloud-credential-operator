@@ -18,7 +18,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/controller/utils/gcp"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
@@ -88,8 +90,17 @@ type ReconcileCloudCredSecret struct {
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	r.Logger.Info("validating cloud cred secret")
 
+	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, r.Logger)
+	if err != nil {
+		r.Logger.WithError(err).Error("error checking if operator is disabled")
+		return reconcile.Result{}, err
+	} else if operatorIsDisabled {
+		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
+		return reconcile.Result{}, err
+	}
+
 	secret := &corev1.Secret{}
-	err := r.Get(context.Background(), request.NamespacedName, secret)
+	err = r.Get(context.Background(), request.NamespacedName, secret)
 	if err != nil {
 		r.Logger.Debugf("secret not found: %v", err)
 		return reconcile.Result{}, err

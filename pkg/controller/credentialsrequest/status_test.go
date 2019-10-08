@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
@@ -77,6 +78,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 		name               string
 		credRequests       []minterv1.CredentialsRequest
 		cloudPlatform      configv1.PlatformType
+		operatorDisabled   bool
 		expectedConditions []configv1.ClusterOperatorStatusCondition
 	}{
 		{
@@ -207,6 +209,22 @@ func TestClusterOperatorStatus(t *testing.T) {
 				testCondition(configv1.OperatorUpgradeable, configv1.ConditionTrue, ""),
 			},
 		},
+		{
+			name: "operator disabled",
+			credRequests: []minterv1.CredentialsRequest{
+				testCredentialsRequestWithStatus("cred1", false, []minterv1.CredentialsRequestCondition{}, nil),
+				testCredentialsRequestWithStatus("cred2", false, []minterv1.CredentialsRequestCondition{
+					testCRCondition(minterv1.CredentialsProvisionFailure, corev1.ConditionTrue),
+				}, nil),
+			},
+			cloudPlatform:    configv1.AWSPlatformType,
+			operatorDisabled: true,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{
+				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, reasonOperatorDisabled),
+				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonOperatorDisabled),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonOperatorDisabled),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -214,12 +232,12 @@ func TestClusterOperatorStatus(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests, test.cloudPlatform)
+			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests, test.cloudPlatform, test.operatorDisabled, log.WithField("test", test.name))
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
 				if assert.NotNil(t, c) {
-					assert.Equal(t, string(ec.Status), string(c.Status))
-					assert.Equal(t, ec.Reason, c.Reason)
+					assert.Equal(t, string(ec.Status), string(c.Status), "unexpected status for condition %s", ec.Type)
+					assert.Equal(t, ec.Reason, c.Reason, "unexpected reason for condition %s", ec.Type)
 
 					if ec.Message != "" {
 						assert.Contains(t, c.Message, ec.Message)
