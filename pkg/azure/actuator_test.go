@@ -516,6 +516,7 @@ func defaultExistingObjects() []runtime.Object {
 		&clusterInfra,
 		&rootSecretMintAnnotation,
 		&clusterDNS,
+		&cloudProviderConfigMap,
 	}
 	return objs
 }

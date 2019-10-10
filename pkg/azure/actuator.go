@@ -18,6 +18,7 @@ package azure
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"reflect"
@@ -29,6 +30,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
@@ -261,6 +263,8 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 // loadAzureInfrastructureResourceGroups loads the cluster Infrastructure config and returns
 // resource group reported in its status
 func loadAzureInfrastructureResourceGroups(c client.Client, logger log.FieldLogger) ([]string, error) {
+	resourceGroups := sets.NewString()
+
 	infra := &configv1.Infrastructure{}
 	err := c.Get(context.Background(), types.NamespacedName{Name: "cluster"}, infra)
 	if err != nil {
@@ -279,8 +283,7 @@ func loadAzureInfrastructureResourceGroups(c client.Client, logger log.FieldLogg
 		logger.Error(err)
 		return nil, err
 	}
-
-	resourceGroups := []string{infra.Status.PlatformStatus.Azure.ResourceGroupName}
+	resourceGroups.Insert(infra.Status.PlatformStatus.Azure.ResourceGroupName)
 
 	dns := &configv1.DNS{}
 	err = c.Get(context.Background(), types.NamespacedName{Name: "cluster"}, dns)
@@ -295,11 +298,24 @@ func loadAzureInfrastructureResourceGroups(c client.Client, logger log.FieldLogg
 			logger.Error("failed to parse ID for public zone")
 			return nil, err
 		}
-		resourceGroups = append(resourceGroups, id.ResourceGroup)
+		resourceGroups.Insert(id.ResourceGroup)
 	}
 
-	logger.Infof("Loaded azure infrastructure resource groups: %s", resourceGroups)
-	return resourceGroups, nil
+	cloudConfigCM := &corev1.ConfigMap{}
+	err = c.Get(context.Background(), types.NamespacedName{Namespace: "openshift-config", Name: infra.Spec.CloudConfig.Name}, cloudConfigCM)
+	if err != nil {
+		logger.Error("error loading the cloud-config configmap")
+		return nil, err
+	}
+	var cloudproviderconfig cloudconfig
+	if err := json.Unmarshal([]byte(cloudConfigCM.Data[infra.Spec.CloudConfig.Key]), &cloudproviderconfig); err != nil {
+		logger.Errorf("failed to unmarshal cloud provider config: %v", err)
+		return nil, err
+	}
+	resourceGroups.Insert(cloudproviderconfig.VnetResourceGroup)
+
+	logger.Infof("Loaded azure infrastructure resource groups: %s", resourceGroups.UnsortedList())
+	return resourceGroups.List(), nil
 
 }
 
