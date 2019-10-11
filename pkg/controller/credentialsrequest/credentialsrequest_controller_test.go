@@ -1453,6 +1453,11 @@ func testInfrastructure(infraName string) *configv1.Infrastructure {
 		Status: configv1.InfrastructureStatus{
 			Platform:           configv1.AWSPlatformType,
 			InfrastructureName: infraName,
+			PlatformStatus: &configv1.PlatformStatus{
+				AWS: &configv1.AWSPlatformStatus{
+					Region: "test-region-2",
+				},
+			},
 		},
 	}
 }
