@@ -55,6 +55,7 @@ const (
 	testAWSAccessKeyID     = "FAKEAWSACCESSKEYID"
 	testInfraName          = "testcluster-abc123"
 	testAWSSecretAccessKey = "KEEPITSECRET"
+	testAWSRegion          = "test-region-2"
 )
 
 var (
@@ -123,11 +124,26 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient)
 
 				mockGetUser(mockAWSClient)
-				mockSimulatePrincipalPolicyCredPassthroughSuccess(mockAWSClient)
+				mockSimulatePrincipalPolicyCredPassthrough(mockAWSClient, testAWSRegion)
 
 				return mockAWSClient
 			},
 			validateAnnotationValue: constants.PassthroughAnnotation,
+		},
+		{
+			name:     "cred passthrough mode wrong region permission",
+			existing: []runtime.Object{testSecret()},
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient)
+
+				mockGetUser(mockAWSClient)
+				mockSimulatePrincipalPolicyCredPassthrough(mockAWSClient, "expect-this-region")
+
+				return mockAWSClient
+			},
+			validateAnnotationValue: constants.InsufficientAnnotation,
 		},
 		{
 			name:     "useless creds",
@@ -176,6 +192,11 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				Status: configv1.InfrastructureStatus{
 					Platform:           configv1.AWSPlatformType,
 					InfrastructureName: testInfraName,
+					PlatformStatus: &configv1.PlatformStatus{
+						AWS: &configv1.AWSPlatformStatus{
+							Region: testAWSRegion,
+						},
+					},
 				},
 			}
 
@@ -265,11 +286,28 @@ func mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient *mockaws.MockClient
 		})
 }
 
-func mockSimulatePrincipalPolicyCredPassthroughSuccess(mockAWSClient *mockaws.MockClient) {
+func mockSimulatePrincipalPolicyCredPassthrough(mockAWSClient *mockaws.MockClient, expectedRegion string) {
 	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
 		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
-			f(successfulSimulateResponse, true)
+			if checkRegionParamSet(input, expectedRegion) {
+				f(successfulSimulateResponse, true)
+			} else {
+				f(failedSimulationResponse, true)
+			}
 		})
+}
+
+func checkRegionParamSet(input *iam.SimulatePrincipalPolicyInput, expectedRegion string) bool {
+	for _, ctx := range input.ContextEntries {
+		if *ctx.ContextKeyName == "aws:RequestedRegion" {
+			for _, value := range ctx.ContextKeyValues {
+				if *value == expectedRegion {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }
 
 func mockSimulatePrincipalPolicyCredPassthroughFail(mockAWSClient *mockaws.MockClient) {
