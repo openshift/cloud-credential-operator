@@ -156,7 +156,14 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	}
 
 	// Else, can we just pass through the current creds?
-	cloudCheckResult, err = ccaws.CheckCloudCredPassthrough(awsClient, r.Logger)
+	region, err := utils.LoadInfrastructureRegion(r.Client, r.Logger)
+	if err != nil {
+		return err
+	}
+	simParams := &ccaws.SimulateParams{
+		Region: region,
+	}
+	cloudCheckResult, err = ccaws.CheckCloudCredPassthrough(awsClient, simParams, r.Logger)
 	if err != nil {
 		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 		return fmt.Errorf("failed checking passthrough cloud creds: %v", err)
