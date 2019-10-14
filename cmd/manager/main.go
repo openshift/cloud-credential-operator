@@ -74,6 +74,7 @@ func NewRootCommand() *cobra.Command {
 			// Create a new Cmd to provide shared dependencies and start components
 			log.Info("setting up manager")
 			mgr, err := manager.New(cfg, manager.Options{
+				MetricsBindAddress:      ":2112",
 				LeaderElection:          true,
 				LeaderElectionNamespace: minterv1.CloudCredOperatorNamespace,
 				LeaderElectionID:        leaderElectionConfigMap,

@@ -3,6 +3,7 @@ package gcp
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -19,6 +20,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/controller/utils/gcp"
@@ -26,6 +28,8 @@ import (
 )
 
 const (
+	controllerName = "secretannotator"
+
 	// GCPCloudCredSecretName is the name of the secret created by installer containing cloud creds.
 	GCPCloudCredSecretName = "gcp-credentials"
 
@@ -88,6 +92,8 @@ type ReconcileCloudCredSecret struct {
 // 3) 'insufficient' for indicating that the creds are not usable for the cluster
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;update
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+
 	r.Logger.Info("validating cloud cred secret")
 
 	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, r.Logger)
@@ -98,6 +104,11 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
+
+	defer func() {
+		dur := time.Since(start)
+		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+	}()
 
 	secret := &corev1.Secret{}
 	err = r.Get(context.Background(), request.NamespacedName, secret)
