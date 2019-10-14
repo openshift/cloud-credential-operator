@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -15,12 +16,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 	log "github.com/sirupsen/logrus"
 )
 
 const (
+	controllerName = "secretannotator"
+
 	cloudCredSecretName = "azure-credentials"
 	azureClientID       = "azure_client_id"
 	azureClientSecret   = "azure_client_secret"
@@ -73,6 +77,8 @@ func cloudCredSecretObjectCheck(secret metav1.Object) bool {
 }
 
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+
 	r.Logger.Info("validating cloud cred secret")
 
 	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, r.Logger)
@@ -83,6 +89,11 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
+
+	defer func() {
+		dur := time.Since(start)
+		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+	}()
 
 	secret := &corev1.Secret{}
 	err = r.Get(context.Background(), request.NamespacedName, secret)

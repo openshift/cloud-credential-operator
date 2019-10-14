@@ -28,6 +28,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/internalcontroller"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -50,6 +51,8 @@ import (
 )
 
 const (
+	controllerName = "credreq"
+
 	namespaceMissing = "NamespaceMissing"
 	namespaceExists  = "NamespaceExists"
 
@@ -258,8 +261,10 @@ type ReconcileCredentialsRequest struct {
 // +kubebuilder:rbac:groups=config.openshift.io,resources=infrastructures;dnses,verbs=get;list;watch
 // +kubebuilder:rbac:groups=config.openshift.io,resources=clusteroperators;clusteroperators/status,verbs=create;get;update;list;watch
 func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+
 	logger := log.WithFields(log.Fields{
-		"controller": "credreq",
+		"controller": controllerName,
 		"cr":         fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
 	})
 
@@ -270,6 +275,8 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		if err != nil {
 			logger.WithError(err).Error("failed to sync operator status")
 		}
+		dur := time.Since(start)
+		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
 
 	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, logger)
