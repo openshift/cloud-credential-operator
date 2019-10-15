@@ -281,6 +281,9 @@ func loadAzureInfrastructureResourceGroups(c client.Client, logger log.FieldLogg
 	}
 
 	resourceGroups := []string{infra.Status.PlatformStatus.Azure.ResourceGroupName}
+	if infra.Status.PlatformStatus.Azure.NetworkResourceGroupName != "" && infra.Status.PlatformStatus.Azure.NetworkResourceGroupName != infra.Status.PlatformStatus.Azure.ResourceGroupName {
+		resourceGroups = append(resourceGroups, infra.Status.PlatformStatus.Azure.NetworkResourceGroupName)
+	}
 
 	dns := &configv1.DNS{}
 	err = c.Get(context.Background(), types.NamespacedName{Name: "cluster"}, dns)
