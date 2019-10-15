@@ -21,6 +21,7 @@ import (
 	"crypto/md5"
 	"fmt"
 	"os"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -35,6 +36,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/openshift/cloud-credential-operator/pkg/controller/metrics"
 )
 
 const (
@@ -111,6 +114,13 @@ type ReconcileConfigMap struct {
 
 // Reconcile checks for changes to the contents of the certificate authority configMap
 func (r *ReconcileConfigMap) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+
+	defer func() {
+		dur := time.Since(start)
+		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+	}()
+
 	cm := &corev1.ConfigMap{}
 	if err := r.Get(context.TODO(), request.NamespacedName, cm); err != nil {
 		r.logger.WithError(err).Error("failed to read in configmap")
