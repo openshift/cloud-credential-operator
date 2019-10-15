@@ -3,6 +3,7 @@ package aws
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -20,12 +21,14 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 )
 
 const (
-	// TODO: dynamically detect which environment we're running on
+	controllerName = "secretannotator"
+
 	AWSCloudCredSecretName = "aws-creds"
 
 	AwsAccessKeyName       = "aws_access_key_id"
@@ -84,6 +87,8 @@ type ReconcileCloudCredSecret struct {
 // 3) 'insufficient' for indicating that the creds are not usable for the cluster
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;update
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+
 	r.Logger.Info("validating cloud cred secret")
 
 	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, r.Logger)
@@ -94,6 +99,11 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
+
+	defer func() {
+		dur := time.Since(start)
+		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+	}()
 
 	secret := &corev1.Secret{}
 	err = r.Get(context.Background(), request.NamespacedName, secret)
