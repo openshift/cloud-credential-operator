@@ -27,6 +27,7 @@
   packages = [
     "services/authorization/mgmt/2015-07-01/authorization",
     "services/graphrbac/1.6/graphrbac",
+    "services/resources/mgmt/2015-11-01/resources",
     "version",
   ]
   pruneopts = "T"
@@ -476,11 +477,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:31a625a6b154e00d2031365c024ce921e7a25e3ce6ad6e73b7ab91ed8fdfdf56"
+  digest = "1:276fa17b484108770520ba301fcd34639cc6112dc8ba34bf89f37f564e3076a6"
   name = "github.com/openshift/api"
   packages = ["config/v1"]
   pruneopts = "T"
-  revision = "0922aa5a655be314e20a3e0e94f4f2b105100154"
+  revision = "9c66d377c971623a3507a4ce5b33c496e72b9499"
 
 [[projects]]
   digest = "1:ccf387b1000d4864aaf832aae3524898c320263620f7e3162ded978fe2ea3ba4"
@@ -1293,6 +1294,7 @@
     "cloud.google.com/go/iam/admin/apiv1",
     "github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization",
     "github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac",
+    "github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2015-11-01/resources",
     "github.com/Azure/go-autorest/autorest",
     "github.com/Azure/go-autorest/autorest/azure",
     "github.com/Azure/go-autorest/autorest/azure/auth",
@@ -1349,7 +1351,6 @@
     "k8s.io/client-go/util/workqueue",
     "k8s.io/code-generator/cmd/client-gen",
     "k8s.io/code-generator/cmd/deepcopy-gen",
-    "k8s.io/klog",
     "sigs.k8s.io/controller-runtime/pkg/cache",
     "sigs.k8s.io/controller-runtime/pkg/client",
     "sigs.k8s.io/controller-runtime/pkg/client/config",
