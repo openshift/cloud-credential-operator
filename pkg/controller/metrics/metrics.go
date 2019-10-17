@@ -7,6 +7,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -27,6 +28,12 @@ var (
 		Help: "Total number of credentials requests.",
 	}, []string{"cloud_type"})
 
+	// Capture the various conditions set on the CredentialsRequests
+	metricCredentialsRequestConditions = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "cco_credentials_requests_conditions",
+		Help: "Credentials requests with asserted conditions.",
+	}, []string{"condition"})
+
 	// MetricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
@@ -42,6 +49,7 @@ var (
 
 func init() {
 	metrics.Registry.MustRegister(metricCredentialsRequestTotal)
+	metrics.Registry.MustRegister(metricCredentialsRequestConditions)
 
 	metrics.Registry.MustRegister(MetricControllerReconcileTime)
 }
@@ -122,13 +130,15 @@ func cloudProviderSpecToMetricsKey(cloud string) string {
 type credRequestAccumulator struct {
 	logger log.FieldLogger
 
-	crTotals map[string]int
+	crTotals     map[string]int
+	crConditions map[credreqv1.CredentialsRequestConditionType]int
 }
 
 func newAccumulator(logger log.FieldLogger) *credRequestAccumulator {
 	return &credRequestAccumulator{
-		logger:   logger,
-		crTotals: map[string]int{},
+		logger:       logger,
+		crTotals:     map[string]int{},
+		crConditions: map[credreqv1.CredentialsRequestConditionType]int{},
 	}
 }
 
@@ -139,10 +149,20 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest) {
 	}
 	cloudKey := cloudProviderSpecToMetricsKey(cloudType)
 	a.crTotals[cloudKey]++
+
+	for _, cond := range cr.Status.Conditions {
+		if cond.Status == corev1.ConditionTrue {
+			a.crConditions[cond.Type]++
+		}
+	}
 }
 
 func (a *credRequestAccumulator) setMetrics() {
 	for k, v := range a.crTotals {
 		metricCredentialsRequestTotal.WithLabelValues(k).Set(float64(v))
+	}
+
+	for k, v := range a.crConditions {
+		metricCredentialsRequestConditions.WithLabelValues(string(k)).Set(float64(v))
 	}
 }
