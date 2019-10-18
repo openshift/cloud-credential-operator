@@ -5,8 +5,26 @@ metadata:
     openshift.io/node-selector: ""
   labels:
     controller-tools.k8s.io: "1.0"
+    openshift.io/cluster-monitoring: "true"
     openshift.io/run-level: "1"
   name: openshift-cloud-credential-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-cloud-credential-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -98,6 +116,20 @@ rules:
   - update
 ---
 apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-cloud-credential-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+---
+apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
   creationTimestamp: null
@@ -118,6 +150,22 @@ metadata:
     config.openshift.io/inject-trusted-cabundle: "true"
   name: cco-trusted-ca
   namespace: openshift-cloud-credential-operator
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cco-metrics
+  namespace: openshift-cloud-credential-operator
+spec:
+  ports:
+  - name: cco-metrics
+    port: 2112
+    protocol: TCP
+    targetPort: 2112
+  selector:
+    app: cloud-credential-operator
+  sessionAffinity: None
+  type: ClusterIP
 ---
 apiVersion: v1
 kind: Service
@@ -154,6 +202,7 @@ spec:
   template:
     metadata:
       labels:
+        app: cloud-credential-operator
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
@@ -210,3 +259,22 @@ spec:
           name: cco-trusted-ca
           optional: true
         name: cco-trusted-ca
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloud-credential-operator
+  namespace: openshift-cloud-credential-operator
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+    port: cco-metrics
+    scheme: http
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: cco.openshift-cloud-credential-operator.svc
+  namespaceSelector:
+    matchNames:
+    - openshift-cloud-credential-operator
+  selector: {}
