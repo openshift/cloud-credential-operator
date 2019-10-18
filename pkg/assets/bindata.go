@@ -139,6 +139,7 @@ spec:
   template:
     metadata:
       labels:
+        app: cloud-credential-operator
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
@@ -209,6 +210,27 @@ func config_manager_deployment_yaml() ([]byte, error) {
 	return _config_manager_deployment_yaml, nil
 }
 
+var _config_manager_metrics_service_yaml = []byte(`apiVersion: v1
+kind: Service
+metadata:
+  name: cco-metrics
+  namespace: openshift-cloud-credential-operator
+spec:
+  ports:
+  - name: cco-metrics
+    port: 2112
+    protocol: TCP
+    targetPort: 2112
+  selector:
+    app: cloud-credential-operator
+  sessionAffinity: None
+  type: ClusterIP
+`)
+
+func config_manager_metrics_service_yaml() ([]byte, error) {
+	return _config_manager_metrics_service_yaml, nil
+}
+
 var _config_manager_namespace_yaml = []byte(`apiVersion: v1
 kind: Namespace
 metadata:
@@ -217,6 +239,7 @@ metadata:
   labels:
     controller-tools.k8s.io: "1.0"
     openshift.io/run-level: "1"
+    openshift.io/cluster-monitoring: "true"
   name: openshift-cloud-credential-operator
 `)
 
@@ -242,6 +265,30 @@ spec:
 
 func config_manager_service_yaml() ([]byte, error) {
 	return _config_manager_service_yaml, nil
+}
+
+var _config_manager_servicemonitor_yaml = []byte(`apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloud-credential-operator
+  namespace: openshift-cloud-credential-operator
+spec:
+  endpoints:
+  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+    interval: 30s
+    port: cco-metrics
+    scheme: http
+    tlsConfig:
+      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
+      serverName: cco.openshift-cloud-credential-operator.svc
+  namespaceSelector:
+    matchNames:
+    - openshift-cloud-credential-operator
+  selector: {}
+`)
+
+func config_manager_servicemonitor_yaml() ([]byte, error) {
+	return _config_manager_servicemonitor_yaml, nil
 }
 
 var _config_rbac_cloud_credential_operator_role_yaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
@@ -357,6 +404,47 @@ func config_rbac_cloud_credential_operator_role_binding_yaml() ([]byte, error) {
 	return _config_rbac_cloud_credential_operator_role_binding_yaml, nil
 }
 
+var _config_rbac_prometheus_role_yaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-cloud-credential-operator
+rules:
+- apiGroups:
+  - ""
+  resources:
+  - services
+  - endpoints
+  - pods
+  verbs:
+  - get
+  - list
+  - watch
+`)
+
+func config_rbac_prometheus_role_yaml() ([]byte, error) {
+	return _config_rbac_prometheus_role_yaml, nil
+}
+
+var _config_rbac_prometheus_role_binding_yaml = []byte(`apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-cloud-credential-operator
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: prometheus-k8s
+subjects:
+- kind: ServiceAccount
+  name: prometheus-k8s
+  namespace: openshift-monitoring
+`)
+
+func config_rbac_prometheus_role_binding_yaml() ([]byte, error) {
+	return _config_rbac_prometheus_role_binding_yaml, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -381,10 +469,14 @@ func AssetNames() []string {
 var _bindata = map[string]func() ([]byte, error){
 	"config/crds/cloudcredential_v1_credentialsrequest.yaml":  config_crds_cloudcredential_v1_credentialsrequest_yaml,
 	"config/manager/deployment.yaml":                          config_manager_deployment_yaml,
+	"config/manager/metrics-service.yaml":                     config_manager_metrics_service_yaml,
 	"config/manager/namespace.yaml":                           config_manager_namespace_yaml,
 	"config/manager/service.yaml":                             config_manager_service_yaml,
+	"config/manager/servicemonitor.yaml":                      config_manager_servicemonitor_yaml,
 	"config/rbac/cloud-credential-operator_role.yaml":         config_rbac_cloud_credential_operator_role_yaml,
 	"config/rbac/cloud-credential-operator_role_binding.yaml": config_rbac_cloud_credential_operator_role_binding_yaml,
+	"config/rbac/prometheus_role.yaml":                        config_rbac_prometheus_role_yaml,
+	"config/rbac/prometheus_role_binding.yaml":                config_rbac_prometheus_role_binding_yaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -433,13 +525,17 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 			"cloudcredential_v1_credentialsrequest.yaml": {config_crds_cloudcredential_v1_credentialsrequest_yaml, map[string]*_bintree_t{}},
 		}},
 		"manager": {nil, map[string]*_bintree_t{
-			"deployment.yaml": {config_manager_deployment_yaml, map[string]*_bintree_t{}},
-			"namespace.yaml":  {config_manager_namespace_yaml, map[string]*_bintree_t{}},
-			"service.yaml":    {config_manager_service_yaml, map[string]*_bintree_t{}},
+			"deployment.yaml":      {config_manager_deployment_yaml, map[string]*_bintree_t{}},
+			"metrics-service.yaml": {config_manager_metrics_service_yaml, map[string]*_bintree_t{}},
+			"namespace.yaml":       {config_manager_namespace_yaml, map[string]*_bintree_t{}},
+			"service.yaml":         {config_manager_service_yaml, map[string]*_bintree_t{}},
+			"servicemonitor.yaml":  {config_manager_servicemonitor_yaml, map[string]*_bintree_t{}},
 		}},
 		"rbac": {nil, map[string]*_bintree_t{
 			"cloud-credential-operator_role.yaml":         {config_rbac_cloud_credential_operator_role_yaml, map[string]*_bintree_t{}},
 			"cloud-credential-operator_role_binding.yaml": {config_rbac_cloud_credential_operator_role_binding_yaml, map[string]*_bintree_t{}},
+			"prometheus_role.yaml":                        {config_rbac_prometheus_role_yaml, map[string]*_bintree_t{}},
+			"prometheus_role_binding.yaml":                {config_rbac_prometheus_role_binding_yaml, map[string]*_bintree_t{}},
 		}},
 	}},
 }}

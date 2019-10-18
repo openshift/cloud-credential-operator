@@ -18,6 +18,7 @@ spec:
   template:
     metadata:
       labels:
+        app: cloud-credential-operator
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
