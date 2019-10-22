@@ -247,6 +247,42 @@ func config_manager_namespace_yaml() ([]byte, error) {
 	return _config_manager_namespace_yaml, nil
 }
 
+var _config_manager_prometheusrule_yaml = []byte(`apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloud-credential-operator-alerts
+  namespace: openshift-cloud-credential-operator
+spec:
+  groups:
+  - name: CloudCredentialOperator
+    rules:
+    - alert: TargetNamespaceMissing
+      expr: cco_credentials_requests_conditions{condition="MissingTargetNamespace"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: CredentialsRequest(s) pointing to non-existant namespace
+    - alert: ProvisioningFailed
+      expr: cco_credentials_requests_conditions{condition="CredentialsProvisionFailure"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: CredentialsRequest(s) unable to be fulfilled
+    - alert: DeprovisioningFailed
+      expr: cco_credentials_requests_conditions{condition="CredentialsDeprovisionFailure"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: CredentialsRequest(s) unable to be cleaned up
+`)
+
+func config_manager_prometheusrule_yaml() ([]byte, error) {
+	return _config_manager_prometheusrule_yaml, nil
+}
+
 var _config_manager_service_yaml = []byte(`apiVersion: v1
 kind: Service
 metadata:
@@ -471,6 +507,7 @@ var _bindata = map[string]func() ([]byte, error){
 	"config/manager/deployment.yaml":                          config_manager_deployment_yaml,
 	"config/manager/metrics-service.yaml":                     config_manager_metrics_service_yaml,
 	"config/manager/namespace.yaml":                           config_manager_namespace_yaml,
+	"config/manager/prometheusrule.yaml":                      config_manager_prometheusrule_yaml,
 	"config/manager/service.yaml":                             config_manager_service_yaml,
 	"config/manager/servicemonitor.yaml":                      config_manager_servicemonitor_yaml,
 	"config/rbac/cloud-credential-operator_role.yaml":         config_rbac_cloud_credential_operator_role_yaml,
@@ -528,6 +565,7 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 			"deployment.yaml":      {config_manager_deployment_yaml, map[string]*_bintree_t{}},
 			"metrics-service.yaml": {config_manager_metrics_service_yaml, map[string]*_bintree_t{}},
 			"namespace.yaml":       {config_manager_namespace_yaml, map[string]*_bintree_t{}},
+			"prometheusrule.yaml":  {config_manager_prometheusrule_yaml, map[string]*_bintree_t{}},
 			"service.yaml":         {config_manager_service_yaml, map[string]*_bintree_t{}},
 			"servicemonitor.yaml":  {config_manager_servicemonitor_yaml, map[string]*_bintree_t{}},
 		}},
