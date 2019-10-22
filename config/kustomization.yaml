@@ -15,10 +15,11 @@ resources:
 - rbac/cloud-credential-operator_role_binding.yaml
 - rbac/prometheus_role.yaml
 - rbac/prometheus_role_binding.yaml
-- manager/namespace.yaml
-- manager/service.yaml
 - manager/deployment.yaml
-- manager/servicemonitor.yaml
 - manager/metrics-service.yaml
+- manager/namespace.yaml
+- manager/prometheusrule.yaml
+- manager/service.yaml
+- manager/servicemonitor.yaml
 
 
