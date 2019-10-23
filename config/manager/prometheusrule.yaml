@@ -1,0 +1,30 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: cloud-credential-operator-alerts
+  namespace: openshift-cloud-credential-operator
+spec:
+  groups:
+  - name: CloudCredentialOperator
+    rules:
+    - alert: TargetNamespaceMissing
+      expr: cco_credentials_requests_conditions{condition="MissingTargetNamespace"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: CredentialsRequest(s) pointing to non-existant namespace
+    - alert: ProvisioningFailed
+      expr: cco_credentials_requests_conditions{condition="CredentialsProvisionFailure"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: CredentialsRequest(s) unable to be fulfilled
+    - alert: DeprovisioningFailed
+      expr: cco_credentials_requests_conditions{condition="CredentialsDeprovisionFailure"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: CredentialsRequest(s) unable to be cleaned up
