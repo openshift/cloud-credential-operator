@@ -256,27 +256,34 @@ spec:
   groups:
   - name: CloudCredentialOperator
     rules:
-    - alert: TargetNamespaceMissing
+    - alert: CCOTargetNamespaceMissing
       expr: cco_credentials_requests_conditions{condition="MissingTargetNamespace"} > 0
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: CredentialsRequest(s) pointing to non-existant namespace
-    - alert: ProvisioningFailed
+    - alert: CCOProvisioningFailed
       expr: cco_credentials_requests_conditions{condition="CredentialsProvisionFailure"} > 0
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: CredentialsRequest(s) unable to be fulfilled
-    - alert: DeprovisioningFailed
+    - alert: CCODeprovisioningFailed
       expr: cco_credentials_requests_conditions{condition="CredentialsDeprovisionFailure"} > 0
       for: 5m
       labels:
         severity: warning
       annotations:
         summary: CredentialsRequest(s) unable to be cleaned up
+    - alert: CCOInsufficientCloudCreds
+      expr: cco_credentials_requests_conditions{condition="InsufficientCloudCreds"} > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: Cluster's cloud credentials insufficient for minting or passthrough
 `)
 
 func config_manager_prometheusrule_yaml() ([]byte, error) {
