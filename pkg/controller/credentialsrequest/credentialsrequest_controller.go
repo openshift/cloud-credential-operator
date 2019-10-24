@@ -412,12 +412,28 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	} else {
 		logger.Debug("found secret namespace")
 		setMissingTargetNamespaceCondition(cr, false)
+
+	}
+
+	// Check if the secret the credRequest wants created already exists
+	var crSecretExists bool
+	crSecret := &corev1.Secret{}
+	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
+	if err := r.Get(context.TODO(), secretKey, crSecret); err != nil {
+		if errors.IsNotFound(err) {
+			crSecretExists = false
+		} else {
+			logger.WithError(err).Error("could not query whether secret already exists")
+			return reconcile.Result{}, err
+		}
+	} else {
+		crSecretExists = true
 	}
 
 	isStale := cr.Generation != cr.Status.LastSyncGeneration
 	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(time.Hour*1).After(time.Now())
 
-	if !isStale && hasRecentlySynced {
+	if !isStale && hasRecentlySynced && crSecretExists {
 		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
 		return reconcile.Result{}, nil
 	}
