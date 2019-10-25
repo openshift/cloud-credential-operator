@@ -165,6 +165,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
 				mockCreateUser(mockAWSClient)
 				mockPutUserPolicy(mockAWSClient)
 				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
@@ -219,6 +220,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
 				mockCreateUser(mockAWSClient)
 				mockPutUserPolicy(mockAWSClient)
 				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
@@ -782,6 +784,48 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.NotEqual(t, testTwentyMinuteOldTimestamp.Unix(), cr.Status.LastSyncTimestamp.Time.Unix())
 			},
 		},
+		{
+			name: "pass along any existing permissions boundary",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserWithPermissionsBoundary(mockAWSClient)
+
+				mockCreateUserWithPermissionsBoundary(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				mockTagUser(mockAWSClient)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockGetUserPolicyMissing(mockAWSClient)
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -879,6 +923,8 @@ const (
 	testRootAWSSecretAccessKey = "rootsecretkey"
 	testReadAWSAccessKeyID     = "readaccesskey"
 	testReadAWSSecretAccessKey = "readsecretkey"
+	testPermissionsBoundaryARN = "some:boundary:ARN:1234"
+	testPermissionBoundaryType = "Policy" // currently the only allowed value in AWS
 )
 
 var (
@@ -1028,6 +1074,18 @@ func mockGetUserNotFound(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil)).AnyTimes()
 }
 
+func mockGetUserWithPermissionsBoundary(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+		&iam.GetUserOutput{
+			User: &iam.User{
+				PermissionsBoundary: &iam.AttachedPermissionsBoundary{
+					PermissionsBoundaryArn:  aws.String(testPermissionsBoundaryARN),
+					PermissionsBoundaryType: aws.String(testPermissionBoundaryType),
+				},
+			},
+		}, nil)
+}
+
 func mockGetUser(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
 		&iam.GetUserOutput{
@@ -1089,6 +1147,25 @@ func mockListAccessKeys(mockAWSClient *mockaws.MockClient, accessKeyID string) {
 			AccessKeyMetadata: []*iam.AccessKeyMetadata{
 				{
 					AccessKeyId: aws.String(accessKeyID),
+				},
+			},
+		}, nil)
+}
+
+func mockCreateUserWithPermissionsBoundary(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().CreateUser(
+		&iam.CreateUserInput{
+			UserName:            aws.String(testAWSUser),
+			PermissionsBoundary: aws.String(testPermissionsBoundaryARN),
+		}).Return(
+		&iam.CreateUserOutput{
+			User: &iam.User{
+				UserName: aws.String(testAWSUser),
+				UserId:   aws.String(testAWSUserID),
+				Arn:      aws.String(testAWSARN),
+				PermissionsBoundary: &iam.AttachedPermissionsBoundary{
+					PermissionsBoundaryArn:  aws.String(testPermissionsBoundaryARN),
+					PermissionsBoundaryType: aws.String(testPermissionBoundaryType),
 				},
 			},
 		}, nil)
