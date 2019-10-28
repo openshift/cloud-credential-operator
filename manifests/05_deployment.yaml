@@ -292,6 +292,13 @@ spec:
       for: 5m
       labels:
         severity: warning
+    - alert: CCOperatorDown
+      annotations:
+        summary: cloud-credential-operator pod not running
+      expr: absent(up{job="cco-metrics"} == 1)
+      for: 5m
+      labels:
+        severity: critical
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
