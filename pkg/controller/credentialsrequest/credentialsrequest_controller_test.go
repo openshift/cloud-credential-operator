@@ -739,6 +739,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequestWithRecentLastSync(t),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -747,6 +748,36 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				cr := getCR(c)
 				assert.Equal(t, testTwentyMinuteOldTimestamp.Unix(), cr.Status.LastSyncTimestamp.Time.Unix())
+			},
+		},
+		{
+			name: "regenerate secret if missing",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				testClusterVersion(),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequestWithRecentLastSync(t),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				// delete the "old" (now missing secret) access key details
+				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID2,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey2,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
 			},
 		},
 		{
