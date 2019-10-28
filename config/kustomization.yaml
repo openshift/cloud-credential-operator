@@ -17,7 +17,6 @@ resources:
 - rbac/prometheus_role_binding.yaml
 - manager/deployment.yaml
 - manager/metrics-service.yaml
-- manager/namespace.yaml
 - manager/prometheusrule.yaml
 - manager/service.yaml
 - manager/servicemonitor.yaml
