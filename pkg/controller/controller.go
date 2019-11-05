@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/controller/platform"
 	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/openstack"
+	"github.com/openshift/cloud-credential-operator/pkg/ovirt"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -86,6 +87,15 @@ func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 				log.Fatalf("missing GCP configuration in platform status")
 			}
 			a, err = gcpactuator.NewActuator(m.GetClient(), infraStatus.PlatformStatus.GCP.ProjectID)
+			if err != nil {
+				return err
+			}
+		case configv1.OvirtPlatformType:
+			log.Info("initializing Ovirt actuator")
+			if infraStatus.PlatformStatus == nil || infraStatus.PlatformStatus.Ovirt == nil {
+				log.Fatalf("missing Ovirt configuration in platform status")
+			}
+			a, err = ovirt.NewActuator(m.GetClient())
 			if err != nil {
 				return err
 			}
