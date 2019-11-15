@@ -5,6 +5,8 @@ metadata:
     controller-tools.k8s.io: "1.0"
   name: cloud-credential-operator-iam-ro
   namespace: openshift-cloud-credential-operator
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
 spec:
   secretRef:
     name: cloud-credential-operator-iam-ro-creds
