@@ -54,6 +54,7 @@ manifests:
 	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name cloud-credential-operator
 	# kustomize and move to manifests dir for release image:
 	kustomize build config > manifests/05_deployment.yaml
+	cp config/manager/namespace.yaml manifests/00_namespace.yaml
 	cp config/crds/cloudcredential_v1_credentialsrequest.yaml manifests/00_v1_crd.yaml
 
 # Run go fmt against code

@@ -247,21 +247,6 @@ func config_manager_namespace_yaml() ([]byte, error) {
 	return _config_manager_namespace_yaml, nil
 }
 
-var _config_manager_operator_configmap_yaml = []byte(`apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cloud-credential-operator-config
-  namespace: openshift-cloud-credential-operator
-  annotations:
-    release.openshift.io/create-only: "true"
-data:
-  disabled: "true"
-`)
-
-func config_manager_operator_configmap_yaml() ([]byte, error) {
-	return _config_manager_operator_configmap_yaml, nil
-}
-
 var _config_manager_prometheusrule_yaml = []byte(`apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
@@ -467,6 +452,8 @@ kind: Role
 metadata:
   name: prometheus-k8s
   namespace: openshift-cloud-credential-operator
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
 rules:
 - apiGroups:
   - ""
@@ -529,7 +516,6 @@ var _bindata = map[string]func() ([]byte, error){
 	"config/manager/deployment.yaml":                          config_manager_deployment_yaml,
 	"config/manager/metrics-service.yaml":                     config_manager_metrics_service_yaml,
 	"config/manager/namespace.yaml":                           config_manager_namespace_yaml,
-	"config/manager/operator-configmap.yaml":                  config_manager_operator_configmap_yaml,
 	"config/manager/prometheusrule.yaml":                      config_manager_prometheusrule_yaml,
 	"config/manager/service.yaml":                             config_manager_service_yaml,
 	"config/manager/servicemonitor.yaml":                      config_manager_servicemonitor_yaml,
@@ -585,13 +571,12 @@ var _bintree = &_bintree_t{nil, map[string]*_bintree_t{
 			"cloudcredential_v1_credentialsrequest.yaml": {config_crds_cloudcredential_v1_credentialsrequest_yaml, map[string]*_bintree_t{}},
 		}},
 		"manager": {nil, map[string]*_bintree_t{
-			"deployment.yaml":         {config_manager_deployment_yaml, map[string]*_bintree_t{}},
-			"metrics-service.yaml":    {config_manager_metrics_service_yaml, map[string]*_bintree_t{}},
-			"namespace.yaml":          {config_manager_namespace_yaml, map[string]*_bintree_t{}},
-			"operator-configmap.yaml": {config_manager_operator_configmap_yaml, map[string]*_bintree_t{}},
-			"prometheusrule.yaml":     {config_manager_prometheusrule_yaml, map[string]*_bintree_t{}},
-			"service.yaml":            {config_manager_service_yaml, map[string]*_bintree_t{}},
-			"servicemonitor.yaml":     {config_manager_servicemonitor_yaml, map[string]*_bintree_t{}},
+			"deployment.yaml":      {config_manager_deployment_yaml, map[string]*_bintree_t{}},
+			"metrics-service.yaml": {config_manager_metrics_service_yaml, map[string]*_bintree_t{}},
+			"namespace.yaml":       {config_manager_namespace_yaml, map[string]*_bintree_t{}},
+			"prometheusrule.yaml":  {config_manager_prometheusrule_yaml, map[string]*_bintree_t{}},
+			"service.yaml":         {config_manager_service_yaml, map[string]*_bintree_t{}},
+			"servicemonitor.yaml":  {config_manager_servicemonitor_yaml, map[string]*_bintree_t{}},
 		}},
 		"rbac": {nil, map[string]*_bintree_t{
 			"cloud-credential-operator_role.yaml":         {config_rbac_cloud_credential_operator_role_yaml, map[string]*_bintree_t{}},
