@@ -35,3 +35,10 @@ spec:
         severity: warning
       annotations:
         summary: Cluster's cloud credentials insufficient for minting or passthrough
+    - alert: CCOperatorDown
+      annotations:
+        summary: cloud-credential-operator pod not running
+      expr: absent(up{job="cco-metrics"} == 1)
+      for: 5m
+      labels:
+        severity: critical
