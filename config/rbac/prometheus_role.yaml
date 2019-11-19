@@ -3,6 +3,8 @@ kind: Role
 metadata:
   name: prometheus-k8s
   namespace: openshift-cloud-credential-operator
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
 rules:
 - apiGroups:
   - ""
