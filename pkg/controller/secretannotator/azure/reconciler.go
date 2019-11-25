@@ -135,7 +135,6 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 
 	// TODO(jchaloup): find a way to dynamically check whether these creds really
 	// can be used for minting (or passthrough) or whether they are useless (i.e. InsufficientAnnotation)
-	r.Logger.Info("Platform is azure: allowing to mint new credentials")
 	if err := r.updateSecretAnnotations(secret, constants.MintAnnotation); err != nil {
 		r.Logger.Errorf("error while validating cloud credentials: %v", err)
 		return err
@@ -150,7 +149,14 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 		secretAnnotations = map[string]string{}
 	}
 
-	secretAnnotations[constants.AnnotationKey] = value
+	// ARO relies on being CCO being in passthrough mode -
+	// should not automatically switch to mint mode
+	if secretAnnotations[constants.AnnotationKey] != constants.PassthroughAnnotation {
+		r.Logger.Info("Platform is azure: allowing to mint new credentials")
+		secretAnnotations[constants.AnnotationKey] = value
+	} else {
+		r.Logger.Info("Platform is azure: passthrough credentials")
+	}
 	secret.SetAnnotations(secretAnnotations)
 
 	return r.Update(context.Background(), secret)
