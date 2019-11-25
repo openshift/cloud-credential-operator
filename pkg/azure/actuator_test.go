@@ -47,13 +47,14 @@ import (
 )
 
 const (
-	testNamespace       = "default"
-	testAppRegName      = "Test App Reg"
-	testAppRegID        = "some-unique-app-id"
-	testAppRegObjID     = "some-unique-app-obj-id"
-	testCredRequestName = "testCredRequest"
-	testRandomSuffix    = "rando"
-	testRoleName        = "Contributor"
+	testNamespace        = "default"
+	testAppRegName       = "Test App Reg"
+	testAppRegID         = "some-unique-app-id"
+	testAppRegObjID      = "some-unique-app-obj-id"
+	testCredRequestName  = "testCredRequest"
+	testRandomSuffix     = "rando"
+	testRoleName         = "Contributor"
+	testRoleDefinitionID = "some-role-def-id"
 )
 
 var (
@@ -303,6 +304,40 @@ func TestActuator(t *testing.T) {
 				// validation done in gomock.EXEPCT()
 			},
 		},
+		{
+			name:               "Skip role assignment creation when they already exist",
+			existing:           defaultExistingObjects(),
+			credentialsRequest: testCredentialsRequest(t),
+			mockRoleAssignmentsClient: func(mockCtrl *gomock.Controller) *azuremock.MockRoleAssignmentsClient {
+				client := azuremock.NewMockRoleAssignmentsClient(mockCtrl)
+				expectedFilter := fmt.Sprintf("principalId eq '%s'", *testServicePrincipal().ObjectID)
+				// ensure that when listing the role assignments, everything is already assigned
+				client.EXPECT().List(gomock.Any(), gomock.Eq(expectedFilter)).Return(
+					[]authorization.RoleAssignment{
+						{
+							Properties: &authorization.RoleAssignmentPropertiesWithScope{
+								RoleDefinitionID: to.StringPtr(testRoleDefinitionID),
+								Scope:            to.StringPtr("/subscriptions//resourceGroups/" + testResourceGroupName),
+							},
+						},
+						{
+							Properties: &authorization.RoleAssignmentPropertiesWithScope{
+								RoleDefinitionID: to.StringPtr(testRoleDefinitionID),
+								Scope:            to.StringPtr("/subscriptions//resourceGroups/" + testDNSResourceGroupName),
+							},
+						},
+					}, nil,
+				).Times(2) // once for gathering current role assignments, and once for checking for extra role assignments
+
+				return client
+			},
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Update(context.TODO(), cr)
+			},
+			validate: func(t *testing.T, c client.Client) {
+				// validation done in gomock.EXPECT()
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -460,7 +495,7 @@ func mockServicePrincipalClientNoCalls(mockCtrl *gomock.Controller) *azuremock.M
 func testRoleDefinition() authorization.RoleDefinition {
 	rd := authorization.RoleDefinition{
 		Name: to.StringPtr(testRoleName),
-		ID:   to.StringPtr("some-role-def-id"),
+		ID:   to.StringPtr(testRoleDefinitionID),
 	}
 	return rd
 }
@@ -504,6 +539,12 @@ func defaultMockRoleAssignmentsClient(mockCtrl *gomock.Controller) *azuremock.Mo
 		testRoleAssignment(),
 		nil,
 	)
+	// One list when gathering current role assignments
+	client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
+		[]authorization.RoleAssignment{}, nil,
+	)
+
+	// One more list when checking whether any extra roles are assigned
 	client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
 		[]authorization.RoleAssignment{testRoleAssignment()},
 		nil,
