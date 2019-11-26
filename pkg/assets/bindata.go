@@ -262,35 +262,35 @@ spec:
       labels:
         severity: warning
       annotations:
-        summary: CredentialsRequest(s) pointing to non-existant namespace
+        message: CredentialsRequest(s) pointing to non-existant namespace
     - alert: CCOProvisioningFailed
       expr: cco_credentials_requests_conditions{condition="CredentialsProvisionFailure"} > 0
       for: 5m
       labels:
         severity: warning
       annotations:
-        summary: CredentialsRequest(s) unable to be fulfilled
+        message: CredentialsRequest(s) unable to be fulfilled
     - alert: CCODeprovisioningFailed
       expr: cco_credentials_requests_conditions{condition="CredentialsDeprovisionFailure"} > 0
       for: 5m
       labels:
         severity: warning
       annotations:
-        summary: CredentialsRequest(s) unable to be cleaned up
+        message: CredentialsRequest(s) unable to be cleaned up
     - alert: CCOInsufficientCloudCreds
       expr: cco_credentials_requests_conditions{condition="InsufficientCloudCreds"} > 0
       for: 5m
       labels:
         severity: warning
       annotations:
-        summary: Cluster's cloud credentials insufficient for minting or passthrough
+        message: Cluster's cloud credentials insufficient for minting or passthrough
     - alert: CCOperatorDown
-      annotations:
-        summary: cloud-credential-operator pod not running
       expr: absent(up{job="cco-metrics"} == 1)
       for: 5m
       labels:
         severity: critical
+      annotations:
+        message: cloud-credential-operator pod not running
 `)
 
 func config_manager_prometheusrule_yaml() ([]byte, error) {
