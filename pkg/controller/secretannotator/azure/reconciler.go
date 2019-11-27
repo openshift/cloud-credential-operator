@@ -2,6 +2,7 @@ package azure
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -15,6 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/dgrijalva/jwt-go"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
@@ -133,15 +137,21 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 	}
 
-	// TODO(jchaloup): find a way to dynamically check whether these creds really
-	// can be used for minting (or passthrough) or whether they are useless (i.e. InsufficientAnnotation)
-	r.Logger.Info("Platform is azure: allowing to mint new credentials")
-	if err := r.updateSecretAnnotations(secret, constants.MintAnnotation); err != nil {
-		r.Logger.Errorf("error while validating cloud credentials: %v", err)
-		return err
+	// Can we mint new creds?
+	cloudCheckResult, err := r.checkCloudCredCreation(string(secret.Data[azureTenantID]), string(secret.Data[azureClientID]), string(secret.Data[azureClientSecret]))
+	if err != nil {
+		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		return fmt.Errorf("failed checking create cloud creds: %v", err)
 	}
 
-	return nil
+	if cloudCheckResult {
+		r.Logger.Info("Verified cloud creds can be used for minting new creds")
+		return r.updateSecretAnnotations(secret, constants.MintAnnotation)
+	}
+
+	// else if chech succeded with no error but minting is not possible - passthrouth
+	r.Logger.Info("Verified cloud creds can be used as-is (passthrough)")
+	return r.updateSecretAnnotations(secret, constants.PassthroughAnnotation)
 }
 
 func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {
@@ -154,4 +164,35 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 	secret.SetAnnotations(secretAnnotations)
 
 	return r.Update(context.Background(), secret)
+}
+
+func (r *ReconcileCloudCredSecret) checkCloudCredCreation(tenantID, clientID, secret string) (bool, error) {
+	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
+	if err != nil {
+		return false, err
+	}
+
+	token, err := adal.NewServicePrincipalToken(*oauthConfig, clientID, secret, azure.PublicCloud.GraphEndpoint)
+	if err != nil {
+		return false, err
+	}
+
+	err = token.EnsureFresh()
+	if err != nil {
+		return false, err
+	}
+
+	p := &jwt.Parser{}
+	c := &azureClaim{}
+	_, _, err = p.ParseUnverified(token.OAuthToken(), c)
+	if err != nil {
+		return false, err
+	}
+
+	for _, role := range c.Roles {
+		if role == "Application.ReadWrite.OwnedBy" {
+			return true, nil
+		}
+	}
+	return false, nil
 }
