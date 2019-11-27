@@ -236,11 +236,34 @@ func (credMinter *AzureCredentialsMinter) AssignResourceScopedRole(ctx context.C
 		return fmt.Errorf("more than one role %q found", targetRole)
 	}
 
+	credMinter.logger.Debugf("getting current role assignments for service principal %s", principalName)
+	filter := fmt.Sprintf("principalId eq '%s'", principalID)
+	currentRoleAssignments, err := credMinter.roleAssignmentsClient.List(ctx, filter)
+	if err != nil {
+		credMinter.logger.WithError(err).Error("failed to list role assignments")
+		return err
+	}
+
 	for _, resourceGroup := range resourceGroups {
-		scope := "subscriptions/" + credMinter.subscriptionID + "/resourceGroups/" + resourceGroup
+		scope := "/subscriptions/" + credMinter.subscriptionID + "/resourceGroups/" + resourceGroup
+
+		// check whether assignment already exists
+		alreadyExists := false
+		for _, r := range currentRoleAssignments {
+			if *r.Properties.Scope == scope {
+				credMinter.logger.Debugf("role %s already assigned in resource group %s for service principal %s", targetRole, resourceGroup, principalName)
+				alreadyExists = true
+				break
+			}
+		}
+		if alreadyExists {
+			continue
+		}
+
 		raName := uuid.NewV4().String()
 
 		err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
+			credMinter.logger.Debugf("assigning role %s for resource group %s", *roleDefinition.Name, resourceGroup)
 			_, err = credMinter.roleAssignmentsClient.Create(ctx, scope, raName, authorization.RoleAssignmentCreateParameters{
 				Properties: &authorization.RoleAssignmentProperties{
 					RoleDefinitionID: roleDefinition.ID,
