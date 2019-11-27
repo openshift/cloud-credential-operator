@@ -79,3 +79,7 @@ required = [
 name = "gopkg.in/fsnotify.v1"
 source = "https://github.com/fsnotify/fsnotify.git"
 version="v1.4.7"
+
+[[constraint]]
+  name = "github.com/Azure/go-autorest"
+  version = "12.3.0"
