@@ -16,7 +16,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	"github.com/Azure/go-autorest/autorest/adal"
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/dgrijalva/jwt-go"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -41,12 +40,14 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	client.Client
 	Logger log.FieldLogger
+	Adal   AdalService
 }
 
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client: mgr.GetClient(),
 		Logger: log.WithField("controller", constants.ControllerName),
+		Adal:   &adalService{},
 	}
 }
 
@@ -149,8 +150,8 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 		return r.updateSecretAnnotations(secret, constants.MintAnnotation)
 	}
 
-	// else if chech succeded with no error but minting is not possible - passthrouth
-	r.Logger.Info("Verified cloud creds can be used as-is (passthrough)")
+	// else if check succeded with no error but minting is not possible, assume passthrough
+	r.Logger.Info("Cloud creds will be used as-is (passthrough)")
 	return r.updateSecretAnnotations(secret, constants.PassthroughAnnotation)
 }
 
@@ -167,23 +168,20 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 }
 
 func (r *ReconcileCloudCredSecret) checkCloudCredCreation(tenantID, clientID, secret string) (bool, error) {
-	oauthConfig, err := adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
+	oauthConfig, err := r.Adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
+		r.Logger.WithError(err).Error("error while creating oAuthConfig")
 		return false, err
 	}
 
-	token, err := adal.NewServicePrincipalToken(*oauthConfig, clientID, secret, azure.PublicCloud.GraphEndpoint)
+	token, err := r.Adal.NewServicePrincipalToken(*oauthConfig, clientID, secret, azure.PublicCloud.GraphEndpoint)
 	if err != nil {
-		return false, err
-	}
-
-	err = token.EnsureFresh()
-	if err != nil {
+		r.Logger.WithError(err).Error("error while creating service principal")
 		return false, err
 	}
 
 	p := &jwt.Parser{}
-	c := &azureClaim{}
+	c := &AzureClaim{}
 	_, _, err = p.ParseUnverified(token.OAuthToken(), c)
 	if err != nil {
 		return false, err

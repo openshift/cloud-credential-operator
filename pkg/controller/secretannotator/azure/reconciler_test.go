@@ -4,12 +4,16 @@ import (
 	"context"
 	"testing"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/Azure/go-autorest/autorest/adal"
+	"github.com/Azure/go-autorest/autorest/azure"
+	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/dgrijalva/jwt-go"
+	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -23,61 +27,148 @@ import (
 
 	ccazure "github.com/openshift/cloud-credential-operator/pkg/azure"
 	. "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/azure"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/azure/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 )
 
 const (
-	testNamespace = "test"
+	TestResource                = "SomeResource"
+	TestClientID                = "SomeClientID"
+	TestClientSecret            = "SomeClientSecret"
+	TestTenantID                = "SomeTenantID"
+	TestRegion                  = "SomeRegion"
+	TestResourceGroup           = "SomeResourceGroup"
+	TestAzurePrefix             = "SomeAzurePrefix"
+	TestSubscriptionID          = "SomeSubscriptionID"
+	TestSecretName              = "azure-credentials"
+	TestNamespace               = "test"
+	TestActiveDirectoryEndpoint = "https://login.test.com/"
+)
+
+var (
+	testOAuthConfig, _ = adal.NewOAuthConfig(TestActiveDirectoryEndpoint, TestTenantID)
+	TestOAuthConfig    = *testOAuthConfig
 )
 
 func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 	apis.AddToScheme(scheme.Scheme)
 	configv1.Install(scheme.Scheme)
-	existingSecret := []runtime.Object{&corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      "azure-credentials",
-			Namespace: testNamespace,
-		},
-		Data: map[string][]byte{
-			ccazure.AzureClientID:       []byte("AZURE_CLIENT_ID"),
-			ccazure.AzureClientSecret:   []byte("AZURE_CLIENT_SECRET"),
-			ccazure.AzureRegion:         []byte("AZURE_REGION"),
-			ccazure.AzureResourceGroup:  []byte("AZURE_RESOURCEGROUP"),
-			ccazure.AzureResourcePrefix: []byte("AZURE_RESOURCE_PREFIX"),
-			ccazure.AzureSubscriptionID: []byte("AZURE_SUBSCRIPTION_ID"),
-			ccazure.AzureTenantID:       []byte("AZURE_TENANT_ID"),
-		},
-	}}
 
-	fakeClient := fake.NewFakeClient(existingSecret...)
-
-	rcc := &ReconcileCloudCredSecret{
-		Client: fakeClient,
-		Logger: log.WithField("controller", "testController"),
+	tests := []struct {
+		name  string
+		wants func(*corev1.Secret)
+		roles []string
+	}{
+		{
+			name: "mint mode",
+			wants: func(s *corev1.Secret) {
+				s.Annotations[constants.AnnotationKey] = constants.MintAnnotation
+			},
+			roles: []string{"Application.ReadWrite.OwnedBy"},
+		},
+		{
+			name: "passthrough mode",
+			wants: func(s *corev1.Secret) {
+				s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
+			},
+			roles: []string{"Application.ReadWrite"},
+		},
+		{
+			name: "invalid credentials",
+			wants: func(s *corev1.Secret) {
+				s.Annotations[constants.AnnotationKey] = constants.InsufficientAnnotation
+			},
+			roles: nil,
+		},
 	}
 
-	_, err := rcc.Reconcile(reconcile.Request{
-		NamespacedName: types.NamespacedName{
-			Name:      "azure-credentials",
-			Namespace: testNamespace,
-		},
-	})
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			base := getInputSecret()
+			fakeClient := fake.NewFakeClient(base)
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockAdalClient := mock.NewMockAdalService(mockCtrl)
+			setupAdalMock(mockAdalClient.EXPECT(), test.roles)
+			rcc := &ReconcileCloudCredSecret{
+				Client: fakeClient,
+				Logger: log.WithField("controller", "testController"),
+				Adal:   mockAdalClient,
+			}
 
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+			// error will end-up in InsufficientAnnotation on the secret
+			rcc.Reconcile(reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      TestSecretName,
+					Namespace: TestNamespace,
+				},
+			})
+
+			secret := &corev1.Secret{}
+			fakeClient.Get(context.TODO(), client.ObjectKey{Name: TestSecretName, Namespace: TestNamespace}, secret)
+			expected := getInputSecret()
+			if test.wants != nil {
+				test.wants(expected)
+			}
+			if !assert.Equal(t, expected, secret) {
+				t.Errorf("%s: expected result:\n %v \ngot result:\n %v \n", test.name, expected, secret)
+			}
+		})
 	}
-	secret := &corev1.Secret{}
-	fakeClient.Get(context.TODO(), client.ObjectKey{Name: "azure-credentials", Namespace: testNamespace}, secret)
-	validateAnnotation(t, secret, annotatorconst.MintAnnotation)
 }
 
-func validateAnnotation(t *testing.T, secret *corev1.Secret, annotation string) {
-	if secret.ObjectMeta.Annotations == nil {
-		t.Errorf("unexpected empty annotations on secret")
-	}
-	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
-		t.Errorf("missing annotation")
+func getInputSecret() *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        TestSecretName,
+			Namespace:   TestNamespace,
+			Annotations: map[string]string{},
+		},
+		Data: map[string][]byte{
+			ccazure.AzureClientID:       []byte(TestClientID),
+			ccazure.AzureClientSecret:   []byte(TestClientSecret),
+			ccazure.AzureRegion:         []byte(TestRegion),
+			ccazure.AzureResourceGroup:  []byte(TestResourceGroup),
+			ccazure.AzureResourcePrefix: []byte(TestAzurePrefix),
+			ccazure.AzureSubscriptionID: []byte(TestSubscriptionID),
+			ccazure.AzureTenantID:       []byte(TestTenantID),
+		},
 	}
 
-	assert.Exactly(t, annotation, secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey])
+}
+
+func setupAdalMock(r *mock.MockAdalServiceMockRecorder, roles []string) {
+	gomock.InOrder(
+		// these methdods are extensivly tested in azure codebase
+		r.NewOAuthConfig(gomock.Eq(azure.PublicCloud.ActiveDirectoryEndpoint), gomock.Eq(TestTenantID)).Return(&TestOAuthConfig, nil),
+		r.NewServicePrincipalToken(gomock.Eq(TestOAuthConfig), gomock.Eq(TestClientID), gomock.Eq(TestClientSecret), gomock.Eq(azure.PublicCloud.GraphEndpoint)).Return(newServicePrincipalTokenManual(roles), nil),
+	)
+}
+
+func newServicePrincipalTokenManual(roles []string) *adal.ServicePrincipalToken {
+	token := newToken(roles)
+	token.RefreshToken = "refreshtoken"
+	spt, _ := adal.NewServicePrincipalTokenFromManualToken(TestOAuthConfig, TestClientID, TestClientSecret, token)
+	return spt
+}
+
+func newToken(roles []string) adal.Token {
+	token := adal.Token{
+		ExpiresIn: "0",
+		ExpiresOn: "0",
+		NotBefore: "0",
+	}
+
+	mySigningKey := []byte("SigningKey")
+
+	// Create the Claims
+	if roles != nil {
+		claims := &AzureClaim{
+			Roles: roles,
+		}
+		t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+		ss, _ := t.SignedString(mySigningKey)
+		token.AccessToken = ss
+	}
+	return token
 }
