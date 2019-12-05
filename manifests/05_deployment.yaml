@@ -307,13 +307,9 @@ metadata:
   namespace: openshift-cloud-credential-operator
 spec:
   endpoints:
-  - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
-    interval: 30s
+  - interval: 30s
     port: cco-metrics
     scheme: http
-    tlsConfig:
-      caFile: /etc/prometheus/configmaps/serving-certs-ca-bundle/service-ca.crt
-      serverName: cco.openshift-cloud-credential-operator.svc
   namespaceSelector:
     matchNames:
     - openshift-cloud-credential-operator
