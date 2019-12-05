@@ -260,7 +260,7 @@ spec:
   groups:
   - name: CloudCredentialOperator
     rules:
-    - alert: CCOTargetNamespaceMissing
+    - alert: CloudCredentialOperatorTargetNamespaceMissing
       annotations:
         summary: CredentialsRequest(s) pointing to non-existant namespace
       expr: cco_credentials_requests_conditions{condition="MissingTargetNamespace"}
@@ -268,7 +268,7 @@ spec:
       for: 5m
       labels:
         severity: warning
-    - alert: CCOProvisioningFailed
+    - alert: CloudCredentialOperatorProvisioningFailed
       annotations:
         summary: CredentialsRequest(s) unable to be fulfilled
       expr: cco_credentials_requests_conditions{condition="CredentialsProvisionFailure"}
@@ -276,7 +276,7 @@ spec:
       for: 5m
       labels:
         severity: warning
-    - alert: CCODeprovisioningFailed
+    - alert: CloudCredentialOperatorDeprovisioningFailed
       annotations:
         summary: CredentialsRequest(s) unable to be cleaned up
       expr: cco_credentials_requests_conditions{condition="CredentialsDeprovisionFailure"}
@@ -284,7 +284,7 @@ spec:
       for: 5m
       labels:
         severity: warning
-    - alert: CCOInsufficientCloudCreds
+    - alert: CloudCredentialOperatorInsufficientCloudCreds
       annotations:
         summary: Cluster's cloud credentials insufficient for minting or passthrough
       expr: cco_credentials_requests_conditions{condition="InsufficientCloudCreds"}
@@ -292,7 +292,7 @@ spec:
       for: 5m
       labels:
         severity: warning
-    - alert: CCOperatorDown
+    - alert: CloudCredentialOperatorDown
       annotations:
         summary: cloud-credential-operator pod not running
       expr: absent(up{job="cco-metrics"} == 1)
