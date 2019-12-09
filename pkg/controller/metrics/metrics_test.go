@@ -10,6 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/constants"
 )
 
 var (
@@ -86,6 +87,18 @@ func TestCredentialsRequests(t *testing.T) {
 	assert.Equal(t, 1, accumulator.crConditions[credreqv1.CredentialsProvisionFailure])
 	assert.Equal(t, 1, accumulator.crConditions[credreqv1.Ignored])
 	assert.Equal(t, 1, accumulator.crConditions[credreqv1.InsufficientCloudCredentials])
+}
+
+func TestMetricsInitialization(t *testing.T) {
+	logger := log.WithField("controller", "metricscontrollertest")
+
+	accumulator := newAccumulator(logger)
+
+	// Assert that all possible conditions have explicit '0' values
+	// after initializing the accumulator.
+	for _, c := range constants.FailureConditionTypes {
+		assert.Zero(t, accumulator.crConditions[c])
+	}
 }
 
 func testCredReqWithConditions(cr credreqv1.CredentialsRequest, conditions []credreqv1.CredentialsRequestCondition) credreqv1.CredentialsRequest {
