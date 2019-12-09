@@ -12,6 +12,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
@@ -32,16 +33,6 @@ const (
 	reasonReconcilingComplete       = "ReconcilingComplete"
 	reasonCredentialsNotProvisioned = "CredentialsNotProvisioned"
 	reasonOperatorDisabled          = "OperatorDisabledByAdmin"
-)
-
-var (
-	// If any of these conditions are present and true, we consider it a failing credential:
-	failureConditionTypes = []minterv1.CredentialsRequestConditionType{
-		minterv1.InsufficientCloudCredentials,
-		minterv1.MissingTargetNamespace,
-		minterv1.CredentialsProvisionFailure,
-		minterv1.CredentialsDeprovisionFailure,
-	}
 )
 
 // syncOperatorStatus computes the operator's current status and
@@ -180,7 +171,7 @@ func computeStatusConditions(
 	for _, cr := range validCredRequests {
 		// Check for provision failure conditions:
 		foundFailure := false
-		for _, t := range failureConditionTypes {
+		for _, t := range constants.FailureConditionTypes {
 			failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
 			if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
 				foundFailure = true
