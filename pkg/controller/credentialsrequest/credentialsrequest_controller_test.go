@@ -44,6 +44,7 @@ import (
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 
@@ -840,7 +841,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() runtime.Object {
 					cr := testGCPCredentialsRequest(t)
-					for _, cond := range failureConditionTypes {
+					for _, cond := range constants.FailureConditionTypes {
 						cr.Status.Conditions = append(cr.Status.Conditions, minterv1.CredentialsRequestCondition{
 							Type:   cond,
 							Status: corev1.ConditionTrue,

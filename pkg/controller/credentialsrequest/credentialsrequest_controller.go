@@ -27,6 +27,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
@@ -600,7 +601,7 @@ func setIgnoredCondition(cr *minterv1.CredentialsRequest, clusterPlatform config
 
 	// Also clear any other conditions since we are ignoring this cred request,
 	// and we don't want to be in a degraded state b/c of cred requests that we're ignoring.
-	for _, cond := range failureConditionTypes {
+	for _, cond := range constants.FailureConditionTypes {
 		cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, cond,
 			corev1.ConditionFalse, reason, msg, updateCheck)
 	}
