@@ -15,6 +15,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 )
 
@@ -135,11 +136,19 @@ type credRequestAccumulator struct {
 }
 
 func newAccumulator(logger log.FieldLogger) *credRequestAccumulator {
-	return &credRequestAccumulator{
+	acc := &credRequestAccumulator{
 		logger:       logger,
 		crTotals:     map[string]int{},
 		crConditions: map[credreqv1.CredentialsRequestConditionType]int{},
 	}
+
+	// make entries with '0' so we make sure to send updated metrics for any
+	// condititons that may have cleared
+	for _, c := range constants.FailureConditionTypes {
+		acc.crConditions[c] = 0
+	}
+
+	return acc
 }
 
 func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest) {
