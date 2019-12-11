@@ -19,7 +19,6 @@ package main
 import (
 	"flag"
 	golog "log"
-	"os"
 	"time"
 
 	"github.com/golang/glog"
@@ -67,8 +66,7 @@ func NewRootCommand() *cobra.Command {
 			log.Info("setting up client for manager")
 			cfg, err := config.GetConfig()
 			if err != nil {
-				log.Error(err, "unable to set up client config")
-				os.Exit(1)
+				log.WithError(err).Fatal("unable to set up client config")
 			}
 
 			// Create a new Cmd to provide shared dependencies and start components
@@ -80,8 +78,7 @@ func NewRootCommand() *cobra.Command {
 				LeaderElectionID:        leaderElectionConfigMap,
 			})
 			if err != nil {
-				log.Error(err, "unable to set up overall controller manager")
-				os.Exit(1)
+				log.WithError(err).Fatal("unable to set up overall controller manager")
 			}
 
 			log.Info("registering components")
@@ -89,8 +86,7 @@ func NewRootCommand() *cobra.Command {
 			// Setup Scheme for all resources
 			log.Info("setting up scheme")
 			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-				log.Error(err, "unable add APIs to scheme")
-				os.Exit(1)
+				log.WithError(err).Fatal("unable to add APIs to scheme")
 			}
 
 			// Setup Openshift API scheme:
@@ -102,15 +98,13 @@ func NewRootCommand() *cobra.Command {
 			log.Info("setting up controller")
 			kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
 			if err := controller.AddToManager(mgr, kubeconfigCommandLinePath); err != nil {
-				log.Error(err, "unable to register controllers to the manager")
-				os.Exit(1)
+				log.WithError(err).Fatal("unable to register controllers to the manager")
 			}
 
 			// Start the Cmd
 			log.Info("starting the cmd")
 			if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-				log.Error(err, "unable to run the manager")
-				os.Exit(1)
+				log.WithError(err).Fatal("unable to run the manager")
 			}
 		},
 	}
