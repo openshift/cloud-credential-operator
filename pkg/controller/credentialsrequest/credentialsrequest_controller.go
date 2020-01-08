@@ -674,6 +674,8 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 		return cloudType == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name(), nil
 	case configv1.OpenStackPlatformType:
 		return cloudType == reflect.TypeOf(minterv1.OpenStackProviderSpec{}).Name(), nil
+	case configv1.OvirtPlatformType:
+		return cloudType == reflect.TypeOf(minterv1.OvirtProviderSpec{}).Name(), nil
 	default:
 		return false, fmt.Errorf("unsupported platorm type: %v", clusterCloudPlatform)
 	}
