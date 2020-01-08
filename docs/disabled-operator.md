@@ -2,17 +2,17 @@ Cloud Credential Operator can be disabled prior to install in environments where
 
   * Clone a release image so we can layer in our modification to disable the cloud credential operator at install time:
     * `export ctr=$(buildah from registry.svc.ci.openshift.org/ocp/release:4.3.0-0.ci-2019-10-28-103949)`
-  * Create a local file with the new contents of the configmap we want, the only change here is disabled=true.
+  * Create a local file with the new contents of the configmap we want, the only change here is `disabled=true`.
     * ```apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cloud-credential-operator-config
-  namespace: openshift-cloud-credential-operator
-  annotations:
-    release.openshift.io/create-only: "true"
-data:
-  disabled: "true"
-```
+      kind: ConfigMap
+      metadata:
+        name: cloud-credential-operator-config
+        namespace: openshift-cloud-credential-operator
+        annotations:
+          release.openshift.io/create-only: "true"
+      data:
+        disabled: "true"
+      ```
   * Add our custom manifest file to overwrite the original:
     * `buildah add $ctr configmap.yaml release-manifests/0000_50_cloud-credential-operator_01_operator_configmap.yaml`
   * Commit the new image and push to a registry:
