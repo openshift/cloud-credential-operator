@@ -940,6 +940,65 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "recently synced but with error condition set",
+			existing: []runtime.Object{
+				func() *minterv1.CredentialsRequest {
+					cr := testCredentialsRequestWithRecentLastSync(t)
+					cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions,
+						minterv1.CredentialsProvisionFailure, corev1.ConditionTrue, credentialsProvisionFailure,
+						"Please investigate", utils.UpdateConditionAlways)
+					return cr
+				}(),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				return mockAWSClient
+			},
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        credentialsProvisionSuccess,
+					status:        corev1.ConditionFalse,
+				},
+			},
+		},
+		{
+			name: "recently synced but not provisioned",
+			existing: []runtime.Object{
+				func() *minterv1.CredentialsRequest {
+					cr := testCredentialsRequestWithRecentLastSync(t)
+					cr.Status.Provisioned = false
+					return cr
+				}(),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1061,6 +1120,7 @@ func testCredentialsRequestWithRecentLastSync(t *testing.T) *minterv1.Credential
 		// fake 20 minute old last sync
 		Time: testTwentyMinuteOldTimestamp,
 	}
+	cr.Status.Provisioned = true
 	return cr
 }
 
