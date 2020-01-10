@@ -433,8 +433,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 
 	isStale := cr.Generation != cr.Status.LastSyncGeneration
 	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(time.Hour*1).After(time.Now())
+	hasActiveFailureConditions := checkForFailureConditions(cr)
 
-	if !isStale && hasRecentlySynced && crSecretExists {
+	if !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
 		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
 		return reconcile.Result{}, nil
 	}
@@ -679,4 +680,14 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 	default:
 		return false, fmt.Errorf("unsupported platorm type: %v", clusterCloudPlatform)
 	}
+}
+
+func checkForFailureConditions(cr *minterv1.CredentialsRequest) bool {
+	for _, t := range constants.FailureConditionTypes {
+		failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
+		if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
 }
