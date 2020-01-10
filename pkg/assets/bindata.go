@@ -129,6 +129,7 @@ metadata:
     controller-tools.k8s.io: "1.0"
   annotations:
     config.openshift.io/inject-proxy: "manager"
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
 spec:
   selector:
     matchLabels:
@@ -252,6 +253,8 @@ kind: PrometheusRule
 metadata:
   name: cloud-credential-operator-alerts
   namespace: openshift-cloud-credential-operator
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
 spec:
   groups:
   - name: CloudCredentialOperator
@@ -459,8 +462,6 @@ kind: Role
 metadata:
   name: prometheus-k8s
   namespace: openshift-cloud-credential-operator
-  annotations:
-    exclude.release.openshift.io/internal-openshift-hosted: "true"
 rules:
 - apiGroups:
   - ""
