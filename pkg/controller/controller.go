@@ -24,6 +24,7 @@ import (
 	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/openstack"
 	"github.com/openshift/cloud-credential-operator/pkg/ovirt"
+	vsphereactuator "github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -96,6 +97,12 @@ func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 				log.Fatalf("missing Ovirt configuration in platform status")
 			}
 			a, err = ovirt.NewActuator(m.GetClient())
+			if err != nil {
+				return err
+			}
+		case configv1.VSpherePlatformType:
+			log.Info("initializing VSphere actuator")
+			a, err = vsphereactuator.NewVSphereActuator(m.GetClient())
 			if err != nil {
 				return err
 			}

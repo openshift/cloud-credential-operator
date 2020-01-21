@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/vsphere"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -46,6 +47,8 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 			log.Fatalf("Missing GCP configuration in infrastructure platform status")
 		}
 		return gcp.Add(mgr, gcp.NewReconciler(mgr, infraStatus.PlatformStatus.GCP.ProjectID))
+	case configv1.VSpherePlatformType:
+		return vsphere.Add(mgr, vsphere.NewReconciler(mgr))
 	default: // returning the AWS implementation for default to avoid changing any behavior
 		return aws.Add(mgr, aws.NewReconciler(mgr))
 	}
