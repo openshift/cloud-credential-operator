@@ -54,16 +54,31 @@ func LoadCredsFromSecret(kubeClient client.Client, namespace, secretName string)
 // LoadInfrastructureName loads the cluster Infrastructure config and returns the infra name
 // used to identify this cluster, and tag some cloud objects.
 func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, error) {
-	infra := &configv1.Infrastructure{}
-	err := c.Get(context.Background(), types.NamespacedName{Name: "cluster"}, infra)
+	infra, err := getInfrastructure(c)
 	if err != nil {
 		logger.WithError(err).Error("error loading Infrastructure config 'cluster'")
 		return "", err
 	}
-
-	logger.Debugf("Loaded infrastructure name: %s", infra.Status.InfrastructureName)
+	logger.Debugf("Loading infrastructure name: %s", infra.Status.InfrastructureName)
 	return infra.Status.InfrastructureName, nil
+}
 
+// LoadInfrastructureRegion loads the AWS region the cluster is installed to.
+func LoadInfrastructureRegion(c client.Client, logger log.FieldLogger) (string, error) {
+	infra, err := getInfrastructure(c)
+	if err != nil {
+		logger.WithError(err).Error("error loading Infrastructure region")
+		return "", err
+	}
+	return infra.Status.PlatformStatus.AWS.Region, nil
+}
+
+func getInfrastructure(c client.Client) (*configv1.Infrastructure, error) {
+	infra := &configv1.Infrastructure{}
+	if err := c.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infra); err != nil {
+		return nil, err
+	}
+	return infra, nil
 }
 
 // GetCredentialsRequestCloudType decodes a Spec.ProviderSpec and returns the kind
