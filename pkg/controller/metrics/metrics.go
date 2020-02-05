@@ -97,17 +97,24 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 
 		mcLog.Info("calculating metrics for all CredentialsRequests")
 
+		ccoDisabled, err := utils.IsOperatorDisabled(mc.Client, mcLog)
+		if err != nil {
+			mcLog.WithError(err).Error("failed to determine whether CCO is disabled")
+			return
+		}
+
 		credRequests := &credreqv1.CredentialsRequestList{}
 		if err := mc.Client.List(context.TODO(), credRequests); err != nil {
 			mcLog.WithError(err).Error("error listing CredentialsRequests")
-		} else {
-			accumulator := newAccumulator(mcLog)
-			for _, cr := range credRequests.Items {
-				accumulator.processCR(&cr)
-			}
-
-			accumulator.setMetrics()
+			return
 		}
+
+		accumulator := newAccumulator(mcLog)
+		for _, cr := range credRequests.Items {
+			accumulator.processCR(&cr, ccoDisabled)
+		}
+
+		accumulator.setMetrics()
 	}, mc.Interval, stopCh)
 
 	return nil
@@ -151,7 +158,7 @@ func newAccumulator(logger log.FieldLogger) *credRequestAccumulator {
 	return acc
 }
 
-func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest) {
+func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest, ccoDisabled bool) {
 	cloudType, err := utils.GetCredentialsRequestCloudType(cr.Spec.ProviderSpec)
 	if err != nil {
 		a.logger.WithError(err).Warningf("unable to determine cloud type for CredentialsRequest: %v", cr.Name)
@@ -159,9 +166,12 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest) {
 	cloudKey := cloudProviderSpecToMetricsKey(cloudType)
 	a.crTotals[cloudKey]++
 
-	for _, cond := range cr.Status.Conditions {
-		if cond.Status == corev1.ConditionTrue {
-			a.crConditions[cond.Type]++
+	// Skip reporting conditions if CCO is disabled, as we shouldn't be alerting in that case.
+	if !ccoDisabled {
+		for _, cond := range cr.Status.Conditions {
+			if cond.Status == corev1.ConditionTrue {
+				a.crConditions[cond.Type]++
+			}
 		}
 	}
 }
