@@ -149,7 +149,7 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 
 // needsUpdate will return whether the current credentials satisfy what's being requested
 // in the CredentialsRequest
-func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest, infraName string) (bool, error) {
+func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest, infraName, region string) (bool, error) {
 	logger := a.getLogger(cr)
 	// If the secret simply doesn't exist, we definitely need an update
 	exists, err := a.Exists(ctx, cr)
@@ -231,7 +231,10 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	} else {
 		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
-		goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, logger)
+		simParams := &ccaws.SimulateParams{
+			Region: region,
+		}
+		goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, simParams, logger)
 		if err != nil {
 			return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
 		}
@@ -266,8 +269,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
+	region, err := utils.LoadInfrastructureRegion(a.Client, logger)
+	if err != nil {
+		return err
+	}
+
 	// Should we update anything
-	needsUpdate, err := a.needsUpdate(ctx, cr, infraName)
+	needsUpdate, err := a.needsUpdate(ctx, cr, infraName, region)
 	if err != nil {
 		logger.WithError(err).Error("error determining whether a credentials update is needed")
 		return &actuatoriface.ActuatorError{
