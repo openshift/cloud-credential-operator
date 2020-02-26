@@ -78,7 +78,7 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	client.Client
 	Logger           log.FieldLogger
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, infraName string) (ccaws.Client, error)
+	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, region, infraName string) (ccaws.Client, error)
 }
 
 // Reconcile will annotate the cloud cred secret to indicate the capabilities of the cred's capabilities:
@@ -134,11 +134,15 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 	}
 
+	region, err := utils.LoadInfrastructureRegion(r.Client, r.Logger)
+	if err != nil {
+		return err
+	}
 	infraName, err := utils.LoadInfrastructureName(r.Client, r.Logger)
 	if err != nil {
 		return err
 	}
-	awsClient, err := r.AWSClientBuilder(accessKey, secretKey, infraName)
+	awsClient, err := r.AWSClientBuilder(accessKey, secretKey, region, infraName)
 	if err != nil {
 		return fmt.Errorf("error creating aws client: %v", err)
 	}
@@ -156,10 +160,6 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	}
 
 	// Else, can we just pass through the current creds?
-	region, err := utils.LoadInfrastructureRegion(r.Client, r.Logger)
-	if err != nil {
-		return err
-	}
 	simParams := &ccaws.SimulateParams{
 		Region: region,
 	}
