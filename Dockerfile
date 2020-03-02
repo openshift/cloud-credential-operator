@@ -20,6 +20,8 @@ FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
 WORKDIR /root/
 COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/manager .
 ADD manifests/ /manifests
+# Update perms so we can copy updated CA if needed
+RUN chmod -R g+w /etc/pki/ca-trust/extracted/pem/
 
 LABEL io.openshift.release.operator=true
 ENTRYPOINT ["./manager"]
