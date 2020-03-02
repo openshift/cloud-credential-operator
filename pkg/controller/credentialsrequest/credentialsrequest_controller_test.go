@@ -1024,7 +1024,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					Client: fakeClient,
 					Codec:  codec,
 					Scheme: scheme.Scheme,
-					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, infraName string) (minteraws.Client, error) {
+					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, region, infraName string) (minteraws.Client, error) {
 						if string(accessKeyID) == testRootAWSAccessKeyID {
 							return mockRootAWSClient, nil
 						} else if string(accessKeyID) == testAWSAccessKeyID {
