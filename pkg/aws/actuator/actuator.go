@@ -123,14 +123,6 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
 		return false, err
 	}
-	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
-	if err != nil {
-		return false, err
-	}
-	if awsStatus.User == "" {
-		logger.Debug("username unset")
-		return false, nil
-	}
 
 	existingSecret := &corev1.Secret{}
 	err = a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
@@ -767,23 +759,13 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, region
 	var accessKeyID, secretAccessKey []byte
 	var err error
 
-	// Handle an edge case with management of our own RO creds using a credentials request.
-	// If we're operating on those credentials, just use the root creds.
-	if cr.Spec.SecretRef.Name == roAWSCredsSecret && cr.Spec.SecretRef.Namespace == roAWSCredsSecretNamespace {
-		log.Debug("operating our our RO creds, using root creds for all AWS client operations")
-		accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, rootAWSCredsSecretNamespace, rootAWSCredsSecret)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
-		// cluster, we need to load different secrets for each cluster.
-		accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				logger.Warn("read-only creds not found, using root creds client")
-				return a.buildRootAWSClient(cr, region, infraName)
-			}
+	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
+	// cluster, we need to load different secrets for each cluster.
+	accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Warn("read-only creds not found, using root creds client")
+			return a.buildRootAWSClient(cr, region, infraName)
 		}
 	}
 
