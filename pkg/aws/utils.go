@@ -33,63 +33,8 @@ var (
 	}
 
 	credPassthroughActions = []string{
-		// so we can query whether we have the below list of creds
 		"iam:GetUser",
 		"iam:SimulatePrincipalPolicy",
-
-		// openshift-ingress
-		"elasticloadbalancing:DescribeLoadBalancers",
-		"route53:ListHostedZones",
-		"route53:ChangeResourceRecordSets",
-		"tag:GetResources",
-
-		// openshift-image-registry
-		"s3:CreateBucket",
-		"s3:DeleteBucket",
-		"s3:PutBucketTagging",
-		"s3:GetBucketTagging",
-		"s3:PutEncryptionConfiguration",
-		"s3:GetEncryptionConfiguration",
-		"s3:PutLifecycleConfiguration",
-		"s3:GetLifecycleConfiguration",
-		"s3:GetBucketLocation",
-		"s3:ListBucket",
-		"s3:HeadBucket",
-		"s3:GetObject",
-		"s3:PutObject",
-		"s3:DeleteObject",
-		"s3:ListBucketMultipartUploads",
-		"s3:AbortMultipartUpload",
-
-		// openshift-cluster-api
-		"ec2:DescribeImages",
-		"ec2:DescribeVpcs",
-		"ec2:DescribeSubnets",
-		"ec2:DescribeAvailabilityZones",
-		"ec2:DescribeSecurityGroups",
-		"ec2:RunInstances",
-		"ec2:DescribeInstances",
-		"ec2:TerminateInstances",
-		"elasticloadbalancing:RegisterInstancesWithLoadBalancer",
-		"elasticloadbalancing:DescribeLoadBalancers",
-		"elasticloadbalancing:DescribeTargetGroups",
-		"elasticloadbalancing:RegisterTargets",
-		"ec2:DescribeVpcs",
-		"ec2:DescribeSubnets",
-		"ec2:DescribeAvailabilityZones",
-		"ec2:DescribeSecurityGroups",
-		"ec2:RunInstances",
-		"ec2:DescribeInstances",
-		"ec2:TerminateInstances",
-		"elasticloadbalancing:RegisterInstancesWithLoadBalancer",
-		"elasticloadbalancing:DescribeLoadBalancers",
-		"elasticloadbalancing:DescribeTargetGroups",
-		"elasticloadbalancing:RegisterTargets",
-
-		// iam-ro
-		"iam:GetUser",
-		"iam:GetUserPolicy",
-		"iam:ListAccessKeys",
 	}
 
 	credentailRequestScheme = runtime.NewScheme()
@@ -229,10 +174,9 @@ func CheckPermissionsAgainstActions(awsClient Client, actionList []string, param
 	return CheckPermissionsAgainstStatementList(awsClient, statementList, params, logger)
 }
 
-// CheckCloudCredPassthrough will see if the provided creds are good enough to pass through
-// to other components as-is based on the static list of permissions needed by the various
-// users of CredentialsRequests
-// TODO: move away from static list (to dynamic passthrough validation?)
+// CheckCloudCredPassthrough will check if the provided creds are good enough to perform
+// runtime determination of whether the creds can be used to self-inspect for knowing if they
+// can be used as-is to satisfy a CredentialsRequest.
 func CheckCloudCredPassthrough(awsClient Client, params *SimulateParams, logger log.FieldLogger) (bool, error) {
 	return CheckPermissionsAgainstActions(awsClient, credPassthroughActions, params, logger)
 }

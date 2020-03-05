@@ -22,6 +22,7 @@ import (
 	"net/url"
 	"reflect"
 
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -39,7 +40,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -135,7 +136,7 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 	existingSecret := &corev1.Secret{}
 	err = a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.Debug("target secret does not exist")
 			return false, nil
 		}
@@ -306,7 +307,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 
 	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
 		logger.Debugf("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
+		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, region, infraName, logger)
 		if err != nil {
 			return err
 		}
@@ -326,12 +327,42 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	return nil
 }
 
-func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
+func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest,
+	cloudCredsSecret *corev1.Secret,
+	region, infraName string, logger log.FieldLogger) error {
+	// first see if the passthrough creds have enough permissions to satisfy the credentialsrequest
+	rootAWSClient, err := a.buildRootAWSClient(cr, region, infraName)
+	if err != nil {
+		logger.WithError(err).Error("failed to build AWS client with root creds")
+		return err
+	}
+
+	awsSpec, err := DecodeProviderSpec(a.Codec, cr)
+	if err != nil {
+		return err
+	}
+
+	simParams := &ccaws.SimulateParams{
+		Region: region,
+	}
+	goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(rootAWSClient, rootAWSClient, awsSpec.StatementEntries, simParams, logger)
+	if err != nil {
+		return errors.Wrap(err, "error validating whether current creds are good enough")
+	}
+	if !goodEnough {
+		msg := "Cloud credentials do not satisfy the CredentialsRequest"
+		logger.Error(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.InsufficientCloudCredentials,
+			Message:   msg,
+		}
+	}
+
 	existingSecret, _, _ := a.loadExistingSecret(cr)
 	accessKeyID := string(cloudCredsSecret.Data[awsannotator.AwsAccessKeyName])
 	secretAccessKey := string(cloudCredsSecret.Data[awsannotator.AwsSecretAccessKeyName])
 	// userPolicy param empty because in passthrough mode this doesn't really have any meaning
-	err := a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
+	err = a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -685,7 +716,7 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	existingSecret := &corev1.Secret{}
 	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			logger.Debug("secret does not exist")
 		}
 	} else {
@@ -780,7 +811,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, region
 		// cluster, we need to load different secrets for each cluster.
 		accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
 		if err != nil {
-			if errors.IsNotFound(err) {
+			if apierrors.IsNotFound(err) {
 				logger.Warn("read-only creds not found, using root creds client")
 				return a.buildRootAWSClient(cr, region, infraName)
 			}

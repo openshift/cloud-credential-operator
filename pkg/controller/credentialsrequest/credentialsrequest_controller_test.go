@@ -53,7 +53,26 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 )
 
-var c client.Client
+var (
+	c client.Client
+
+	successfulSimulateResponse = &iam.SimulatePolicyResponse{
+		EvaluationResults: []*iam.EvaluationResult{
+			{
+				EvalDecision:   aws.String("allowed"),
+				EvalActionName: aws.String("SomeAWSAction"),
+			},
+		},
+	}
+	failedSimulationResponse = &iam.SimulatePolicyResponse{
+		EvaluationResults: []*iam.EvaluationResult{
+			{
+				EvalDecision:   aws.String("notallowed"),
+				EvalActionName: aws.String("SomeAWSAction"),
+			},
+		},
+	}
+)
 
 const (
 	openshiftClusterIDKey = "openshiftClusterID"
@@ -604,6 +623,8 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -620,6 +641,39 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				}
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "new passthrough but insufficient cloud creds",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testPassthroughCredentialsRequest(t),
+				testPassthroughAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockSimulatePrincipalPolicyPagesFail(mockAWSClient)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.False(t, cr.Status.Provisioned)
+			},
+			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.InsufficientCloudCredentials,
+					reason:        "CloudCredsInsufficient",
+					status:        corev1.ConditionTrue,
+				},
 			},
 		},
 		{
@@ -1087,7 +1141,7 @@ const (
 	testSecretName             = "test-secret"
 	testSecretNamespace        = "myproject"
 	testAWSUser                = "mycluster-test-aws-user"
-	testAWSARN                 = "some:fake:ARN:1234"
+	testAWSARN                 = "arn:aws:iam::1234:user/mycluster-test-aws-user"
 	testAWSUserID              = "FAKEAWSUSERID"
 	testAWSAccessKeyID         = "FAKEAWSACCESSKEYID"
 	testAWSAccessKeyID2        = "FAKEAWSACCESSKEYID2"
@@ -1435,6 +1489,20 @@ func testClusterVersion() *configv1.ClusterVersion {
 			ClusterID: testClusterID,
 		},
 	}
+}
+
+func mockSimulatePrincipalPolicyPagesFail(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
+		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
+			f(failedSimulationResponse, true)
+		})
+}
+
+func mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
+		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
+			f(successfulSimulateResponse, true)
+		})
 }
 
 func mockSimulatePrincipalPolicySuccess(mockAWSClient *mockaws.MockClient) {
