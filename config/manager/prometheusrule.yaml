@@ -3,6 +3,8 @@ kind: PrometheusRule
 metadata:
   name: cloud-credential-operator-alerts
   namespace: openshift-cloud-credential-operator
+  annotations:
+    exclude.release.openshift.io/internal-openshift-hosted: "true"
 spec:
   groups:
   - name: CloudCredentialOperator
