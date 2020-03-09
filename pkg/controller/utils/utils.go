@@ -24,6 +24,10 @@ const (
 	awsCredsSecretIDKey          = "aws_access_key_id"
 	awsCredsSecretAccessKey      = "aws_secret_access_key"
 	operatorConfigMapDisabledKey = "disabled"
+
+	// OperatorDisabledDefault holds the default behavior of whether CCO is disabled
+	// in the absence of any setting in the ConfigMap
+	OperatorDisabledDefault = false
 )
 
 func LoadCredsFromSecret(kubeClient client.Client, namespace, secretName string) ([]byte, []byte, error) {
@@ -146,15 +150,21 @@ func IsOperatorDisabled(kubeClient client.Client, logger log.FieldLogger) (bool,
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debugf("%s ConfigMap does not exist, assuming default behavior", minterv1.CloudCredOperatorConfigMap)
-			return false, nil
+			return OperatorDisabledDefault, nil
 		}
-		return false, err
+		return OperatorDisabledDefault, err
 	}
 
+	return CCODisabledCheck(cm, logger)
+}
+
+// CCODisabledCheck will take the operator configuration ConfigMap and return
+// whether the CCO operator is set to enabled or disabled.
+func CCODisabledCheck(cm *corev1.ConfigMap, logger log.FieldLogger) (bool, error) {
 	disabled, ok := cm.Data[operatorConfigMapDisabledKey]
 	if !ok {
 		logger.Debugf("%s ConfigMap has no %s key, assuming default behavior", minterv1.CloudCredOperatorConfigMap, operatorConfigMapDisabledKey)
-		return false, nil
+		return OperatorDisabledDefault, nil
 	}
 	return strconv.ParseBool(disabled)
 }

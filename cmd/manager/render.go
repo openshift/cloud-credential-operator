@@ -25,7 +25,12 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
+	corev1 "k8s.io/api/core/v1"
+	yaml "k8s.io/apimachinery/pkg/util/yaml"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/assets"
+	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
 )
 
 const (
@@ -99,6 +104,8 @@ func runRenderCmd(cmd *cobra.Command, args []string) {
 	log.SetLevel(level)
 	log.Debug("debug logging enabled")
 
+	operatorDisabled := isDisabled()
+
 	log.Infof("Rendering files to %s", renderOpts.destinationDir)
 
 	ccoRenderDir := renderOpts.destinationDir
@@ -115,22 +122,73 @@ func runRenderCmd(cmd *cobra.Command, args []string) {
 		}
 
 		assetRenderPath := filepath.Join(ccoRenderDir, "manifests", "cco-"+filepath.Base(assetName))
-		log.Debugf("writing file: %s", assetRenderPath)
+		log.Infof("Writing file: %s", assetRenderPath)
 		err = ioutil.WriteFile(assetRenderPath, asset, 0644)
 		if err != nil {
 			log.WithError(err).Fatal("failed to write file")
 		}
 	}
 
-	// render static pod
-	if err := os.Mkdir(filepath.Join(ccoRenderDir, bootstrapManifestsDir), 0775); err != nil {
-		log.WithError(err).Fatal("error creating bootstrap-manifests directory")
+	if !operatorDisabled {
+		log.Info("Rendering static pod")
+		if err := os.Mkdir(filepath.Join(ccoRenderDir, bootstrapManifestsDir), 0775); err != nil {
+			log.WithError(err).Fatal("error creating bootstrap-manifests directory")
+		}
+		podPath := filepath.Join(ccoRenderDir, bootstrapManifestsDir, "cloud-credential-operator-pod.yaml")
+		podContent := fmt.Sprintf(podTemplate, renderOpts.ccoImage)
+		log.Infof("writing file: %s", podPath)
+		err = ioutil.WriteFile(podPath, []byte(podContent), 0644)
+		if err != nil {
+			log.WithError(err).Fatal("failed to write file")
+		}
+	} else {
+		log.Info("CCO disabled, skipping static pod manifest.")
 	}
-	podPath := filepath.Join(ccoRenderDir, bootstrapManifestsDir, "cloud-credential-operator-pod.yaml")
-	podContent := fmt.Sprintf(podTemplate, renderOpts.ccoImage)
-	log.Debugf("writing file: %s", podPath)
-	err = ioutil.WriteFile(podPath, []byte(podContent), 0644)
+}
+
+// isDisabled will search through all the files in destinationDir (which also contains
+// the source manifests) for a configmap indicating whether or not CCO is disabled. In
+// the absence of any configmap, it will return the default disabled setting (which is
+// that the operator is enabled by default) for the operator.
+func isDisabled() bool {
+
+	files, err := ioutil.ReadDir(renderOpts.destinationDir)
 	if err != nil {
-		log.WithError(err).Fatal("failed to write file")
+		log.WithError(err).Errorf("failed to list files in %s, using defualt operator settings", renderOpts.destinationDir)
+		return utils.OperatorDisabledDefault
 	}
+
+	for _, fInfo := range files {
+		// non-recursive checking of all files where the the source manifests are located
+		if fInfo.IsDir() {
+			continue
+		}
+
+		fullPath := filepath.Join(renderOpts.destinationDir, fInfo.Name())
+		log.Debugf("checking file: %s", fullPath)
+		file, err := os.Open(fullPath)
+		if err != nil {
+			log.WithError(err).Warn("failed to open file while searching for configmap")
+			continue
+		}
+		decoder := yaml.NewYAMLOrJSONDecoder(file, 4096)
+		configMap := &corev1.ConfigMap{}
+		if err := decoder.Decode(configMap); err != nil {
+			log.WithError(err).Debug("failed to decode into configmap")
+			continue
+		}
+
+		if configMap.Namespace == minterv1.CloudCredOperatorNamespace && configMap.Name == minterv1.CloudCredOperatorConfigMap {
+			logger := log.New()
+			logger.SetLevel(log.GetLevel())
+			disabled, err := utils.CCODisabledCheck(configMap, logger)
+			if err != nil {
+				return utils.OperatorDisabledDefault
+			}
+
+			return disabled
+		}
+	}
+
+	return utils.OperatorDisabledDefault
 }
