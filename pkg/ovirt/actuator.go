@@ -41,6 +41,7 @@ const (
 	passwordKey          = "ovirt_password"
 	cafileKey            = "ovirt_cafile"
 	insecureKey          = "ovirt_insecure"
+	cabundleKey          = "ovirt_ca_bundle"
 )
 
 type OvirtActuator struct {
@@ -53,6 +54,7 @@ type OvirtCreds struct {
 	Username string `json:"ovirt_username"`
 	Passord  string `json:"ovirt_password"`
 	CAFile   string `json:"ovirt_cafile"`
+	CABundle string `json:"ovirt_ca_bundle"`
 	Insecure bool   `json:"ovirt_insecure"`
 }
 
@@ -227,6 +229,9 @@ func (a *OvirtActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*co
 	if _, ok := loadedSecret.Data[cafileKey]; !ok {
 		logger.Warningf("secret did not have expected key: %s", cafileKey)
 	}
+	if _, ok := loadedSecret.Data[cabundleKey]; !ok {
+		logger.Warningf("secret did not have expected key: %s", cabundleKey)
+	}
 
 	return loadedSecret, nil
 }
@@ -278,6 +283,10 @@ func secretToCreds(secret *corev1.Secret) (OvirtCreds, error) {
 	if !ok {
 		return c, fmt.Errorf("missing field %s", insecureKey)
 	}
+	caBundle, ok := secret.Data[cabundleKey]
+	if !ok {
+		return c, fmt.Errorf("missing field %s", cabundleKey)
+	}
 
 	c.URL = string(url)
 	c.Username = string(username)
@@ -288,6 +297,7 @@ func secretToCreds(secret *corev1.Secret) (OvirtCreds, error) {
 		return c, fmt.Errorf("failed to parse filed: insecure to boolean from value: %v error: %s", insecure, err)
 	}
 	c.Insecure = parse
+	c.CABundle = string(caBundle)
 	return c, nil
 }
 
@@ -328,5 +338,6 @@ func secretDataFrom(ovirtCreds *OvirtCreds) map[string][]byte {
 		passwordKey: []byte(ovirtCreds.Passord),
 		cafileKey:   []byte(ovirtCreds.CAFile),
 		insecureKey: []byte(strconv.FormatBool(ovirtCreds.Insecure)),
+		cabundleKey: []byte(ovirtCreds.CABundle),
 	}
 }
