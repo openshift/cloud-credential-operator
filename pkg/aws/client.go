@@ -121,7 +121,12 @@ func NewClient(accessKeyID, secretAccessKey []byte, region, infraName string) (C
 		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Version, infraName),
 	})
 
+	return NewClientFromIAMClient(iam.New(s))
+}
+
+// NewClientFromIAMClient create a client from AWS IAM client.
+func NewClientFromIAMClient(client iamiface.IAMAPI) (Client, error) {
 	return &awsClient{
-		iamClient: iam.New(s),
+		iamClient: client,
 	}, nil
 }
