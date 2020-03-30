@@ -79,6 +79,7 @@ var (
 	}
 
 	renderOpts struct {
+		manifestsDir   string
 		destinationDir string
 		ccoImage       string
 		logLevel       string
@@ -86,6 +87,7 @@ var (
 )
 
 func newRenderCommand() *cobra.Command {
+	renderCmd.Flags().StringVar(&renderOpts.manifestsDir, "manifests-dir", "", "The directory where the install-time manifests are located.")
 	renderCmd.Flags().StringVar(&renderOpts.destinationDir, "dest-dir", "", "The destination directory where CCO writes the manifests.")
 	renderCmd.MarkFlagRequired("dest-dir")
 	renderCmd.Flags().StringVar(&renderOpts.ccoImage, "cloud-credential-operator-image", "", "Image for Cloud Credential Operator.")
@@ -152,7 +154,13 @@ func runRenderCmd(cmd *cobra.Command, args []string) {
 // that the operator is enabled by default) for the operator.
 func isDisabled() bool {
 
-	files, err := ioutil.ReadDir(renderOpts.destinationDir)
+	// if were were not provided a place to search for the install-time manifests,
+	// just return the default CCO operator enabled/disabled value
+	if renderOpts.manifestsDir == "" {
+		return utils.OperatorDisabledDefault
+	}
+
+	files, err := ioutil.ReadDir(renderOpts.manifestsDir)
 	if err != nil {
 		log.WithError(err).Errorf("failed to list files in %s, using defualt operator settings", renderOpts.destinationDir)
 		return utils.OperatorDisabledDefault
@@ -164,7 +172,7 @@ func isDisabled() bool {
 			continue
 		}
 
-		fullPath := filepath.Join(renderOpts.destinationDir, fInfo.Name())
+		fullPath := filepath.Join(renderOpts.manifestsDir, fInfo.Name())
 		log.Debugf("checking file: %s", fullPath)
 		file, err := os.Open(fullPath)
 		if err != nil {
