@@ -4,3 +4,6 @@ approvers:
 - dgoodwin
 - joelddiaz
 - twiest
+- staebler
+
+component: "Cloud Credential Operator"
