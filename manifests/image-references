@@ -6,3 +6,7 @@ spec:
     from:
       kind: DockerImage
       Name: quay.io/openshift/origin-cloud-credential-operator
+  - name: aws-pod-identity-webhook
+    from:
+      kind: DockerImage
+      Name: quay.io/openshift/aws-pod-identity-webhook

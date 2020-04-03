@@ -163,6 +163,8 @@ spec:
       - env:
         - name: RELEASE_VERSION
           value: "0.0.1-snapshot"
+        - name: AWS_POD_IDENTITY_WEBHOOK_IMAGE
+          value: quay.io/openshift/aws-pod-identity-webhook:latest
         image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: IfNotPresent
         name: manager
