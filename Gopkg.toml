@@ -1,31 +1,28 @@
 required = [
-    "github.com/aws/aws-sdk-go",
-    "github.com/emicklei/go-restful",
-    "github.com/jteeuwen/go-bindata",
-    "github.com/onsi/ginkgo", # for test framework
-    "github.com/onsi/gomega", # for test matchers
-    "github.com/stretchr/testify/assert",
-    "github.com/openshift/installer/pkg/types",
-    "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
-    "k8s.io/code-generator/cmd/client-gen", # for go generate
-    "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
-    "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
-    "sigs.k8s.io/controller-runtime/pkg/client/config",
-    "sigs.k8s.io/controller-runtime/pkg/controller",
-    "sigs.k8s.io/controller-runtime/pkg/handler",
-    "sigs.k8s.io/controller-runtime/pkg/manager",
-    "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
-    "sigs.k8s.io/controller-runtime/pkg/source",
-    "sigs.k8s.io/testing_frameworks/integration", # for integration testing
-	"k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
-    ]
+  "github.com/aws/aws-sdk-go",
+  "github.com/emicklei/go-restful",
+  "github.com/jteeuwen/go-bindata/go-bindata",
+  "github.com/onsi/ginkgo", # for test framework
+  "github.com/onsi/gomega", # for test matchers
+  "github.com/stretchr/testify/assert",
+  "github.com/openshift/installer/pkg/types",
+  "k8s.io/client-go/plugin/pkg/client/auth/gcp", # for development against gcp
+  "k8s.io/code-generator/cmd/client-gen", # for go generate
+  "k8s.io/code-generator/cmd/deepcopy-gen", # for go generate
+  "sigs.k8s.io/controller-tools/cmd/controller-gen", # for crd/rbac generation
+  "sigs.k8s.io/controller-runtime/pkg/client/config",
+  "sigs.k8s.io/controller-runtime/pkg/controller",
+  "sigs.k8s.io/controller-runtime/pkg/handler",
+  "sigs.k8s.io/controller-runtime/pkg/manager",
+  "sigs.k8s.io/controller-runtime/pkg/runtime/signals",
+  "sigs.k8s.io/controller-runtime/pkg/source",
+  "sigs.k8s.io/testing_frameworks/integration", # for integration testing
+  "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1beta1",
+]
 
 [prune]
   go-tests = true
-
-  [[prune.project]]
-    name = "github.com/jteeuwen/go-bindata"
-    unused-packages = false
+  unused-packages = true
 
 # STANZAS BELOW ARE GENERATED AND MAY BE WRITTEN - DO NOT MODIFY BELOW THIS LINE.
 
