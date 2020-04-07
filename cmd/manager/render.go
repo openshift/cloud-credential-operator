@@ -131,11 +131,12 @@ func runRenderCmd(cmd *cobra.Command, args []string) {
 		}
 	}
 
+	// need at least the empty dir so the installer bootkube.sh script works as expected
+	if err := os.Mkdir(filepath.Join(ccoRenderDir, bootstrapManifestsDir), 0775); err != nil {
+		log.WithError(err).Fatal("error creating bootstrap-manifests directory")
+	}
 	if !operatorDisabled {
 		log.Info("Rendering static pod")
-		if err := os.Mkdir(filepath.Join(ccoRenderDir, bootstrapManifestsDir), 0775); err != nil {
-			log.WithError(err).Fatal("error creating bootstrap-manifests directory")
-		}
 		podPath := filepath.Join(ccoRenderDir, bootstrapManifestsDir, "cloud-credential-operator-pod.yaml")
 		podContent := fmt.Sprintf(podTemplate, renderOpts.ccoImage)
 		log.Infof("writing file: %s", podPath)
