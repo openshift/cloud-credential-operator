@@ -22,7 +22,7 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/appscode/jsonpatch"
+	"gomodules.xyz/jsonpatch/v2"
 	admissionv1beta1 "k8s.io/api/admission/v1beta1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/runtime/inject"
@@ -47,7 +47,7 @@ func (hs multiMutating) Handle(ctx context.Context, req Request) Response {
 	var err error
 	marshaledPatch, err := json.Marshal(patches)
 	if err != nil {
-		return Errored(http.StatusBadRequest, fmt.Errorf("error when marshaling the patch: %v", err))
+		return Errored(http.StatusBadRequest, fmt.Errorf("error when marshaling the patch: %w", err))
 	}
 	return Response{
 		AdmissionResponse: admissionv1beta1.AdmissionResponse{

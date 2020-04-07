@@ -260,6 +260,14 @@ type IAMAPI interface {
 	GenerateCredentialReportWithContext(aws.Context, *iam.GenerateCredentialReportInput, ...request.Option) (*iam.GenerateCredentialReportOutput, error)
 	GenerateCredentialReportRequest(*iam.GenerateCredentialReportInput) (*request.Request, *iam.GenerateCredentialReportOutput)
 
+	GenerateOrganizationsAccessReport(*iam.GenerateOrganizationsAccessReportInput) (*iam.GenerateOrganizationsAccessReportOutput, error)
+	GenerateOrganizationsAccessReportWithContext(aws.Context, *iam.GenerateOrganizationsAccessReportInput, ...request.Option) (*iam.GenerateOrganizationsAccessReportOutput, error)
+	GenerateOrganizationsAccessReportRequest(*iam.GenerateOrganizationsAccessReportInput) (*request.Request, *iam.GenerateOrganizationsAccessReportOutput)
+
+	GenerateServiceLastAccessedDetails(*iam.GenerateServiceLastAccessedDetailsInput) (*iam.GenerateServiceLastAccessedDetailsOutput, error)
+	GenerateServiceLastAccessedDetailsWithContext(aws.Context, *iam.GenerateServiceLastAccessedDetailsInput, ...request.Option) (*iam.GenerateServiceLastAccessedDetailsOutput, error)
+	GenerateServiceLastAccessedDetailsRequest(*iam.GenerateServiceLastAccessedDetailsInput) (*request.Request, *iam.GenerateServiceLastAccessedDetailsOutput)
+
 	GetAccessKeyLastUsed(*iam.GetAccessKeyLastUsedInput) (*iam.GetAccessKeyLastUsedOutput, error)
 	GetAccessKeyLastUsedWithContext(aws.Context, *iam.GetAccessKeyLastUsedInput, ...request.Option) (*iam.GetAccessKeyLastUsedOutput, error)
 	GetAccessKeyLastUsedRequest(*iam.GetAccessKeyLastUsedInput) (*request.Request, *iam.GetAccessKeyLastUsedOutput)
@@ -314,6 +322,10 @@ type IAMAPI interface {
 	GetOpenIDConnectProviderWithContext(aws.Context, *iam.GetOpenIDConnectProviderInput, ...request.Option) (*iam.GetOpenIDConnectProviderOutput, error)
 	GetOpenIDConnectProviderRequest(*iam.GetOpenIDConnectProviderInput) (*request.Request, *iam.GetOpenIDConnectProviderOutput)
 
+	GetOrganizationsAccessReport(*iam.GetOrganizationsAccessReportInput) (*iam.GetOrganizationsAccessReportOutput, error)
+	GetOrganizationsAccessReportWithContext(aws.Context, *iam.GetOrganizationsAccessReportInput, ...request.Option) (*iam.GetOrganizationsAccessReportOutput, error)
+	GetOrganizationsAccessReportRequest(*iam.GetOrganizationsAccessReportInput) (*request.Request, *iam.GetOrganizationsAccessReportOutput)
+
 	GetPolicy(*iam.GetPolicyInput) (*iam.GetPolicyOutput, error)
 	GetPolicyWithContext(aws.Context, *iam.GetPolicyInput, ...request.Option) (*iam.GetPolicyOutput, error)
 	GetPolicyRequest(*iam.GetPolicyInput) (*request.Request, *iam.GetPolicyOutput)
@@ -341,6 +353,14 @@ type IAMAPI interface {
 	GetServerCertificate(*iam.GetServerCertificateInput) (*iam.GetServerCertificateOutput, error)
 	GetServerCertificateWithContext(aws.Context, *iam.GetServerCertificateInput, ...request.Option) (*iam.GetServerCertificateOutput, error)
 	GetServerCertificateRequest(*iam.GetServerCertificateInput) (*request.Request, *iam.GetServerCertificateOutput)
+
+	GetServiceLastAccessedDetails(*iam.GetServiceLastAccessedDetailsInput) (*iam.GetServiceLastAccessedDetailsOutput, error)
+	GetServiceLastAccessedDetailsWithContext(aws.Context, *iam.GetServiceLastAccessedDetailsInput, ...request.Option) (*iam.GetServiceLastAccessedDetailsOutput, error)
+	GetServiceLastAccessedDetailsRequest(*iam.GetServiceLastAccessedDetailsInput) (*request.Request, *iam.GetServiceLastAccessedDetailsOutput)
+
+	GetServiceLastAccessedDetailsWithEntities(*iam.GetServiceLastAccessedDetailsWithEntitiesInput) (*iam.GetServiceLastAccessedDetailsWithEntitiesOutput, error)
+	GetServiceLastAccessedDetailsWithEntitiesWithContext(aws.Context, *iam.GetServiceLastAccessedDetailsWithEntitiesInput, ...request.Option) (*iam.GetServiceLastAccessedDetailsWithEntitiesOutput, error)
+	GetServiceLastAccessedDetailsWithEntitiesRequest(*iam.GetServiceLastAccessedDetailsWithEntitiesInput) (*request.Request, *iam.GetServiceLastAccessedDetailsWithEntitiesOutput)
 
 	GetServiceLinkedRoleDeletionStatus(*iam.GetServiceLinkedRoleDeletionStatusInput) (*iam.GetServiceLinkedRoleDeletionStatusOutput, error)
 	GetServiceLinkedRoleDeletionStatusWithContext(aws.Context, *iam.GetServiceLinkedRoleDeletionStatusInput, ...request.Option) (*iam.GetServiceLinkedRoleDeletionStatusOutput, error)
@@ -448,6 +468,10 @@ type IAMAPI interface {
 
 	ListPoliciesPages(*iam.ListPoliciesInput, func(*iam.ListPoliciesOutput, bool) bool) error
 	ListPoliciesPagesWithContext(aws.Context, *iam.ListPoliciesInput, func(*iam.ListPoliciesOutput, bool) bool, ...request.Option) error
+
+	ListPoliciesGrantingServiceAccess(*iam.ListPoliciesGrantingServiceAccessInput) (*iam.ListPoliciesGrantingServiceAccessOutput, error)
+	ListPoliciesGrantingServiceAccessWithContext(aws.Context, *iam.ListPoliciesGrantingServiceAccessInput, ...request.Option) (*iam.ListPoliciesGrantingServiceAccessOutput, error)
+	ListPoliciesGrantingServiceAccessRequest(*iam.ListPoliciesGrantingServiceAccessInput) (*request.Request, *iam.ListPoliciesGrantingServiceAccessOutput)
 
 	ListPolicyVersions(*iam.ListPolicyVersionsInput) (*iam.ListPolicyVersionsOutput, error)
 	ListPolicyVersionsWithContext(aws.Context, *iam.ListPolicyVersionsInput, ...request.Option) (*iam.ListPolicyVersionsOutput, error)
@@ -572,6 +596,10 @@ type IAMAPI interface {
 	SetDefaultPolicyVersionWithContext(aws.Context, *iam.SetDefaultPolicyVersionInput, ...request.Option) (*iam.SetDefaultPolicyVersionOutput, error)
 	SetDefaultPolicyVersionRequest(*iam.SetDefaultPolicyVersionInput) (*request.Request, *iam.SetDefaultPolicyVersionOutput)
 
+	SetSecurityTokenServicePreferences(*iam.SetSecurityTokenServicePreferencesInput) (*iam.SetSecurityTokenServicePreferencesOutput, error)
+	SetSecurityTokenServicePreferencesWithContext(aws.Context, *iam.SetSecurityTokenServicePreferencesInput, ...request.Option) (*iam.SetSecurityTokenServicePreferencesOutput, error)
+	SetSecurityTokenServicePreferencesRequest(*iam.SetSecurityTokenServicePreferencesInput) (*request.Request, *iam.SetSecurityTokenServicePreferencesOutput)
+
 	SimulateCustomPolicy(*iam.SimulateCustomPolicyInput) (*iam.SimulatePolicyResponse, error)
 	SimulateCustomPolicyWithContext(aws.Context, *iam.SimulateCustomPolicyInput, ...request.Option) (*iam.SimulatePolicyResponse, error)
 	SimulateCustomPolicyRequest(*iam.SimulateCustomPolicyInput) (*request.Request, *iam.SimulatePolicyResponse)
@@ -672,6 +700,12 @@ type IAMAPI interface {
 
 	WaitUntilInstanceProfileExists(*iam.GetInstanceProfileInput) error
 	WaitUntilInstanceProfileExistsWithContext(aws.Context, *iam.GetInstanceProfileInput, ...request.WaiterOption) error
+
+	WaitUntilPolicyExists(*iam.GetPolicyInput) error
+	WaitUntilPolicyExistsWithContext(aws.Context, *iam.GetPolicyInput, ...request.WaiterOption) error
+
+	WaitUntilRoleExists(*iam.GetRoleInput) error
+	WaitUntilRoleExistsWithContext(aws.Context, *iam.GetRoleInput, ...request.WaiterOption) error
 
 	WaitUntilUserExists(*iam.GetUserInput) error
 	WaitUntilUserExistsWithContext(aws.Context, *iam.GetUserInput, ...request.WaiterOption) error

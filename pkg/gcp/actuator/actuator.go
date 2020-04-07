@@ -26,11 +26,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
-	gcputils "github.com/openshift/cloud-credential-operator/pkg/controller/utils/gcp"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 
 	// GCP packages
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
