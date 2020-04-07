@@ -1,80 +1,103 @@
+all: build
+.PHONY: all
 
-# Image URL to use all building/pushing image targets
-IMG ?= cloud-credential-operator:latest
+# Include the library makefile
+include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
+	golang.mk \
+	targets/openshift/bindata.mk \
+	targets/openshift/crd-schema-gen.mk \
+)
 
-DISTRO ?= $(shell if which lsb_release &> /dev/null; then lsb_release -si; else echo "Unknown"; fi)
+# adapted from https://github.com/openshift/build-machinery-go/blob/master/make/targets/openshift/images.mk
 
-# Default fedora to not using sudo since it's not needed
-ifeq ($(DISTRO),Fedora)
-	SUDO_CMD =
-else # Other distros like RHEL 7 and CentOS 7 currently need sudo.
-	SUDO_CMD = sudo
-endif
+# IMAGE_BUILD_EXTRA_FLAGS lets you add extra flags for imagebuilder
+# e.g. to mount secrets and repo information into base image like:
+# make images IMAGE_BUILD_EXTRA_FLAGS='-mount ~/projects/origin-repos/4.2/:/etc/yum.repos.d/'
+IMAGE_BUILD_EXTRA_FLAGS ?= --no-cache
 
-all: test manager
+# $1 - target name
+# $2 - image ref
+# $3 - Dockerfile path
+# $4 - context
+define build-image-internal
+image-$(1):
+	$(strip \
+		podman build \
+		-t $(2) \
+		-f $(3) \
+		$(IMAGE_BUILD_EXTRA_FLAGS) \
+		$(4) \
+	)
+.PHONY: image-$(1)
 
-# Run tests
-test: generate fmt vet manifests
-	go test ./pkg/... ./cmd/... -coverprofile cover.out
+images: image-$(1)
+.PHONY: images
+endef
 
-# Run tests without attempting any code generation. (CI)
-test-no-gen: fmt vet
-	go test ./pkg/... ./cmd/... -coverprofile cover.out
+define build-image
+$(eval $(call build-image-internal,$(1),$(2),$(3),$(4)))
+endef
 
-.PHONY: test-sec
-test-sec:
-	@which gosec 2> /dev/null >&1 || { echo "gosec must be installed to lint code";  exit 1; }
-	gosec -severity medium --confidence medium -quiet ./...
+# Set crd-schema-gen variables
+CONTROLLER_GEN_VERSION := v0.2.1
+CRD_APIS :=./pkg/apis/cloudcredential/v1
 
-# Build manager binary
-manager: generate fmt vet
-	go build -o bin/manager github.com/openshift/cloud-credential-operator/cmd/manager
+# Exclude e2e tests from unit testing
+GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
-# Build without attempting any code generation. (CI)
-build-no-gen: fmt vet
-	go build -o bin/manager github.com/openshift/cloud-credential-operator/cmd/manager
+IMAGE_REGISTRY :=registry.svc.ci.openshift.org
 
-# Run against the configured Kubernetes cluster in ~/.kube/config
-run: generate fmt vet
-	go run ./cmd/manager --log-level=debug
+# This will call a macro called "add-bindata" which will generate bindata specific targets based on the parameters:
+# $0 - macro name
+# $1 - target suffix
+# $2 - input dirs
+# $3 - prefix
+# $4 - pkg
+# $5 - output
+# It will generate targets {update,verify}-bindata-$(1) logically grouping them in unsuffixed versions of these targets
+# and also hooked into {update,verify}-generated for broader integration.
+$(call add-bindata,bootstrap,./bindata/bootstrap/...,bindata,bootstrap,pkg/assets/bootstrap/bindata.go)
+
+# This will call a macro called "build-image" which will generate image specific targets based on the parameters:
+# $0 - macro name
+# $1 - target name
+# $2 - image ref
+# $3 - Dockerfile path
+# $4 - context directory for image build
+$(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/ocp/4.5:cloud-credential-operator, ./Dockerfile,.)
+
+# This will call a macro called "add-crd-gen" will will generate crd manifests based on the parameters:
+# $1 - target name
+# $2 - apis
+# $3 - manifests
+# $4 - output
+$(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
+$(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
+
+update-codegen: update-codegen-crds
+.PHONY: update-codegen
+
+verify-codegen: verify-codegen-crds
+.PHONY: verify-codegen
+
+clean:
+	$(RM) ./cloud-credential-operator
+.PHONY: clean
+
+# Run against the configured cluster in ~/.kube/config
+run: build
+	./cloud-credential-operator operator --log-level=debug
 
 # Install CRDs into a cluster
-install: manifests
-	kubectl apply -f config/crds
+install: update-codegen
+	kubectl apply -f manifests/00_v1_crd.yaml
 
-# Deploy controller in the configured Kubernetes cluster in ~/.kube/config
-.PHONY: manifests
-deploy: manifests
-	kubectl apply -f config/crds
-	kustomize build config | kubectl apply -f -
+# TODO targets for backward compatibility while we make the shift in CI
+test-no-gen: test
+.PHONY: test-no-gen
 
-# Generate manifests e.g. CRD, RBAC etc.
-manifests:
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go crd
-	go run vendor/sigs.k8s.io/controller-tools/cmd/controller-gen/main.go rbac --name cloud-credential-operator
-	# kustomize and move to manifests dir for release image:
-	kustomize build config > manifests/05_deployment.yaml
-	cp config/manager/namespace.yaml manifests/00_namespace.yaml
-	cp config/crds/cloudcredential_v1_credentialsrequest.yaml manifests/00_v1_crd.yaml
+vet: verify-govet
+.PHONY: vet
 
-# Run go fmt against code
-fmt:
-	go fmt ./pkg/... ./cmd/...
-
-# Run go vet against code
-vet:
-	go vet ./pkg/... ./cmd/...
-
-# Generate code
-generate:
-	go generate ./pkg/... ./cmd/...
-	hack/update-bindata.sh
-
-# Build the image with buildah
-.PHONY: buildah-build
-buildah-build: test
-	BUILDAH_ISOLATION=chroot $(SUDO_CMD) buildah bud --tag ${IMG} .
-
-.PHONY: buildah-push
-buildah-push: buildah-build
-	$(SUDO_CMD) buildah push ${IMG}
+build-no-gen: build
+.PHONY: build-no-gen
