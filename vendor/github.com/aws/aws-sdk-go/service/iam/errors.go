@@ -18,7 +18,7 @@ const (
 	// The request was rejected because the most recent credential report has expired.
 	// To generate a new credential report, use GenerateCredentialReport. For more
 	// information about credential report expiration, see Getting Credential Reports
-	// (http://docs.aws.amazon.com/IAM/latest/UserGuide/credential-reports.html)
+	// (https://docs.aws.amazon.com/IAM/latest/UserGuide/credential-reports.html)
 	// in the IAM User Guide.
 	ErrCodeCredentialReportExpiredException = "ReportExpired"
 
@@ -137,8 +137,8 @@ const (
 	// ErrCodeNoSuchEntityException for service response error code
 	// "NoSuchEntity".
 	//
-	// The request was rejected because it referenced an entity that does not exist.
-	// The error message describes the entity.
+	// The request was rejected because it referenced a resource entity that does
+	// not exist. The error message describes the resource.
 	ErrCodeNoSuchEntityException = "NoSuchEntity"
 
 	// ErrCodePasswordPolicyViolationException for service response error code
@@ -161,6 +161,13 @@ const (
 	// The request failed because AWS service role policies can only be attached
 	// to the service-linked role for that service.
 	ErrCodePolicyNotAttachableException = "PolicyNotAttachable"
+
+	// ErrCodeReportGenerationLimitExceededException for service response error code
+	// "ReportGenerationLimitExceeded".
+	//
+	// The request failed because the maximum number of concurrent requests for
+	// this account are already running.
+	ErrCodeReportGenerationLimitExceededException = "ReportGenerationLimitExceeded"
 
 	// ErrCodeServiceFailureException for service response error code
 	// "ServiceFailure".

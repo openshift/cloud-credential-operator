@@ -31,7 +31,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	azuremock "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -43,7 +43,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 const (

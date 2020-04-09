@@ -17,7 +17,7 @@ limitations under the License.
 package azure
 
 import (
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	corev1 "k8s.io/api/core/v1"
 )
 
