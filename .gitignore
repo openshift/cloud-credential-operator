@@ -1,17 +1,3 @@
-# Binaries for programs and plugins
-*.exe
-*.exe~
-*.dll
-*.so
-*.dylib
-
-# Test binary, build with `go test -c`
-*.test
-
-bin/*
-
-# Output of the go coverage tool, specifically when used with LiteIDE
-*.out
-
-# IDE stuff
-.vscode
+/cloud-credential-operator
+.vscode/
+/_output/

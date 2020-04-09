@@ -27,10 +27,10 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/controller/credentialsrequest/actuator"
-	awsannotator "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/aws"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/controller/secretannotator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/controller/utils"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
 

@@ -1,27 +1,15 @@
-#
-# Dockerfile for building local images.
-#
-
-# Build the manager binary
-FROM registry.svc.ci.openshift.org/openshift/release:golang-1.10 as builder
-
-# Copy in the go src
+FROM registry.svc.ci.openshift.org/openshift/release:golang-1.13 as builder
 WORKDIR /go/src/github.com/openshift/cloud-credential-operator
-COPY pkg/    pkg/
-COPY cmd/    cmd/
-COPY vendor/ vendor/
-COPY version/ version/
+COPY . .
+ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
+RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/cloud-credential-operator
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux go build -a -o manager github.com/openshift/cloud-credential-operator/cmd/manager
-
-# Copy the controller-manager into a thin image
-FROM registry.svc.ci.openshift.org/openshift/origin-v4.0:base
-WORKDIR /root/
-COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/manager .
-ADD manifests/ /manifests
+FROM registry.svc.ci.openshift.org/ocp/4.5:base
+COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/cloud-credential-operator /usr/bin/
+COPY manifests /manifests
 # Update perms so we can copy updated CA if needed
 RUN chmod -R g+w /etc/pki/ca-trust/extracted/pem/
-
 LABEL io.openshift.release.operator=true
-ENTRYPOINT ["./manager"]
+# TODO make path explicit here to remove need for ENTRYPOINT
+# https://github.com/openshift/installer/blob/a8ddf6619794416c4600a827c2d9284724d382d8/data/data/bootstrap/files/usr/local/bin/bootkube.sh.template#L347
+ENTRYPOINT [ "/usr/bin/cloud-credential-operator" ]

@@ -7,8 +7,8 @@ package mock
 import (
 	context "context"
 	gomock "github.com/golang/mock/gomock"
-	v1 "google.golang.org/api/cloudresourcemanager/v1"
-	v10 "google.golang.org/genproto/googleapis/iam/admin/v1"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	admin "google.golang.org/genproto/googleapis/iam/admin/v1"
 	reflect "reflect"
 )
 
@@ -36,10 +36,10 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // CreateServiceAccount mocks base method
-func (m *MockClient) CreateServiceAccount(arg0 context.Context, arg1 *v10.CreateServiceAccountRequest) (*v10.ServiceAccount, error) {
+func (m *MockClient) CreateServiceAccount(arg0 context.Context, arg1 *admin.CreateServiceAccountRequest) (*admin.ServiceAccount, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateServiceAccount", arg0, arg1)
-	ret0, _ := ret[0].(*v10.ServiceAccount)
+	ret0, _ := ret[0].(*admin.ServiceAccount)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -51,10 +51,10 @@ func (mr *MockClientMockRecorder) CreateServiceAccount(arg0, arg1 interface{}) *
 }
 
 // CreateServiceAccountKey mocks base method
-func (m *MockClient) CreateServiceAccountKey(arg0 context.Context, arg1 *v10.CreateServiceAccountKeyRequest) (*v10.ServiceAccountKey, error) {
+func (m *MockClient) CreateServiceAccountKey(arg0 context.Context, arg1 *admin.CreateServiceAccountKeyRequest) (*admin.ServiceAccountKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateServiceAccountKey", arg0, arg1)
-	ret0, _ := ret[0].(*v10.ServiceAccountKey)
+	ret0, _ := ret[0].(*admin.ServiceAccountKey)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -66,7 +66,7 @@ func (mr *MockClientMockRecorder) CreateServiceAccountKey(arg0, arg1 interface{}
 }
 
 // DeleteServiceAccount mocks base method
-func (m *MockClient) DeleteServiceAccount(arg0 context.Context, arg1 *v10.DeleteServiceAccountRequest) error {
+func (m *MockClient) DeleteServiceAccount(arg0 context.Context, arg1 *admin.DeleteServiceAccountRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteServiceAccount", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -80,7 +80,7 @@ func (mr *MockClientMockRecorder) DeleteServiceAccount(arg0, arg1 interface{}) *
 }
 
 // DeleteServiceAccountKey mocks base method
-func (m *MockClient) DeleteServiceAccountKey(arg0 context.Context, arg1 *v10.DeleteServiceAccountKeyRequest) error {
+func (m *MockClient) DeleteServiceAccountKey(arg0 context.Context, arg1 *admin.DeleteServiceAccountKeyRequest) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteServiceAccountKey", arg0, arg1)
 	ret0, _ := ret[0].(error)
@@ -94,10 +94,10 @@ func (mr *MockClientMockRecorder) DeleteServiceAccountKey(arg0, arg1 interface{}
 }
 
 // GetRole mocks base method
-func (m *MockClient) GetRole(arg0 context.Context, arg1 *v10.GetRoleRequest) (*v10.Role, error) {
+func (m *MockClient) GetRole(arg0 context.Context, arg1 *admin.GetRoleRequest) (*admin.Role, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetRole", arg0, arg1)
-	ret0, _ := ret[0].(*v10.Role)
+	ret0, _ := ret[0].(*admin.Role)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -109,10 +109,10 @@ func (mr *MockClientMockRecorder) GetRole(arg0, arg1 interface{}) *gomock.Call {
 }
 
 // GetServiceAccount mocks base method
-func (m *MockClient) GetServiceAccount(arg0 context.Context, arg1 *v10.GetServiceAccountRequest) (*v10.ServiceAccount, error) {
+func (m *MockClient) GetServiceAccount(arg0 context.Context, arg1 *admin.GetServiceAccountRequest) (*admin.ServiceAccount, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetServiceAccount", arg0, arg1)
-	ret0, _ := ret[0].(*v10.ServiceAccount)
+	ret0, _ := ret[0].(*admin.ServiceAccount)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -124,10 +124,10 @@ func (mr *MockClientMockRecorder) GetServiceAccount(arg0, arg1 interface{}) *gom
 }
 
 // ListServiceAccountKeys mocks base method
-func (m *MockClient) ListServiceAccountKeys(arg0 context.Context, arg1 *v10.ListServiceAccountKeysRequest) (*v10.ListServiceAccountKeysResponse, error) {
+func (m *MockClient) ListServiceAccountKeys(arg0 context.Context, arg1 *admin.ListServiceAccountKeysRequest) (*admin.ListServiceAccountKeysResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ListServiceAccountKeys", arg0, arg1)
-	ret0, _ := ret[0].(*v10.ListServiceAccountKeysResponse)
+	ret0, _ := ret[0].(*admin.ListServiceAccountKeysResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -139,10 +139,10 @@ func (mr *MockClientMockRecorder) ListServiceAccountKeys(arg0, arg1 interface{})
 }
 
 // GetProjectIamPolicy mocks base method
-func (m *MockClient) GetProjectIamPolicy(projectName string, request *v1.GetIamPolicyRequest) (*v1.Policy, error) {
+func (m *MockClient) GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetProjectIamPolicy", projectName, request)
-	ret0, _ := ret[0].(*v1.Policy)
+	ret0, _ := ret[0].(*cloudresourcemanager.Policy)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -168,10 +168,10 @@ func (mr *MockClientMockRecorder) GetProjectName() *gomock.Call {
 }
 
 // SetProjectIamPolicy mocks base method
-func (m *MockClient) SetProjectIamPolicy(projectName string, request *v1.SetIamPolicyRequest) (*v1.Policy, error) {
+func (m *MockClient) SetProjectIamPolicy(projectName string, request *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetProjectIamPolicy", projectName, request)
-	ret0, _ := ret[0].(*v1.Policy)
+	ret0, _ := ret[0].(*cloudresourcemanager.Policy)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -183,10 +183,10 @@ func (mr *MockClientMockRecorder) SetProjectIamPolicy(projectName, request inter
 }
 
 // TestIamPermissions mocks base method
-func (m *MockClient) TestIamPermissions(arg0 string, arg1 *v1.TestIamPermissionsRequest) (*v1.TestIamPermissionsResponse, error) {
+func (m *MockClient) TestIamPermissions(arg0 string, arg1 *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "TestIamPermissions", arg0, arg1)
-	ret0, _ := ret[0].(*v1.TestIamPermissionsResponse)
+	ret0, _ := ret[0].(*cloudresourcemanager.TestIamPermissionsResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
