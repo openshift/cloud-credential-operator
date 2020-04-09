@@ -6,6 +6,7 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/bindata.mk \
 	targets/openshift/crd-schema-gen.mk \
+	targets/openshift/deps.mk \
 )
 
 # adapted from https://github.com/openshift/build-machinery-go/blob/master/make/targets/openshift/images.mk
