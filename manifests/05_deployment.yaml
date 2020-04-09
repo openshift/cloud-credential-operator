@@ -214,7 +214,7 @@ spec:
           value: quay.io/openshift/aws-pod-identity-webhook:latest
         image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: IfNotPresent
-        name: manager
+        name: cloud-credential-operator
         ports:
         - containerPort: 9876
           name: webhook-server

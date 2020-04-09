@@ -49,7 +49,7 @@ spec:
     - --kubeconfig=/etc/kubernetes/secrets/kubeconfig
     image: %s
     imagePullPolicy: IfNotPresent
-    name: manager
+    name: cloud-credential-operator
     volumeMounts:
     - mountPath: /etc/kubernetes/secrets
       name: secrets
