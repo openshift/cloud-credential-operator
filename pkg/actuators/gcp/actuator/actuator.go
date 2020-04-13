@@ -25,8 +25,8 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"

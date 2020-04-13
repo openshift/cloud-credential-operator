@@ -24,9 +24,9 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	ccaws "github.com/openshift/cloud-credential-operator/pkg/actuators/aws"
+	minteraws "github.com/openshift/cloud-credential-operator/pkg/actuators/aws"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"

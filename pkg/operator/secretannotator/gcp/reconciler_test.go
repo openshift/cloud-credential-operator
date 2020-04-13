@@ -36,10 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp"
+	mockgcp "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
-	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 

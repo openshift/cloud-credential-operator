@@ -22,7 +22,7 @@ import (
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp"
 )
 
 // ensurePolicyBindings will add and remove any policy bindings for the service account to match the

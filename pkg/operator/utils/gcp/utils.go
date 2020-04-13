@@ -22,8 +22,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 

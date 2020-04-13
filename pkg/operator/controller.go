@@ -17,18 +17,18 @@ limitations under the License.
 package controller
 
 import (
-	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/azure"
-	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/openstack"
+	awsactuator "github.com/openshift/cloud-credential-operator/pkg/actuators/aws/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/actuators/azure"
+	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/actuators/openstack"
+	"github.com/openshift/cloud-credential-operator/pkg/actuators/ovirt"
+	vsphereactuator "github.com/openshift/cloud-credential-operator/pkg/actuators/vsphere/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/configmap"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator"
-	"github.com/openshift/cloud-credential-operator/pkg/ovirt"
-	vsphereactuator "github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 
 	configv1 "github.com/openshift/api/config/v1"
 

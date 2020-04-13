@@ -25,7 +25,7 @@ import (
 
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp"
 )
 
 var (

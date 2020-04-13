@@ -24,7 +24,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/actuators/gcp"
 )
 
 func getPermissionsFromRoles(gcpClient ccgcp.Client, roles []string) ([]string, error) {

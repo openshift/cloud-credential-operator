@@ -39,10 +39,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 
+	ccaws "github.com/openshift/cloud-credential-operator/pkg/actuators/aws"
+	mockaws "github.com/openshift/cloud-credential-operator/pkg/actuators/aws/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 
 	annaws "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"

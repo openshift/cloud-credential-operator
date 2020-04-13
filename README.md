@@ -100,6 +100,6 @@ Currently this repository only supports AWS, but uses an actuator pattern to all
 The rough steps to add a new cloud provider would be:
 
  1. Update the API to cover how credentials/permissions are defined on the new provider. (see AWS types [here](https://github.com/openshift/cloud-credential-operator/blob/master/pkg/apis/cloudcredential/v1/aws_types.go)) These types are embedded into the main CredentialsRequest as a RawExtension.
- 1. Implement the very simple [Actuator interface](https://github.com/openshift/cloud-credential-operator/blob/master/pkg/controller/credentialsrequest/actuator/actuator.go). ([AWS implementation](https://github.com/openshift/cloud-credential-operator/tree/master/pkg/aws/actuator))
+ 1. Implement the very simple [Actuator interface](https://github.com/openshift/cloud-credential-operator/blob/master/pkg/controller/credentialsrequest/actuator/actuator.go). ([AWS implementation](https://github.com/openshift/cloud-credential-operator/tree/master/pkg/actuators/aws/actuator))
  1. Instantiate your actuator when we detect we're running on that cloud provider, which happens in the [AddToManager](https://github.com/openshift/cloud-credential-operator/blob/master/pkg/controller/controller.go#L49) function.
  1. Coordinate with OpenShift teams who use and ship CredentialsRequests. (machine-api, registry, ingress)

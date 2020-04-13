@@ -21,7 +21,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/actuators/gcp/mock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
