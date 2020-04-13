@@ -175,7 +175,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   annotations:
-    config.openshift.io/inject-proxy: manager
+    config.openshift.io/inject-proxy: cloud-credential-operator
     exclude.release.openshift.io/internal-openshift-hosted: "true"
   labels:
     control-plane: controller-manager
