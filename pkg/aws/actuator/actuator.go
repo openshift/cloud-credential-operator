@@ -901,9 +901,10 @@ func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, us
 	}
 	for _, se := range entries {
 		policyDoc.Statement = append(policyDoc.Statement, StatementEntry{
-			Effect:   se.Effect,
-			Action:   se.Action,
-			Resource: se.Resource,
+			Effect:    se.Effect,
+			Action:    se.Action,
+			Resource:  se.Resource,
+			Condition: se.PolicyCondition,
 		})
 	}
 
@@ -1154,9 +1155,10 @@ type PolicyDocument struct {
 // StatementEntry is a simple type used to serialize to AWS' PolicyDocument format. We cannot
 // re-use minterv1.StatementEntry due to different conventions for the serialization keys. (caps)
 type StatementEntry struct {
-	Effect   string
-	Action   []string
-	Resource string
+	Effect    string
+	Action    []string
+	Resource  string
+	Condition minterv1.IAMPolicyCondition `json:",omitempty"`
 }
 
 func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (configv1.ClusterID, error) {
