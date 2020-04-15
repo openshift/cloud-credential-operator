@@ -3,7 +3,8 @@ Cloud Credential Operator can be disabled prior to install in environments where
   * Run the OpenShift installer to generate manifests:
     * `openshift-install create manifests --dir=mycluster`
   * Insert a ConfigMap into the manifests directory so the the Cloud Credential Operator will be disabled:
-    * ```apiVersion: v1
+    * ```
+      apiVersion: v1
       kind: ConfigMap
       metadata:
         name: cloud-credential-operator-config
