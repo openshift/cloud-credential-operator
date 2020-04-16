@@ -44,7 +44,7 @@ spec:
   - command:
     - /usr/bin/cloud-credential-operator
     args:
-	- operator
+    - operator
     - --log-level=debug
     - --kubeconfig=/etc/kubernetes/secrets/kubeconfig
     image: %s
