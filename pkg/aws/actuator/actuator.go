@@ -31,6 +31,7 @@ import (
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -63,7 +64,7 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 type AWSActuator struct {
 	Client           client.Client
 	Codec            *minterv1.ProviderCodec
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, region, infraName string) (ccaws.Client, error)
+	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 	Scheme           *runtime.Scheme
 }
 
@@ -78,7 +79,7 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator,
 	return &AWSActuator{
 		Codec:            codec,
 		Client:           client,
-		AWSClientBuilder: ccaws.NewClient,
+		AWSClientBuilder: awsutils.ClientBuilder,
 		Scheme:           scheme,
 	}, nil
 }
@@ -141,7 +142,7 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 
 // needsUpdate will return whether the current credentials satisfy what's being requested
 // in the CredentialsRequest
-func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest, region, infraName string) (bool, error) {
+func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
 	logger := a.getLogger(cr)
 	// If the secret simply doesn't exist, we definitely need an update
 	exists, err := a.Exists(ctx, cr)
@@ -154,7 +155,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	// Various checks for the kinds of reasons that would trigger a needed update
 	_, accessKey, secretKey := a.loadExistingSecret(cr)
-	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey), region, infraName)
+	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey), a.Client)
 	if err != nil {
 		return true, err
 	}
@@ -168,7 +169,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
 
-	readAWSClient, err := a.buildReadAWSClient(cr, region, infraName)
+	readAWSClient, err := a.buildReadAWSClient(cr)
 	if err != nil {
 		log.WithError(err).Error("error creating read-only AWS client")
 		return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
@@ -190,6 +191,10 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			return true, err
 		}
 
+		infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+		if err != nil {
+			return true, err
+		}
 		if !userHasExpectedTags(logger, user.User, infraName, string(clusterUUID)) {
 			return true, nil
 		}
@@ -223,6 +228,10 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	} else {
 		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
+		region, err := awsutils.LoadInfrastructureRegion(a.Client, logger)
+		if err != nil {
+			return true, err
+		}
 		simParams := &ccaws.SimulateParams{
 			Region: region,
 		}
@@ -256,18 +265,8 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
-	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
-	if err != nil {
-		return err
-	}
-
-	region, err := utils.LoadInfrastructureRegion(a.Client, logger)
-	if err != nil {
-		return err
-	}
-
 	// Should we update anything
-	needsUpdate, err := a.needsUpdate(ctx, cr, region, infraName)
+	needsUpdate, err := a.needsUpdate(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("error determining whether a credentials update is needed")
 		return &actuatoriface.ActuatorError{
@@ -304,7 +303,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.MintAnnotation {
 		logger.Debugf("provisioning with cred minting")
-		err := a.syncMint(ctx, cr, region, infraName, logger)
+		err := a.syncMint(ctx, cr, logger)
 		if err != nil {
 			msg := "error syncing creds in mint-mode"
 			logger.WithError(err).Error(msg)
@@ -337,7 +336,7 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 }
 
 // syncMint handles both create and update idempotently.
-func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, region, infraName string, logger log.FieldLogger) error {
+func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	var err error
 
 	awsSpec, err := DecodeProviderSpec(a.Codec, cr)
@@ -346,6 +345,11 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 
 	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
+	if err != nil {
+		return err
+	}
+
+	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
 	if err != nil {
 		return err
 	}
@@ -375,12 +379,12 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		}
 	}
 
-	rootAWSClient, err := a.buildRootAWSClient(cr, region, infraName)
+	rootAWSClient, err := a.buildRootAWSClient(cr)
 	if err != nil {
 		logger.WithError(err).Warn("error building root AWS client, will error if one must be used")
 	}
 
-	readAWSClient, err := a.buildReadAWSClient(cr, region, infraName)
+	readAWSClient, err := a.buildReadAWSClient(cr)
 	if err != nil {
 		logger.WithError(err).Error("error building read-only AWS client")
 		return err
@@ -595,16 +599,8 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	logger = logger.WithField("userName", awsStatus.User)
 
 	logger.Info("deleting credential from AWS")
-	region, err := utils.LoadInfrastructureRegion(a.Client, logger)
-	if err != nil {
-		return err
-	}
-	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
-	if err != nil {
-		return err
-	}
 
-	awsClient, err := a.buildRootAWSClient(cr, region, infraName)
+	awsClient, err := a.buildRootAWSClient(cr)
 	if err != nil {
 		return err
 	}
@@ -730,7 +726,7 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 
 // buildRootAWSClient will return an AWS client using the "root" AWS creds which are expected to
 // live in kube-system/aws-creds.
-func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest, region, infraName string) (minteraws.Client, error) {
+func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", rootAWSCredsSecretNamespace, rootAWSCredsSecret))
 
 	logger.Debug("loading AWS credentials from secret")
@@ -742,7 +738,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest, region
 	}
 
 	logger.Debug("creating root AWS client")
-	return a.AWSClientBuilder(accessKeyID, secretAccessKey, region, infraName)
+	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.Client)
 }
 
 // buildReadAWSCreds will return an AWS client using the the scaled down read only AWS creds
@@ -752,7 +748,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest, region
 //
 // If these are not available but root creds are, we will use the root creds instead.
 // This allows us to create the read creds initially.
-func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, region, infraName string) (minteraws.Client, error) {
+func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", roAWSCredsSecretNamespace, roAWSCredsSecret))
 	logger.Debug("loading AWS credentials from secret")
 
@@ -765,12 +761,12 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, region
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Warn("read-only creds not found, using root creds client")
-			return a.buildRootAWSClient(cr, region, infraName)
+			return a.buildRootAWSClient(cr)
 		}
 	}
 
 	logger.Debug("creating read AWS client")
-	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey, region, infraName)
+	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey, a.Client)
 	if err != nil {
 		return nil, err
 	}
@@ -789,7 +785,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest, region
 			switch aerr.Code() {
 			case "InvalidClientTokenId":
 				logger.Warn("InvalidClientTokenId for read-only AWS account, likely a propagation delay, falling back to root AWS client")
-				return a.buildRootAWSClient(cr, region, infraName)
+				return a.buildRootAWSClient(cr)
 			}
 			// Any other error we just let following code sort out.
 		}
