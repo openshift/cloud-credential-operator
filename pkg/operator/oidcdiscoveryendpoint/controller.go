@@ -21,9 +21,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
+	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 
 	configv1 "github.com/openshift/api/config/v1"
 	configset "github.com/openshift/client-go/config/clientset/versioned"
@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -121,12 +122,13 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 	}
 
 	r := &s3EndpointReconciler{
-		kubeclientset:      kubeclientset,
-		configclientset:    configclientset,
-		logger:             logger,
-		eventRecorder:      eventRecorder,
-		infrastructureName: infraStatus.InfrastructureName,
-		region:             infraStatus.PlatformStatus.AWS.Region,
+		controllerRuntimeClient: mgr.GetClient(),
+		kubeclientset:           kubeclientset,
+		configclientset:         configclientset,
+		logger:                  logger,
+		eventRecorder:           eventRecorder,
+		infrastructureName:      infraStatus.InfrastructureName,
+		region:                  infraStatus.PlatformStatus.AWS.Region,
 	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
@@ -180,12 +182,13 @@ func isServiceAccountTokenSigner(meta metav1.Object) bool {
 }
 
 type s3EndpointReconciler struct {
-	kubeclientset      *kubernetes.Clientset
-	configclientset    *configset.Clientset
-	logger             log.FieldLogger
-	eventRecorder      events.Recorder
-	infrastructureName string
-	region             string
+	controllerRuntimeClient client.Client
+	kubeclientset           *kubernetes.Clientset
+	configclientset         *configset.Clientset
+	logger                  log.FieldLogger
+	eventRecorder           events.Recorder
+	infrastructureName      string
+	region                  string
 }
 
 var _ reconcile.Reconciler = &s3EndpointReconciler{}
@@ -274,7 +277,7 @@ func (r *s3EndpointReconciler) reconcileS3Resources() error {
 		return fmt.Errorf("couldn't fetch key containing %s from cloud cred secret", awsannotator.AwsSecretAccessKeyName)
 	}
 
-	awsClient, err := aws.NewClient(accessKey, secretKey, r.region, r.infrastructureName)
+	awsClient, err := awsutils.ClientBuilder(accessKey, secretKey, r.controllerRuntimeClient)
 	if err != nil {
 		return fmt.Errorf("error creating aws client: %v", err)
 	}

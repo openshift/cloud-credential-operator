@@ -29,6 +29,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
@@ -53,7 +54,7 @@ type awsClientBuilderRecorder struct {
 	fakeAWSClientError error
 }
 
-func (a *awsClientBuilderRecorder) ClientBuilder(accessKeyID, secretAccessKey []byte, region, infra string) (ccaws.Client, error) {
+func (a *awsClientBuilderRecorder) ClientBuilder(accessKeyID, secretAccessKey []byte, client client.Client) (ccaws.Client, error) {
 	a.accessKeyID = accessKeyID
 	a.secretAccessKey = secretAccessKey
 
@@ -195,7 +196,7 @@ func TestCredentialsFetching(t *testing.T) {
 				AWSClientBuilder: clientRecorder.ClientBuilder,
 			}
 
-			aClient, err := a.buildReadAWSClient(test.credentialsRequest, "testregion", "testinfra")
+			aClient, err := a.buildReadAWSClient(test.credentialsRequest)
 
 			if test.expectedError {
 				assert.Error(t, err, "expected error for test case")

@@ -17,6 +17,7 @@ limitations under the License.
 package aws
 
 import (
+	"github.com/aws/aws-sdk-go/aws"
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
@@ -51,6 +52,14 @@ type Client interface {
 	CreateBucket(*s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
 	PutBucketTagging(*s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error)
 	PutObject(*s3.PutObjectInput) (*s3.PutObjectOutput, error)
+}
+
+// ClientParams holds the various optional tunables that can be used to modify the AWS
+// client that will be used for API calls.
+type ClientParams struct {
+	InfraName string
+	Region    string
+	Endpoint  string
 }
 
 type awsClient struct {
@@ -122,11 +131,17 @@ func (c *awsClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, er
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
-func NewClient(accessKeyID, secretAccessKey []byte, region, infraName string) (Client, error) {
+func NewClient(accessKeyID, secretAccessKey []byte, params *ClientParams) (Client, error) {
 	awsConfig := &awssdk.Config{}
 
-	if region != "" {
-		awsConfig.Region = &region
+	if params != nil {
+		if params.Region != "" {
+			awsConfig.Region = aws.String(params.Region)
+		}
+
+		if params.Endpoint != "" {
+			awsConfig.Endpoint = aws.String(params.Endpoint)
+		}
 	}
 
 	awsConfig.Credentials = credentials.NewStaticCredentials(
@@ -136,9 +151,14 @@ func NewClient(accessKeyID, secretAccessKey []byte, region, infraName string) (C
 	if err != nil {
 		return nil, err
 	}
+
+	agentText := "defaultAgent"
+	if params != nil && params.InfraName != "" {
+		agentText = params.InfraName
+	}
 	s.Handlers.Build.PushBackNamed(request.NamedHandler{
 		Name: "openshift.io/cloud-credential-operator",
-		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Get().String(), infraName),
+		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Get().String(), agentText),
 	})
 
 	return &awsClient{
