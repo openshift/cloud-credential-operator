@@ -15,9 +15,11 @@ require (
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/mock v1.4.3
+	github.com/imdario/mergo v0.3.7 // indirect
 	github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
-	github.com/openshift/api v0.0.0-20200210091934-a0e53e94816b
+	github.com/openshift/api v0.0.0-20200414152312-3e8f22fb0b56
 	github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160
+	github.com/openshift/library-go v0.0.0-20200407165825-2e79bd232e72
 	github.com/prometheus/client_golang v1.5.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.5.0
