@@ -21,6 +21,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/openstack"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/awspodidentity"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/configmap"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
@@ -46,6 +47,7 @@ func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs, configmap.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, metrics.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, secretannotator.Add)
+	AddToManagerFuncs = append(AddToManagerFuncs, awspodidentity.Add)
 	AddToManagerWithActuatorFuncs = append(AddToManagerWithActuatorFuncs, credentialsrequest.AddWithActuator)
 }
 
