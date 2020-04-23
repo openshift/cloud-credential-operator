@@ -8,4 +8,3 @@ status:
   versions:
   - name: operator
     version: "0.0.1-snapshot"
-
