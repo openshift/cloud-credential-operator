@@ -44,15 +44,66 @@ const (
 	CloudCredOperatorConfigMap = "cloud-credential-operator-config"
 )
 
-// NOTE: Run "make" to regenerate code after modifying this file
+// NOTE: Run "make update" to regenerate code after modifying this file
 
 // CredentialsRequestSpec defines the desired state of CredentialsRequest
 type CredentialsRequestSpec struct {
 	// SecretRef points to the secret where the credentials should be stored once generated.
-	SecretRef corev1.ObjectReference `json:"secretRef"`
+	// +optional
+	SecretRef corev1.ObjectReference `json:"secretRef,omitempty"`
+
+	// Storage specifies the type and location of a resource to which the credentials
+	// information can be stored or linked.
+	Storage Storage `json:"storage,omitempty"`
 
 	// ProviderSpec contains the cloud provider specific credentials specification.
 	ProviderSpec *runtime.RawExtension `json:"providerSpec,omitempty"`
+}
+
+const (
+	SecretStorageType         = "Secret"
+	ServiceAccountStorageType = "ServiceAccount"
+)
+
+// Storage defines the type and location of a resource to which the credentials
+// information can be stored or linked.
+// +union
+type Storage struct {
+	// StorageType contains the type of storage that should be used for the credentials.
+	// +unionDiscriminator
+	// +required
+	Type string `json:"type"`
+
+	// Secret specifies a secret in which to store the credentials.
+	// +optional
+	Secret *SecretStorage `json:"secret,omitempty"`
+
+	// ServiceAccount specifies a serviceaccount to which the credentials will be linked.
+	// This is currently only supported on AWS.
+	// +optional
+	ServiceAccount *ServiceAccountStorage `json:"serviceAccount,omitempty"`
+}
+
+// SecretStorage specifies a secret into which user credentials will be injected.
+type SecretStorage struct {
+	// Namespace specifies the namespace of the secret into which user credentials will be injected
+	// +required
+	Namespace string `json:"namespace"`
+
+	// Name specifies the name of the secret into which user credentials will be injected
+	// +required
+	Name string `json:"name"`
+}
+
+// ServiceAccountStorage specifies a serviceaccount to which a role will be linked.
+type ServiceAccountStorage struct {
+	// Namespace specifies the namespace of the serviceaccount to which a role will be linked.
+	// +required
+	Namespace string `json:"namespace"`
+
+	// Name specifies the name of the serviceaccount to which a role will be linked.
+	// +required
+	Name string `json:"name"`
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest

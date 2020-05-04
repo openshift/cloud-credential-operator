@@ -117,6 +117,9 @@ func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 // difference. As such we will not check if the user exists in AWS and is correctly configured
 // as this will all be handled in both Create and Update.
 func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	if cr.Spec.Storage.Type != minterv1.SecretStorageType {
+		return false, fmt.Errorf("storage type %s is not yet supported by the AWS actuator", cr.Spec.Storage.Type)
+	}
 	logger := a.getLogger(cr)
 	logger.Debug("running Exists")
 	var err error
@@ -258,6 +261,9 @@ func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsReques
 }
 
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if cr.Spec.Storage.Type != minterv1.SecretStorageType {
+		return fmt.Errorf("storage type %s is not yet supported by the AWS actuator", cr.Spec.Storage.Type)
+	}
 	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
 		return err
 	}
@@ -585,6 +591,9 @@ func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.Field
 
 // Delete the credentials. If no error is returned, it is assumed that all dependent resources have been cleaned up.
 func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
+	if cr.Spec.Storage.Type != minterv1.SecretStorageType {
+		return fmt.Errorf("storage type %s is not yet supported by the AWS actuator", cr.Spec.Storage.Type)
+	}
 	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
 		return err
 	}

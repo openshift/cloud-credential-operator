@@ -83,8 +83,6 @@ spec:
         spec:
           description: CredentialsRequestSpec defines the desired state of CredentialsRequest
           type: object
-          required:
-          - secretRef
           properties:
             providerSpec:
               description: ProviderSpec contains the cloud provider specific credentials
@@ -126,6 +124,49 @@ spec:
                   type: string
                 uid:
                   description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                  type: string
+            storage:
+              description: Storage specifies the type and location of a resource to
+                which the credentials information can be stored or linked
+              type: object
+              required:
+              - type
+              properties:
+                secret:
+                  description: Secret specifies a secret in which to store the credentials
+                  type: object
+                  required:
+                  - name
+                  - namespace
+                  properties:
+                    name:
+                      description: Name specifies the name of the secret into which
+                        user credentials will be injected
+                      type: string
+                    namespace:
+                      description: Namespace specifies the namespace of the secret
+                        into which user credentials will be injected
+                      type: string
+                serviceAccount:
+                  description: ServiceAccount specifies a serviceaccount to which
+                    the credentials will be linked This is currently only supported
+                    on AWS
+                  type: object
+                  required:
+                  - name
+                  - namespace
+                  properties:
+                    name:
+                      description: Name specifies the name of the serviceaccount to
+                        which a role will be linked
+                      type: string
+                    namespace:
+                      description: Namespace specifies the namespace of the serviceaccount
+                        to which a role will be linked
+                      type: string
+                type:
+                  description: StorageType contains the type of storage that should
+                    be used for the credentials
                   type: string
         status:
           description: CredentialsRequestStatus defines the observed state of CredentialsRequest

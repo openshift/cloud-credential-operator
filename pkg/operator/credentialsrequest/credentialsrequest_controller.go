@@ -66,7 +66,10 @@ const (
 	cloudCredDeprovisionFailure = "CloudCredDeprovisionFailure"
 	cloudCredDeprovisionSuccess = "CloudCredDeprovisionSuccess"
 
-	credentialsRequestInfraMismatch = "InfrastructureMismatch"
+	credentialsRequestInfraMismatch          = "InfrastructureMismatch"
+	credentialsRequestUnsupportedStorageType = "UnsupportedStorageType"
+	credentialsRequestInvalidStorageRef      = "InvalidStorageRef"
+	credentialsRequestInvalidStorageType     = "InvalidStorageType"
 )
 
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
@@ -199,18 +202,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			mgr.GetClient().List(context.TODO(), crs)
 			requests := []reconcile.Request{}
 			for _, cr := range crs.Items {
-				if !cr.Status.Provisioned && cr.Spec.SecretRef.Namespace == newNamespace {
-					log.WithFields(log.Fields{
-						"namespace": newNamespace,
-						"cr":        fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
-					}).Info("found credentials request for namespace")
-					requests = append(requests, reconcile.Request{
-						NamespacedName: types.NamespacedName{
-							Name:      cr.Name,
-							Namespace: cr.Namespace,
-						},
-					})
+				if cr.Status.Provisioned ||
+					cr.Spec.Storage.Type != minterv1.SecretStorageType ||
+					cr.Spec.Storage.Secret.Namespace != newNamespace {
+					continue
 				}
+				log.WithFields(log.Fields{
+					"namespace": newNamespace,
+					"cr":        fmt.Sprintf("%s/%s", cr.Spec.Storage.Secret.Namespace, cr.Spec.Storage.Secret.Name),
+				}).Info("found credentials request for namespace")
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      cr.Name,
+						Namespace: cr.Namespace,
+					},
+				})
 			}
 			return requests
 		})
@@ -300,12 +306,54 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		logger.WithError(err).Error("error getting credentials request, requeuing")
 		return reconcile.Result{}, err
 	}
-	logger = logger.WithFields(log.Fields{
-		"secret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
-	})
+
 	// Maintain a copy, but work on a copy of the credentials request:
 	origCR := cr
 	cr = cr.DeepCopy()
+
+	// Copy deprecated secretRef to the new storage field for internal processing
+	if cr.Spec.Storage.Type == "" {
+		cr.Spec.Storage.Type = minterv1.SecretStorageType
+		cr.Spec.Storage.Secret = &minterv1.SecretStorage{
+			Namespace: cr.Spec.SecretRef.Namespace,
+			Name:      cr.Spec.SecretRef.Name,
+		}
+	}
+
+	storageType := cr.Spec.Storage.Type
+
+	if storageType != minterv1.SecretStorageType && storageType != minterv1.ServiceAccountStorageType {
+		setInvalidStorageType(cr, r.platformType)
+		err := r.updateStatus(origCR, cr, logger)
+		if err != nil {
+			logger.WithError(err).Error("failed to update conditions")
+		}
+		return reconcile.Result{}, err
+	}
+
+	// CRs must contain a reference for their storage type (union)
+	if (storageType == minterv1.SecretStorageType && cr.Spec.Storage.Secret == nil) ||
+		(storageType == minterv1.ServiceAccountStorageType && cr.Spec.Storage.ServiceAccount == nil) {
+		setInvalidStorageRef(cr, r.platformType)
+		err := r.updateStatus(origCR, cr, logger)
+		if err != nil {
+			logger.WithError(err).Error("failed to update conditions")
+		}
+		return reconcile.Result{}, err
+	}
+
+	var namespace, name string
+	if storageType == minterv1.SecretStorageType {
+		namespace = cr.Spec.Storage.Secret.Namespace
+		name = cr.Spec.Storage.Secret.Name
+
+	} else if storageType == minterv1.ServiceAccountStorageType {
+		namespace = cr.Spec.Storage.ServiceAccount.Namespace
+		name = cr.Spec.Storage.ServiceAccount.Name
+	}
+	logger = logger.WithFields(log.Fields{
+		"storage": fmt.Sprintf("%s %s/%s", storageType, namespace, name),
+	})
 
 	// Ignore CR if it's for a different cloud/infra
 	infraMatch, err := crInfraMatches(cr, r.platformType)
@@ -316,6 +364,16 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	if !infraMatch {
 		logger.Debug("ignoring cr as it is for a different cloud")
 		setIgnoredCondition(cr, r.platformType)
+		err := r.updateStatus(origCR, cr, logger)
+		if err != nil {
+			logger.WithError(err).Error("failed to update conditions")
+		}
+		return reconcile.Result{}, err
+	}
+
+	// CRs for platforms other than AWS require secret storage type
+	if r.platformType != configv1.AWSPlatformType && storageType != minterv1.SecretStorageType {
+		setUnsupportedStorageType(cr, r.platformType)
 		err := r.updateStatus(origCR, cr, logger)
 		if err != nil {
 			logger.WithError(err).Error("failed to update conditions")
@@ -345,27 +403,33 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 				}
 			}
 
-			// Delete the target secret if it exists:
-			targetSecret := &corev1.Secret{}
-			err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, targetSecret)
-			sLog := logger.WithFields(log.Fields{
-				"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
-			})
-			if err != nil {
-				if errors.IsNotFound(err) {
-					sLog.Debug("target secret does not exist")
-				} else {
-					sLog.WithError(err).Error("unexpected error getting target secret to delete")
-					return reconcile.Result{}, err
-				}
-			} else {
-				err := r.Client.Delete(context.TODO(), targetSecret)
+			if storageType == minterv1.SecretStorageType {
+				// Delete the target secret if it exists
+				secretRef := cr.Spec.Storage.Secret
+				targetSecret := &corev1.Secret{}
+				err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: secretRef.Namespace, Name: secretRef.Name}, targetSecret)
+				sLog := logger.WithFields(log.Fields{
+					"targetSecret": fmt.Sprintf("%s/%s", secretRef.Namespace, secretRef.Name),
+				})
 				if err != nil {
-					sLog.WithError(err).Error("error deleting target secret")
-					return reconcile.Result{}, err
+					if errors.IsNotFound(err) {
+						sLog.Debug("target secret does not exist")
+					} else {
+						sLog.WithError(err).Error("unexpected error getting target secret to delete")
+						return reconcile.Result{}, err
+					}
 				} else {
-					sLog.Info("target secret deleted successfully")
+					err := r.Client.Delete(context.TODO(), targetSecret)
+					if err != nil {
+						sLog.WithError(err).Error("error deleting target secret")
+						return reconcile.Result{}, err
+					} else {
+						sLog.Info("target secret deleted successfully")
+					}
 				}
+			} else if storageType == minterv1.ServiceAccountStorageType {
+				// TODO: remove annotation from service account
+				// TODO: should we annotation service accounts we create (vs just annotate) and clean them up?
 			}
 
 			logger.Info("actuator deletion complete, removing finalizer")
@@ -394,12 +458,12 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	// Ensure the target namespace exists for the secret, if not, there's no point
 	// continuing:
 	targetNS := &corev1.Namespace{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: cr.Spec.SecretRef.Namespace}, targetNS)
+	err = r.Get(context.TODO(), types.NamespacedName{Name: namespace}, targetNS)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// TODO: technically we should deprovision if a credential was in this ns, but it
 			// was then deleted.
-			logger.Warn("secret namespace does not yet exist")
+			logger.Warn("storage  namespace does not yet exist")
 			setMissingTargetNamespaceCondition(cr, true)
 			if err := r.updateStatus(origCR, cr, logger); err != nil {
 				logger.WithError(err).Error("error updating condition")
@@ -410,32 +474,48 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		}
 		logger.WithError(err).Error("unexpected error looking up namespace")
 		return reconcile.Result{}, err
-	} else {
-		logger.Debug("found secret namespace")
-		setMissingTargetNamespaceCondition(cr, false)
-
 	}
 
-	// Check if the secret the credRequest wants created already exists
-	var crSecretExists bool
-	crSecret := &corev1.Secret{}
-	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
-	if err := r.Get(context.TODO(), secretKey, crSecret); err != nil {
-		if errors.IsNotFound(err) {
-			crSecretExists = false
-		} else {
-			logger.WithError(err).Error("could not query whether secret already exists")
-			return reconcile.Result{}, err
+	logger.Debug("found storage  namespace")
+	setMissingTargetNamespaceCondition(cr, false)
+
+	// Check if the secret/serviceaccount the credRequest wants created already exists
+	exists := true
+	if storageType == minterv1.SecretStorageType {
+		crSecret := &corev1.Secret{}
+		secretKey := types.NamespacedName{
+			Namespace: cr.Spec.Storage.Secret.Namespace,
+			Name:      cr.Spec.Storage.Secret.Name,
 		}
-	} else {
-		crSecretExists = true
+		if err := r.Get(context.TODO(), secretKey, crSecret); err != nil {
+			if errors.IsNotFound(err) {
+				exists = false
+			} else {
+				logger.WithError(err).Error("could not query whether secret already exists")
+				return reconcile.Result{}, err
+			}
+		}
+	} else if storageType == minterv1.ServiceAccountStorageType {
+		crServiceAccount := &corev1.ServiceAccount{}
+		serviceAccountKey := types.NamespacedName{
+			Namespace: cr.Spec.Storage.ServiceAccount.Namespace,
+			Name:      cr.Spec.Storage.ServiceAccount.Name,
+		}
+		if err := r.Get(context.TODO(), serviceAccountKey, crServiceAccount); err != nil {
+			if errors.IsNotFound(err) {
+				exists = false
+			} else {
+				logger.WithError(err).Error("could not query whether serviceaccount already exists")
+				return reconcile.Result{}, err
+			}
+		}
 	}
 
 	isStale := cr.Generation != cr.Status.LastSyncGeneration
 	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(time.Hour*1).After(time.Now())
 	hasActiveFailureConditions := checkForFailureConditions(cr)
 
-	if !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
+	if !isStale && hasRecentlySynced && exists && !hasActiveFailureConditions && cr.Status.Provisioned {
 		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
 		return reconcile.Result{}, nil
 	}
@@ -512,13 +592,19 @@ func setMissingTargetNamespaceCondition(cr *minterv1.CredentialsRequest, missing
 		status      corev1.ConditionStatus
 		updateCheck utils.UpdateConditionCheck
 	)
+	var namespace string
+	if cr.Spec.Storage.Type == minterv1.SecretStorageType {
+		namespace = cr.Spec.Storage.Secret.Namespace
+	} else if cr.Spec.Storage.Type == minterv1.ServiceAccountStorageType {
+		namespace = cr.Spec.Storage.ServiceAccount.Namespace
+	}
 	if missing {
-		msg = fmt.Sprintf("target namespace %v not found", cr.Spec.SecretRef.Namespace)
+		msg = fmt.Sprintf("target namespace %v not found", namespace)
 		status = corev1.ConditionTrue
 		reason = namespaceMissing
 		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
 	} else {
-		msg = fmt.Sprintf("target namespace %v found", cr.Spec.SecretRef.Namespace)
+		msg = fmt.Sprintf("target namespace %v found", namespace)
 		status = corev1.ConditionFalse
 		reason = namespaceExists
 		updateCheck = utils.UpdateConditionNever
@@ -606,6 +692,36 @@ func setIgnoredCondition(cr *minterv1.CredentialsRequest, clusterPlatform config
 		cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, cond,
 			corev1.ConditionFalse, reason, msg, updateCheck)
 	}
+}
+
+func setInvalidStorageType(cr *minterv1.CredentialsRequest, clusterPlatform configv1.PlatformType) {
+	msg := fmt.Sprintf("CredentialsRequest has invalid storage type %s", cr.Spec.Storage.Type)
+	reason := credentialsRequestInvalidStorageType
+	updateCheck := utils.UpdateConditionIfReasonOrMessageChange
+	status := corev1.ConditionTrue
+
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.Ignored,
+		status, reason, msg, updateCheck)
+}
+
+func setUnsupportedStorageType(cr *minterv1.CredentialsRequest, clusterPlatform configv1.PlatformType) {
+	msg := fmt.Sprintf("CredentialsRequest with storage type %s is not suppported for platform %s", cr.Spec.Storage.Type, clusterPlatform)
+	reason := credentialsRequestUnsupportedStorageType
+	updateCheck := utils.UpdateConditionIfReasonOrMessageChange
+	status := corev1.ConditionTrue
+
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.Ignored,
+		status, reason, msg, updateCheck)
+}
+
+func setInvalidStorageRef(cr *minterv1.CredentialsRequest, clusterPlatform configv1.PlatformType) {
+	msg := fmt.Sprintf("CredentialsRequest requires a storage reference for type %s", cr.Spec.Storage.Type)
+	reason := credentialsRequestInvalidStorageRef
+	updateCheck := utils.UpdateConditionIfReasonOrMessageChange
+	status := corev1.ConditionTrue
+
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.Ignored,
+		status, reason, msg, updateCheck)
 }
 
 func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
