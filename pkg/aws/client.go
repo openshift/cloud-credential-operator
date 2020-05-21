@@ -23,6 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
+	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/aws/aws-sdk-go/service/s3/s3iface"
 	"github.com/openshift/cloud-credential-operator/pkg/version"
 )
 
@@ -44,10 +46,16 @@ type Client interface {
 	SimulatePrincipalPolicy(*iam.SimulatePrincipalPolicyInput) (*iam.SimulatePolicyResponse, error)
 	SimulatePrincipalPolicyPages(*iam.SimulatePrincipalPolicyInput, func(*iam.SimulatePolicyResponse, bool) bool) error
 	TagUser(*iam.TagUserInput) (*iam.TagUserOutput, error)
+
+	//S3
+	CreateBucket(*s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
+	PutBucketTagging(*s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error)
+	PutObject(*s3.PutObjectInput) (*s3.PutObjectOutput, error)
 }
 
 type awsClient struct {
 	iamClient iamiface.IAMAPI
+	s3Client  s3iface.S3API
 }
 
 func (c *awsClient) CreateAccessKey(input *iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error) {
@@ -101,6 +109,18 @@ func (c *awsClient) TagUser(input *iam.TagUserInput) (*iam.TagUserOutput, error)
 	return c.iamClient.TagUser(input)
 }
 
+func (c *awsClient) CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
+	return c.s3Client.CreateBucket(input)
+}
+
+func (c *awsClient) PutBucketTagging(input *s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error) {
+	return c.s3Client.PutBucketTagging(input)
+}
+
+func (c *awsClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	return c.s3Client.PutObject(input)
+}
+
 // NewClient creates our client wrapper object for the actual AWS clients we use.
 func NewClient(accessKeyID, secretAccessKey []byte, region, infraName string) (Client, error) {
 	awsConfig := &awssdk.Config{}
@@ -121,12 +141,8 @@ func NewClient(accessKeyID, secretAccessKey []byte, region, infraName string) (C
 		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Get().String(), infraName),
 	})
 
-	return NewClientFromIAMClient(iam.New(s))
-}
-
-// NewClientFromIAMClient create a client from AWS IAM client.
-func NewClientFromIAMClient(client iamiface.IAMAPI) (Client, error) {
 	return &awsClient{
-		iamClient: client,
+		iamClient: iam.New(s),
+		s3Client:  s3.New(s),
 	}, nil
 }

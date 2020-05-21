@@ -18,7 +18,9 @@ require (
 	github.com/golang/mock v1.4.3
 	github.com/openshift/api v0.0.0-20200521162313-4090b8d67ad8
 	github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
+	github.com/openshift/client-go v0.0.0-20200521150516-05eb9880269c
 	github.com/openshift/library-go v0.0.0-20200521170207-eeebfaa62843
+	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.5.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.5.0
@@ -30,6 +32,7 @@ require (
 	google.golang.org/api v0.21.0
 	google.golang.org/genproto v0.0.0-20200406120821-33397c535dc2
 	google.golang.org/grpc v1.28.0
+	gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api v0.18.3
 	k8s.io/apimachinery v0.18.3
 	k8s.io/client-go v0.18.3
