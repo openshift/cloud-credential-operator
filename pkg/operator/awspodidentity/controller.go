@@ -1,6 +1,7 @@
 package awspodidentity
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -149,7 +150,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 			return err
 		}
 
-		informer, err := cache.GetInformer(obj)
+		informer, err := cache.GetInformer(context.TODO(), obj)
 		if err != nil {
 			return err
 		}
@@ -214,7 +215,7 @@ func (r *staticResourceReconciler) ReconcileResources() error {
 	// "v4.1.0/aws-pod-identity-webhook/deployment.yaml"
 	requestedDeployment := resourceread.ReadDeploymentV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/deployment.yaml"))
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
-	resultDeployment, modified, err := resourceapply.ApplyDeployment(r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration, false)
+	resultDeployment, modified, err := resourceapply.ApplyDeployment(r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration)
 	r.deploymentGeneration = resultDeployment.Generation
 	if err != nil {
 		r.logger.WithError(err).Error("error applying Deployment")
@@ -249,9 +250,9 @@ func ReadMutatingWebhookConfigurationV1Beta1OrDie(objBytes []byte) *admissionreg
 
 // ApplyMutatingWebhookConfiguration merges objectmeta, does not worry about anything else
 func ApplyMutatingWebhookConfiguration(client admissionregistrationclientv1beta1.MutatingWebhookConfigurationsGetter, recorder events.Recorder, required *admissionregistrationv1beta1.MutatingWebhookConfiguration) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, bool, error) {
-	existing, err := client.MutatingWebhookConfigurations().Get(required.Name, metav1.GetOptions{})
+	existing, err := client.MutatingWebhookConfigurations().Get(context.TODO(), required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		actual, err := client.MutatingWebhookConfigurations().Create(required)
+		actual, err := client.MutatingWebhookConfigurations().Create(context.TODO(), required, metav1.CreateOptions{})
 		reportCreateEvent(recorder, required, err)
 		return actual, true, err
 	}
@@ -270,7 +271,7 @@ func ApplyMutatingWebhookConfiguration(client admissionregistrationclientv1beta1
 		return existingCopy, false, nil
 	}
 
-	actual, err := client.MutatingWebhookConfigurations().Update(existingCopy)
+	actual, err := client.MutatingWebhookConfigurations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
 	reportUpdateEvent(recorder, required, err)
 	return actual, true, err
 }
