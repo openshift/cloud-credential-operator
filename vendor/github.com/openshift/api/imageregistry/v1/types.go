@@ -87,6 +87,9 @@ type ImageRegistrySpec struct {
 	// +optional
 	// +kubebuilder:validation:Pattern=`^(RollingUpdate|Recreate)$`
 	RolloutStrategy string `json:"rolloutStrategy,omitempty" protobuf:"bytes,15,opt,name=rolloutStrategy"`
+	// affinity is a group of node affinity scheduling rules for the image registry pod(s).
+	// +optional
+	Affinity *corev1.Affinity `json:"affinity,omitempty" protobuf:"bytes,16,opt,name=affinity"`
 }
 
 // ImageRegistryStatus reports image registry operational status.
@@ -168,6 +171,11 @@ type ImageRegistryConfigStorageS3 struct {
 	// registry.
 	// +optional
 	CloudFront *ImageRegistryConfigStorageS3CloudFront `json:"cloudFront,omitempty" protobuf:"bytes,6,opt,name=cloudFront"`
+	// virtualHostedStyle enables using S3 virtual hosted style bucket paths with
+	// a custom RegionEndpoint
+	// Optional, defaults to false.
+	// +optional
+	VirtualHostedStyle bool `json:"virtualHostedStyle" protobuf:"varint,7,opt,name=virtualHostedStyle"`
 }
 
 // ImageRegistryConfigStorageGCS holds GCS configuration.
