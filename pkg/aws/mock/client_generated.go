@@ -6,6 +6,7 @@ package mock
 
 import (
 	iam "github.com/aws/aws-sdk-go/service/iam"
+	s3 "github.com/aws/aws-sdk-go/service/s3"
 	gomock "github.com/golang/mock/gomock"
 	reflect "reflect"
 )
@@ -225,4 +226,49 @@ func (m *MockClient) TagUser(arg0 *iam.TagUserInput) (*iam.TagUserOutput, error)
 func (mr *MockClientMockRecorder) TagUser(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagUser", reflect.TypeOf((*MockClient)(nil).TagUser), arg0)
+}
+
+// CreateBucket mocks base method
+func (m *MockClient) CreateBucket(arg0 *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateBucket", arg0)
+	ret0, _ := ret[0].(*s3.CreateBucketOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateBucket indicates an expected call of CreateBucket
+func (mr *MockClientMockRecorder) CreateBucket(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), arg0)
+}
+
+// PutBucketTagging mocks base method
+func (m *MockClient) PutBucketTagging(arg0 *s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutBucketTagging", arg0)
+	ret0, _ := ret[0].(*s3.PutBucketTaggingOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutBucketTagging indicates an expected call of PutBucketTagging
+func (mr *MockClientMockRecorder) PutBucketTagging(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketTagging", reflect.TypeOf((*MockClient)(nil).PutBucketTagging), arg0)
+}
+
+// PutObject mocks base method
+func (m *MockClient) PutObject(arg0 *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutObject", arg0)
+	ret0, _ := ret[0].(*s3.PutObjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutObject indicates an expected call of PutObject
+func (mr *MockClientMockRecorder) PutObject(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), arg0)
 }
