@@ -55,7 +55,7 @@ type Actuator struct {
 	generateServicePrincipalName servicePrincipalNameBuilder
 }
 
-func NewActuator(c client.Client) (*Actuator, error) {
+func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating Azure codec")
@@ -64,9 +64,11 @@ func NewActuator(c client.Client) (*Actuator, error) {
 
 	client := newClientWrapper(c)
 	return &Actuator{
-		client:                       client,
-		codec:                        codec,
-		credentialMinterBuilder:      NewAzureCredentialsMinter,
+		client: client,
+		codec:  codec,
+		credentialMinterBuilder: func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
+			return NewAzureCredentialsMinter(logger, clientID, clientSecret, cloudName, tenantID, subscriptionID)
+		},
 		generateServicePrincipalName: generateServicePrincipalName,
 	}, nil
 }
