@@ -166,7 +166,7 @@ func TestPassthroughExists(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := fake.NewFakeClient(&validRootSecret, &validSecret)
-			actuator, err := azure.NewActuator(f)
+			actuator, err := azure.NewActuator(f, openshiftapiv1.AzurePublicCloud)
 			assert.Nil(t, err)
 
 			cr, err := newCredentialsRequest(tt.in)
@@ -197,7 +197,7 @@ func TestPassthroughCreate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra, &clusterDNS)
-			actuator, err := azure.NewActuator(f)
+			actuator, err := azure.NewActuator(f, openshiftapiv1.AzurePublicCloud)
 			assert.Nil(t, err)
 
 			cr, err := newCredentialsRequest(tt.in)
@@ -238,7 +238,7 @@ func TestPassthroughUpdate(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := fake.NewFakeClient(&validRootSecret, &validSecret, &clusterInfra, &clusterDNS)
-			actuator, err := azure.NewActuator(f)
+			actuator, err := azure.NewActuator(f, openshiftapiv1.AzurePublicCloud)
 			assert.Nil(t, err)
 
 			cr, err := newCredentialsRequest(tt.in)
@@ -270,7 +270,7 @@ func TestPassthroughDelete(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := fake.NewFakeClient(&validRootSecret, &validSecret)
-			actuator, err := azure.NewActuator(f)
+			actuator, err := azure.NewActuator(f, openshiftapiv1.AzurePublicCloud)
 			assert.Nil(t, err)
 
 			cr, err := newCredentialsRequest(tt.in)
