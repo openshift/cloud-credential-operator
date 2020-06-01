@@ -141,13 +141,3 @@ const (
 	// CredentialsRequests where the cloud/infra matches.
 	Ignored CredentialsRequestConditionType = "Ignored"
 )
-
-func init() {
-	SchemeBuilder.Register(
-		&CredentialsRequest{}, &CredentialsRequestList{},
-		&AWSProviderStatus{}, &AWSProviderSpec{},
-		&AzureProviderStatus{}, &AzureProviderSpec{},
-		&GCPProviderStatus{}, &GCPProviderSpec{},
-		&VSphereProviderStatus{}, &VSphereProviderSpec{},
-	)
-}
