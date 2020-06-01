@@ -1,3 +1,4 @@
 /cloud-credential-operator
 .vscode/
 /_output/
+.idea/
