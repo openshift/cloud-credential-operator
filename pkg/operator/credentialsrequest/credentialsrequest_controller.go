@@ -240,7 +240,59 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Monitor the cloud-credential-operator-config configmap to check if operator is re-enabled.
+	// Check if attempts were made to delete the credentials requests when the operator was disabled.
+	// We have to have to reconcile all those credential requests.
+	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
+	allCredRequestsMapFn := handler.ToRequestsFunc(
+		func(a handler.MapObject) []reconcile.Request {
+			log.Info("requeueing all CredentialsRequests")
+			crs := &minterv1.CredentialsRequestList{}
+			err := mgr.GetClient().List(context.TODO(), crs)
+			var requests []reconcile.Request
+			if err != nil {
+				log.WithError(err).Error("error listing all cred requests for requeue")
+				return requests
+			}
+			for _, cr := range crs.Items {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      cr.Name,
+						Namespace: cr.Namespace,
+					},
+				})
+			}
+			return requests
+		})
+
+	// Check if operator is re-enabled in cloud-credential-operator-config configmap
+	configMapPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isCloudCredOperatorConfigMap(e.MetaNew)
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isCloudCredOperatorConfigMap(e.Meta)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return isCloudCredOperatorConfigMap(e.Meta)
+		},
+	}
+	err = c.Watch(
+		&source.Kind{Type: &corev1.ConfigMap{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: allCredRequestsMapFn,
+		},
+		configMapPredicate)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// isCloudCredOperatorConfigMap returns true if given configmap is cloud-credential-operator-config configmap
+func isCloudCredOperatorConfigMap(cm metav1.Object) bool {
+	return cm.GetName() == operatorconstants.CloudCredOperatorConfigMap && cm.GetNamespace() == minterv1.CloudCredOperatorNamespace
 }
 
 var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
