@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-identity-webhook
+  namespace: openshift-cloud-credential-operator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pod-identity-webhook
+  template:
+    metadata:
+      labels:
+        app: pod-identity-webhook
+    spec:
+      containers:
+      - name: pod-identity-webhook
+        image: ${IMAGE}
+        imagePullPolicy: IfNotPresent
+        command:
+        - /usr/bin/aws-pod-identity-webhook
+        - --in-cluster
+        - --namespace=openshift-cloud-credential-operator
+        - --port=6443
+        - --service-name=pod-identity-webhook
+        - --tls-secret=pod-identity-webhook
+        - --annotation-prefix=eks.amazonaws.com # TODO: use openshift.io based prefix
+        - --token-audience=sts.amazonaws.com
+        - --logtostderr
+        resources:
+          requests:
+            cpu: 10m
+            memory: 10Mi
+        volumeMounts:
+        - name: webhook-certs
+          mountPath: /var/run/app/certs
+          readOnly: false
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      serviceAccountName: pod-identity-webhook
+      tolerations:
+      - effect: NoSchedule
+        key: node-role.kubernetes.io/master
+        operator: Exists
+      - effect: NoExecute
+        key: node.kubernetes.io/unreachable
+        operator: Exists
+        tolerationSeconds: 120
+      - effect: NoExecute
+        key: node.kubernetes.io/not-ready
+        operator: Exists
+        tolerationSeconds: 120
+      volumes:
+      - name: webhook-certs
+        emptyDir: {}

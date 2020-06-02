@@ -58,6 +58,7 @@ IMAGE_REGISTRY :=registry.svc.ci.openshift.org
 # It will generate targets {update,verify}-bindata-$(1) logically grouping them in unsuffixed versions of these targets
 # and also hooked into {update,verify}-generated for broader integration.
 $(call add-bindata,bootstrap,./bindata/bootstrap/...,bindata,bootstrap,pkg/assets/bootstrap/bindata.go)
+$(call add-bindata,v4.1.0,./bindata/v4.1.0/...,bindata,v410_00_assets,pkg/assets/v410_00_assets/bindata.go)
 
 # This will call a macro called "build-image" which will generate image specific targets based on the parameters:
 # $0 - macro name
