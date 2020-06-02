@@ -1,0 +1,19 @@
+apiVersion: admissionregistration.k8s.io/v1beta1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: pod-identity-webhook
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+- name: pod-identity-webhook.amazonaws.com
+  failurePolicy: Ignore
+  clientConfig:
+    service:
+      name: pod-identity-webhook
+      namespace: openshift-cloud-credential-operator
+      path: "/mutate"
+  rules:
+  - operations: [ "CREATE" ]
+    apiGroups: [""]
+    apiVersions: ["v1"]
+    resources: ["pods"]
