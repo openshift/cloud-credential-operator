@@ -26,9 +26,87 @@ NOTE: at present, only some components have transitioned to this new model, the 
   * If the admin credentials cannot create additional credentials, but do themselves fulfill the requirements of the credentials request, they will be used. (with logged warnings and a condition on the credentials request)
   * If the admin credentials fulfill neither of the above requirements, the controller will fail to generate the credentials, report failure back to the Cluster Version Operator, and thus block upgrading. The installer will also perform this check early to inform the user their cluster will not function.
 
-## AWS
+## Cloud Credentials
+If running in-cluster, your credentials are expected to exist in kube-system namespace.
+Credentials stored in a secret that is created per deployment infrastructure.
+Here are the available options:
+  1. AWS:
+  ```yaml
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: kube-system
+    name: aws-creds
+  data:
+    aws_access_key_id: Base64encodeAccessKeyID
+    aws_secret_access_key: Base64encodeSecretAccessKey
+  ```
+  2. Azure:
+  ```yaml
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: kube-system
+    name: azure-credentials
+  data:
+    azure_subscription_id: Base64encodeSubscriptionID
+    azure_client_id: Base64encodeClientID
+    azure_client_secret: Base64encodeClientSecret
+    azure_tenant_id: Base64encodeTenantID
+    azure_resource_prefix: Base64encodeResourcePrefix
+    azure_resourcegroup: Base64encodeResourceGroup
+    azure_region: Base64encodeRegion
+  ```
+  3. GCP:
+  ```yaml
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: kube-system
+    name: gcp-credentials
+  data:
+    service_account.json: Base64encodeServiceAccount
+  ```
+  4. OpenStack:
+  ```yaml
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: kube-system
+    name: openstack-credentials
+  data:
+    clouds.yaml: Base64encodeCloudCreds
+    clouds.conf: Base64encodeCloudCredsINI
+  ```
+  5. Ovirt:
+  ```yaml
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: kube-system
+    name: ovirt-credentials
+  data:
+    ovirt_url: Base64encodeURL
+    ovirt_username: Base64encodeUsername
+    ovirt_password: Base64encodePassword
+    ovirt_cafile: Base64encodeCAFile
+    ovirt_insecure: Base64encodeInsecure
+    ovirt_ca_bundle: Base64encodeCABundle
+  ```
+  6. VSphere:
+  ```yaml
+  apiVersion: v1
+  kind: Secret
+  metadata:
+    namespace: kube-system
+    name: vsphere-creds
+  data:
+   {{VCenter.username}}: Base64encodeUsername
+   {{VCenter.password}}: Base64encodePassword
+  ```
 
-Currently AWS is the only supported cloud provider. If running in-cluster, your credentials are expected to exist in kube-system/aws-creds with the keys aws_access_key_id and aws_secret_access_key.
+Source of templates:
+  * https://github.com/openshift/installer/blob/master/data/data/manifests/openshift/cloud-creds-secret.yaml.template
 
 # Running from source
 
@@ -57,34 +135,59 @@ Cred Minter should now be running in openshift-cloud-credential-operator.
 
 # Obtaining Credentials
 
-A sample credentials request looks like:
+In order to obtain credentials you need to create a credentials request.
+Credentials request constists of: 
+ 1. secretRef - Points to the secret where the credentials should be stored once generated. 
+  * secretRef can be in another namespace, as it would need to be used by pods.
+  * If secretRef's namespace does not yet exist, the controller will immediately sync when it sees that namespace being created.
+ 2. providerSpec - Contains the cloud provider specific credentials specification.
+  * See in APIs: https://github.com/jeniawhite/cloud-credential-operator/tree/master/pkg/apis/cloudcredential/v1
 
-```yaml
-apiVersion: cloudcredential.openshift.io/v1
-kind: CredentialsRequest
-metadata:
-  name: openshift-image-registry
-  namespace: openshift-cloud-credential-operator
-spec:
-  secretRef:
-    name: installer-cloud-credentials
-    namespace: openshift-image-registry
-  providerSpec:
-    apiVersion: cloudcredential.openshift.io/v1
-    kind: AWSProviderSpec
-    statementEntries:
-    - effect: Allow
-      action:
-      - s3:CreateBucket
-      - s3:DeleteBucket
-      resource: "*"
-```
+Examples of credentials request for the different platforms:
+  1. AWS:
+  ```yaml
+  apiVersion: cloudcredential.openshift.io/v1
+  kind: CredentialsRequest
+  metadata:
+    name: openshift-image-registry
+    namespace: openshift-cloud-credential-operator
+  spec:
+    secretRef:
+      name: installer-cloud-credentials
+      namespace: openshift-image-registry
+    providerSpec:
+      apiVersion: cloudcredential.openshift.io/v1
+      kind: AWSProviderSpec
+      statementEntries:
+      - effect: Allow
+        action:
+        - s3:CreateBucket
+        - s3:DeleteBucket
+        resource: "*"
+  ```
+  Once created, assuming admin credentials are available, the controller will provision a user, access key, and user policy in AWS. The access and secret key will be stored in the target secret specified above.
+  
+  You can freely edit a CredentialsRequest to adjust permissions and the controller will reconcile those changes out to the respective user policy. (assuming admin credentials)
 
-Once created, assuming admin credentials are available, the controller will provision a user, access key, and user policy in AWS. The access and secret key will be stored in the target secret specified above.
-
-Target secrets can be in another namespace, as it would need to be to be used by pods. If this namespace does not yet exist, the controller will immediately sync when it sees that namespace being created.
-
-You can freely edit a CredentialsRequest to adjust permissions and the controller will reconcile those changes out to the respective user policy. (assuming admin credentials)
+  2. Azure:
+  ```yaml
+  apiVersion: cloudcredential.openshift.io/v1
+  kind: CredentialsRequest
+  metadata:
+    name: openshift-image-registry
+    namespace: openshift-cloud-credential-operator
+  spec:
+    secretRef:
+      name: installer-cloud-credentials
+      namespace: openshift-image-registry
+    providerSpec:
+      apiVersion: cloudcredential.openshift.io/v1
+      kind: AzureProviderSpec
+      roleBindings:
+        - role: Storage Account Contributor
+        - role: Storage Blob Data Contributor
+  ```
+  List of Azure built in roles: https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
 
 ## For OpenShift Components
 
@@ -95,7 +198,7 @@ You can freely edit a CredentialsRequest to adjust permissions and the controlle
 
 # Adding A New Cloud Provider
 
-Currently this repository only supports AWS, but uses an actuator pattern to allow plugging in additional cloud providers.
+This repository uses an actuator pattern to allow plugging in additional cloud providers.
 
 The rough steps to add a new cloud provider would be:
 
