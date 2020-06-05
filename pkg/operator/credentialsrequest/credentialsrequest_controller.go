@@ -26,6 +26,7 @@ import (
 	"golang.org/x/time/rate"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	operatorconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
@@ -285,7 +286,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
 	} else if operatorIsDisabled {
-		logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
+		logger.Infof("operator disabled in %s ConfigMap", operatorconstants.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
 

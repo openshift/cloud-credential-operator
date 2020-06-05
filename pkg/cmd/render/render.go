@@ -30,6 +30,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	assets "github.com/openshift/cloud-credential-operator/pkg/assets/bootstrap"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
@@ -189,7 +190,7 @@ func isDisabled() bool {
 			continue
 		}
 
-		if configMap.Namespace == minterv1.CloudCredOperatorNamespace && configMap.Name == minterv1.CloudCredOperatorConfigMap {
+		if configMap.Namespace == minterv1.CloudCredOperatorNamespace && configMap.Name == constants.CloudCredOperatorConfigMap {
 			logger := log.New()
 			logger.SetLevel(log.GetLevel())
 			disabled, err := utils.CCODisabledCheck(configMap, logger)
