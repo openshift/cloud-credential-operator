@@ -18,9 +18,9 @@ import (
 
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/dgrijalva/jwt-go"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -46,14 +46,14 @@ type ReconcileCloudCredSecret struct {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client: mgr.GetClient(),
-		Logger: log.WithField("controller", constants.ControllerName),
+		Logger: log.WithField("controller", secretconstants.ControllerName),
 		Adal:   &adalService{},
 	}
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(secretconstants.ControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == cloudCredSecretName
+	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == cloudCredSecretName
 }
 
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
@@ -91,7 +91,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		r.Logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
 	} else if operatorIsDisabled {
-		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
+		r.Logger.Infof("operator disabled in %s ConfigMap", constants.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
 
@@ -120,39 +120,39 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 
 	if _, ok := secret.Data[azureClientID]; !ok {
 		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureClientID)
-		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 	}
 
 	if _, ok := secret.Data[azureClientSecret]; !ok {
 		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureClientSecret)
-		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 	}
 
 	if _, ok := secret.Data[azureTenantID]; !ok {
 		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureTenantID)
-		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 	}
 
 	if _, ok := secret.Data[azureSubscriptionID]; !ok {
 		r.Logger.Errorf("Couldn't fetch key containing %v from cloud cred secret", azureSubscriptionID)
-		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 	}
 
 	// Can we mint new creds?
 	cloudCheckResult, err := r.checkCloudCredCreation(string(secret.Data[azureTenantID]), string(secret.Data[azureClientID]), string(secret.Data[azureClientSecret]))
 	if err != nil {
-		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 		return fmt.Errorf("failed checking create cloud creds: %v", err)
 	}
 
 	if cloudCheckResult {
 		r.Logger.Info("Verified cloud creds can be used for minting new creds")
-		return r.updateSecretAnnotations(secret, constants.MintAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.MintAnnotation)
 	}
 
 	// else if check succeded with no error but minting is not possible, assume passthrough
 	r.Logger.Info("Cloud creds will be used as-is (passthrough)")
-	return r.updateSecretAnnotations(secret, constants.PassthroughAnnotation)
+	return r.updateSecretAnnotations(secret, secretconstants.PassthroughAnnotation)
 }
 
 func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {
@@ -161,7 +161,7 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 		secretAnnotations = map[string]string{}
 	}
 
-	secretAnnotations[constants.AnnotationKey] = value
+	secretAnnotations[secretconstants.AnnotationKey] = value
 	secret.SetAnnotations(secretAnnotations)
 
 	return r.Update(context.Background(), secret)
