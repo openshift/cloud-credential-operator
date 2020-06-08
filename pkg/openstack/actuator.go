@@ -31,11 +31,11 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
 	rootOpenStackCredsSecretNamespace = "kube-system"
-	rootOpenStackCredsSecret          = "openstack-credentials"
 	rootOpenStackCredsSecretKey       = "clouds.yaml"
 )
 
@@ -213,7 +213,7 @@ func (a *OpenStackActuator) getRootCloudCredentialsSecretData(ctx context.Contex
 	var clouds string
 
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, types.NamespacedName{Name: rootOpenStackCredsSecret, Namespace: rootOpenStackCredsSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, types.NamespacedName{Name: constants.OpenStackCloudCredsSecretName, Namespace: rootOpenStackCredsSecretNamespace}, cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return "", &actuatoriface.ActuatorError{

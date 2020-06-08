@@ -7,10 +7,17 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/scheme"
+
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	configv1 "github.com/openshift/api/config/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 var (
@@ -37,12 +44,99 @@ var (
 	}
 )
 
-func TestCredentialsRequests(t *testing.T) {
+func TestSecretGetter(t *testing.T) {
 	var err error
 	codec, err = credreqv1.NewCodec()
 	if err != nil {
 		t.Fatalf("failed to create codec: %v", err)
 	}
+
+	configv1.AddToScheme(scheme.Scheme)
+
+	logger := log.WithField("controller", "metricscontrollertest")
+
+	tests := []struct {
+		name             string
+		cloudCredsSecret *corev1.Secret
+		clusterInfra     *configv1.Infrastructure
+		validate         func(*testing.T, *corev1.Secret, error)
+	}{
+		{
+			name:             "aws cloud creds exist",
+			clusterInfra:     testClusterInfra("aws"),
+			cloudCredsSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, "anyAnnotation"),
+			validate: func(t *testing.T, secret *corev1.Secret, err error) {
+				assert.NoError(t, err, "unexpected error")
+				assert.NotNil(t, secret, "secret should not be nil")
+			},
+		},
+		{
+			name:             "aws cloud creds missing",
+			clusterInfra:     testClusterInfra("aws"),
+			cloudCredsSecret: testCloudCredSecret("not-aws-creds", "anyAnnotation"),
+			validate: func(t *testing.T, secret *corev1.Secret, err error) {
+				notFound := errors.IsNotFound(err)
+				assert.True(t, notFound)
+			},
+		},
+		{
+			name:             "gcp cloud creds exist",
+			clusterInfra:     testClusterInfra("gcp"),
+			cloudCredsSecret: testCloudCredSecret(secretconstants.GCPCloudCredSecretName, "anyAnnotation"),
+			validate: func(t *testing.T, secret *corev1.Secret, err error) {
+				assert.NoError(t, err, "unexpected error")
+				assert.NotNil(t, secret, "secret shout not be nil")
+			},
+		},
+		{
+			name:             "infra get error",
+			clusterInfra:     &configv1.Infrastructure{},
+			cloudCredsSecret: &corev1.Secret{},
+			validate: func(t *testing.T, secret *corev1.Secret, err error) {
+				assert.Error(t, err, "expected error when infra is missing")
+			},
+		},
+		{
+			name: "unsupported cloud",
+			clusterInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				// no platformtype set
+			},
+			cloudCredsSecret: &corev1.Secret{},
+			validate: func(t *testing.T, secret *corev1.Secret, err error) {
+				assert.Nil(t, secret)
+				assert.Nil(t, err)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			fakeClient := fake.NewFakeClient(test.clusterInfra, test.cloudCredsSecret)
+			calc := &Calculator{
+				Client: fakeClient,
+				log:    logger,
+			}
+
+			secret, err := calc.getCloudSecret()
+			test.validate(t, secret, err)
+		})
+	}
+
+}
+
+func TestCredentialsRequests2(t *testing.T) {
+	var err error
+	codec, err = credreqv1.NewCodec()
+	if err != nil {
+		t.Fatalf("failed to create codec: %v", err)
+	}
+
+	credreqv1.AddToScheme(scheme.Scheme)
+	configv1.AddToScheme(scheme.Scheme)
 
 	logger := log.WithField("controller", "metricscontrollertest")
 
@@ -50,7 +144,7 @@ func TestCredentialsRequests(t *testing.T) {
 		name        string
 		credReqs    []credreqv1.CredentialsRequest
 		ccoDisabled bool
-		validate    func(*credRequestAccumulator, *testing.T)
+		validate    func(*testing.T, *credRequestAccumulator)
 	}{
 		{
 			name: "mixed credentials",
@@ -74,8 +168,9 @@ func TestCredentialsRequests(t *testing.T) {
 				testGCPCredRequest("gregular"),
 				// GCP credreq with condition set
 				testCredReqWithConditions(testGCPCredRequest("gignored"), []credreqv1.CredentialsRequestCondition{ignoredCond}),
+				//testClusterInfra("aws"),
 			},
-			validate: func(accumulator *credRequestAccumulator, t *testing.T) {
+			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				// total cred requests
 				assert.Equal(t, 5, accumulator.crTotals["aws"])
 				assert.Equal(t, 2, accumulator.crTotals["gcp"])
@@ -101,7 +196,7 @@ func TestCredentialsRequests(t *testing.T) {
 				// GCP credreq with condition set
 				testCredReqWithConditions(testGCPCredRequest("gignored"), []credreqv1.CredentialsRequestCondition{ignoredCond}),
 			},
-			validate: func(accumulator *credRequestAccumulator, t *testing.T) {
+			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				// total cred requests
 				assert.Equal(t, 3, accumulator.crTotals["aws"])
 				assert.Equal(t, 1, accumulator.crTotals["gcp"])
@@ -122,7 +217,68 @@ func TestCredentialsRequests(t *testing.T) {
 				accumulator.processCR(&cr, test.ccoDisabled)
 			}
 
-			test.validate(accumulator, t)
+			test.validate(t, accumulator)
+		})
+	}
+
+}
+
+func TestCredentialsMode(t *testing.T) {
+	configv1.AddToScheme(scheme.Scheme)
+	credreqv1.AddToScheme(scheme.Scheme)
+
+	logger := log.WithField("controller", "metricscontrollertest")
+
+	tests := []struct {
+		name            string
+		cloudCredSecret *corev1.Secret
+		secretMissing   bool
+		ccoDisabled     bool
+		expectedMode    constants.CredentialsMode
+	}{
+		{
+			name:            "mint mode",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.MintAnnotation),
+			expectedMode:    constants.ModeMint,
+		},
+		{
+			name:            "passthrough mode",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.PassthroughAnnotation),
+			expectedMode:    constants.ModePassthrough,
+		},
+		{
+			name:            "degraded mode",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.InsufficientAnnotation),
+			expectedMode:    constants.ModeDegraded,
+		},
+		{
+			name:          "manual mode",
+			ccoDisabled:   true,
+			secretMissing: true,
+			expectedMode:  constants.ModeManual,
+		},
+		{
+			name:          "cred removed mode",
+			secretMissing: true,
+			expectedMode:  constants.ModeCredsRemoved,
+		},
+		{
+			name:            "unexpected secret annotation",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, "unexpectedAnnotation"),
+			expectedMode:    constants.ModeUnknown,
+		},
+		{
+			name:            "unannotated secret",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, ""),
+			expectedMode:    constants.ModeUnknown,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+
+			detectedMode := determineCredentialsMode(test.ccoDisabled, test.cloudCredSecret, test.secretMissing, logger)
+			assert.Equal(t, test.expectedMode, detectedMode)
 		})
 	}
 
@@ -137,6 +293,10 @@ func TestMetricsInitialization(t *testing.T) {
 	// after initializing the accumulator.
 	for _, c := range constants.FailureConditionTypes {
 		assert.Zero(t, accumulator.crConditions[c])
+	}
+
+	for _, m := range constants.CredentialsModeList {
+		assert.Zero(t, accumulator.crMode[m])
 	}
 }
 
@@ -183,4 +343,39 @@ func testGCPCredRequest(name string) credreqv1.CredentialsRequest {
 	cr.Spec.ProviderSpec = gcpProviderSpec
 
 	return cr
+}
+
+func testCloudCredSecret(secretName, annotation string) *corev1.Secret {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: secretconstants.CloudCredSecretNamespace,
+			Annotations: map[string]string{
+				secretconstants.AnnotationKey: annotation,
+			},
+		},
+	}
+
+	return secret
+}
+
+func testClusterInfra(cloud string) *configv1.Infrastructure {
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Status: configv1.InfrastructureStatus{},
+	}
+	switch cloud {
+	case "aws":
+		infra.Status.Platform = configv1.AWSPlatformType
+	case "azure":
+		infra.Status.Platform = configv1.AzurePlatformType
+	case "gcp":
+		infra.Status.Platform = configv1.GCPPlatformType
+	default:
+		panic("unsupported cloud for creating test infrastructure object")
+	}
+
+	return infra
 }
