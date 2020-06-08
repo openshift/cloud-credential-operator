@@ -29,8 +29,6 @@ import (
 const (
 	controllerName = "secretannotator"
 
-	AWSCloudCredSecretName = "aws-creds"
-
 	AwsAccessKeyName       = "aws_access_key_id"
 	AwsSecretAccessKeyName = "aws_secret_access_key"
 )
@@ -44,7 +42,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == AWSCloudCredSecretName
+	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == secretconstants.AWSCloudCredSecretName
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {

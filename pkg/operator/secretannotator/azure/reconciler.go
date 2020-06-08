@@ -28,7 +28,6 @@ import (
 const (
 	controllerName = "secretannotator"
 
-	cloudCredSecretName = "azure-credentials"
 	azureClientID       = "azure_client_id"
 	azureClientSecret   = "azure_client_secret"
 	azureSubscriptionID = "azure_subscription_id"
@@ -78,7 +77,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == cloudCredSecretName
+	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == secretconstants.AzureCloudCredSecretName
 }
 
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
