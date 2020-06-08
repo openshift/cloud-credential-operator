@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"time"
 
+	errors "github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -17,7 +18,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
@@ -33,6 +34,7 @@ const (
 	reasonReconcilingComplete       = "ReconcilingComplete"
 	reasonCredentialsNotProvisioned = "CredentialsNotProvisioned"
 	reasonOperatorDisabled          = "OperatorDisabledByAdmin"
+	reasonParentCredRemoved         = "ParentCredentialMissing"
 )
 
 // syncOperatorStatus computes the operator's current status and
@@ -42,7 +44,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	logger.Debug("syncing cluster operator status")
 	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredClusterOperator}}
 	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
-	isNotFound := errors.IsNotFound(err)
+	isNotFound := apierrors.IsNotFound(err)
 	if err != nil && !isNotFound {
 		return fmt.Errorf("failed to get clusteroperator %s: %v", co.Name, err)
 	}
@@ -55,7 +57,12 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	oldConditions := co.Status.Conditions
 	oldVersions := co.Status.Versions
 	oldRelatedObjects := co.Status.RelatedObjects
-	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType, operatorIsDisabled, logger)
+	parentSecretExists, err := r.parentSecretExists()
+	if err != nil {
+		return errors.Wrap(err, "error checking if parent secret exists")
+	}
+	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType, operatorIsDisabled,
+		parentSecretExists, r.Actuator.GetParentCredSecretLocation(), logger)
 	co.Status.Versions = computeClusterOperatorVersions()
 	co.Status.RelatedObjects = buildExpectedRelatedObjects(credRequests)
 
@@ -93,13 +100,24 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	return nil
 }
 
+func (r *ReconcileCredentialsRequest) parentSecretExists() (bool, error) {
+	parentSecret := &corev1.Secret{}
+	if err := r.Client.Get(context.TODO(), r.Actuator.GetParentCredSecretLocation(), parentSecret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
 // getOperatorState gets and returns the resources necessary to compute the
 // operator's current state.
 func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest, bool, error) {
 
 	ns := &corev1.Namespace{}
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: minterv1.CloudCredOperatorNamespace}, ns); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return nil, nil, false, nil
 		}
 
@@ -141,7 +159,7 @@ func computeStatusConditions(
 	conditions []configv1.ClusterOperatorStatusCondition,
 	credRequests []minterv1.CredentialsRequest,
 	clusterCloudPlatform configv1.PlatformType,
-	operatorIsDisabled bool,
+	operatorIsDisabled bool, parentCredExists bool, parentCredLocation types.NamespacedName,
 	logger log.FieldLogger) []configv1.ClusterOperatorStatusCondition {
 
 	// Degraded should be true if we are encountering errors. We consider any credentials request
@@ -262,6 +280,15 @@ func computeStatusConditions(
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
 		Status: configv1.ConditionTrue,
 		Type:   configv1.OperatorUpgradeable,
+	}
+	// If the operator is not disabled, and we do not have a parent cred in kube-system, we are not
+	// upgradable. Admin cred removal is a valid mode to run in but it should be restored before
+	// you can upgrade.
+	if !operatorIsDisabled && !parentCredExists {
+		upgradeableCondition.Status = configv1.ConditionFalse
+		upgradeableCondition.Reason = reasonParentCredRemoved
+		upgradeableCondition.Message = fmt.Sprintf("Parent credential secret %s/%s must be restored prior to upgrade",
+			parentCredLocation.Namespace, parentCredLocation.Name)
 	}
 	conditions = clusteroperator.SetStatusCondition(conditions,
 		upgradeableCondition)

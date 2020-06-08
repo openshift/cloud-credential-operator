@@ -28,6 +28,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
@@ -45,10 +46,8 @@ import (
 )
 
 const (
-	rootGCPCredsSecretNamespace = "kube-system"
-	rootGCPCredsSecret          = "gcp-credentials"
-	roGCPCredsSecretNamespace   = "openshift-cloud-credential-operator"
-	roGCPCredsSecret            = "cloud-credential-operator-iam-ro-creds"
+	roGCPCredsSecretNamespace = "openshift-cloud-credential-operator"
+	roGCPCredsSecret          = "cloud-credential-operator-iam-ro-creds"
 
 	gcpSecretJSONKey = "service_account.json"
 )
@@ -333,7 +332,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		if status.Code(err) == codes.NotFound {
 			logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Debug("service account does not exist, creating")
 			if rootGCPClient == nil {
-				return fmt.Errorf("no root GCP client available, cred secret may not exist: %s/%s", rootGCPCredsSecretNamespace, rootGCPCredsSecret)
+				return fmt.Errorf("no root GCP client available, cred secret may not exist: %s/%s", constants.KubeSystemNS, annotatorconst.GCPCloudCredSecretName)
 			}
 		} else {
 			return fmt.Errorf("error checking for existing service account: %v", err)
@@ -488,10 +487,10 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 }
 
 func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Client, error) {
-	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", rootGCPCredsSecretNamespace, rootGCPCredsSecret))
+	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", constants.KubeSystemNS, annotatorconst.GCPCloudCredSecretName))
 
 	logger.Debug("loading GCP credentials from secret")
-	jsonBytes, err := loadCredsFromSecret(a.Client, rootGCPCredsSecretNamespace, rootGCPCredsSecret)
+	jsonBytes, err := loadCredsFromSecret(a.Client, constants.KubeSystemNS, annotatorconst.GCPCloudCredSecretName)
 	if err != nil {
 		return nil, err
 	}
@@ -509,7 +508,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 
 	if cr.Spec.SecretRef.Name == roGCPCredsSecret && cr.Spec.SecretRef.Namespace == roGCPCredsSecretNamespace {
 		log.Debug("operating our own RO creds, using root creds for GCP client operator")
-		jsonBytes, err = loadCredsFromSecret(a.Client, rootGCPCredsSecretNamespace, rootGCPCredsSecret)
+		jsonBytes, err = loadCredsFromSecret(a.Client, constants.KubeSystemNS, annotatorconst.GCPCloudCredSecretName)
 		if err != nil {
 			return nil, err
 		}
@@ -555,10 +554,15 @@ func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLog
 	return nil
 }
 
+// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *Actuator) GetParentCredSecretLocation() types.NamespacedName {
+	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.GCPCloudCredSecretName}
+}
+
 // getRootCloudCredentialsSecret will return the cluster's root GCP cloud cred secret if it exists and is properly annotated
 func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, types.NamespacedName{Name: rootGCPCredsSecret, Namespace: rootGCPCredsSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, a.GetParentCredSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -568,7 +572,7 @@ func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", rootGCPCredsSecretNamespace, rootGCPCredsSecret)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.KubeSystemNS, annotatorconst.GCPCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),

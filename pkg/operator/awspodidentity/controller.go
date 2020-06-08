@@ -2,15 +2,12 @@ package awspodidentity
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/assets/v410_00_assets"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
@@ -34,6 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	"github.com/openshift/cloud-credential-operator/pkg/assets/v410_00_assets"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 )
 
 const (
@@ -109,7 +109,8 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 	logger := log.WithFields(log.Fields{"controller": controllerName})
 	imagePullSpec := os.Getenv("AWS_POD_IDENTITY_WEBHOOK_IMAGE")
 	if len(imagePullSpec) == 0 {
-		return errors.New("AWS_POD_IDENTITY_WEBHOOK_IMAGE is not set")
+		logger.Warn("AWS_POD_IDENTITY_WEBHOOK_IMAGE is not set, skipping controller")
+		return nil
 	}
 
 	r := &staticResourceReconciler{

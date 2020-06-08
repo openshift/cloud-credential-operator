@@ -24,6 +24,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 
 	corev1 "k8s.io/api/core/v1"
@@ -32,10 +33,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-)
-
-const (
-	cloudCredsSecretName = "vsphere-creds"
 )
 
 var _ actuatoriface.Actuator = (*VSphereActuator)(nil)
@@ -333,9 +330,14 @@ func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secr
 	return nil
 }
 
+// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *VSphereActuator) GetParentCredSecretLocation() types.NamespacedName {
+	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.VSphereCloudCredSecretName}
+}
+
 func (a *VSphereActuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, types.NamespacedName{Name: cloudCredsSecretName, Namespace: annotatorconst.CloudCredSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, a.GetParentCredSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -345,7 +347,7 @@ func (a *VSphereActuator) getCloudCredentialsSecret(ctx context.Context, logger 
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", annotatorconst.CloudCredSecretNamespace, cloudCredsSecretName)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", annotatorconst.CloudCredSecretNamespace, annotatorconst.VSphereCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
