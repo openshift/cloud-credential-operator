@@ -24,6 +24,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -608,7 +609,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 
 			for _, condition := range test.expectedCOConditions {
 				co := getClusterOperator(fakeClient)
-				assert.NotNil(t, co)
+				require.NotNil(t, co)
 				foundCondition := findClusterOperatorCondition(co.Status.Conditions, condition.conditionType)
 				assert.NotNil(t, foundCondition)
 				assert.Equal(t, string(condition.status), string(foundCondition.Status), "condition %s had unexpected status", condition.conditionType)
