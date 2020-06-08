@@ -36,6 +36,8 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
@@ -286,8 +288,8 @@ func testReadOnlySecret() *corev1.Secret {
 func testRootSecret() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      rootAWSCredsSecret,
-			Namespace: rootAWSCredsSecretNamespace,
+			Name:      annotatorconst.AWSCloudCredSecretName,
+			Namespace: constants.KubeSystemNS,
 		},
 		Data: map[string][]byte{
 			"aws_access_key_id":     []byte(testRootAccessKeyID),

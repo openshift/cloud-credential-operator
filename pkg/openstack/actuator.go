@@ -31,12 +31,12 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	crconst "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
-	rootOpenStackCredsSecretNamespace = "kube-system"
-	rootOpenStackCredsSecretKey       = "clouds.yaml"
+	rootOpenStackCredsSecretKey = "clouds.yaml"
 )
 
 type OpenStackActuator struct {
@@ -209,11 +209,16 @@ func (a *OpenStackActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) 
 	return existingSecret, nil
 }
 
+// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *OpenStackActuator) GetParentCredSecretLocation() types.NamespacedName {
+	return types.NamespacedName{Namespace: crconst.KubeSystemNS, Name: constants.OpenStackCloudCredsSecretName}
+}
+
 func (a *OpenStackActuator) getRootCloudCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (string, error) {
 	var clouds string
 
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, types.NamespacedName{Name: constants.OpenStackCloudCredsSecretName, Namespace: rootOpenStackCredsSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, a.GetParentCredSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return "", &actuatoriface.ActuatorError{

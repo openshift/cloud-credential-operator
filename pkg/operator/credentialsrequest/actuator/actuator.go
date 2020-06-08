@@ -18,7 +18,11 @@ package actuator
 import (
 	"context"
 
+	"k8s.io/apimachinery/pkg/types"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 // Actuator controls credentials on a specific infrastructure. All
@@ -30,8 +34,10 @@ type Actuator interface {
 	Delete(context.Context, *minterv1.CredentialsRequest) error
 	// Update the credentials to the provided definition.
 	Update(context.Context, *minterv1.CredentialsRequest) error
-	// Checks if the credentials currently exists.
+	// Exists checks if the credentials currently exist.
 	Exists(context.Context, *minterv1.CredentialsRequest) (bool, error)
+	// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
+	GetParentCredSecretLocation() types.NamespacedName
 }
 
 type DummyActuator struct {
@@ -51,6 +57,11 @@ func (a *DummyActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequ
 
 func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	return nil
+}
+
+// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *DummyActuator) GetParentCredSecretLocation() types.NamespacedName {
+	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AWSCloudCredSecretName}
 }
 
 type ActuatorError struct {
