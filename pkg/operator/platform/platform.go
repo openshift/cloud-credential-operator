@@ -17,10 +17,16 @@ func GetInfraStatusUsingKubeconfig(m manager.Manager, kubeconfig string) (*confi
 	if err != nil {
 		return nil, err
 	}
-	infraName := types.NamespacedName{Name: "cluster"}
+
+	return GetInfraStatus(c)
+}
+
+// GetInfraStatus will return the clusterwide Infrastructure's object status
+func GetInfraStatus(kClient client.Client) (*configv1.InfrastructureStatus, error) {
 	infra := &configv1.Infrastructure{}
-	err = c.Get(context.Background(), infraName, infra)
-	if err != nil {
+	infraName := types.NamespacedName{Name: "cluster"}
+
+	if err := kClient.Get(context.Background(), infraName, infra); err != nil {
 		return nil, err
 	}
 	return &infra.Status, nil

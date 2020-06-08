@@ -39,7 +39,6 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
-	vsphereconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/vsphere"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 )
@@ -307,7 +306,7 @@ func testVSphereCredsSecretPassthrough() *corev1.Secret {
 }
 
 func testVSphereCredsSecret() *corev1.Secret {
-	s := testSecret("kube-system", vsphereconst.VSphereCloudCredSecretName, testVSphereCloudCredsSecretData)
+	s := testSecret("kube-system", annotatorconst.VSphereCloudCredSecretName, testVSphereCloudCredsSecretData)
 	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.MintAnnotation
 
 	return s

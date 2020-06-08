@@ -8,14 +8,20 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
@@ -35,6 +41,12 @@ var (
 		Help: "Credentials requests with asserted conditions.",
 	}, []string{"condition"})
 
+	// Report on the mode CCO is operating under
+	metricCredentialsMode = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "cco_credentials_mode",
+		Help: "Track current mode the cloud-credentials-operator is functioning under.",
+	}, []string{"mode"})
+
 	// MetricControllerReconcileTime tracks the length of time our reconcile loops take. controller-runtime
 	// technically tracks this for us, but due to bugs currently also includes time in the queue, which leads to
 	// extremely strange results. For now, track our own metric.
@@ -51,15 +63,19 @@ var (
 func init() {
 	metrics.Registry.MustRegister(metricCredentialsRequestTotal)
 	metrics.Registry.MustRegister(metricCredentialsRequestConditions)
+	metrics.Registry.MustRegister(metricCredentialsMode)
 
 	metrics.Registry.MustRegister(MetricControllerReconcileTime)
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
 func Add(mgr manager.Manager, kubeConfig string) error {
+	logger := log.WithField("controller", controllerName)
+
 	mc := &Calculator{
 		Client:   mgr.GetClient(),
 		Interval: 2 * time.Minute,
+		log:      logger,
 	}
 	err := mgr.Add(mc)
 	if err != nil {
@@ -79,45 +95,85 @@ type Calculator struct {
 
 	// Interval is the length of time we sleep between metrics calculations.
 	Interval time.Duration
+
+	log log.FieldLogger
 }
 
 // Start begins the metrics calculation loop.
 func (mc *Calculator) Start(stopCh <-chan struct{}) error {
-	log.Info("started metrics calculator goroutine")
+	mc.log.Info("started metrics calculator goroutine")
 
 	// Run forever, sleep at the end:
-	wait.Until(func() {
-		start := time.Now()
-		mcLog := log.WithField("controller", controllerName)
-		defer func() {
-			dur := time.Since(start)
-			MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
-			mcLog.WithField("elapsed", dur).Info("reconcile complete")
-		}()
-
-		mcLog.Info("calculating metrics for all CredentialsRequests")
-
-		ccoDisabled, err := utils.IsOperatorDisabled(mc.Client, mcLog)
-		if err != nil {
-			mcLog.WithError(err).Error("failed to determine whether CCO is disabled")
-			return
-		}
-
-		credRequests := &credreqv1.CredentialsRequestList{}
-		if err := mc.Client.List(context.TODO(), credRequests); err != nil {
-			mcLog.WithError(err).Error("error listing CredentialsRequests")
-			return
-		}
-
-		accumulator := newAccumulator(mcLog)
-		for _, cr := range credRequests.Items {
-			accumulator.processCR(&cr, ccoDisabled)
-		}
-
-		accumulator.setMetrics()
-	}, mc.Interval, stopCh)
+	wait.Until(mc.metricsLoop, mc.Interval, stopCh)
 
 	return nil
+}
+
+func (mc *Calculator) metricsLoop() {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start)
+		MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		mc.log.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
+	mc.log.Info("calculating metrics for all CredentialsRequests")
+
+	ccoDisabled, err := utils.IsOperatorDisabled(mc.Client, mc.log)
+	if err != nil {
+		mc.log.WithError(err).Error("failed to determine whether CCO is disabled")
+		return
+	}
+
+	credRequests := &credreqv1.CredentialsRequestList{}
+	if err := mc.Client.List(context.TODO(), credRequests); err != nil {
+		mc.log.WithError(err).Error("error listing CredentialsRequests")
+		return
+	}
+
+	accumulator := newAccumulator(mc.log)
+	for _, cr := range credRequests.Items {
+		accumulator.processCR(&cr, ccoDisabled)
+	}
+	accumulator.setMetrics()
+
+	cloudSecret, err := mc.getCloudSecret()
+	if err != nil && !errors.IsNotFound(err) {
+		mc.log.WithError(err).Error("failed to fetch cloud secret")
+		return
+	}
+	setCredentialsMode(ccoDisabled, cloudSecret, errors.IsNotFound(err), mc.log)
+}
+
+func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
+	infraStatus, err := platform.GetInfraStatus(mc.Client)
+	if err != nil {
+		mc.log.WithError(err).Error("failed to get Infrastructure.Status")
+		return nil, err
+	}
+	platformType := platform.GetType(infraStatus)
+
+	secret := &corev1.Secret{}
+	secretKey := types.NamespacedName{Namespace: secretconstants.CloudCredSecretNamespace}
+	switch platformType {
+	case configv1.AWSPlatformType:
+		secretKey.Name = secretconstants.AWSCloudCredSecretName
+	case configv1.AzurePlatformType:
+		secretKey.Name = secretconstants.AzureCloudCredSecretName
+	case configv1.GCPPlatformType:
+		secretKey.Name = secretconstants.GCPCloudCredSecretName
+	case configv1.OpenStackPlatformType:
+		secretKey.Name = secretconstants.OpenStackCloudCredsSecretName
+	case configv1.OvirtPlatformType:
+		secretKey.Name = secretconstants.OvirtCloudCredsSecretName
+	case configv1.VSpherePlatformType:
+		secretKey.Name = secretconstants.VSphereCloudCredSecretName
+	default:
+		mc.log.WithField("cloud", platformType).Info("unsupported cloud for determing CCO mode")
+		return nil, nil
+	}
+	err = mc.Client.Get(context.TODO(), secretKey, secret)
+	return secret, err
 }
 
 func cloudProviderSpecToMetricsKey(cloud string) string {
@@ -130,6 +186,10 @@ func cloudProviderSpecToMetricsKey(cloud string) string {
 		return "gcp"
 	case "OpenStackProviderSpec":
 		return "openstack"
+	case "OvirtProviderSpec":
+		return "ovirt"
+	case "VsphereProviderSpec":
+		return "vsphere"
 	default:
 		return "unknown"
 	}
@@ -140,6 +200,7 @@ type credRequestAccumulator struct {
 
 	crTotals     map[string]int
 	crConditions map[credreqv1.CredentialsRequestConditionType]int
+	crMode       map[constants.CredentialsMode]int
 }
 
 func newAccumulator(logger log.FieldLogger) *credRequestAccumulator {
@@ -173,6 +234,55 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest, cco
 				a.crConditions[cond.Type]++
 			}
 		}
+	}
+}
+
+func setCredentialsMode(ccoDisabled bool, secret *corev1.Secret, notFound bool, logger log.FieldLogger) {
+	crMode := map[constants.CredentialsMode]int{}
+
+	// First set all possibilities to zero (in case we have switched modes since last time)
+	for _, mode := range constants.CredentialsModeList {
+		crMode[mode] = 0
+	}
+	detectedMode := determineCredentialsMode(ccoDisabled, secret, notFound, logger)
+
+	crMode[detectedMode] = 1
+
+	for k, v := range crMode {
+		metricCredentialsMode.WithLabelValues(string(k)).Set(float64(v))
+	}
+}
+
+func determineCredentialsMode(ccoDisabled bool, secret *corev1.Secret, secretNotFound bool, logger log.FieldLogger) constants.CredentialsMode {
+	if ccoDisabled {
+		return constants.ModeManual
+	}
+
+	// if secret returned was nil and it wasn't a notFound err, then we have an unsupported
+	// cloud and we'll just set it to "unknown" mode
+	if secret == nil && !secretNotFound {
+		return constants.ModeUnknown
+	}
+
+	if secretNotFound {
+		return constants.ModeCredsRemoved
+	}
+
+	annotation, ok := secret.Annotations[secretconstants.AnnotationKey]
+	if !ok {
+		logger.Warn("Secret missing mode annotation, assuming ModeUnknown")
+		return constants.ModeUnknown
+	}
+
+	switch annotation {
+	case secretconstants.MintAnnotation:
+		return constants.ModeMint
+	case secretconstants.PassthroughAnnotation:
+		return constants.ModePassthrough
+	case secretconstants.InsufficientAnnotation:
+		return constants.ModeDegraded
+	default:
+		return constants.ModeUnknown
 	}
 }
 

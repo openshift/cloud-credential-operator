@@ -31,17 +31,16 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
-	credsSecretNamespace = "kube-system"
-	credsSecret          = "ovirt-credentials"
-	urlKey               = "ovirt_url"
-	usernameKey          = "ovirt_username"
-	passwordKey          = "ovirt_password"
-	cafileKey            = "ovirt_cafile"
-	insecureKey          = "ovirt_insecure"
-	cabundleKey          = "ovirt_ca_bundle"
+	urlKey      = "ovirt_url"
+	usernameKey = "ovirt_username"
+	passwordKey = "ovirt_password"
+	cafileKey   = "ovirt_cafile"
+	insecureKey = "ovirt_insecure"
+	cabundleKey = "ovirt_ca_bundle"
 )
 
 type OvirtActuator struct {
@@ -238,7 +237,7 @@ func (a *OvirtActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*co
 
 func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (OvirtCreds, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, types.NamespacedName{Name: credsSecret, Namespace: credsSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, types.NamespacedName{Name: constants.OvirtCloudCredsSecretName, Namespace: constants.CloudCredSecretNamespace}, cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return OvirtCreds{}, &actuatoriface.ActuatorError{
@@ -249,10 +248,10 @@ func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log
 
 	out, err := secretToCreds(cloudCredSecret)
 	if err != nil {
-		logger.Warnf("secret did not have expected key: %s", credsSecret)
+		logger.Warnf("secret did not have expected key: %s", constants.OvirtCloudCredsSecretName)
 		return OvirtCreds{}, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
-			Message:   fmt.Sprintf("secret did not have expected key: %v", credsSecret),
+			Message:   fmt.Sprintf("secret did not have expected key: %v", constants.OvirtCloudCredsSecretName),
 		}
 	}
 
