@@ -19,10 +19,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 )
@@ -41,19 +41,19 @@ const (
 func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client:           mgr.GetClient(),
-		Logger:           log.WithField("controller", constants.ControllerName),
+		Logger:           log.WithField("controller", secretconstants.ControllerName),
 		GCPClientBuilder: ccgcp.NewClient,
 		ProjectName:      projectName,
 	}
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == GCPCloudCredSecretName
+	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == GCPCloudCredSecretName
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(secretconstants.ControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -101,7 +101,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		r.Logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
 	} else if operatorIsDisabled {
-		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
+		r.Logger.Infof("operator disabled in %s ConfigMap", constants.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
 
@@ -130,7 +130,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	authJSON, ok := secret.Data[GCPAuthJSONKey]
 	if !ok {
 		r.Logger.Errorf("Couldn't fetch key containing authentication details from cloud cred secret")
-		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 	}
 
 	gcpClient, err := r.GCPClientBuilder(r.ProjectName, authJSON)
@@ -141,30 +141,30 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	// Can we mint new creds?
 	mintResult, err := gcputils.CheckCloudCredCreation(gcpClient, r.Logger)
 	if err != nil {
-		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 		return fmt.Errorf("error checking whether we can mint new creds: %v", err)
 	}
 
 	if mintResult {
 		r.Logger.Info("Verified cloud creds can be used for minting new creds")
-		return r.updateSecretAnnotations(secret, constants.MintAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.MintAnnotation)
 	}
 
 	// Else, can we just pass through the current creds?
 	passthroughResult, err := gcputils.CheckCloudCredPassthrough(gcpClient, r.Logger)
 	if err != nil {
-		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+		r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 		return fmt.Errorf("error checking whether we can passthrough cloud creds: %v", err)
 	}
 
 	if passthroughResult {
 		r.Logger.Info("Verified cloud creds can be used as-is (passthrough)")
-		return r.updateSecretAnnotations(secret, constants.PassthroughAnnotation)
+		return r.updateSecretAnnotations(secret, secretconstants.PassthroughAnnotation)
 	}
 
 	// Else, these creds aren't presently useful
 	r.Logger.Warning("Cloud creds unable to be used for either minting or passthrough")
-	return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
+	return r.updateSecretAnnotations(secret, secretconstants.InsufficientAnnotation)
 }
 
 func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {
@@ -173,7 +173,7 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 		secretAnnotations = map[string]string{}
 	}
 
-	secretAnnotations[constants.AnnotationKey] = value
+	secretAnnotations[secretconstants.AnnotationKey] = value
 	secret.SetAnnotations(secretAnnotations)
 
 	return r.Update(context.TODO(), secret)

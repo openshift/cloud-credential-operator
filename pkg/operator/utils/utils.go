@@ -18,6 +18,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 const (
@@ -154,11 +155,11 @@ func IsOperatorDisabled(kubeClient client.Client, logger log.FieldLogger) (bool,
 	err := kubeClient.Get(context.TODO(),
 		types.NamespacedName{
 			Namespace: minterv1.CloudCredOperatorNamespace,
-			Name:      minterv1.CloudCredOperatorConfigMap,
+			Name:      constants.CloudCredOperatorConfigMap,
 		}, cm)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.Debugf("%s ConfigMap does not exist, assuming default behavior", minterv1.CloudCredOperatorConfigMap)
+			logger.Debugf("%s ConfigMap does not exist, assuming default behavior", constants.CloudCredOperatorConfigMap)
 			return OperatorDisabledDefault, nil
 		}
 		return OperatorDisabledDefault, err
@@ -172,7 +173,7 @@ func IsOperatorDisabled(kubeClient client.Client, logger log.FieldLogger) (bool,
 func CCODisabledCheck(cm *corev1.ConfigMap, logger log.FieldLogger) (bool, error) {
 	disabled, ok := cm.Data[operatorConfigMapDisabledKey]
 	if !ok {
-		logger.Debugf("%s ConfigMap has no %s key, assuming default behavior", minterv1.CloudCredOperatorConfigMap, operatorConfigMapDisabledKey)
+		logger.Debugf("%s ConfigMap has no %s key, assuming default behavior", constants.CloudCredOperatorConfigMap, operatorConfigMapDisabledKey)
 		return OperatorDisabledDefault, nil
 	}
 	return strconv.ParseBool(disabled)

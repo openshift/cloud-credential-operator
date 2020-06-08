@@ -44,6 +44,7 @@ import (
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	operatorconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
@@ -1465,7 +1466,7 @@ func testInfrastructure(infraName string) *configv1.Infrastructure {
 func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      minterv1.CloudCredOperatorConfigMap,
+			Name:      operatorconstants.CloudCredOperatorConfigMap,
 			Namespace: minterv1.CloudCredOperatorNamespace,
 		},
 		Data: map[string]string{

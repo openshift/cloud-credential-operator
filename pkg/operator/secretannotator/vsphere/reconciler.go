@@ -31,9 +31,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -58,14 +58,14 @@ type ReconcileCloudCredSecret struct {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client: mgr.GetClient(),
-		Logger: log.WithField("controller", constants.ControllerName),
+		Logger: log.WithField("controller", secretconstants.ControllerName),
 	}
 }
 
 // Add sets up a controller for watching the cloud cred secret.
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(secretconstants.ControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -90,7 +90,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == VSphereCloudCredSecretName
+	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == VSphereCloudCredSecretName
 }
 
 // Reconcile handles annotating the cloud cred secret.
@@ -104,7 +104,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		r.Logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
 	} else if operatorIsDisabled {
-		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
+		r.Logger.Infof("operator disabled in %s ConfigMap", constants.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
 
@@ -136,7 +136,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 
 	// Assume passthrough
 	r.Logger.Info("Cloud creds will be used as-is (passthrough)")
-	return r.updateSecretAnnotations(secret, constants.PassthroughAnnotation)
+	return r.updateSecretAnnotations(secret, secretconstants.PassthroughAnnotation)
 }
 
 func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {
@@ -145,7 +145,7 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 		secretAnnotations = map[string]string{}
 	}
 
-	secretAnnotations[constants.AnnotationKey] = value
+	secretAnnotations[secretconstants.AnnotationKey] = value
 	secret.SetAnnotations(secretAnnotations)
 
 	return r.Update(context.Background(), secret)
