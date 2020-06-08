@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -136,15 +135,14 @@ func (mc *Calculator) metricsLoop() {
 	for _, cr := range credRequests.Items {
 		accumulator.processCR(&cr, ccoDisabled)
 	}
+	accumulator.setMetrics()
 
 	cloudSecret, err := mc.getCloudSecret()
 	if err != nil && !errors.IsNotFound(err) {
 		mc.log.WithError(err).Error("failed to fetch cloud secret")
 		return
 	}
-	accumulator.setCredentialsMode(ccoDisabled, cloudSecret, errors.IsNotFound(err))
-
-	accumulator.setMetrics()
+	setCredentialsMode(ccoDisabled, cloudSecret, errors.IsNotFound(err), mc.log)
 }
 
 func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
@@ -210,18 +208,12 @@ func newAccumulator(logger log.FieldLogger) *credRequestAccumulator {
 		logger:       logger,
 		crTotals:     map[string]int{},
 		crConditions: map[credreqv1.CredentialsRequestConditionType]int{},
-		crMode:       map[constants.CredentialsMode]int{},
 	}
 
 	// make entries with '0' so we make sure to send updated metrics for any
 	// condititons that may have cleared
 	for _, c := range constants.FailureConditionTypes {
 		acc.crConditions[c] = 0
-	}
-
-	// First set all possibilities to zero (in case we have switched modes since last time)
-	for _, mode := range constants.CredentialsModeList {
-		acc.crMode[mode] = 0
 	}
 
 	return acc
@@ -245,44 +237,53 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest, cco
 	}
 }
 
-func (a *credRequestAccumulator) setCredentialsMode(ccoDisabled bool, secret *corev1.Secret, notFound bool) {
+func setCredentialsMode(ccoDisabled bool, secret *corev1.Secret, notFound bool, logger log.FieldLogger) {
+	crMode := map[constants.CredentialsMode]int{}
+
+	// First set all possibilities to zero (in case we have switched modes since last time)
+	for _, mode := range constants.CredentialsModeList {
+		crMode[mode] = 0
+	}
+	detectedMode := determineCredentialsMode(ccoDisabled, secret, notFound, logger)
+
+	crMode[detectedMode] = 1
+
+	for k, v := range crMode {
+		metricCredentialsMode.WithLabelValues(string(k)).Set(float64(v))
+	}
+}
+
+func determineCredentialsMode(ccoDisabled bool, secret *corev1.Secret, secretNotFound bool, logger log.FieldLogger) constants.CredentialsMode {
 	if ccoDisabled {
-		a.crMode[constants.ModeManual] = 1
-		return
+		return constants.ModeManual
 	}
 
 	// if secret returned was nil and it wasn't a notFound err, then we have an unsupported
 	// cloud and we'll just set it to "unknown" mode
-	if secret == nil && !notFound {
-		a.crMode[constants.ModeUnknown] = 1
-		return
+	if secret == nil && !secretNotFound {
+		return constants.ModeUnknown
 	}
 
-	if notFound {
-		a.crMode[constants.ModeCredsRemoved] = 1
-		return
+	if secretNotFound {
+		return constants.ModeCredsRemoved
 	}
-
-	fmt.Printf("SECRET: %+v", secret.Annotations)
 
 	annotation, ok := secret.Annotations[secretconstants.AnnotationKey]
 	if !ok {
-		// Unannotated secret...let it fall through so we get ModeUnknown???
-		return
+		logger.Warn("Secret missing mode annotation, assuming ModeUnknown")
+		return constants.ModeUnknown
 	}
 
 	switch annotation {
 	case secretconstants.MintAnnotation:
-		a.crMode[constants.ModeMint] = 1
+		return constants.ModeMint
 	case secretconstants.PassthroughAnnotation:
-		a.crMode[constants.ModePassthrough] = 1
+		return constants.ModePassthrough
 	case secretconstants.InsufficientAnnotation:
-		a.crMode[constants.ModeDegraded] = 1
+		return constants.ModeDegraded
 	default:
-		a.crMode[constants.ModeUnknown] = 1
+		return constants.ModeUnknown
 	}
-
-	return
 }
 
 func (a *credRequestAccumulator) setMetrics() {
@@ -292,9 +293,5 @@ func (a *credRequestAccumulator) setMetrics() {
 
 	for k, v := range a.crConditions {
 		metricCredentialsRequestConditions.WithLabelValues(string(k)).Set(float64(v))
-	}
-
-	for k, v := range a.crMode {
-		metricCredentialsMode.WithLabelValues(string(k)).Set(float64(v))
 	}
 }

@@ -3,15 +3,12 @@ package metrics
 import (
 	"testing"
 
-	"github.com/prometheus/client_golang/prometheus"
-	promtest "github.com/prometheus/client_golang/prometheus/testutil"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -131,7 +128,7 @@ func TestSecretGetter(t *testing.T) {
 
 }
 
-func TestCredentialsRequests(t *testing.T) {
+func TestCredentialsRequests2(t *testing.T) {
 	var err error
 	codec, err = credreqv1.NewCodec()
 	if err != nil {
@@ -144,13 +141,14 @@ func TestCredentialsRequests(t *testing.T) {
 	logger := log.WithField("controller", "metricscontrollertest")
 
 	tests := []struct {
-		name            string
-		existingObjects []runtime.Object
-		validate        func(*testing.T)
+		name        string
+		credReqs    []credreqv1.CredentialsRequest
+		ccoDisabled bool
+		validate    func(*testing.T, *credRequestAccumulator)
 	}{
 		{
 			name: "mixed credentials",
-			existingObjects: []runtime.Object{
+			credReqs: []credreqv1.CredentialsRequest{
 				// just a regular cred request
 				testAWSCredRequest("aregular"),
 				// missing namespace condition
@@ -158,7 +156,7 @@ func TestCredentialsRequests(t *testing.T) {
 				// provision failed condition
 				testCredReqWithConditions(testAWSCredRequest("aprovisionfailed"), []credreqv1.CredentialsRequestCondition{provisionFailedCond}),
 				// provision failed false condition
-				func() *credreqv1.CredentialsRequest {
+				func() credreqv1.CredentialsRequest {
 					cr := testCredReqWithConditions(testAWSCredRequest("aprovisionnotfailed"), []credreqv1.CredentialsRequestCondition{provisionFailedCond})
 					cr.Status.Conditions[0].Status = corev1.ConditionFalse
 					return cr
@@ -170,23 +168,24 @@ func TestCredentialsRequests(t *testing.T) {
 				testGCPCredRequest("gregular"),
 				// GCP credreq with condition set
 				testCredReqWithConditions(testGCPCredRequest("gignored"), []credreqv1.CredentialsRequestCondition{ignoredCond}),
-				testClusterInfra("aws"),
+				//testClusterInfra("aws"),
 			},
-			validate: func(t *testing.T) {
+			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				// total cred requests
-				metricAssert(t, metricCredentialsRequestTotal, "aws", 5)
-				metricAssert(t, metricCredentialsRequestTotal, "gcp", 2)
+				assert.Equal(t, 5, accumulator.crTotals["aws"])
+				assert.Equal(t, 2, accumulator.crTotals["gcp"])
 
 				// conditions
-				metricAssert(t, metricCredentialsRequestConditions, string(credreqv1.MissingTargetNamespace), 1)
-				metricAssert(t, metricCredentialsRequestConditions, string(credreqv1.CredentialsProvisionFailure), 1)
-				metricAssert(t, metricCredentialsRequestConditions, string(credreqv1.Ignored), 1)
-				metricAssert(t, metricCredentialsRequestConditions, string(credreqv1.InsufficientCloudCredentials), 1)
+				assert.Equal(t, 1, accumulator.crConditions[credreqv1.MissingTargetNamespace])
+				assert.Equal(t, 1, accumulator.crConditions[credreqv1.CredentialsProvisionFailure])
+				assert.Equal(t, 1, accumulator.crConditions[credreqv1.Ignored])
+				assert.Equal(t, 1, accumulator.crConditions[credreqv1.InsufficientCloudCredentials])
 			},
 		},
 		{
-			name: "cco disabled report no conditions",
-			existingObjects: []runtime.Object{
+			name:        "cco disabled report no conditions",
+			ccoDisabled: true,
+			credReqs: []credreqv1.CredentialsRequest{
 				// missing namespace condition
 				testCredReqWithConditions(testAWSCredRequest("amissingnamespace"), []credreqv1.CredentialsRequestCondition{missingTargetNamespaceCond}),
 				// provision failed condition
@@ -196,15 +195,15 @@ func TestCredentialsRequests(t *testing.T) {
 
 				// GCP credreq with condition set
 				testCredReqWithConditions(testGCPCredRequest("gignored"), []credreqv1.CredentialsRequestCondition{ignoredCond}),
-
-				testConfigMap(true),
 			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsRequestTotal, "aws", 3)
-				metricAssert(t, metricCredentialsRequestTotal, "gcp", 1)
+			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
+				// total cred requests
+				assert.Equal(t, 3, accumulator.crTotals["aws"])
+				assert.Equal(t, 1, accumulator.crTotals["gcp"])
 
+				// failure conditions should all be zero as CCO is disabled
 				for _, cond := range constants.FailureConditionTypes {
-					metricAssert(t, metricCredentialsRequestConditions, string(cond), 0)
+					assert.Equal(t, 0, accumulator.crConditions[cond])
 				}
 			},
 		},
@@ -212,26 +211,16 @@ func TestCredentialsRequests(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+			accumulator := newAccumulator(logger)
 
-			fakeClient := fake.NewFakeClient(test.existingObjects...)
-
-			mc := &Calculator{
-				Client: fakeClient,
-				log:    logger,
+			for _, cr := range test.credReqs {
+				accumulator.processCR(&cr, test.ccoDisabled)
 			}
 
-			mc.metricsLoop()
-
-			test.validate(t)
+			test.validate(t, accumulator)
 		})
 	}
 
-}
-
-func metricAssert(t *testing.T, metric *prometheus.GaugeVec, label string, expectedValue int) {
-	val, err := metric.GetMetricWithLabelValues(label)
-	assert.NoError(t, err, "unexpected error getting stored metric value")
-	assert.Equal(t, float64(expectedValue), promtest.ToFloat64(val))
 }
 
 func TestCredentialsMode(t *testing.T) {
@@ -242,92 +231,54 @@ func TestCredentialsMode(t *testing.T) {
 
 	tests := []struct {
 		name            string
-		existingObjects []runtime.Object
-		validate        func(*testing.T)
+		cloudCredSecret *corev1.Secret
+		secretMissing   bool
+		ccoDisabled     bool
+		expectedMode    constants.CredentialsMode
 	}{
 		{
-			name: "mint mode",
-			existingObjects: []runtime.Object{
-				testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.MintAnnotation),
-				testClusterInfra("aws"),
-			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsMode, string(constants.ModeMint), 1)
-			},
+			name:            "mint mode",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.MintAnnotation),
+			expectedMode:    constants.ModeMint,
 		},
 		{
-			name: "passthrough mode",
-			existingObjects: []runtime.Object{
-				testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.PassthroughAnnotation),
-				testClusterInfra("aws"),
-			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsMode, string(constants.ModePassthrough), 1)
-			},
+			name:            "passthrough mode",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.PassthroughAnnotation),
+			expectedMode:    constants.ModePassthrough,
 		},
 		{
-			name: "degraded mode",
-			existingObjects: []runtime.Object{
-				testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.InsufficientAnnotation),
-				testClusterInfra("aws"),
-			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsMode, string(constants.ModeDegraded), 1)
-			},
+			name:            "degraded mode",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.InsufficientAnnotation),
+			expectedMode:    constants.ModeDegraded,
 		},
 		{
-			name: "manual mode",
-			existingObjects: []runtime.Object{
-				testConfigMap(true),
-				testClusterInfra("aws"),
-			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsMode, string(constants.ModeManual), 1)
-			},
+			name:          "manual mode",
+			ccoDisabled:   true,
+			secretMissing: true,
+			expectedMode:  constants.ModeManual,
 		},
 		{
-			name: "cred removed mode",
-			existingObjects: []runtime.Object{
-				testClusterInfra("aws"),
-			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsMode, string(constants.ModeCredsRemoved), 1)
-			},
+			name:          "cred removed mode",
+			secretMissing: true,
+			expectedMode:  constants.ModeCredsRemoved,
 		},
 		{
-			name: "unexpected secret annotation",
-			existingObjects: []runtime.Object{
-				testCloudCredSecret(secretconstants.AWSCloudCredSecretName, "unexpectedAnnotation"),
-				testClusterInfra("aws"),
-			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsMode, string(constants.ModeUnknown), 1)
-			},
+			name:            "unexpected secret annotation",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, "unexpectedAnnotation"),
+			expectedMode:    constants.ModeUnknown,
 		},
 		{
-			name: "unannotated secret",
-			existingObjects: []runtime.Object{
-				testCloudCredSecret(secretconstants.AWSCloudCredSecretName, ""),
-				testClusterInfra("aws"),
-			},
-			validate: func(t *testing.T) {
-				metricAssert(t, metricCredentialsMode, string(constants.ModeUnknown), 1)
-			},
+			name:            "unannotated secret",
+			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, ""),
+			expectedMode:    constants.ModeUnknown,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingObjects...)
 
-			mc := &Calculator{
-				Client: fakeClient,
-				log:    logger,
-			}
-
-			mc.metricsLoop()
-
-			test.validate(t)
+			detectedMode := determineCredentialsMode(test.ccoDisabled, test.cloudCredSecret, test.secretMissing, logger)
+			assert.Equal(t, test.expectedMode, detectedMode)
 		})
 	}
 
@@ -349,13 +300,13 @@ func TestMetricsInitialization(t *testing.T) {
 	}
 }
 
-func testCredReqWithConditions(cr *credreqv1.CredentialsRequest, conditions []credreqv1.CredentialsRequestCondition) *credreqv1.CredentialsRequest {
+func testCredReqWithConditions(cr credreqv1.CredentialsRequest, conditions []credreqv1.CredentialsRequestCondition) credreqv1.CredentialsRequest {
 	cr.Status.Conditions = conditions
 	return cr
 }
 
-func testAWSCredRequest(name string) *credreqv1.CredentialsRequest {
-	cr := &credreqv1.CredentialsRequest{
+func testAWSCredRequest(name string) credreqv1.CredentialsRequest {
+	cr := credreqv1.CredentialsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: "openshift-cloud-credential-operator",
@@ -377,7 +328,7 @@ func testAWSCredRequest(name string) *credreqv1.CredentialsRequest {
 	return cr
 }
 
-func testGCPCredRequest(name string) *credreqv1.CredentialsRequest {
+func testGCPCredRequest(name string) credreqv1.CredentialsRequest {
 	gcpProviderSpec, err := codec.EncodeProviderSpec(
 		&credreqv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
@@ -427,22 +378,4 @@ func testClusterInfra(cloud string) *configv1.Infrastructure {
 	}
 
 	return infra
-}
-
-func testConfigMap(disabled bool) *corev1.ConfigMap {
-	ccoDisabled := "false"
-	if disabled {
-		ccoDisabled = "true"
-	}
-	cm := &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      credreqv1.CloudCredOperatorConfigMap,
-			Namespace: credreqv1.CloudCredOperatorNamespace,
-		},
-		Data: map[string]string{
-			"disabled": ccoDisabled,
-		},
-	}
-
-	return cm
 }
