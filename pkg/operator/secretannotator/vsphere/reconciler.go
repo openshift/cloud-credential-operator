@@ -40,10 +40,6 @@ import (
 
 const (
 	controllerName = "secretannotator"
-
-	// VSphereCloudCredSecretName is the name of the secret where credentials
-	// for vSphere are stored.
-	VSphereCloudCredSecretName = "vsphere-creds"
 )
 
 var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
@@ -90,7 +86,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == VSphereCloudCredSecretName
+	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == secretconstants.VSphereCloudCredSecretName
 }
 
 // Reconcile handles annotating the cloud cred secret.

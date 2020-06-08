@@ -30,9 +30,6 @@ import (
 const (
 	controllerName = "secretannotator"
 
-	// GCPCloudCredSecretName is the name of the secret created by installer containing cloud creds.
-	GCPCloudCredSecretName = "gcp-credentials"
-
 	// GCPAuthJSONKey is the key name in GCP credentials secrets where the json auth
 	// contents will be stored.
 	GCPAuthJSONKey = "service_account.json"
@@ -48,7 +45,7 @@ func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == GCPCloudCredSecretName
+	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == secretconstants.GCPCloudCredSecretName
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
