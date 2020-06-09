@@ -59,7 +59,7 @@ func LoadCredsFromSecret(kubeClient client.Client, namespace, secretName string)
 // LoadInfrastructureName loads the cluster Infrastructure config and returns the infra name
 // used to identify this cluster, and tag some cloud objects.
 func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, error) {
-	infra, err := getInfrastructure(c)
+	infra, err := GetInfrastructure(c)
 	if err != nil {
 		logger.WithError(err).Error("error loading Infrastructure config 'cluster'")
 		return "", err
@@ -70,7 +70,7 @@ func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, er
 
 // LoadInfrastructureRegion loads the AWS region the cluster is installed to.
 func LoadInfrastructureRegion(c client.Client, logger log.FieldLogger) (string, error) {
-	infra, err := getInfrastructure(c)
+	infra, err := GetInfrastructure(c)
 	if err != nil {
 		logger.WithError(err).Error("error loading Infrastructure region")
 		return "", err
@@ -87,7 +87,8 @@ func LoadInfrastructureRegion(c client.Client, logger log.FieldLogger) (string, 
 	return infra.Status.PlatformStatus.AWS.Region, nil
 }
 
-func getInfrastructure(c client.Client) (*configv1.Infrastructure, error) {
+// GetInfrastructure will return the cluster's Infrastructure object.
+func GetInfrastructure(c client.Client) (*configv1.Infrastructure, error) {
 	infra := &configv1.Infrastructure{}
 	if err := c.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, infra); err != nil {
 		return nil, err

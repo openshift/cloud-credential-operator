@@ -222,7 +222,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			rcc := &annaws.ReconcileCloudCredSecret{
 				Client: fakeClient,
 				Logger: log.WithField("controller", "testController"),
-				AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, region, infraName string) (ccaws.Client, error) {
+				AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error) {
 					return fakeAWSClient, nil
 				},
 			}
