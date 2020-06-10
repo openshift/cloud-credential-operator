@@ -21,15 +21,13 @@ import (
 
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 )
 
 const (
-	controllerName = "secretannotator"
-
 	AwsAccessKeyName       = "aws_access_key_id"
 	AwsSecretAccessKeyName = "aws_secret_access_key"
 )
@@ -37,7 +35,7 @@ const (
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client:           mgr.GetClient(),
-		Logger:           log.WithField("controller", secretconstants.ControllerName),
+		Logger:           log.WithField("controller", secretconstants.SecretAnnotatorControllerName),
 		AWSClientBuilder: awsutils.ClientBuilder,
 	}
 }
@@ -48,7 +46,7 @@ func cloudCredSecretObjectCheck(secret metav1.Object) bool {
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(secretconstants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(secretconstants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -101,7 +99,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 
 	defer func() {
 		dur := time.Since(start)
-		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		metrics.MetricControllerReconcileTime.WithLabelValues(secretconstants.SecretAnnotatorControllerName).Observe(dur.Seconds())
 	}()
 
 	secret := &corev1.Secret{}

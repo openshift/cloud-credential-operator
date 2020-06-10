@@ -33,7 +33,6 @@ import (
 
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -54,14 +53,14 @@ type ReconcileCloudCredSecret struct {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client: mgr.GetClient(),
-		Logger: log.WithField("controller", secretconstants.ControllerName),
+		Logger: log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 }
 
 // Add sets up a controller for watching the cloud cred secret.
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(secretconstants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(constants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -86,7 +85,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == secretconstants.CloudCredSecretNamespace && secret.GetName() == secretconstants.VSphereCloudCredSecretName
+	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants.VSphereCloudCredSecretName
 }
 
 // Reconcile handles annotating the cloud cred secret.
@@ -132,7 +131,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 
 	// Assume passthrough
 	r.Logger.Info("Cloud creds will be used as-is (passthrough)")
-	return r.updateSecretAnnotations(secret, secretconstants.PassthroughAnnotation)
+	return r.updateSecretAnnotations(secret, constants.PassthroughAnnotation)
 }
 
 func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {
@@ -141,7 +140,7 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 		secretAnnotations = map[string]string{}
 	}
 
-	secretAnnotations[secretconstants.AnnotationKey] = value
+	secretAnnotations[constants.AnnotationKey] = value
 	secret.SetAnnotations(secretAnnotations)
 
 	return r.Update(context.Background(), secret)

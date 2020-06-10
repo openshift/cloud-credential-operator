@@ -26,12 +26,10 @@ import (
 	"golang.org/x/time/rate"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	operatorconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -315,17 +313,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 // isCloudCredOperatorConfigMap returns true if given configmap is cloud-credential-operator-config configmap
 func isCloudCredOperatorConfigMap(cm metav1.Object) bool {
-	return cm.GetName() == operatorconstants.CloudCredOperatorConfigMap && cm.GetNamespace() == minterv1.CloudCredOperatorNamespace
+	return cm.GetName() == constants.CloudCredOperatorConfigMap && cm.GetNamespace() == minterv1.CloudCredOperatorNamespace
 }
 
 func isAdminCredSecret(namespace, secretName string) bool {
-	if namespace == constants.KubeSystemNS {
-		if secretName == annotatorconst.AWSCloudCredSecretName ||
-			secretName == annotatorconst.AzureCloudCredSecretName ||
-			secretName == annotatorconst.GCPCloudCredSecretName ||
-			secretName == annotatorconst.OpenStackCloudCredsSecretName ||
-			secretName == annotatorconst.OvirtCloudCredsSecretName ||
-			secretName == annotatorconst.VSphereCloudCredSecretName {
+	if namespace == constants.CloudCredSecretNamespace {
+		if secretName == constants.AWSCloudCredSecretName ||
+			secretName == constants.AzureCloudCredSecretName ||
+			secretName == constants.GCPCloudCredSecretName ||
+			secretName == constants.OpenStackCloudCredsSecretName ||
+			secretName == constants.OvirtCloudCredsSecretName ||
+			secretName == constants.VSphereCloudCredSecretName {
 			log.WithField("secret", secretName).WithField("namespace", namespace).Info("observed admin cloud credential secret event")
 			return true
 		}
@@ -376,7 +374,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
 	} else if operatorIsDisabled {
-		logger.Infof("operator disabled in %s ConfigMap", operatorconstants.CloudCredOperatorConfigMap)
+		logger.Infof("operator disabled in %s ConfigMap", constants.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
 
@@ -693,7 +691,7 @@ func setIgnoredCondition(cr *minterv1.CredentialsRequest, clusterPlatform config
 
 	// Also clear any other conditions since we are ignoring this cred request,
 	// and we don't want to be in a degraded state b/c of cred requests that we're ignoring.
-	for _, cond := range constants.FailureConditionTypes {
+	for _, cond := range minterv1.FailureConditionTypes {
 		cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, cond,
 			corev1.ConditionFalse, reason, msg, updateCheck)
 	}
@@ -776,7 +774,7 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 }
 
 func checkForFailureConditions(cr *minterv1.CredentialsRequest) bool {
-	for _, t := range constants.FailureConditionTypes {
+	for _, t := range minterv1.FailureConditionTypes {
 		failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
 		if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
 			return true

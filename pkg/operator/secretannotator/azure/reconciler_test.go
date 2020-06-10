@@ -26,9 +26,9 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 
 	ccazure "github.com/openshift/cloud-credential-operator/pkg/azure"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	. "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure/mock"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (

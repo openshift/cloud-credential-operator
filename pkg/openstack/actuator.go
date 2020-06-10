@@ -30,9 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	crconst "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
@@ -211,7 +210,7 @@ func (a *OpenStackActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) 
 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *OpenStackActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
-	return types.NamespacedName{Namespace: crconst.KubeSystemNS, Name: constants.OpenStackCloudCredsSecretName}
+	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.OpenStackCloudCredsSecretName}
 }
 
 func (a *OpenStackActuator) getRootCloudCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (string, error) {

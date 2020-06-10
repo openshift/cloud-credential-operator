@@ -30,9 +30,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	crconst "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
@@ -238,7 +237,7 @@ func (a *OvirtActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*co
 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *OvirtActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
-	return types.NamespacedName{Namespace: crconst.KubeSystemNS, Name: annotatorconst.OvirtCloudCredsSecretName}
+	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.OvirtCloudCredsSecretName}
 }
 
 func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (OvirtCreds, error) {
@@ -254,10 +253,10 @@ func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log
 
 	out, err := secretToCreds(cloudCredSecret)
 	if err != nil {
-		logger.Warnf("secret did not have expected key: %s", annotatorconst.OvirtCloudCredsSecretName)
+		logger.Warnf("secret did not have expected key: %s", constants.OvirtCloudCredsSecretName)
 		return OvirtCreds{}, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
-			Message:   fmt.Sprintf("secret did not have expected key: %v", annotatorconst.OvirtCloudCredsSecretName),
+			Message:   fmt.Sprintf("secret did not have expected key: %v", constants.OvirtCloudCredsSecretName),
 		}
 	}
 

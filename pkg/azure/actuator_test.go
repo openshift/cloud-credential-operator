@@ -31,8 +31,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	azuremock "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -61,10 +60,10 @@ const (
 var (
 	rootSecretMintAnnotation = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      annotatorconst.AzureCloudCredSecretName,
-			Namespace: constants.KubeSystemNS,
+			Name:      constants.AzureCloudCredSecretName,
+			Namespace: constants.CloudCredSecretNamespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+				constants.AnnotationKey: constants.MintAnnotation,
 			},
 		},
 	}
