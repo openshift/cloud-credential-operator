@@ -21,8 +21,8 @@ import (
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 )
@@ -38,7 +38,7 @@ const (
 func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client:           mgr.GetClient(),
-		Logger:           log.WithField("controller", secretconstants.ControllerName),
+		Logger:           log.WithField("controller", secretconstants.SecretAnnotatorControllerName),
 		GCPClientBuilder: ccgcp.NewClient,
 		ProjectName:      projectName,
 	}
@@ -50,7 +50,7 @@ func cloudCredSecretObjectCheck(secret metav1.Object) bool {
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(secretconstants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(secretconstants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}

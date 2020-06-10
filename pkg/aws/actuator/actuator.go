@@ -27,10 +27,9 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 
@@ -284,20 +283,20 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.InsufficientAnnotation {
+	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.InsufficientAnnotation {
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
 			Message:   msg,
 		}
-	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
+	} else if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
 		logger.Debugf("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
 			return err
 		}
-	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.MintAnnotation {
+	} else if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.MintAnnotation {
 		logger.Debugf("provisioning with cred minting")
 		err := a.syncMint(ctx, cr, logger)
 		if err != nil {
@@ -309,7 +308,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 			}
 		}
 	} else {
-		logger.Infof("unknown or missing %s annotation on admin credentials Secret, skipping reconcile", annotatorconst.AnnotationKey)
+		logger.Infof("unknown or missing %s annotation on admin credentials Secret, skipping reconcile", constants.AnnotationKey)
 	}
 
 	return nil
@@ -397,7 +396,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 			case iam.ErrCodeNoSuchEntityException:
 				logger.WithField("userName", awsStatus.User).Debug("user does not exist, creating")
 				if rootAWSClient == nil {
-					return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.KubeSystemNS, annotatorconst.AWSCloudCredSecretName)
+					return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 				}
 
 				createOut, err := a.createUser(logger, rootAWSClient, awsStatus.User)
@@ -426,7 +425,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	// Check if the user has the expected tags:
 	if !userHasExpectedTags(logger, userOut, infraName, string(clusterUUID)) {
 		if rootAWSClient == nil {
-			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.KubeSystemNS, annotatorconst.AWSCloudCredSecretName)
+			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 		}
 
 		err = a.tagUser(logger, rootAWSClient, awsStatus.User, infraName, string(clusterUUID))
@@ -444,7 +443,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, userOut, readAWSClient, logger)
 	if !policyEqual {
 		if rootAWSClient == nil {
-			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.KubeSystemNS, annotatorconst.AWSCloudCredSecretName)
+			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 		}
 		err = a.setUserPolicy(logger, rootAWSClient, awsStatus.User, awsStatus.Policy, desiredUserPolicy)
 		if err != nil {
@@ -485,7 +484,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		// we should cleanup all pre-existing access keys. This will allow deleting the
 		// secret in Kubernetes to revoke old credentials and create new.
 		if rootAWSClient == nil {
-			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.KubeSystemNS, annotatorconst.AWSCloudCredSecretName)
+			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 		}
 		err := a.deleteAllAccessKeys(logger, rootAWSClient, awsStatus.User, allUserKeys)
 		if err != nil {
@@ -725,12 +724,12 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 // buildRootAWSClient will return an AWS client using the "root" AWS creds which are expected to
 // live in kube-system/aws-creds.
 func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
-	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", constants.KubeSystemNS, annotatorconst.AWSCloudCredSecretName))
+	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName))
 
 	logger.Debug("loading AWS credentials from secret")
 	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 	// cluster, we need to load different secrets for each cluster.
-	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.Client, constants.KubeSystemNS, annotatorconst.AWSCloudCredSecretName)
+	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.Client, constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 	if err != nil {
 		return nil, err
 	}
@@ -896,7 +895,7 @@ func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, us
 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *AWSActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
-	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AWSCloudCredSecretName}
+	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName}
 }
 
 func (a *AWSActuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
@@ -911,7 +910,7 @@ func (a *AWSActuator) getCloudCredentialsSecret(ctx context.Context, logger log.
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.KubeSystemNS, annotatorconst.AWSCloudCredSecretName)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
@@ -926,7 +925,7 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 		return false
 	}
 
-	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		return false
 	}
 

@@ -24,7 +24,6 @@ import (
 	"time"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -33,9 +32,9 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -91,9 +90,9 @@ func (a *Actuator) IsValidMode() error {
 	}
 
 	switch mode {
-	case annotatorconst.MintAnnotation:
+	case constants.MintAnnotation:
 		return nil
-	case annotatorconst.PassthroughAnnotation:
+	case constants.PassthroughAnnotation:
 		return nil
 	}
 
@@ -163,7 +162,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return fmt.Errorf("unable to get secret %v/%v: %v", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name, err)
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
+	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
 		return nil
 	}
 
@@ -229,7 +228,7 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.InsufficientAnnotation {
+	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.InsufficientAnnotation {
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
@@ -238,13 +237,13 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		}
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
+	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
 		logger.Debugf("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
 			return err
 		}
-	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.MintAnnotation {
+	} else if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.MintAnnotation {
 		logger.Debugf("provisioning with cred minting")
 		err := a.syncMint(ctx, cr, cloudCredsSecret, infraName, infraResourceGroups, logger)
 		if err != nil {
@@ -569,7 +568,7 @@ func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.Crede
 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
-	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AzureCloudCredSecretName}
+	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AzureCloudCredSecretName}
 }
 
 func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
@@ -584,7 +583,7 @@ func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.KubeSystemNS, annotatorconst.AzureCloudCredSecretName)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.AzureCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
@@ -599,7 +598,7 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 		return false
 	}
 
-	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		return false
 	}
 

@@ -43,8 +43,7 @@ import (
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 
-	operatorconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	anngcp "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
@@ -241,7 +240,7 @@ func testSecret() *corev1.Secret {
 func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      operatorconstants.CloudCredOperatorConfigMap,
+			Name:      constants.CloudCredOperatorConfigMap,
 			Namespace: minterv1.CloudCredOperatorNamespace,
 		},
 		Data: map[string]string{

@@ -19,8 +19,8 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	log "github.com/sirupsen/logrus"
 )
@@ -45,14 +45,14 @@ type ReconcileCloudCredSecret struct {
 func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
 		Client: mgr.GetClient(),
-		Logger: log.WithField("controller", secretconstants.ControllerName),
+		Logger: log.WithField("controller", secretconstants.SecretAnnotatorControllerName),
 		Adal:   &adalService{},
 	}
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(secretconstants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(secretconstants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
