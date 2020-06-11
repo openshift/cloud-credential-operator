@@ -48,6 +48,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -1037,6 +1038,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				},
 				platformType: configv1.AWSPlatformType,
 			}
+			clusteroperator.AddStatusHandler(rcr)
 
 			_, err = rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{

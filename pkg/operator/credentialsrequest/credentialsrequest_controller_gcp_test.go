@@ -45,6 +45,7 @@ import (
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -579,6 +580,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				},
 				platformType: configv1.GCPPlatformType,
 			}
+			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
