@@ -77,8 +77,8 @@ func (a *passthrough) Update(ctx context.Context, cr *minterv1.CredentialsReques
 	return nil
 }
 
-// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
-func (a *passthrough) GetParentCredSecretLocation() types.NamespacedName {
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *passthrough) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AzureCloudCredSecretName}
 }
 
