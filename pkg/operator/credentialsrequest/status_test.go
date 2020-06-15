@@ -217,7 +217,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			credRequests:      []minterv1.CredentialsRequest{},
 			parentCredRemoved: true,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorUpgradeable, configv1.ConditionFalse, reasonParentCredRemoved),
+				testCondition(configv1.OperatorUpgradeable, configv1.ConditionFalse, reasonCredentialsRootSecretMissing),
 			},
 		},
 		{

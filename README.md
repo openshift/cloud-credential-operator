@@ -19,13 +19,15 @@ instance roles)
 
 Currently the operator supports AWS, GCP, Azure, VMWare, OpenStack and oVirt.
 
-## Admin Credential Secret Formats
+## Credentials Root Secret Formats
 
-If running in-cluster, your credentials are expected to exist in kube-system
-namespace.  Credentials are stored in a Kubernetes Secret, and the format
-varies by cloud. The data in these format in these secrets is also the same
-used for each credentials secret the operator will create for a
-CredentialsRequest.
+Each cloud provider utilizes a credentials root secret in the kube-system
+namespace (by convention), which is then used to satisfy all
+CredentialsRequests and create their respective Secrets. (either by minting new
+credentials (mint mode), or by copying the credentials root secret (passthrough
+mode))
+
+The format for the secret varies by cloud, and is also used for each CredentialsRequest Secret.
 
 ### AWS
 

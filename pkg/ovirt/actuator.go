@@ -236,14 +236,14 @@ func (a *OvirtActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*co
 	return loadedSecret, nil
 }
 
-// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
-func (a *OvirtActuator) GetParentCredSecretLocation() types.NamespacedName {
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *OvirtActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: crconst.KubeSystemNS, Name: annotatorconst.OvirtCloudCredsSecretName}
 }
 
 func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (OvirtCreds, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetParentCredSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return OvirtCreds{}, &actuatoriface.ActuatorError{

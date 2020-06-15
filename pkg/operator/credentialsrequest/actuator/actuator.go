@@ -36,8 +36,8 @@ type Actuator interface {
 	Update(context.Context, *minterv1.CredentialsRequest) error
 	// Exists checks if the credentials currently exist.
 	Exists(context.Context, *minterv1.CredentialsRequest) (bool, error)
-	// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
-	GetParentCredSecretLocation() types.NamespacedName
+	// GetCredentialsRootSecretLocation returns the namespace and name where the credentials root secret is stored.
+	GetCredentialsRootSecretLocation() types.NamespacedName
 }
 
 type DummyActuator struct {
@@ -59,8 +59,8 @@ func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequ
 	return nil
 }
 
-// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
-func (a *DummyActuator) GetParentCredSecretLocation() types.NamespacedName {
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *DummyActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AWSCloudCredSecretName}
 }
 

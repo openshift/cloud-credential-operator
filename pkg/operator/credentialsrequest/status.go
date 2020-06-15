@@ -26,15 +26,15 @@ import (
 )
 
 const (
-	cloudCredClusterOperator        = "cloud-credential"
-	cloudCredOperatorNamespace      = "openshift-cloud-credential-operator"
-	reasonCredentialsFailing        = "CredentialsFailing"
-	reasonNoCredentialsFailing      = "NoCredentialsFailing"
-	reasonReconciling               = "Reconciling"
-	reasonReconcilingComplete       = "ReconcilingComplete"
-	reasonCredentialsNotProvisioned = "CredentialsNotProvisioned"
-	reasonOperatorDisabled          = "OperatorDisabledByAdmin"
-	reasonParentCredRemoved         = "ParentCredentialMissing"
+	cloudCredClusterOperator           = "cloud-credential"
+	cloudCredOperatorNamespace         = "openshift-cloud-credential-operator"
+	reasonCredentialsFailing           = "CredentialsFailing"
+	reasonNoCredentialsFailing         = "NoCredentialsFailing"
+	reasonReconciling                  = "Reconciling"
+	reasonReconcilingComplete          = "ReconcilingComplete"
+	reasonCredentialsNotProvisioned    = "CredentialsNotProvisioned"
+	reasonOperatorDisabled             = "OperatorDisabledByAdmin"
+	reasonCredentialsRootSecretMissing = "CredentialsRootSecretMissing"
 )
 
 // syncOperatorStatus computes the operator's current status and
@@ -62,7 +62,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 		return errors.Wrap(err, "error checking if parent secret exists")
 	}
 	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType, operatorIsDisabled,
-		parentSecretExists, r.Actuator.GetParentCredSecretLocation(), logger)
+		parentSecretExists, r.Actuator.GetCredentialsRootSecretLocation(), logger)
 	co.Status.Versions = computeClusterOperatorVersions()
 	co.Status.RelatedObjects = buildExpectedRelatedObjects(credRequests)
 
@@ -102,7 +102,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 
 func (r *ReconcileCredentialsRequest) parentSecretExists() (bool, error) {
 	parentSecret := &corev1.Secret{}
-	if err := r.Client.Get(context.TODO(), r.Actuator.GetParentCredSecretLocation(), parentSecret); err != nil {
+	if err := r.Client.Get(context.TODO(), r.Actuator.GetCredentialsRootSecretLocation(), parentSecret); err != nil {
 		if apierrors.IsNotFound(err) {
 			return false, nil
 		}
@@ -286,7 +286,7 @@ func computeStatusConditions(
 	// you can upgrade.
 	if !operatorIsDisabled && !parentCredExists {
 		upgradeableCondition.Status = configv1.ConditionFalse
-		upgradeableCondition.Reason = reasonParentCredRemoved
+		upgradeableCondition.Reason = reasonCredentialsRootSecretMissing
 		upgradeableCondition.Message = fmt.Sprintf("Parent credential secret %s/%s must be restored prior to upgrade",
 			parentCredLocation.Namespace, parentCredLocation.Name)
 	}

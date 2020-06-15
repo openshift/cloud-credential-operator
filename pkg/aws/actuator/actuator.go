@@ -894,14 +894,14 @@ func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, us
 	return string(b), nil
 }
 
-// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
-func (a *AWSActuator) GetParentCredSecretLocation() types.NamespacedName {
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *AWSActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AWSCloudCredSecretName}
 }
 
 func (a *AWSActuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetParentCredSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{

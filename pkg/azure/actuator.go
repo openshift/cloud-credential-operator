@@ -567,14 +567,14 @@ func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.Crede
 	return nil
 }
 
-// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
-func (a *Actuator) GetParentCredSecretLocation() types.NamespacedName {
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AzureCloudCredSecretName}
 }
 
 func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.client.Client.Get(ctx, a.GetParentCredSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.client.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{

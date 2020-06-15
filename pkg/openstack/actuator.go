@@ -209,8 +209,8 @@ func (a *OpenStackActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) 
 	return existingSecret, nil
 }
 
-// GetParentCredSecretLocation returns the namespace and name where the parent credentials secret is stored.
-func (a *OpenStackActuator) GetParentCredSecretLocation() types.NamespacedName {
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *OpenStackActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: crconst.KubeSystemNS, Name: constants.OpenStackCloudCredsSecretName}
 }
 
@@ -218,7 +218,7 @@ func (a *OpenStackActuator) getRootCloudCredentialsSecretData(ctx context.Contex
 	var clouds string
 
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetParentCredSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return "", &actuatoriface.ActuatorError{
