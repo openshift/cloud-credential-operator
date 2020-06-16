@@ -22,16 +22,12 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-const (
-	RootSecretNamespace = "kube-system"
-	RootSecretName      = "azure-credentials"
-)
-
-var RootSecretKey = client.ObjectKey{Name: RootSecretName, Namespace: RootSecretNamespace}
+var RootSecretKey = client.ObjectKey{Name: annotatorconst.AzureCloudCredSecretName, Namespace: constants.KubeSystemNS}
 
 type clientWrapper struct {
 	client.Client

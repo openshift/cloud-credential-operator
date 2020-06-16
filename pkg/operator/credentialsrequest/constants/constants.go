@@ -54,4 +54,6 @@ var (
 		ModeDegraded,
 		ModeUnknown,
 	}
+
+	KubeSystemNS = "kube-system"
 )
