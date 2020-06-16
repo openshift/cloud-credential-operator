@@ -1,0 +1,7 @@
+---
+- op: add
+  path: /metadata/annotations/profile.cvo.openshift.io
+  value: hypershift
+- op: replace
+  path: /spec/replicas
+  value: 0

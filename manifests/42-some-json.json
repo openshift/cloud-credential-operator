@@ -1,0 +1,1 @@
+{"metadata": {"annotations": {"some-openshift-annotation": "managed"}}, "spec": {"replicas": 1}}
