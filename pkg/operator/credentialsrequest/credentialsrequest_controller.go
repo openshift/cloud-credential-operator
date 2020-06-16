@@ -31,6 +31,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -130,7 +131,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// We use an annotation on secrets that refers back to their owning credentials request because
 	// the normal owner reference is not namespaced, and we want to support credentials requests being
 	// in a centralized namespace, but writing secrets into component namespaces.
-	mapFn := handler.ToRequestsFunc(
+	targetCredSecretMapFunc := handler.ToRequestsFunc(
 		func(a handler.MapObject) []reconcile.Request {
 			// Predicate below should ensure this map function is not called if the
 			// secret does not have our label:
@@ -178,9 +179,53 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = c.Watch(
 		&source.Kind{Type: &corev1.Secret{}},
 		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: mapFn,
+			ToRequests: targetCredSecretMapFunc,
 		},
 		p)
+	if err != nil {
+		return err
+	}
+
+	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
+	allCredRequestsMapFn := handler.ToRequestsFunc(
+		func(a handler.MapObject) []reconcile.Request {
+			log.Info("requeueing all CredentialsRequests")
+			crs := &minterv1.CredentialsRequestList{}
+			err := mgr.GetClient().List(context.TODO(), crs)
+			var requests []reconcile.Request
+			if err != nil {
+				log.WithError(err).Error("error listing all cred requests for requeue")
+				return requests
+			}
+			for _, cr := range crs.Items {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      cr.Name,
+						Namespace: cr.Namespace,
+					},
+				})
+			}
+			return requests
+		})
+
+	adminCredSecretPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isAdminCredSecret(e.MetaNew.GetNamespace(), e.MetaNew.GetName())
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isAdminCredSecret(e.Meta.GetNamespace(), e.Meta.GetName())
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return isAdminCredSecret(e.Meta.GetNamespace(), e.Meta.GetName())
+		},
+	}
+	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
+	err = c.Watch(
+		&source.Kind{Type: &corev1.Secret{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: allCredRequestsMapFn,
+		},
+		adminCredSecretPredicate)
 	if err != nil {
 		return err
 	}
@@ -243,28 +288,6 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Monitor the cloud-credential-operator-config configmap to check if operator is re-enabled.
 	// Check if attempts were made to delete the credentials requests when the operator was disabled.
 	// We have to have to reconcile all those credential requests.
-	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
-	allCredRequestsMapFn := handler.ToRequestsFunc(
-		func(a handler.MapObject) []reconcile.Request {
-			log.Info("requeueing all CredentialsRequests")
-			crs := &minterv1.CredentialsRequestList{}
-			err := mgr.GetClient().List(context.TODO(), crs)
-			var requests []reconcile.Request
-			if err != nil {
-				log.WithError(err).Error("error listing all cred requests for requeue")
-				return requests
-			}
-			for _, cr := range crs.Items {
-				requests = append(requests, reconcile.Request{
-					NamespacedName: types.NamespacedName{
-						Name:      cr.Name,
-						Namespace: cr.Namespace,
-					},
-				})
-			}
-			return requests
-		})
-
 	// Check if operator is re-enabled in cloud-credential-operator-config configmap
 	configMapPredicate := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
@@ -293,6 +316,21 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 // isCloudCredOperatorConfigMap returns true if given configmap is cloud-credential-operator-config configmap
 func isCloudCredOperatorConfigMap(cm metav1.Object) bool {
 	return cm.GetName() == operatorconstants.CloudCredOperatorConfigMap && cm.GetNamespace() == minterv1.CloudCredOperatorNamespace
+}
+
+func isAdminCredSecret(namespace, secretName string) bool {
+	if namespace == constants.KubeSystemNS {
+		if secretName == annotatorconst.AWSCloudCredSecretName ||
+			secretName == annotatorconst.AzureCloudCredSecretName ||
+			secretName == annotatorconst.GCPCloudCredSecretName ||
+			secretName == annotatorconst.OpenStackCloudCredsSecretName ||
+			secretName == annotatorconst.OvirtCloudCredsSecretName ||
+			secretName == annotatorconst.VSphereCloudCredSecretName {
+			log.WithField("secret", secretName).WithField("namespace", namespace).Info("observed admin cloud credential secret event")
+			return true
+		}
+	}
+	return false
 }
 
 var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}

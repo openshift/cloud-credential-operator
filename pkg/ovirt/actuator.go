@@ -31,7 +31,8 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	crconst "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
@@ -235,9 +236,14 @@ func (a *OvirtActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*co
 	return loadedSecret, nil
 }
 
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *OvirtActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
+	return types.NamespacedName{Namespace: crconst.KubeSystemNS, Name: annotatorconst.OvirtCloudCredsSecretName}
+}
+
 func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (OvirtCreds, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, types.NamespacedName{Name: constants.OvirtCloudCredsSecretName, Namespace: constants.CloudCredSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return OvirtCreds{}, &actuatoriface.ActuatorError{
@@ -248,10 +254,10 @@ func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log
 
 	out, err := secretToCreds(cloudCredSecret)
 	if err != nil {
-		logger.Warnf("secret did not have expected key: %s", constants.OvirtCloudCredsSecretName)
+		logger.Warnf("secret did not have expected key: %s", annotatorconst.OvirtCloudCredsSecretName)
 		return OvirtCreds{}, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
-			Message:   fmt.Sprintf("secret did not have expected key: %v", constants.OvirtCloudCredsSecretName),
+			Message:   fmt.Sprintf("secret did not have expected key: %v", annotatorconst.OvirtCloudCredsSecretName),
 		}
 	}
 

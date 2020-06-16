@@ -38,6 +38,8 @@ import (
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 var (
@@ -79,6 +81,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 		credRequests       []minterv1.CredentialsRequest
 		cloudPlatform      configv1.PlatformType
 		operatorDisabled   bool
+		parentCredRemoved  bool
 		expectedConditions []configv1.ClusterOperatorStatusCondition
 	}{
 		{
@@ -210,6 +213,14 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
+			name:              "upgradable false if parent cred removed",
+			credRequests:      []minterv1.CredentialsRequest{},
+			parentCredRemoved: true,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{
+				testCondition(configv1.OperatorUpgradeable, configv1.ConditionFalse, reasonCredentialsRootSecretMissing),
+			},
+		},
+		{
 			name: "operator disabled",
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", false, []minterv1.CredentialsRequestCondition{}, nil),
@@ -232,7 +243,11 @@ func TestClusterOperatorStatus(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests, test.cloudPlatform, test.operatorDisabled, log.WithField("test", test.name))
+			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests,
+				test.cloudPlatform, test.operatorDisabled,
+				!test.parentCredRemoved,
+				types.NamespacedName{Namespace: annotatorconst.CloudCredSecretNamespace, Name: annotatorconst.AWSCloudCredSecretName},
+				log.WithField("test", test.name))
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
 				if assert.NotNil(t, c) {
@@ -287,7 +302,8 @@ func TestClusterOperatorVersion(t *testing.T) {
 			fakeClient := fake.NewFakeClient(existing...)
 
 			rcr := &ReconcileCredentialsRequest{
-				Client: fakeClient,
+				Client:   fakeClient,
+				Actuator: &actuator.DummyActuator{},
 			}
 
 			assert.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")

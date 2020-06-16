@@ -24,6 +24,8 @@ import (
 	"time"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -565,9 +567,14 @@ func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.Crede
 	return nil
 }
 
+// GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
+func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
+	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AzureCloudCredSecretName}
+}
+
 func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.client.Client.Get(ctx, types.NamespacedName{Name: RootSecretName, Namespace: RootSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.client.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -577,7 +584,7 @@ func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", RootSecretNamespace, RootSecretName)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.KubeSystemNS, annotatorconst.AzureCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
