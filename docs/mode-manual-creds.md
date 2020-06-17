@@ -79,6 +79,24 @@ spec:
 
 You must now create Secret yaml files in your openshift-install manifests directory generated earlier. The Secrets must be stored in the namespace and name defined in each request.spec.secretRef. The format for the Secret data varies by cloud provider, please see the [Admin Credentials Secret Format](../README.md) in the README for examples.
 
+### Azure Credentials Secret Format
+
+On Azure, the Credentials Secret Format includes two properties which must contain the cluster's infrastructure ID, generated randomly for each cluster install. This value can be found after running create manifests:
+
+```bash
+$ cat .openshift_install_state.json | jq '."*installconfig.ClusterID".InfraID' -r
+mycluster-2mpcn
+```
+
+This value would be used in the secret data as follows:
+
+```yaml
+azure_resource_prefix: mycluster-2mpcn
+azure_resourcegroup: mycluster-2mpcn-rg
+```
+
+## Create Your Cluster
+
 Finally, proceed with cluster creation:
 
 ```bash
