@@ -113,7 +113,7 @@ func TestAnnotations(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			f := fake.NewFakeClient(&tt.in, &validSecret)
-			actuator, err := azure.NewActuator(f)
+			actuator, err := azure.NewActuator(f, openshiftapiv1.AzurePublicCloud)
 			if err != nil {
 				assert.Regexp(t, tt.errRegexp, err)
 				assert.Nil(t, actuator)

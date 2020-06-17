@@ -18,6 +18,8 @@ import (
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/Azure/go-autorest/autorest/to"
 	uuid "github.com/satori/go.uuid"
+
+	configv1 "github.com/openshift/api/config/v1"
 )
 
 func getAuthorizer(clientID, clientSecret, tenantID, resourceEndpoint string) (autorest.Authorizer, error) {
@@ -50,22 +52,26 @@ func NewFakeAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecre
 	}, nil
 }
 
-func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
-	graphAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, azure.PublicCloud.GraphEndpoint)
+func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret string, cloudName configv1.AzureCloudEnvironment, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
+	env, err := azure.EnvironmentFromName(string(cloudName))
+	if err != nil {
+		return nil, fmt.Errorf("Unable to determine Azure environment: %w", err)
+	}
+	graphAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env.GraphEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to construct GraphEndpoint authorizer: %v", err)
 	}
 
-	rmAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, azure.PublicCloud.ResourceManagerEndpoint)
+	rmAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env.ResourceManagerEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to construct ResourceManagerEndpoint authorizer: %v", err)
 	}
 
 	return &AzureCredentialsMinter{
-		appClient:             NewAppClient(tenantID, graphAuthorizer),
-		spClient:              NewServicePrincipalClient(tenantID, graphAuthorizer),
-		roleAssignmentsClient: NewRoleAssignmentsClient(subscriptionID, rmAuthorizer),
-		roleDefinitionClient:  NewRoleDefinitionClient(subscriptionID, rmAuthorizer),
+		appClient:             NewAppClient(env, tenantID, graphAuthorizer),
+		spClient:              NewServicePrincipalClient(env, tenantID, graphAuthorizer),
+		roleAssignmentsClient: NewRoleAssignmentsClient(env, subscriptionID, rmAuthorizer),
+		roleDefinitionClient:  NewRoleDefinitionClient(env, subscriptionID, rmAuthorizer),
 		tenantID:              tenantID,
 		subscriptionID:        subscriptionID,
 		logger:                logger,

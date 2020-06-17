@@ -16,7 +16,7 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/mock v1.4.3
-	github.com/openshift/api v0.0.0-20200521162313-4090b8d67ad8
+	github.com/openshift/api v0.0.0-20200609191024-dca637550e8c
 	github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
 	github.com/openshift/client-go v0.0.0-20200521150516-05eb9880269c
 	github.com/openshift/library-go v0.0.0-20200521170207-eeebfaa62843

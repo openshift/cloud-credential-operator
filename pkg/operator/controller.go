@@ -30,6 +30,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator"
 	"github.com/openshift/cloud-credential-operator/pkg/ovirt"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 	vsphereactuator "github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -87,7 +88,7 @@ func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 			}
 		case configv1.AzurePlatformType:
 			log.Info("initializing Azure actuator")
-			a, err = azure.NewActuator(m.GetClient())
+			a, err = azure.NewActuator(m.GetClient(), util.GetAzureCloudName(infraStatus))
 			if err != nil {
 				return err
 			}

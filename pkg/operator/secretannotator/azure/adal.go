@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/Azure/go-autorest/autorest/adal"
-	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 //go:generate mockgen -source=./adal.go -destination=./mock/adal_generated.go -package=mock
@@ -18,7 +17,7 @@ type AdalService interface {
 type adalService struct{}
 
 func (a *adalService) NewOAuthConfig(activeDirectoryEndpoint, tenantID string) (*adal.OAuthConfig, error) {
-	return adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
+	return adal.NewOAuthConfig(activeDirectoryEndpoint, tenantID)
 }
 
 func (a *adalService) NewServicePrincipalToken(oauthConfig adal.OAuthConfig, clientID string, secret string, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
