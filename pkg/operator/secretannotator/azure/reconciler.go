@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	configv1 "github.com/openshift/api/config/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -22,6 +24,8 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
+
 	log "github.com/sirupsen/logrus"
 )
 
@@ -167,13 +171,24 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 }
 
 func (r *ReconcileCloudCredSecret) checkCloudCredCreation(tenantID, clientID, secret string) (bool, error) {
-	oauthConfig, err := r.Adal.NewOAuthConfig(azure.PublicCloud.ActiveDirectoryEndpoint, tenantID)
+	infra := &configv1.Infrastructure{}
+	if err := r.Get(context.Background(), types.NamespacedName{Name: "cluster"}, infra); err != nil {
+		return false, fmt.Errorf("could not get infrastructure resource: %w", err)
+	}
+
+	cloudName := util.GetAzureCloudName(&infra.Status)
+	env, err := azure.EnvironmentFromName(string(cloudName))
+	if err != nil {
+		return false, fmt.Errorf("unable to determine Azure environment: %w", err)
+	}
+
+	oauthConfig, err := r.Adal.NewOAuthConfig(env.ActiveDirectoryEndpoint, tenantID)
 	if err != nil {
 		r.Logger.WithError(err).Error("error while creating oAuthConfig")
 		return false, err
 	}
 
-	token, err := r.Adal.NewServicePrincipalToken(*oauthConfig, clientID, secret, azure.PublicCloud.GraphEndpoint)
+	token, err := r.Adal.NewServicePrincipalToken(*oauthConfig, clientID, secret, env.GraphEndpoint)
 	if err != nil {
 		r.Logger.WithError(err).Error("error while creating service principal")
 		return false, err

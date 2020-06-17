@@ -85,7 +85,8 @@ func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			base := getInputSecret()
-			fakeClient := fake.NewFakeClient(base)
+			infra := &configv1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+			fakeClient := fake.NewFakeClient(base, infra)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockAdalClient := mock.NewMockAdalService(mockCtrl)

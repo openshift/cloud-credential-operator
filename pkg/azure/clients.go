@@ -6,6 +6,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 //go:generate mockgen -source=./clients.go -destination=./mock/client_generated.go -package=mock
@@ -47,8 +48,8 @@ func (appClient *appClient) Delete(ctx context.Context, applicationObjectID stri
 
 var _ AppClient = &appClient{}
 
-func NewAppClient(tenantID string, authorizer autorest.Authorizer) *appClient {
-	client := graphrbac.NewApplicationsClient(tenantID)
+func NewAppClient(env azure.Environment, tenantID string, authorizer autorest.Authorizer) *appClient {
+	client := graphrbac.NewApplicationsClientWithBaseURI(env.GraphEndpoint, tenantID)
 	client.Authorizer = authorizer
 	return &appClient{
 		client: client,
@@ -80,8 +81,8 @@ func (spClient *servicePrincipalClient) Create(ctx context.Context, parameters g
 
 var _ ServicePrincipalClient = &servicePrincipalClient{}
 
-func NewServicePrincipalClient(tenantID string, authorizer autorest.Authorizer) *servicePrincipalClient {
-	client := graphrbac.NewServicePrincipalsClient(tenantID)
+func NewServicePrincipalClient(env azure.Environment, tenantID string, authorizer autorest.Authorizer) *servicePrincipalClient {
+	client := graphrbac.NewServicePrincipalsClientWithBaseURI(env.GraphEndpoint, tenantID)
 	client.Authorizer = authorizer
 	return &servicePrincipalClient{
 		client: client,
@@ -119,8 +120,8 @@ func (raClient *roleAssignmentsClient) DeleteByID(ctx context.Context, roleAssig
 
 var _ RoleAssignmentsClient = &roleAssignmentsClient{}
 
-func NewRoleAssignmentsClient(subscriptionID string, authorizer autorest.Authorizer) *roleAssignmentsClient {
-	client := authorization.NewRoleAssignmentsClient(subscriptionID)
+func NewRoleAssignmentsClient(env azure.Environment, subscriptionID string, authorizer autorest.Authorizer) *roleAssignmentsClient {
+	client := authorization.NewRoleAssignmentsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
 	client.Authorizer = authorizer
 	return &roleAssignmentsClient{
 		client: client,
@@ -147,8 +148,8 @@ func (rdClient *roleDefinitionClient) List(ctx context.Context, scope string, fi
 
 var _ RoleDefinitionClient = &roleDefinitionClient{}
 
-func NewRoleDefinitionClient(subscriptionID string, authorizer autorest.Authorizer) *roleDefinitionClient {
-	client := authorization.NewRoleDefinitionsClient(subscriptionID)
+func NewRoleDefinitionClient(env azure.Environment, subscriptionID string, authorizer autorest.Authorizer) *roleDefinitionClient {
+	client := authorization.NewRoleDefinitionsClientWithBaseURI(env.ResourceManagerEndpoint, subscriptionID)
 	client.Authorizer = authorizer
 	return &roleDefinitionClient{
 		client: client,
