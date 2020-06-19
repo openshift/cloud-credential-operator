@@ -26,9 +26,7 @@ spec:
         - --upstream=http://127.0.0.1:2112/
         - --tls-cert-file=/etc/tls/private/tls.crt
         - --tls-private-key-file=/etc/tls/private/tls.key
-        - --config-file=/etc/kube-rbac-proxy/config-file.yaml
         - --logtostderr=true
-        - -v=10
         image: quay.io/openshift/origin-kube-rbac-proxy:latest
         imagePullPolicy: IfNotPresent
         name: kube-rbac-proxy
@@ -43,8 +41,6 @@ spec:
         terminationMessagePath: /dev/termination-log
         terminationMessagePolicy: File
         volumeMounts:
-        - mountPath: /etc/kube-rbac-proxy
-          name: auth-proxy-config
         - mountPath: /etc/tls/private
           name: cloud-credential-operator-serving-cert
       - args:
@@ -98,9 +94,6 @@ spec:
           name: cco-trusted-ca
           optional: true
         name: cco-trusted-ca
-      - configMap:
-          name: kube-rbac-proxy
-        name: auth-proxy-config
       - name: cloud-credential-operator-serving-cert
         secret:
           secretName: cloud-credential-operator-serving-cert
