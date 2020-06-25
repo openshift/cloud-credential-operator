@@ -876,12 +876,13 @@ func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, us
 		Statement: []StatementEntry{},
 	}
 	for _, se := range entries {
-		policyDoc.Statement = append(policyDoc.Statement, StatementEntry{
-			Effect:    se.Effect,
-			Action:    se.Action,
-			Resource:  se.Resource,
-			Condition: se.PolicyCondition,
-		})
+		policyDoc.Statement = append(policyDoc.Statement,
+			StatementEntry{
+				Effect:    se.Effect,
+				Action:    se.Action,
+				Resource:  se.Resource,
+				Condition: se.PolicyCondition,
+			})
 	}
 
 	// Always allow a statment that enables iam:GetUser on yourself (to allow access_key/awsClient to username lookups)
@@ -1136,9 +1137,11 @@ type PolicyDocument struct {
 // StatementEntry is a simple type used to serialize to AWS' PolicyDocument format. We cannot
 // re-use minterv1.StatementEntry due to different conventions for the serialization keys. (caps)
 type StatementEntry struct {
-	Effect    string
-	Action    []string
-	Resource  string
+	Effect   string
+	Action   []string
+	Resource string
+	// Must "omitempty" otherwise we send unacceptable JSON to the AWS API when no
+	// condition is defined.
 	Condition minterv1.IAMPolicyCondition `json:",omitempty"`
 }
 

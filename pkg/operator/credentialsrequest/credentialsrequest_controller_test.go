@@ -26,6 +26,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -1000,6 +1001,149 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.True(t, cr.Status.Provisioned)
 			},
 		},
+		{
+			name: "provision with aws policy condition",
+			existing: []runtime.Object{
+				func() *minterv1.CredentialsRequest {
+					cr := testCredentialsRequest(t)
+					awsProvSpec, err := codec.EncodeProviderSpec(
+						&minterv1.AWSProviderSpec{
+							TypeMeta: metav1.TypeMeta{
+								Kind: "AWSProviderSpec",
+							},
+							StatementEntries: []minterv1.StatementEntry{
+								{
+									Effect: "Allow",
+									Action: []string{
+										"iam:GetUser",
+										"iam:GetUserPolicy",
+										"iam:ListAccessKeys",
+									},
+									Resource: "*",
+									PolicyCondition: minterv1.IAMPolicyCondition{
+										"StringEquals": minterv1.IAMPolicyConditionKeyValue{
+											"aws:userid": "testuser",
+										},
+									},
+								},
+							},
+						})
+					require.NoError(t, err, "unexpected error encoding AWSProviderSpec")
+
+					cr.Spec.ProviderSpec = awsProvSpec
+					return cr
+				}(),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				// Just mock up GetUser that doesn't fail for the read-only account test
+				// And it is set up for AnyTimes() so that the next check for whether the credreq user
+				// exists forces the actuator to create a new user.
+				mockGetUserNotFound(mockAWSClient)
+
+				mockGetUserPolicyMissing(mockAWSClient)
+
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockCreateUser(mockAWSClient)
+				mockTagUser(mockAWSClient)
+				mockPutUserPolicyWithExpectedPolicy(mockAWSClient, testPolicyWithConditions)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "already provisioned with aws policy condition",
+			existing: []runtime.Object{
+				func() *minterv1.CredentialsRequest {
+					cr := testCredentialsRequest(t)
+					awsProvSpec, err := codec.EncodeProviderSpec(
+						&minterv1.AWSProviderSpec{
+							TypeMeta: metav1.TypeMeta{
+								Kind: "AWSProviderSpec",
+							},
+							StatementEntries: []minterv1.StatementEntry{
+								{
+									Effect: "Allow",
+									Action: []string{
+										"iam:GetUser",
+										"iam:GetUserPolicy",
+										"iam:ListAccessKeys",
+									},
+									Resource: "*",
+									PolicyCondition: minterv1.IAMPolicyCondition{
+										"StringEquals": minterv1.IAMPolicyConditionKeyValue{
+											"aws:userid": "testuser",
+										},
+									},
+								},
+							},
+						})
+					require.NoError(t, err, "unexpected error encoding AWSProviderSpec")
+
+					cr.Spec.ProviderSpec = awsProvSpec
+
+					awsStatus, err := codec.EncodeProviderStatus(
+						&minterv1.AWSProviderStatus{
+							User:   testAWSUser,
+							Policy: testAWSUser + "-policy",
+						})
+					require.NoError(t, err, "unexpected error creating aws provider status")
+
+					cr.Status.ProviderStatus = awsStatus
+					cr.Status.Provisioned = true
+
+					return cr
+				}(),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+
+				// Already provisioned secret for cred req
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				// Just mock up GetUser that doesn't fail for the read-only account test
+				// And it is set up for AnyTimes() so that the next check for whether the credreq user
+				// exists forces the actuator to handle an already provisioned user.
+				mockGetUser(mockAWSClient)
+
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+
+				mockGetUserPolicy(mockAWSClient, testPolicyWithConditions)
+				return mockAWSClient
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+
+				// no expected calls as we are just verifying that the cred request is still valid
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1103,7 +1247,9 @@ const (
 )
 
 var (
-	testPolicy1                  = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+	testPolicy1              = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+	testPolicyWithConditions = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\",\"Condition\":{\"StringEquals\":{\"aws:userid\":\"testuser\"}}},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+
 	testTwentyMinuteOldTimestamp = time.Now().Add(-20 * time.Minute)
 )
 
@@ -1412,6 +1558,15 @@ func mockDeleteAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID string) 
 			AccessKeyId: aws.String(accessKeyID),
 		}).Return(&iam.DeleteAccessKeyOutput{}, nil)
 }
+
+func mockPutUserPolicyWithExpectedPolicy(mockAWSClient *mockaws.MockClient, policyDoc string) {
+	mockAWSClient.EXPECT().PutUserPolicy(&iam.PutUserPolicyInput{
+		UserName:       aws.String(testAWSUser),
+		PolicyName:     aws.String(testAWSUser + "-policy"),
+		PolicyDocument: aws.String(policyDoc),
+	}).Return(&iam.PutUserPolicyOutput{}, nil)
+}
+
 func mockPutUserPolicy(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any()).Return(&iam.PutUserPolicyOutput{}, nil)
 }

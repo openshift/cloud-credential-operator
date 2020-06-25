@@ -76,10 +76,16 @@ $(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/ocp/4.5:cloud
 $(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
 $(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
 
+update: update-codegen
+
 update-codegen: update-codegen-crds
+	./hack/update-codegen.sh
 .PHONY: update-codegen
 
+verify: verify-codegen
+
 verify-codegen: verify-codegen-crds
+	./hack/verify-codegen.sh
 .PHONY: verify-codegen
 
 clean:
