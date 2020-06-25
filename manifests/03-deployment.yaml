@@ -49,7 +49,7 @@ spec:
               echo "Copying system trust bundle"
               cp -f /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           fi
-          exec /usr/bin/cloud-credential-operator operator --log-level=debug
+          exec /usr/bin/cloud-credential-operator operator
         command:
         - /bin/bash
         - -ec
