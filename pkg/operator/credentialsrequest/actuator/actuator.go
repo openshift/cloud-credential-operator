@@ -21,8 +21,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 // Actuator controls credentials on a specific infrastructure. All
@@ -61,7 +60,7 @@ func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequ
 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *DummyActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
-	return types.NamespacedName{Namespace: constants.KubeSystemNS, Name: annotatorconst.AWSCloudCredSecretName}
+	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName}
 }
 
 type ActuatorError struct {

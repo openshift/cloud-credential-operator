@@ -43,7 +43,7 @@ import (
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 
@@ -111,7 +111,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
-				testGCPCredsSecret("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredentialsRequest(t),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
@@ -167,7 +167,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(""),
 			},
@@ -253,7 +253,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -293,7 +293,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
@@ -333,7 +333,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithDeletionTimestamp(t),
-				testGCPCredsSecret("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
@@ -358,7 +358,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -391,7 +391,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithDeletionTimestamp(t),
-				testGCPCredsSecret("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -416,7 +416,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -449,7 +449,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -485,7 +485,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testGCPPassthroughCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
@@ -517,7 +517,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				createTestNamespace(testSecretNamespace),
 				testGCPPassthroughCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", annotatorconst.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testOldPassthroughPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
@@ -698,7 +698,7 @@ func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReq
 
 func testGCPCredsSecretPassthrough(namespace, name, jsonAUTH string) *corev1.Secret {
 	s := testGCPCredsSecret(namespace, name, jsonAUTH)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
 
@@ -708,7 +708,7 @@ func testGCPCredsSecret(namespace, name, jsonAUTH string) *corev1.Secret {
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+				constants.AnnotationKey: constants.MintAnnotation,
 			},
 		},
 		Data: map[string][]byte{

@@ -44,9 +44,8 @@ import (
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 
-	operatorconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	annaws "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 const (
@@ -262,7 +261,7 @@ func testSecret() *corev1.Secret {
 func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      operatorconstants.CloudCredOperatorConfigMap,
+			Name:      constants.CloudCredOperatorConfigMap,
 			Namespace: minterv1.CloudCredOperatorNamespace,
 		},
 		Data: map[string]string{

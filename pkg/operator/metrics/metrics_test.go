@@ -16,8 +16,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 var (
@@ -64,7 +63,7 @@ func TestSecretGetter(t *testing.T) {
 		{
 			name:             "aws cloud creds exist",
 			clusterInfra:     testClusterInfra("aws"),
-			cloudCredsSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, "anyAnnotation"),
+			cloudCredsSecret: testCloudCredSecret(constants.AWSCloudCredSecretName, "anyAnnotation"),
 			validate: func(t *testing.T, secret *corev1.Secret, err error) {
 				assert.NoError(t, err, "unexpected error")
 				assert.NotNil(t, secret, "secret should not be nil")
@@ -82,7 +81,7 @@ func TestSecretGetter(t *testing.T) {
 		{
 			name:             "gcp cloud creds exist",
 			clusterInfra:     testClusterInfra("gcp"),
-			cloudCredsSecret: testCloudCredSecret(secretconstants.GCPCloudCredSecretName, "anyAnnotation"),
+			cloudCredsSecret: testCloudCredSecret(constants.GCPCloudCredSecretName, "anyAnnotation"),
 			validate: func(t *testing.T, secret *corev1.Secret, err error) {
 				assert.NoError(t, err, "unexpected error")
 				assert.NotNil(t, secret, "secret shout not be nil")
@@ -202,7 +201,7 @@ func TestCredentialsRequests2(t *testing.T) {
 				assert.Equal(t, 1, accumulator.crTotals["gcp"])
 
 				// failure conditions should all be zero as CCO is disabled
-				for _, cond := range constants.FailureConditionTypes {
+				for _, cond := range credreqv1.FailureConditionTypes {
 					assert.Equal(t, 0, accumulator.crConditions[cond])
 				}
 			},
@@ -238,17 +237,17 @@ func TestCredentialsMode(t *testing.T) {
 	}{
 		{
 			name:            "mint mode",
-			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.MintAnnotation),
+			cloudCredSecret: testCloudCredSecret(constants.AWSCloudCredSecretName, constants.MintAnnotation),
 			expectedMode:    constants.ModeMint,
 		},
 		{
 			name:            "passthrough mode",
-			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.PassthroughAnnotation),
+			cloudCredSecret: testCloudCredSecret(constants.AWSCloudCredSecretName, constants.PassthroughAnnotation),
 			expectedMode:    constants.ModePassthrough,
 		},
 		{
 			name:            "degraded mode",
-			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, secretconstants.InsufficientAnnotation),
+			cloudCredSecret: testCloudCredSecret(constants.AWSCloudCredSecretName, constants.InsufficientAnnotation),
 			expectedMode:    constants.ModeDegraded,
 		},
 		{
@@ -264,12 +263,12 @@ func TestCredentialsMode(t *testing.T) {
 		},
 		{
 			name:            "unexpected secret annotation",
-			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, "unexpectedAnnotation"),
+			cloudCredSecret: testCloudCredSecret(constants.AWSCloudCredSecretName, "unexpectedAnnotation"),
 			expectedMode:    constants.ModeUnknown,
 		},
 		{
 			name:            "unannotated secret",
-			cloudCredSecret: testCloudCredSecret(secretconstants.AWSCloudCredSecretName, ""),
+			cloudCredSecret: testCloudCredSecret(constants.AWSCloudCredSecretName, ""),
 			expectedMode:    constants.ModeUnknown,
 		},
 	}
@@ -291,7 +290,7 @@ func TestMetricsInitialization(t *testing.T) {
 
 	// Assert that all possible conditions have explicit '0' values
 	// after initializing the accumulator.
-	for _, c := range constants.FailureConditionTypes {
+	for _, c := range credreqv1.FailureConditionTypes {
 		assert.Zero(t, accumulator.crConditions[c])
 	}
 
@@ -349,9 +348,9 @@ func testCloudCredSecret(secretName, annotation string) *corev1.Secret {
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: secretconstants.CloudCredSecretNamespace,
+			Namespace: constants.CloudCredSecretNamespace,
 			Annotations: map[string]string{
-				secretconstants.AnnotationKey: annotation,
+				constants.AnnotationKey: annotation,
 			},
 		},
 	}

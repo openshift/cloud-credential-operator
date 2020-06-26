@@ -13,7 +13,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
@@ -189,7 +188,7 @@ func computeStatusConditions(
 	for _, cr := range validCredRequests {
 		// Check for provision failure conditions:
 		foundFailure := false
-		for _, t := range constants.FailureConditionTypes {
+		for _, t := range minterv1.FailureConditionTypes {
 			failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
 			if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
 				foundFailure = true
