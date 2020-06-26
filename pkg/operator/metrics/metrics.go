@@ -19,9 +19,8 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	secretconstants "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
@@ -154,20 +153,20 @@ func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
 	platformType := platform.GetType(infraStatus)
 
 	secret := &corev1.Secret{}
-	secretKey := types.NamespacedName{Namespace: secretconstants.CloudCredSecretNamespace}
+	secretKey := types.NamespacedName{Namespace: constants.CloudCredSecretNamespace}
 	switch platformType {
 	case configv1.AWSPlatformType:
-		secretKey.Name = secretconstants.AWSCloudCredSecretName
+		secretKey.Name = constants.AWSCloudCredSecretName
 	case configv1.AzurePlatformType:
-		secretKey.Name = secretconstants.AzureCloudCredSecretName
+		secretKey.Name = constants.AzureCloudCredSecretName
 	case configv1.GCPPlatformType:
-		secretKey.Name = secretconstants.GCPCloudCredSecretName
+		secretKey.Name = constants.GCPCloudCredSecretName
 	case configv1.OpenStackPlatformType:
-		secretKey.Name = secretconstants.OpenStackCloudCredsSecretName
+		secretKey.Name = constants.OpenStackCloudCredsSecretName
 	case configv1.OvirtPlatformType:
-		secretKey.Name = secretconstants.OvirtCloudCredsSecretName
+		secretKey.Name = constants.OvirtCloudCredsSecretName
 	case configv1.VSpherePlatformType:
-		secretKey.Name = secretconstants.VSphereCloudCredSecretName
+		secretKey.Name = constants.VSphereCloudCredSecretName
 	default:
 		mc.log.WithField("cloud", platformType).Info("unsupported cloud for determing CCO mode")
 		return nil, nil
@@ -212,7 +211,7 @@ func newAccumulator(logger log.FieldLogger) *credRequestAccumulator {
 
 	// make entries with '0' so we make sure to send updated metrics for any
 	// condititons that may have cleared
-	for _, c := range constants.FailureConditionTypes {
+	for _, c := range credreqv1.FailureConditionTypes {
 		acc.crConditions[c] = 0
 	}
 
@@ -268,18 +267,18 @@ func determineCredentialsMode(ccoDisabled bool, secret *corev1.Secret, secretNot
 		return constants.ModeCredsRemoved
 	}
 
-	annotation, ok := secret.Annotations[secretconstants.AnnotationKey]
+	annotation, ok := secret.Annotations[constants.AnnotationKey]
 	if !ok {
 		logger.Warn("Secret missing mode annotation, assuming ModeUnknown")
 		return constants.ModeUnknown
 	}
 
 	switch annotation {
-	case secretconstants.MintAnnotation:
+	case constants.MintAnnotation:
 		return constants.ModeMint
-	case secretconstants.PassthroughAnnotation:
+	case constants.PassthroughAnnotation:
 		return constants.ModePassthrough
-	case secretconstants.InsufficientAnnotation:
+	case constants.InsufficientAnnotation:
 		return constants.ModeDegraded
 	default:
 		return constants.ModeUnknown

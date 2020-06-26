@@ -21,13 +21,13 @@ import (
 	"fmt"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-var RootSecretKey = client.ObjectKey{Name: annotatorconst.AzureCloudCredSecretName, Namespace: constants.KubeSystemNS}
+var RootSecretKey = client.ObjectKey{Name: constants.AzureCloudCredSecretName, Namespace: constants.CloudCredSecretNamespace}
 
 type clientWrapper struct {
 	client.Client
@@ -67,5 +67,5 @@ func (cw *clientWrapper) Mode(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	return rs.Annotations[annotatorconst.AnnotationKey], nil
+	return rs.Annotations[constants.AnnotationKey], nil
 }

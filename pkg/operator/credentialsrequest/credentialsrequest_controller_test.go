@@ -45,9 +45,7 @@ import (
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
-	operatorconstants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -843,7 +841,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				func() runtime.Object {
 					cr := testGCPCredentialsRequest(t)
-					for _, cond := range constants.FailureConditionTypes {
+					for _, cond := range minterv1.FailureConditionTypes {
 						cr.Status.Conditions = append(cr.Status.Conditions, minterv1.CredentialsRequestCondition{
 							Type:   cond,
 							Status: corev1.ConditionTrue,
@@ -1360,13 +1358,13 @@ func createTestNamespace(namespace string) *corev1.Namespace {
 
 func testInsufficientAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.InsufficientAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.InsufficientAnnotation
 	return s
 }
 
 func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
 
@@ -1376,7 +1374,7 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+				constants.AnnotationKey: constants.MintAnnotation,
 			},
 		},
 		Data: map[string][]byte{
@@ -1621,7 +1619,7 @@ func testInfrastructure(infraName string) *configv1.Infrastructure {
 func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      operatorconstants.CloudCredOperatorConfigMap,
+			Name:      constants.CloudCredOperatorConfigMap,
 			Namespace: minterv1.CloudCredOperatorNamespace,
 		},
 		Data: map[string]string{

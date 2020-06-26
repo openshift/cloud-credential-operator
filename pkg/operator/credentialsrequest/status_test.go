@@ -38,8 +38,8 @@ import (
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 )
 
 var (
@@ -246,7 +246,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests,
 				test.cloudPlatform, test.operatorDisabled,
 				!test.parentCredRemoved,
-				types.NamespacedName{Namespace: annotatorconst.CloudCredSecretNamespace, Name: annotatorconst.AWSCloudCredSecretName},
+				types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName},
 				log.WithField("test", test.name))
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)

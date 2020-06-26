@@ -138,3 +138,14 @@ const (
 	// CredentialsRequests where the cloud/infra matches.
 	Ignored CredentialsRequestConditionType = "Ignored"
 )
+
+var (
+	// FailureConditionTypes is a list of all conditions where the overall controller status would not
+	// be healthy.
+	FailureConditionTypes = []CredentialsRequestConditionType{
+		InsufficientCloudCredentials,
+		MissingTargetNamespace,
+		CredentialsProvisionFailure,
+		CredentialsDeprovisionFailure,
+	}
+)

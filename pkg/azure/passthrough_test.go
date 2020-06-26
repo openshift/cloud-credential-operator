@@ -23,8 +23,7 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -77,10 +76,10 @@ var (
 
 	validRootSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      annotatorconst.AzureCloudCredSecretName,
-			Namespace: constants.KubeSystemNS,
+			Name:      constants.AzureCloudCredSecretName,
+			Namespace: constants.CloudCredSecretNamespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.PassthroughAnnotation,
+				constants.AnnotationKey: constants.PassthroughAnnotation,
 			},
 		},
 		Data: map[string][]byte{
@@ -96,18 +95,18 @@ var (
 
 	rootSecretBadAnnotation = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      annotatorconst.AzureCloudCredSecretName,
-			Namespace: constants.KubeSystemNS,
+			Name:      constants.AzureCloudCredSecretName,
+			Namespace: constants.CloudCredSecretNamespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: "blah",
+				constants.AnnotationKey: "blah",
 			},
 		},
 	}
 
 	rootSecretNoAnnotation = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        annotatorconst.AzureCloudCredSecretName,
-			Namespace:   constants.KubeSystemNS,
+			Name:        constants.AzureCloudCredSecretName,
+			Namespace:   constants.CloudCredSecretNamespace,
 			Annotations: map[string]string{},
 		},
 	}
