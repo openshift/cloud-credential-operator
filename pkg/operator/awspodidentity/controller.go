@@ -109,7 +109,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 	logger := log.WithFields(log.Fields{"controller": controllerName})
 	imagePullSpec := os.Getenv("AWS_POD_IDENTITY_WEBHOOK_IMAGE")
 	if len(imagePullSpec) == 0 {
-		logger.Warn("AWS_POD_IDENTITY_WEBHOOK_IMAGE is not set, skipping controller")
+		logger.Warn("AWS_POD_IDENTITY_WEBHOOK_IMAGE is not set, AWS pod identity webhook will not be deployed")
 		return nil
 	}
 
