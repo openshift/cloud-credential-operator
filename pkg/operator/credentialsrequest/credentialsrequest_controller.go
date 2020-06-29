@@ -757,17 +757,17 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 
 	switch clusterCloudPlatform {
 	case configv1.AWSPlatformType:
-		return cloudType == reflect.TypeOf(minterv1.AWSProviderSpec{}).Name(), nil
+		return cloudType == reflect.TypeOf(minterv1.AWSCredentialsProviderSpec{}).Name(), nil
 	case configv1.AzurePlatformType:
-		return cloudType == reflect.TypeOf(minterv1.AzureProviderSpec{}).Name(), nil
+		return cloudType == reflect.TypeOf(minterv1.AzureCredentialsProviderSpec{}).Name(), nil
 	case configv1.GCPPlatformType:
-		return cloudType == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name(), nil
+		return cloudType == reflect.TypeOf(minterv1.GCPCredentialsProviderSpec{}).Name(), nil
 	case configv1.OpenStackPlatformType:
-		return cloudType == reflect.TypeOf(minterv1.OpenStackProviderSpec{}).Name(), nil
+		return cloudType == reflect.TypeOf(minterv1.OpenStackCredentialsProviderSpec{}).Name(), nil
 	case configv1.OvirtPlatformType:
-		return cloudType == reflect.TypeOf(minterv1.OvirtProviderSpec{}).Name(), nil
+		return cloudType == reflect.TypeOf(minterv1.OvirtCredentialsProviderSpec{}).Name(), nil
 	case configv1.VSpherePlatformType:
-		return cloudType == reflect.TypeOf(minterv1.VSphereProviderSpec{}).Name(), nil
+		return cloudType == reflect.TypeOf(minterv1.VSphereCredentialsProviderSpec{}).Name(), nil
 	default:
 		return false, fmt.Errorf("unsupported platorm type: %v", clusterCloudPlatform)
 	}

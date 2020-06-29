@@ -314,7 +314,7 @@ func testAWSCredRequest(name string) credreqv1.CredentialsRequest {
 	}
 
 	awsProviderSpec, err := codec.EncodeProviderSpec(
-		&credreqv1.AWSProviderSpec{
+		&credreqv1.AWSCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AWSProviderSpec",
 			},
@@ -329,7 +329,7 @@ func testAWSCredRequest(name string) credreqv1.CredentialsRequest {
 
 func testGCPCredRequest(name string) credreqv1.CredentialsRequest {
 	gcpProviderSpec, err := codec.EncodeProviderSpec(
-		&credreqv1.GCPProviderSpec{
+		&credreqv1.GCPCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},

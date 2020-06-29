@@ -83,6 +83,9 @@ func (c *awsPodIdentityController) Start(stopCh <-chan struct{}) error {
 }
 
 func Add(mgr manager.Manager, kubeconfig string) error {
+	if mgr != nil {
+		return nil
+	}
 	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(mgr, kubeconfig)
 	if err != nil {
 		return err

@@ -111,7 +111,7 @@ func isAzureCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	isAzure := unknown.Kind == reflect.TypeOf(minterv1.AzureProviderSpec{}).Name()
+	isAzure := unknown.Kind == reflect.TypeOf(minterv1.AzureCredentialsProviderSpec{}).Name()
 	if !isAzure {
 		log.WithField("kind", unknown.Kind).
 			Info("actuator handles only azure credentials")
@@ -309,8 +309,8 @@ func loadAzureInfrastructureResourceGroups(c client.Client, logger log.FieldLogg
 
 }
 
-func decodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AzureProviderStatus, error) {
-	azureStatus := minterv1.AzureProviderStatus{}
+func decodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AzureCredentialsProviderStatus, error) {
+	azureStatus := minterv1.AzureCredentialsProviderStatus{}
 	var err error
 	if cr.Status.ProviderStatus == nil {
 		return &azureStatus, nil
@@ -323,9 +323,9 @@ func decodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.Credential
 	return &azureStatus, nil
 }
 
-func decodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AzureProviderSpec, error) {
+func decodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AzureCredentialsProviderSpec, error) {
 	if cr.Spec.ProviderSpec != nil {
-		azureSpec := minterv1.AzureProviderSpec{}
+		azureSpec := minterv1.AzureCredentialsProviderSpec{}
 		err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &azureSpec)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding provider v1 spec: %v", err)
@@ -336,7 +336,7 @@ func decodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 	return nil, fmt.Errorf("no providerSpec defined")
 }
 
-func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, azureStatus *minterv1.AzureProviderStatus) error {
+func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, azureStatus *minterv1.AzureCredentialsProviderStatus) error {
 	var err error
 	cr.Status.ProviderStatus, err = a.codec.EncodeProviderStatus(azureStatus)
 	if err != nil {

@@ -259,7 +259,7 @@ func getCredentialRequestStatements(crBytes []byte) ([]minterv1.StatementEntry, 
 		return statementList, err
 	}
 
-	awsSpec := minterv1.AWSProviderSpec{}
+	awsSpec := minterv1.AWSCredentialsProviderSpec{}
 	err = awsCodec.DecodeProviderSpec(cr.Spec.ProviderSpec, &awsSpec)
 	if err != nil {
 		return statementList, fmt.Errorf("error decoding spec.ProviderSpec: %v", err)

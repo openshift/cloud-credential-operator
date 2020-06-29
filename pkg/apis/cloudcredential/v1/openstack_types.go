@@ -23,14 +23,14 @@ import (
 // TODO: these types should eventually be broken out, along with the actuator,
 // to a separate repo.
 
-// OpenStackProviderSpec the specification of the credentials request in OpenStack.
+// OpenStackCredentialsProviderSpec the specification of the credentials request in OpenStack.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type OpenStackProviderSpec struct {
+type OpenStackCredentialsProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 }
 
-// OpenStackProviderStatus contains the status of the credentials request in OpenStack.
+// OpenStackCredentialsProviderStatus contains the status of the credentials request in OpenStack.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type OpenStackProviderStatus struct {
+type OpenStackCredentialsProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
 }

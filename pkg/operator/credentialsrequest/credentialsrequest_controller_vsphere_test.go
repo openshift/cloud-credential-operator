@@ -264,7 +264,7 @@ func testVSphereCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	}
 
 	vsphereProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.VSphereProviderSpec{
+		&minterv1.VSphereCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "VSphereProviderSpec",
 			},

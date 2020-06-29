@@ -533,7 +533,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	return client, nil
 }
 
-func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPProviderStatus) error {
+func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPCredentialsProviderStatus) error {
 	var err error
 	cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(gcpStatus)
 	if err != nil {
@@ -603,7 +603,7 @@ func isGCPCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	isGCP := unknown.Kind == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name()
+	isGCP := unknown.Kind == reflect.TypeOf(minterv1.GCPCredentialsProviderSpec{}).Name()
 	if !isGCP {
 		log.WithField("kind", unknown.Kind).
 			Debug("actuator handles only gcp credentials")

@@ -23,10 +23,10 @@ import (
 // TODO: these types should eventually be broken out, along with the actuator,
 // to a separate repo.
 
-// VSphereProviderSpec contains the required information to create RBAC role
+// VSphereCredentialsProviderSpec contains the required information to create RBAC role
 // bindings for VSphere.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type VSphereProviderSpec struct {
+type VSphereCredentialsProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// Permissions contains a list of groups of privileges that are being requested.
@@ -49,9 +49,9 @@ type VSpherePermission struct {
 	// Propagate bool `json:"propagate"`
 }
 
-// VSphereProviderStatus contains the status of the credentials request in VSphere.
+// VSphereCredentialsProviderStatus contains the status of the credentials request in VSphere.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type VSphereProviderStatus struct {
+type VSphereCredentialsProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// SecretLastResourceVersion is the resource version of the secret resource

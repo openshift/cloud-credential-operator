@@ -33,9 +33,9 @@ type gcpAuthJSON struct {
 	PrivateKeyID string `json:"private_key_id"`
 }
 
-func decodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.GCPProviderSpec, error) {
+func decodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.GCPCredentialsProviderSpec, error) {
 	if cr.Spec.ProviderSpec != nil {
-		gcpSpec := minterv1.GCPProviderSpec{}
+		gcpSpec := minterv1.GCPCredentialsProviderSpec{}
 		err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &gcpSpec)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding provider v1 spec: %v", err)
@@ -45,8 +45,8 @@ func decodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 	return nil, fmt.Errorf("no providerSpec defined")
 }
 
-func decodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.GCPProviderStatus, error) {
-	gcpStatus := minterv1.GCPProviderStatus{}
+func decodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.GCPCredentialsProviderStatus, error) {
+	gcpStatus := minterv1.GCPCredentialsProviderStatus{}
 	if cr.Status.ProviderStatus == nil {
 		return &gcpStatus, nil
 	}
