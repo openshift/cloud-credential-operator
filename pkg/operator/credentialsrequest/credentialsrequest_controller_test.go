@@ -1020,7 +1020,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 									Resource: "*",
 									PolicyCondition: minterv1.IAMPolicyCondition{
 										"StringEquals": minterv1.IAMPolicyConditionKeyValue{
-											"aws:userid": "testuser",
+											"aws:userid": runtime.RawExtension{
+												Raw: []byte("\"testuser\""),
+											},
 										},
 									},
 								},
@@ -1085,7 +1087,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 									Resource: "*",
 									PolicyCondition: minterv1.IAMPolicyCondition{
 										"StringEquals": minterv1.IAMPolicyConditionKeyValue{
-											"aws:userid": "testuser",
+											"aws:userid": runtime.RawExtension{
+												Raw: []byte("\"testuser\""),
+											},
 										},
 									},
 								},

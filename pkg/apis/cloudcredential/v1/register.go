@@ -54,10 +54,10 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&CredentialsRequest{}, &CredentialsRequestList{},
-		&AWSProviderStatus{}, &AWSProviderSpec{},
-		&AzureProviderStatus{}, &AzureProviderSpec{},
-		&GCPProviderStatus{}, &GCPProviderSpec{},
-		&VSphereProviderStatus{}, &VSphereProviderSpec{},
+		//&AWSProviderStatus{}, &AWSProviderSpec{},
+		//&AzureProviderStatus{}, &AzureProviderSpec{},
+		//&GCPProviderStatus{}, &GCPProviderSpec{},
+		//&VSphereProviderStatus{}, &VSphereProviderSpec{},
 	)
 
 	return nil
