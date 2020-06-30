@@ -35,7 +35,8 @@ import (
 )
 
 const (
-	rootOpenStackCredsSecretKey = "clouds.yaml"
+	rootOpenStackCredsSecretKey          = "clouds.yaml"
+	cloudProviderOpenStackCredsSecretKey = "clouds.conf"
 )
 
 type OpenStackActuator struct {
@@ -95,7 +96,24 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
-	clouds, err := a.getRootCloudCredentialsSecretData(ctx, logger)
+	// Get the base secret
+	cloudCredSecret := &corev1.Secret{}
+	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+		msg := "unable to fetch root cloud cred secret"
+		logger.WithError(err).Error(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("%v: %v", msg, err),
+		}
+	}
+
+	cloudsYAML, err := a.getCloudCredentialsSecretData(cloudCredSecret, rootOpenStackCredsSecretKey, logger)
+	if err != nil {
+		logger.WithError(err).Error("issue with cloud credentials secret")
+		return err
+	}
+
+	cloudsCONF, err := a.getCloudCredentialsSecretData(cloudCredSecret, cloudProviderOpenStackCredsSecretKey, logger)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
@@ -107,7 +125,7 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 		return err
 	}
 
-	err = a.syncCredentialSecret(cr, clouds, existingSecret, "", logger)
+	err = a.syncCredentialSecret(cr, cloudsYAML, cloudsCONF, existingSecret, "", logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -120,14 +138,14 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 	return nil
 }
 
-func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, clouds string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
+func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, cloudsYAML, cloudsCONF string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
 
 	if existingSecret == nil || existingSecret.Name == "" {
-		if clouds == "" {
+		if cloudsYAML == "" || cloudsCONF == "" {
 			msg := "new access key secret needed but no key data provided"
 			sLog.Error(msg)
 			return &actuatoriface.ActuatorError{
@@ -144,7 +162,10 @@ func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest
 					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 				},
 			},
-			Data: map[string][]byte{rootOpenStackCredsSecretKey: []byte(clouds)},
+			Data: map[string][]byte{
+				rootOpenStackCredsSecretKey:          []byte(cloudsYAML),
+				cloudProviderOpenStackCredsSecretKey: []byte(cloudsCONF),
+			},
 		}
 
 		err := a.Client.Create(context.TODO(), secret)
@@ -163,8 +184,11 @@ func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest
 		existingSecret.Annotations = map[string]string{}
 	}
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-	if clouds != "" {
-		existingSecret.Data[rootOpenStackCredsSecretKey] = []byte(clouds)
+	if cloudsYAML != "" {
+		existingSecret.Data[rootOpenStackCredsSecretKey] = []byte(cloudsYAML)
+	}
+	if cloudsCONF != "" {
+		existingSecret.Data[cloudProviderOpenStackCredsSecretKey] = []byte(cloudsCONF)
 	}
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
@@ -202,7 +226,13 @@ func (a *OpenStackActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) 
 	if _, ok := existingSecret.Data[rootOpenStackCredsSecretKey]; !ok {
 		logger.Warning("secret did not have expected key: " + rootOpenStackCredsSecretKey)
 	} else {
-		logger.Debug("found clouds.yaml in existing secret")
+		logger.Debugf("found %v in existing secret", rootOpenStackCredsSecretKey)
+	}
+
+	if _, ok := existingSecret.Data[cloudProviderOpenStackCredsSecretKey]; !ok {
+		logger.Warning("secret did not have expected key: " + cloudProviderOpenStackCredsSecretKey)
+	} else {
+		logger.Debugf("found %v in existing secret", cloudProviderOpenStackCredsSecretKey)
 	}
 
 	return existingSecret, nil
@@ -213,32 +243,18 @@ func (a *OpenStackActuator) GetCredentialsRootSecretLocation() types.NamespacedN
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.OpenStackCloudCredsSecretName}
 }
 
-func (a *OpenStackActuator) getRootCloudCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (string, error) {
-	var clouds string
-
-	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
-		msg := "unable to fetch root cloud cred secret"
-		logger.WithError(err).Error(msg)
-		return "", &actuatoriface.ActuatorError{
-			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("%v: %v", msg, err),
-		}
-	}
-
-	keyBytes, ok := cloudCredSecret.Data[rootOpenStackCredsSecretKey]
+func (a *OpenStackActuator) getCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, key string, logger log.FieldLogger) (string, error) {
+	keyBytes, ok := cloudCredSecret.Data[key]
 	if !ok {
-		logger.Warning("secret did not have expected key: " + rootOpenStackCredsSecretKey)
+		logger.Warning("secret did not have expected key: " + key)
 		return "", &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
-			Message:   fmt.Sprintf("secret did not have expected key: %v", rootOpenStackCredsSecretKey),
+			Message:   fmt.Sprintf("secret did not have expected key: %v", key),
 		}
 	}
+	logger.Debugf("found %v in target secret", key)
 
-	clouds = string(keyBytes)
-	logger.Debug("found clouds.yaml in target secret")
-
-	return clouds, nil
+	return string(keyBytes), nil
 }
 
 // Delete credentials
