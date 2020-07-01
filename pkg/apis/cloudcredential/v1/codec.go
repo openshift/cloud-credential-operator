@@ -24,12 +24,6 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 )
 
-// NewScheme creates a new Scheme
-func NewScheme() (*runtime.Scheme, error) {
-	s := runtime.NewScheme()
-	return s, SchemeBuilder.AddToScheme(s)
-}
-
 // ProviderCodec is a runtime codec for providers.
 // +k8s:deepcopy-gen=false
 type ProviderCodec struct {
@@ -39,10 +33,14 @@ type ProviderCodec struct {
 
 // NewCodec creates a serializer/deserializer for the provider configuration
 func NewCodec() (*ProviderCodec, error) {
-	scheme, err := NewScheme()
-	if err != nil {
-		return nil, err
-	}
+	scheme := runtime.NewScheme()
+	scheme.AddKnownTypes(SchemeGroupVersion,
+		&CredentialsRequest{}, &CredentialsRequestList{},
+		&AWSProviderSpec{}, &AWSProviderStatus{},
+		&AzureProviderSpec{}, &AzureProviderStatus{},
+		&GCPProviderSpec{}, &GCPProviderStatus{},
+		&VSphereProviderSpec{}, &VSphereProviderStatus{},
+	)
 	codecFactory := serializer.NewCodecFactory(scheme)
 	encoder, err := newEncoder(&codecFactory)
 	if err != nil {
@@ -55,7 +53,7 @@ func NewCodec() (*ProviderCodec, error) {
 	return &codec, nil
 }
 
-// EncodeProvider serializes an object to the provider spec.
+// EncodeProviderSpec serializes an object to the provider spec.
 func (codec *ProviderCodec) EncodeProviderSpec(in runtime.Object) (*runtime.RawExtension, error) {
 	var buf bytes.Buffer
 	if err := codec.encoder.Encode(in, &buf); err != nil {
