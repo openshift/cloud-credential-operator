@@ -68,7 +68,7 @@ var (
 		},
 	}
 
-	azureSpec = &minterv1.AzureProviderSpec{
+	azureSpec = &minterv1.AzureCredentialsProviderSpec{
 		RoleBindings: []minterv1.RoleBinding{
 			{
 				Role: testRoleName,
@@ -83,7 +83,7 @@ func TestDecodeToUnknown(t *testing.T) {
 		t.Fatalf("failed to create codec %#v", err)
 	}
 	var raw *runtime.RawExtension
-	aps := minterv1.AzureProviderSpec{}
+	aps := minterv1.AzureCredentialsProviderSpec{}
 	raw, err = codec.EncodeProviderSpec(&aps)
 	if err != nil {
 		t.Fatalf("failed to encode codec %#v", err)
@@ -93,8 +93,8 @@ func TestDecodeToUnknown(t *testing.T) {
 	if err != nil {
 		t.Fatalf("should be able to decode to Unknown %#v", err)
 	}
-	if unknown.Kind != reflect.TypeOf(minterv1.AzureProviderSpec{}).Name() {
-		t.Fatalf("expected decoded kind to be %s but was %s", reflect.TypeOf(minterv1.AzureProviderSpec{}).Name(), unknown.Kind)
+	if unknown.Kind != reflect.TypeOf(minterv1.AzureCredentialsProviderSpec{}).Name() {
+		t.Fatalf("expected decoded kind to be %s but was %s", reflect.TypeOf(minterv1.AzureCredentialsProviderSpec{}).Name(), unknown.Kind)
 	}
 }
 
@@ -130,12 +130,12 @@ func getCredRequest(t *testing.T, c client.Client) *minterv1.CredentialsRequest 
 	return cr
 }
 
-func getProviderStatus(t *testing.T, cr *minterv1.CredentialsRequest) minterv1.AzureProviderStatus {
+func getProviderStatus(t *testing.T, cr *minterv1.CredentialsRequest) minterv1.AzureCredentialsProviderStatus {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		t.Fatalf("error creating Azure codec: %v", err)
 	}
-	azStatus := minterv1.AzureProviderStatus{}
+	azStatus := minterv1.AzureCredentialsProviderStatus{}
 
 	assert.NoError(t, codec.DecodeProviderStatus(cr.Status.ProviderStatus, &azStatus))
 

@@ -22,9 +22,9 @@ import (
 
 // TODO: these types should eventually be broken out, along with the actuator, to a separate repo.
 
-// AWSProviderSpec contains the required information to create a user policy in AWS.
+// AWSCredentialsProviderSpec contains the required information to create a user policy in AWS.
 // +k8s:deepcopy-gen=false
-type AWSProviderSpec struct {
+type AWSCredentialsProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 	// StatementEntries contains a list of policy statements that should be associated with this credentials access key.
 	StatementEntries []StatementEntry `json:"statementEntries"`
@@ -43,9 +43,9 @@ type StatementEntry struct {
 	PolicyCondition IAMPolicyCondition `json:"policyCondition,omitempty"`
 }
 
-// AWSProviderStatus containes the status of the credentials request in AWS.
+// AWSCredentialsProviderStatus containes the status of the credentials request in AWS.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type AWSProviderStatus struct {
+type AWSCredentialsProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
 	// User is the name of the User created in AWS for these credentials.
 	User string `json:"user"`

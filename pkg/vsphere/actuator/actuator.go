@@ -57,8 +57,8 @@ func NewVSphereActuator(client client.Client) (*VSphereActuator, error) {
 }
 
 // DecodeProviderStatus returns a decoded VSphereProviderStatus from a CredentialsRequest
-func DecodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.VSphereProviderStatus, error) {
-	vSphereStatus := minterv1.VSphereProviderStatus{}
+func DecodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.VSphereCredentialsProviderStatus, error) {
+	vSphereStatus := minterv1.VSphereCredentialsProviderStatus{}
 	var err error
 	if cr.Status.ProviderStatus == nil {
 		return &vSphereStatus, nil
@@ -72,9 +72,9 @@ func DecodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.Credential
 }
 
 // DecodeProviderSpec returns a decoded VSphereProviderSpec from a CredentialsRequest
-func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.VSphereProviderSpec, error) {
+func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.VSphereCredentialsProviderSpec, error) {
 	if cr.Spec.ProviderSpec != nil {
-		vSphereSpec := minterv1.VSphereProviderSpec{}
+		vSphereSpec := minterv1.VSphereCredentialsProviderSpec{}
 		err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &vSphereSpec)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding provider v1 spec: %v", err)
@@ -220,7 +220,7 @@ func (a *VSphereActuator) syncPassthrough(ctx context.Context, cr *minterv1.Cred
 	return nil
 }
 
-func (a *VSphereActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, vSphereStatus *minterv1.VSphereProviderStatus) error {
+func (a *VSphereActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, vSphereStatus *minterv1.VSphereCredentialsProviderStatus) error {
 	var err error
 	cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(vSphereStatus)
 	if err != nil {
@@ -378,7 +378,7 @@ func isVSphereCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	isVSphere := unknown.Kind == reflect.TypeOf(minterv1.VSphereProviderSpec{}).Name()
+	isVSphere := unknown.Kind == reflect.TypeOf(minterv1.VSphereCredentialsProviderSpec{}).Name()
 	if !isVSphere {
 		log.WithField("kind", unknown.Kind).
 			Info("actuator handles only vsphere credentials")

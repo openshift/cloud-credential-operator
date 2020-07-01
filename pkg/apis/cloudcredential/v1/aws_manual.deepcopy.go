@@ -5,7 +5,7 @@ import (
 )
 
 // DeepCopyInto will perform a DeepCopy into the provided AWSProviderSpec
-func (in *AWSProviderSpec) DeepCopyInto(out *AWSProviderSpec) {
+func (in *AWSCredentialsProviderSpec) DeepCopyInto(out *AWSCredentialsProviderSpec) {
 	*out = *in
 	out.TypeMeta = in.TypeMeta
 	if in.StatementEntries != nil {
@@ -20,18 +20,18 @@ func (in *AWSProviderSpec) DeepCopyInto(out *AWSProviderSpec) {
 
 // DeepCopy will DeepCopy and return a pointer to a
 // new AWSProviderSpec
-func (in *AWSProviderSpec) DeepCopy() *AWSProviderSpec {
+func (in *AWSCredentialsProviderSpec) DeepCopy() *AWSCredentialsProviderSpec {
 	if in == nil {
 		return nil
 	}
-	out := new(AWSProviderSpec)
+	out := new(AWSCredentialsProviderSpec)
 	in.DeepCopyInto(out)
 	return out
 }
 
 // DeepCopyObject will return a DeepCopied AWSProviderSpec
 // as a runtime.Object
-func (in *AWSProviderSpec) DeepCopyObject() runtime.Object {
+func (in *AWSCredentialsProviderSpec) DeepCopyObject() runtime.Object {
 	if c := in.DeepCopy(); c != nil {
 		return c
 	}

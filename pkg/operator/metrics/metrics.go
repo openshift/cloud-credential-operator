@@ -177,17 +177,17 @@ func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
 
 func cloudProviderSpecToMetricsKey(cloud string) string {
 	switch cloud {
-	case "AWSProviderSpec":
+	case "AWSCredentialsProviderSpec":
 		return "aws"
-	case "AzureProviderSpec":
+	case "AzureCredentialsProviderSpec":
 		return "azure"
-	case "GCPProviderSpec":
+	case "GCPCredentialsProviderSpec":
 		return "gcp"
-	case "OpenStackProviderSpec":
+	case "OpenStackCredentialsProviderSpec":
 		return "openstack"
-	case "OvirtProviderSpec":
+	case "OvirtCredentialsProviderSpec":
 		return "ovirt"
-	case "VsphereProviderSpec":
+	case "VsphereCredentialsProviderSpec":
 		return "vsphere"
 	default:
 		return "unknown"

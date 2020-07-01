@@ -81,8 +81,8 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator,
 	}, nil
 }
 
-func DecodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderStatus, error) {
-	awsStatus := minterv1.AWSProviderStatus{}
+func DecodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSCredentialsProviderStatus, error) {
+	awsStatus := minterv1.AWSCredentialsProviderStatus{}
 	var err error
 	if cr.Status.ProviderStatus == nil {
 		return &awsStatus, nil
@@ -95,9 +95,9 @@ func DecodeProviderStatus(codec *minterv1.ProviderCodec, cr *minterv1.Credential
 	return &awsStatus, nil
 }
 
-func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSProviderSpec, error) {
+func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsRequest) (*minterv1.AWSCredentialsProviderSpec, error) {
 	if cr.Spec.ProviderSpec != nil {
-		awsSpec := minterv1.AWSProviderSpec{}
+		awsSpec := minterv1.AWSCredentialsProviderSpec{}
 		err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &awsSpec)
 		if err != nil {
 			return nil, fmt.Errorf("error decoding provider v1 spec: %v", err)
@@ -513,7 +513,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	return nil
 }
 
-func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, awsSpec *minterv1.AWSProviderSpec, awsStatus *minterv1.AWSProviderStatus, awsUser *iam.User, readAWSClient ccaws.Client, logger log.FieldLogger) (bool, error) {
+func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, awsSpec *minterv1.AWSCredentialsProviderSpec, awsStatus *minterv1.AWSCredentialsProviderStatus, awsUser *iam.User, readAWSClient ccaws.Client, logger log.FieldLogger) (bool, error) {
 
 	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User, awsStatus.Policy)
 	if err != nil {
@@ -555,7 +555,7 @@ func userHasExpectedTags(logger log.FieldLogger, user *iam.User, infraName, clus
 
 	return true
 }
-func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, awsStatus *minterv1.AWSProviderStatus) error {
+func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, awsStatus *minterv1.AWSCredentialsProviderStatus) error {
 
 	var err error
 	cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(awsStatus)
@@ -1169,7 +1169,7 @@ func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	isAWS := unknown.Kind == reflect.TypeOf(minterv1.AWSProviderSpec{}).Name()
+	isAWS := unknown.Kind == reflect.TypeOf(minterv1.AWSCredentialsProviderSpec{}).Name()
 	if !isAWS {
 		log.WithField("kind", unknown.Kind).
 			Info("actuator handles only aws credentials")

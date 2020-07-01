@@ -23,10 +23,10 @@ import (
 // TODO: these types should eventually be broken out, along with the actuator,
 // to a separate repo.
 
-// AzureProviderSpec contains the required information to create RBAC role
+// AzureCredentialsProviderSpec contains the required information to create RBAC role
 // bindings for Azure.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type AzureProviderSpec struct {
+type AzureCredentialsProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// RoleBindings contains a list of roles that should be associated with the minted credential.
@@ -39,9 +39,9 @@ type RoleBinding struct {
 	Role string `json:"role"`
 }
 
-// AzureProviderStatus contains the status of the credentials request in Azure.
+// AzureCredentialsProviderStatus contains the status of the credentials request in Azure.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type AzureProviderStatus struct {
+type AzureCredentialsProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
 
 	// ServicePrincipalName is the name of the service principal created in Azure for these credentials.

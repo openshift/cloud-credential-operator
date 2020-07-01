@@ -379,7 +379,7 @@ func testCredentialsRequestWithStatus(name string, provisioned bool, conditions 
 
 func testAWSProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
 	awsProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.AWSProviderSpec{
+		&minterv1.AWSCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AWSProviderSpec",
 			},
@@ -401,7 +401,7 @@ func testAWSProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension
 
 func testGCPProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
 	gcpProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.GCPProviderSpec{
+		&minterv1.GCPCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},
@@ -415,7 +415,7 @@ func testGCPProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension
 
 func testAzureProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
 	azureProviderSpec, err := codec.EncodeProviderSpec(
-		&minterv1.AzureProviderSpec{
+		&minterv1.AzureCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AzureProviderSpec",
 			},

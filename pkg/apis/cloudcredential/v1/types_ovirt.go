@@ -23,14 +23,14 @@ import (
 // TODO: these types should eventually be broken out, along with the actuator,
 // to a separate repo.
 
-// OvirtProviderSpec the specification of the credentials request in Ovirt.
+// OvirtCredentialsProviderSpec the specification of the credentials request in Ovirt.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type OvirtProviderSpec struct {
+type OvirtCredentialsProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 }
 
-// OvirtProviderStatus contains the status of the credentials request in Ovirt.
+// OvirtCredentialsProviderStatus contains the status of the credentials request in Ovirt.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type OvirtProviderStatus struct {
+type OvirtCredentialsProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
 }

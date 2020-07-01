@@ -634,7 +634,7 @@ func testGCPCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	}
 
 	gcpStatus, err := codec.EncodeProviderStatus(
-		&minterv1.GCPProviderStatus{
+		&minterv1.GCPCredentialsProviderStatus{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},
@@ -667,7 +667,7 @@ func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReq
 		return nil
 	}
 	gcpProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.GCPProviderSpec{
+		&minterv1.GCPCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},

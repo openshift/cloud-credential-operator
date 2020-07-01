@@ -20,8 +20,8 @@ import minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcr
 
 type request struct {
 	*minterv1.CredentialsRequest
-	AzureSpec   *minterv1.AzureProviderSpec
-	AzureStatus *minterv1.AzureProviderStatus
+	AzureSpec   *minterv1.AzureCredentialsProviderSpec
+	AzureStatus *minterv1.AzureCredentialsProviderStatus
 }
 
 func newRequest(cr *minterv1.CredentialsRequest) (*request, error) {
@@ -30,13 +30,13 @@ func newRequest(cr *minterv1.CredentialsRequest) (*request, error) {
 		return nil, err
 	}
 
-	status := minterv1.AzureProviderStatus{}
+	status := minterv1.AzureCredentialsProviderStatus{}
 	err = codec.DecodeProviderStatus(cr.Status.ProviderStatus, &status)
 	if err != nil {
 		return nil, err
 	}
 
-	spec := minterv1.AzureProviderSpec{}
+	spec := minterv1.AzureCredentialsProviderSpec{}
 	err = codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &spec)
 	if err != nil {
 		return nil, err

@@ -1006,7 +1006,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequest(t)
 					awsProvSpec, err := codec.EncodeProviderSpec(
-						&minterv1.AWSProviderSpec{
+						&minterv1.AWSCredentialsProviderSpec{
 							TypeMeta: metav1.TypeMeta{
 								Kind: "AWSProviderSpec",
 							},
@@ -1071,7 +1071,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequest(t)
 					awsProvSpec, err := codec.EncodeProviderSpec(
-						&minterv1.AWSProviderSpec{
+						&minterv1.AWSCredentialsProviderSpec{
 							TypeMeta: metav1.TypeMeta{
 								Kind: "AWSProviderSpec",
 							},
@@ -1097,7 +1097,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					cr.Spec.ProviderSpec = awsProvSpec
 
 					awsStatus, err := codec.EncodeProviderStatus(
-						&minterv1.AWSProviderStatus{
+						&minterv1.AWSCredentialsProviderStatus{
 							User:   testAWSUser,
 							Policy: testAWSUser + "-policy",
 						})
@@ -1288,7 +1288,7 @@ func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReques
 		return nil
 	}
 	awsProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.AWSProviderSpec{
+		&minterv1.AWSCredentialsProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AWSProviderSpec",
 			},
@@ -1337,7 +1337,7 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	}
 
 	awsStatus, err := codec.EncodeProviderStatus(
-		&minterv1.AWSProviderStatus{
+		&minterv1.AWSCredentialsProviderStatus{
 			User: testAWSUser,
 		})
 	if err != nil {

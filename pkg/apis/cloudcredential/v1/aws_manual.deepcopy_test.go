@@ -12,11 +12,11 @@ func TestAWSProviderSpecDeepCopy(t *testing.T) {
 
 	tests := []struct {
 		name         string
-		providerSpec *AWSProviderSpec
+		providerSpec *AWSCredentialsProviderSpec
 	}{
 		{
 			name: "basic provider spec",
-			providerSpec: &AWSProviderSpec{
+			providerSpec: &AWSCredentialsProviderSpec{
 				StatementEntries: []StatementEntry{
 					{
 						Effect: "Allow",
@@ -31,7 +31,7 @@ func TestAWSProviderSpecDeepCopy(t *testing.T) {
 		},
 		{
 			name: "with conditions",
-			providerSpec: &AWSProviderSpec{
+			providerSpec: &AWSCredentialsProviderSpec{
 				StatementEntries: []StatementEntry{
 					{
 						Effect: "Allow",
@@ -64,7 +64,7 @@ func TestAWSProviderSpecDeepCopy(t *testing.T) {
 			assert.Equal(t, test.providerSpec, dCopy, "expected the DeepCopy() results to be deeply equal")
 
 			if test.providerSpec != nil {
-				newAWSProviderSpec := &AWSProviderSpec{}
+				newAWSProviderSpec := &AWSCredentialsProviderSpec{}
 				test.providerSpec.DeepCopyInto(newAWSProviderSpec)
 				assert.Equal(t, test.providerSpec, newAWSProviderSpec, "expected the DeepCopyInto() results to be deeply equal")
 

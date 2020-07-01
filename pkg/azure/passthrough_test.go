@@ -56,8 +56,8 @@ var (
 	unknownError  = errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonUnknown}}
 	notFoundError = errors.StatusError{ErrStatus: metav1.Status{Reason: metav1.StatusReasonNotFound}}
 
-	validStatus = minterv1.AzureProviderStatus{ServicePrincipalName: "http://test-credential", AppID: "1DB7BC50-6390-4DC8-A576-F20F42DCFF23"}
-	emptyStatus = minterv1.AzureProviderStatus{}
+	validStatus = minterv1.AzureCredentialsProviderStatus{ServicePrincipalName: "http://test-credential", AppID: "1DB7BC50-6390-4DC8-A576-F20F42DCFF23"}
+	emptyStatus = minterv1.AzureCredentialsProviderStatus{}
 
 	validObjectKey    = client.ObjectKey{Namespace: validNamespace, Name: validName}
 	notFoundObjectKey = client.ObjectKey{Namespace: notFoundNamespace, Name: notFoundName}
@@ -147,8 +147,8 @@ var (
 
 type testInput struct {
 	req    *minterv1.CredentialsRequest
-	spec   *minterv1.AzureProviderSpec
-	status *minterv1.AzureProviderStatus
+	spec   *minterv1.AzureCredentialsProviderSpec
+	status *minterv1.AzureCredentialsProviderStatus
 }
 
 func TestPassthroughExists(t *testing.T) {
@@ -158,9 +158,9 @@ func TestPassthroughExists(t *testing.T) {
 		exists bool
 		err    error
 	}{
-		{"TestPassthroughExistsEmptyRequest", &testInput{req: &minterv1.CredentialsRequest{}, spec: &minterv1.AzureProviderSpec{}, status: &emptyStatus}, false, nil},
-		{"TestPassthroughExistsMissing", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, false, nil},
-		{"TestPassthroughExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, true, nil},
+		{"TestPassthroughExistsEmptyRequest", &testInput{req: &minterv1.CredentialsRequest{}, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &emptyStatus}, false, nil},
+		{"TestPassthroughExistsMissing", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, false, nil},
+		{"TestPassthroughExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, true, nil},
 	}
 
 	for _, tt := range tests {
@@ -186,8 +186,8 @@ func TestPassthroughCreate(t *testing.T) {
 		in   *testInput
 		err  error
 	}{
-		{"TestPassthroughCreateNew", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, nil},
-		{"TestPassthroughCreateExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, nil},
+		{"TestPassthroughCreateNew", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, nil},
+		{"TestPassthroughCreateExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, nil},
 	}
 
 	if err := openshiftapiv1.Install(scheme.Scheme); err != nil {
@@ -227,8 +227,8 @@ func TestPassthroughUpdate(t *testing.T) {
 		in   *testInput
 		err  error
 	}{
-		{"TestPassthroughUpdateNew", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, nil},
-		{"TestPassthroughUpdateExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, nil},
+		{"TestPassthroughUpdateNew", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, nil},
+		{"TestPassthroughUpdateExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, nil},
 	}
 
 	if err := openshiftapiv1.Install(scheme.Scheme); err != nil {
@@ -263,8 +263,8 @@ func TestPassthroughDelete(t *testing.T) {
 		in       *testInput
 		expected string
 	}{
-		{"TestPassthroughDeleteNotFound", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, `secrets "not-found-name" not found`},
-		{"TestPassthroughDeleteExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureProviderSpec{}, status: &validStatus}, `secrets "valid-name" not found`},
+		{"TestPassthroughDeleteNotFound", &testInput{req: &secretNotFoundCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, `secrets "not-found-name" not found`},
+		{"TestPassthroughDeleteExists", &testInput{req: &secretExistsCredentialRequest, spec: &minterv1.AzureCredentialsProviderSpec{}, status: &validStatus}, `secrets "valid-name" not found`},
 	}
 
 	for _, tt := range tests {

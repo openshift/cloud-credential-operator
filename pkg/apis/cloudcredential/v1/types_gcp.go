@@ -22,9 +22,9 @@ import (
 
 // TODO: these types should eventually be broken out, along with the actuator, to a separate repo.
 
-// GCPProviderSpec contains the required information to create a service account with policy bindings in GCP.
+// GCPCredentialsProviderSpec contains the required information to create a service account with policy bindings in GCP.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type GCPProviderSpec struct {
+type GCPCredentialsProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 	// PredefinedRoles is the list of GCP pre-defined roles
 	// that the CredentialsRequest requires.
@@ -35,9 +35,9 @@ type GCPProviderSpec struct {
 	SkipServiceCheck bool `json:"skipServiceCheck,omitempty"`
 }
 
-// GCPProviderStatus contains the status of the GCP credentials request.
+// GCPCredentialsProviderStatus contains the status of the GCP credentials request.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
-type GCPProviderStatus struct {
+type GCPCredentialsProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
 	// ServiceAccountID is the ID of the service account created in GCP for the requested credentials.
 	ServiceAccountID string `json:"serviceAccountID"`
