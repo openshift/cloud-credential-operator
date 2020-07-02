@@ -4,10 +4,8 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"reflect"
-	"time"
 
-	errors "github.com/pkg/errors"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -18,7 +16,6 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -28,11 +25,7 @@ const (
 	cloudCredClusterOperator           = "cloud-credential"
 	cloudCredOperatorNamespace         = "openshift-cloud-credential-operator"
 	reasonCredentialsFailing           = "CredentialsFailing"
-	reasonNoCredentialsFailing         = "NoCredentialsFailing"
 	reasonReconciling                  = "Reconciling"
-	reasonReconcilingComplete          = "ReconcilingComplete"
-	reasonCredentialsNotProvisioned    = "CredentialsNotProvisioned"
-	reasonOperatorDisabled             = "OperatorDisabledByAdmin"
 	reasonCredentialsRootSecretMissing = "CredentialsRootSecretMissing"
 )
 
@@ -40,63 +33,33 @@ const (
 // creates or updates the ClusterOperator resource for the operator accordingly.
 func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	logger := log.WithField("controller", "credreq_status")
-	logger.Debug("syncing cluster operator status")
-	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredClusterOperator}}
-	err := r.Client.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
-	isNotFound := apierrors.IsNotFound(err)
-	if err != nil && !isNotFound {
-		return fmt.Errorf("failed to get clusteroperator %s: %v", co.Name, err)
-	}
+	return clusteroperator.SyncStatus(r.Client, logger)
+}
 
+var _ clusteroperator.StatusHandler = &ReconcileCredentialsRequest{}
+
+func (r *ReconcileCredentialsRequest) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	_, credRequests, operatorIsDisabled, err := r.getOperatorState(logger)
 	if err != nil {
-		return fmt.Errorf("failed to get operator state: %v", err)
+		return []configv1.ClusterOperatorStatusCondition{}, fmt.Errorf("failed to get operator state: %v", err)
 	}
-
-	oldConditions := co.Status.Conditions
-	oldVersions := co.Status.Versions
-	oldRelatedObjects := co.Status.RelatedObjects
 	parentSecretExists, err := r.parentSecretExists()
 	if err != nil {
-		return errors.Wrap(err, "error checking if parent secret exists")
+		return []configv1.ClusterOperatorStatusCondition{}, errors.Wrap(err, "error checking if parent secret exists")
 	}
-	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType, operatorIsDisabled,
-		parentSecretExists, r.Actuator.GetCredentialsRootSecretLocation(), logger)
-	co.Status.Versions = computeClusterOperatorVersions()
-	co.Status.RelatedObjects = buildExpectedRelatedObjects(credRequests)
+	return computeStatusConditions(credRequests, r.platformType, operatorIsDisabled, parentSecretExists, r.Actuator.GetCredentialsRootSecretLocation(), logger), nil
+}
 
-	// ClusterOperator should already exist (from the manifests payload), but recreate it if needed
-	if isNotFound {
-		if err := r.Client.Create(context.TODO(), co); err != nil {
-			return fmt.Errorf("failed to create clusteroperator %s: %v", co.Name, err)
-		}
-		logger.Info("created clusteroperator")
+func (r *ReconcileCredentialsRequest) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {
+	_, credRequests, _, err := r.getOperatorState(logger)
+	if err != nil {
+		return []configv1.ObjectReference{}, fmt.Errorf("failed to get operator state: %v", err)
 	}
+	return buildExpectedRelatedObjects(credRequests), nil
+}
 
-	// Check if version changed, if so force a progressing last transition update:
-	if !reflect.DeepEqual(oldVersions, co.Status.Versions) {
-		logger.WithFields(log.Fields{
-			"old": oldVersions,
-			"new": co.Status.Versions,
-		}).Info("version has changed, updating progressing condition lastTransitionTime")
-		progressing := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
-		// We know this should be there.
-		progressing.LastTransitionTime = metav1.Time{Time: time.Now()}
-	}
-
-	// Update status fields if needed
-	if !clusteroperator.ConditionsEqual(oldConditions, co.Status.Conditions) ||
-		!reflect.DeepEqual(oldVersions, co.Status.Versions) ||
-		!reflect.DeepEqual(oldRelatedObjects, co.Status.RelatedObjects) {
-
-		err = r.Client.Status().Update(context.TODO(), co)
-		if err != nil {
-			return fmt.Errorf("failed to update clusteroperator %s: %v", co.Name, err)
-		}
-		logger.Debug("cluster operator status updated")
-	}
-
-	return nil
+func (r *ReconcileCredentialsRequest) Name() string {
+	return controllerName
 }
 
 func (r *ReconcileCredentialsRequest) parentSecretExists() (bool, error) {
@@ -155,17 +118,14 @@ func computeClusterOperatorVersions() []configv1.OperandVersion {
 
 // computeStatusConditions computes the operator's current state.
 func computeStatusConditions(
-	conditions []configv1.ClusterOperatorStatusCondition,
 	credRequests []minterv1.CredentialsRequest,
 	clusterCloudPlatform configv1.PlatformType,
 	operatorIsDisabled bool, parentCredExists bool, parentCredLocation types.NamespacedName,
 	logger log.FieldLogger) []configv1.ClusterOperatorStatusCondition {
 
-	// Degraded should be true if we are encountering errors. We consider any credentials request
-	// with either provision or deprovision failure conditions true, to be a degraded condition.
-	degradedCondition := &configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorDegraded,
-		Status: configv1.ConditionFalse,
+	var conditions []configv1.ClusterOperatorStatusCondition
+	if operatorIsDisabled {
+		return conditions
 	}
 
 	failingCredRequests := 0
@@ -202,95 +162,51 @@ func computeStatusConditions(
 
 	}
 
-	if operatorIsDisabled {
-		degradedCondition.Status = configv1.ConditionFalse
-		degradedCondition.Reason = reasonOperatorDisabled
-	} else {
-		if failingCredRequests > 0 {
-			degradedCondition.Status = configv1.ConditionTrue
-			degradedCondition.Reason = reasonCredentialsFailing
-			degradedCondition.Message = fmt.Sprintf(
-				"%d of %d credentials requests are failing to sync.",
-				failingCredRequests, len(validCredRequests))
-		} else {
-			degradedCondition.Status = configv1.ConditionFalse
-			degradedCondition.Reason = reasonNoCredentialsFailing
-			degradedCondition.Message = "No credentials requests reporting errors."
-
-		}
+	if failingCredRequests > 0 {
+		var degradedCondition configv1.ClusterOperatorStatusCondition
+		degradedCondition.Type = configv1.OperatorDegraded
+		degradedCondition.Status = configv1.ConditionTrue
+		degradedCondition.Reason = reasonCredentialsFailing
+		degradedCondition.Message = fmt.Sprintf(
+			"%d of %d credentials requests are failing to sync.",
+			failingCredRequests, len(validCredRequests))
+		conditions = append(conditions, degradedCondition)
 	}
-	conditions = clusteroperator.SetStatusCondition(conditions,
-		degradedCondition)
 
 	// Progressing should be true if the operator is making changes to the operand. In this case
 	// we will set true if any CredentialsRequests are not provisioned, or have failure conditions,
 	// as this indicates the controllers have work they are trying to do.
-	progressingCondition := &configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorProgressing,
-		Status: configv1.ConditionUnknown,
-	}
+	credRequestsNotProvisioned := 0
+	logger.Debugf("%d cred requests", len(validCredRequests))
 
-	if operatorIsDisabled {
-		progressingCondition.Status = configv1.ConditionFalse
-		progressingCondition.Reason = reasonOperatorDisabled
-	} else {
-		credRequestsNotProvisioned := 0
-		logger.Debugf("%d cred requests", len(validCredRequests))
-
-		for _, cr := range validCredRequests {
-			if !cr.Status.Provisioned {
-				credRequestsNotProvisioned = credRequestsNotProvisioned + 1
-			}
-		}
-		if credRequestsNotProvisioned > 0 || failingCredRequests > 0 {
-			progressingCondition.Status = configv1.ConditionTrue
-			progressingCondition.Reason = reasonReconciling
-			progressingCondition.Message = fmt.Sprintf(
-				"%d of %d credentials requests provisioned, %d reporting errors.",
-				len(validCredRequests)-credRequestsNotProvisioned, len(validCredRequests), failingCredRequests)
-		} else {
-			progressingCondition.Status = configv1.ConditionFalse
-			progressingCondition.Reason = reasonReconcilingComplete
-			progressingCondition.Message = fmt.Sprintf(
-				"%d of %d credentials requests provisioned and reconciled.",
-				len(validCredRequests), len(validCredRequests))
+	for _, cr := range validCredRequests {
+		if !cr.Status.Provisioned {
+			credRequestsNotProvisioned = credRequestsNotProvisioned + 1
 		}
 	}
-	conditions = clusteroperator.SetStatusCondition(conditions,
-		progressingCondition)
+	if credRequestsNotProvisioned > 0 || failingCredRequests > 0 {
+		var progressingCondition configv1.ClusterOperatorStatusCondition
+		progressingCondition.Type = configv1.OperatorProgressing
+		progressingCondition.Status = configv1.ConditionTrue
+		progressingCondition.Reason = reasonReconciling
+		progressingCondition.Message = fmt.Sprintf(
+			"%d of %d credentials requests provisioned, %d reporting errors.",
+			len(validCredRequests)-credRequestsNotProvisioned, len(validCredRequests), failingCredRequests)
+		conditions = append(conditions, progressingCondition)
+	}
 
-	// Available should be true if we've made our API available.
-	// (note: definition has fluctuated a lot) Our CO definition in release manifest will set to
-	// unknown, we will set to true indicating we're up and running.
-	// TODO: is there a better way to determine if we've made our API available? We wouldn't
-	// get this far in syncing on a CredentialsRequest if it wasn't available. Would probably need a separate controller syncing on some other type to formally check.
-	availableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorAvailable,
-	}
-	if operatorIsDisabled {
-		availableCondition.Reason = reasonOperatorDisabled
-	}
-	conditions = clusteroperator.SetStatusCondition(conditions,
-		availableCondition)
-
-	// CCO doesn't have the idea of upgradeable vs not-upgradeable, but should report that condition nevertheless.
-	// Always be upgradeable.
-	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
-	}
 	// If the operator is not disabled, and we do not have a parent cred in kube-system, we are not
 	// upgradable. Admin cred removal is a valid mode to run in but it should be restored before
 	// you can upgrade.
 	if !operatorIsDisabled && !parentCredExists {
+		var upgradeableCondition configv1.ClusterOperatorStatusCondition
+		upgradeableCondition.Type = configv1.OperatorUpgradeable
 		upgradeableCondition.Status = configv1.ConditionFalse
 		upgradeableCondition.Reason = reasonCredentialsRootSecretMissing
 		upgradeableCondition.Message = fmt.Sprintf("Parent credential secret %s/%s must be restored prior to upgrade",
 			parentCredLocation.Namespace, parentCredLocation.Name)
+		conditions = append(conditions, upgradeableCondition)
 	}
-	conditions = clusteroperator.SetStatusCondition(conditions,
-		upgradeableCondition)
 
 	// Log all conditions we set:
 	for _, c := range conditions {

@@ -31,6 +31,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -78,11 +79,13 @@ func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator, platType c
 
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) reconcile.Reconciler {
-	return &ReconcileCredentialsRequest{
+	r := &ReconcileCredentialsRequest{
 		Client:       mgr.GetClient(),
 		Actuator:     actuator,
 		platformType: platType,
 	}
+	clusteroperator.AddStatusHandler(r)
+	return r
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler

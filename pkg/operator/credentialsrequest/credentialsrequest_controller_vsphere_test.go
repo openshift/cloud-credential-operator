@@ -40,6 +40,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 	"github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 )
 
@@ -206,6 +207,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				},
 				platformType: configv1.VSpherePlatformType,
 			}
+			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
