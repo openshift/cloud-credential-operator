@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	configv1 "github.com/openshift/api/config/v1"
 	configset "github.com/openshift/client-go/config/clientset/versioned"
@@ -54,6 +55,8 @@ const (
 	credentialsSecretName         = "cloud-credential-operator-s3-creds"
 	discoveryURI                  = ".well-known/openid-configuration"
 	keysURI                       = "keys.json"
+	reasonAuthReconcileFailed     = "AuthReconcileFailed"
+	reasonS3ReconcileFailed       = "S3ReconcileFailed"
 	discoveryTemplate             = `{
 	"issuer": "%s",
 	"jwks_uri": "%s/%s",
@@ -129,6 +132,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		eventRecorder:           eventRecorder,
 		infrastructureName:      infraStatus.InfrastructureName,
 		region:                  infraStatus.PlatformStatus.AWS.Region,
+		degraded:                configv1.ClusterOperatorStatusCondition{Status: configv1.ConditionFalse},
 	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
@@ -168,6 +172,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		return err
 	}
 
+	clusteroperator.AddStatusHandler(r)
 	mgr.Add(&oidcDiscoveryEndpointController{reconciler: r, cache: cache, logger: logger})
 
 	return nil
@@ -189,6 +194,7 @@ type s3EndpointReconciler struct {
 	eventRecorder           events.Recorder
 	infrastructureName      string
 	region                  string
+	degraded                configv1.ClusterOperatorStatusCondition
 }
 
 var _ reconcile.Reconciler = &s3EndpointReconciler{}
@@ -196,9 +202,21 @@ var _ reconcile.Reconciler = &s3EndpointReconciler{}
 func (r *s3EndpointReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	r.logger.Info("reconciling AWS S3 OIDC discovery endpoint")
 
+	// SyncStatus only if our degraded condition changed
+	defer func(initialDegradedCondition configv1.ClusterOperatorStatusCondition) {
+		if !clusteroperator.ConditionEqual(initialDegradedCondition, r.degraded) {
+			clusteroperator.SyncStatus(r.controllerRuntimeClient, r.logger)
+		}
+	}(r.degraded)
+
 	isUnmanaged, err := r.reconcileServiceAccountIssuer()
 	if err != nil {
-		r.logger.WithError(err).Error("failed reconciling cluster authentication")
+		r.logger.WithError(err).Error("failed reconciling cluster Authentication CR")
+		r.degraded = configv1.ClusterOperatorStatusCondition{
+			Status:  configv1.ConditionTrue,
+			Reason:  reasonAuthReconcileFailed,
+			Message: fmt.Sprintf("%s controller: failed reconciling cluster Authentication CR: %v", controllerName, err),
+		}
 		return reconcile.Result{Requeue: true}, err
 	}
 	if isUnmanaged {
@@ -208,7 +226,16 @@ func (r *s3EndpointReconciler) Reconcile(request reconcile.Request) (reconcile.R
 	err = r.reconcileS3Resources()
 	if err != nil {
 		r.logger.WithError(err).Error("failed reconciling S3 resources")
+		r.degraded = configv1.ClusterOperatorStatusCondition{
+			Status:  configv1.ConditionTrue,
+			Reason:  reasonS3ReconcileFailed,
+			Message: fmt.Sprintf("%s controller: failed reconciling S3 resources: %v", controllerName, err),
+		}
 		return reconcile.Result{Requeue: true}, err
+	}
+
+	r.degraded = configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionFalse,
 	}
 
 	return reconcile.Result{}, nil
@@ -292,12 +319,13 @@ func (r *s3EndpointReconciler) reconcileS3Resources() error {
 		if errors.As(err, &aerr) {
 			switch aerr.Code() {
 			case s3.ErrCodeBucketAlreadyExists:
-				r.logger.WithField("bucket", bucketName).WithError(err).Error("bucket already exists but it not owned by us")
+				r.logger.WithField("bucket", bucketName).WithError(aerr).Error("bucket already exists but it not owned by us")
 				return aerr
 			case s3.ErrCodeBucketAlreadyOwnedByYou:
 				r.logger.WithField("bucket", bucketName).Debug("bucket already exists and is owned by us")
 			default:
-				return aerr
+				r.logger.WithField("bucket", bucketName).WithError(aerr).Error("CreateBucket failed")
+				return fmt.Errorf("CreateBucket failed with %s", aerr.Code())
 			}
 		} else {
 			return err
@@ -317,6 +345,11 @@ func (r *s3EndpointReconciler) reconcileS3Resources() error {
 		},
 	})
 	if err != nil {
+		var aerr awserr.Error
+		if errors.As(err, &aerr) {
+			r.logger.WithField("bucket", bucketName).WithError(aerr).Error("PutBucketTagging failed")
+			return fmt.Errorf("PutBucketTagging failed with %s", aerr.Code())
+		}
 		return err
 	}
 	r.logger.WithField("bucket", bucketName).Debug("bucket tagged")
@@ -331,6 +364,11 @@ func (r *s3EndpointReconciler) reconcileS3Resources() error {
 		Key:    awssdk.String(discoveryURI),
 	})
 	if err != nil {
+		var aerr awserr.Error
+		if errors.As(err, &aerr) {
+			r.logger.WithField("bucket", bucketName).WithError(aerr).Error("discovery document PutObject failed")
+			return fmt.Errorf("discovery document PutObject failed with %s", aerr.Code())
+		}
 		return err
 	}
 	r.logger.WithField("bucket", bucketName).Debug("discovery document updated")
@@ -361,6 +399,11 @@ func (r *s3EndpointReconciler) reconcileS3Resources() error {
 		Key:    awssdk.String(keysURI),
 	})
 	if err != nil {
+		var aerr awserr.Error
+		if errors.As(err, &aerr) {
+			r.logger.WithField("bucket", bucketName).WithError(aerr).Error("keys document PutObject failed")
+			return fmt.Errorf("keys document PutObject failed with %s", aerr.Code())
+		}
 		return err
 	}
 	r.logger.WithField("bucket", bucketName).Debug("keys document updated")
@@ -427,4 +470,22 @@ func encodeKeys(pemKeys [][]byte) ([]byte, error) {
 
 	keyResponse := keyResponse{Keys: keys}
 	return json.MarshalIndent(keyResponse, "", "    ")
+}
+
+var _ clusteroperator.StatusHandler = &s3EndpointReconciler{}
+
+func (r *s3EndpointReconciler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+	var conditions []configv1.ClusterOperatorStatusCondition
+	if r.degraded.Status == configv1.ConditionTrue {
+		conditions = append(conditions, r.degraded)
+	}
+	return conditions, nil
+}
+
+func (r *s3EndpointReconciler) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {
+	return []configv1.ObjectReference{}, nil
+}
+
+func (r *s3EndpointReconciler) Name() string {
+	return controllerName
 }
