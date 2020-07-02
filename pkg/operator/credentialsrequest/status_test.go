@@ -85,14 +85,10 @@ func TestClusterOperatorStatus(t *testing.T) {
 		expectedConditions []configv1.ClusterOperatorStatusCondition
 	}{
 		{
-			name:          "no credentials requests",
-			credRequests:  []minterv1.CredentialsRequest{},
-			cloudPlatform: configv1.AWSPlatformType,
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
-				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonReconcilingComplete),
-				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
-			},
+			name:               "no credentials requests",
+			credRequests:       []minterv1.CredentialsRequest{},
+			cloudPlatform:      configv1.AWSPlatformType,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{},
 		},
 		{
 			name: "progressing no errors",
@@ -103,9 +99,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 			cloudPlatform: configv1.AWSPlatformType,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
-				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
 			},
 		},
 		{
@@ -119,7 +113,6 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 			cloudPlatform: configv1.AWSPlatformType,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
 				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonCredentialsFailing),
 			},
@@ -139,7 +132,6 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 			cloudPlatform: configv1.AWSPlatformType,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
 				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonCredentialsFailing),
 			},
@@ -151,12 +143,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 				testCredentialsRequestWithStatus("cred2", true, []minterv1.CredentialsRequestCondition{}, nil),
 				testCredentialsRequestWithStatus("cred3", true, []minterv1.CredentialsRequestCondition{}, nil),
 			},
-			cloudPlatform: configv1.AWSPlatformType,
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
-				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonReconcilingComplete),
-				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
-			},
+			cloudPlatform:      configv1.AWSPlatformType,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{},
 		},
 		{
 			// Implies the credential was initially provisioned but an update is needed and it's failing:
@@ -170,7 +158,6 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 			cloudPlatform: configv1.AWSPlatformType,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionTrue, reasonReconciling),
 				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonCredentialsFailing),
 			},
@@ -183,12 +170,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 				testCredentialsRequestWithStatus("azurecred", false, []minterv1.CredentialsRequestCondition{}, defaultAzureProviderConfig),
 				testCredentialsRequestWithStatus("gcpcred", false, []minterv1.CredentialsRequestCondition{}, defaultGCPProviderConfig),
 			},
-			cloudPlatform: configv1.AWSPlatformType,
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
-				testConditionWithMessage(configv1.OperatorProgressing, configv1.ConditionFalse, reasonReconcilingComplete, "2 of 2 credentials requests"),
-				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
-			},
+			cloudPlatform:      configv1.AWSPlatformType,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{},
 		},
 		{
 			name: "ignore nonGCP credreqs",
@@ -198,19 +181,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 				testCredentialsRequestWithStatus("awscred", false, []minterv1.CredentialsRequestCondition{}, defaultAWSProviderConfig),
 				testCredentialsRequestWithStatus("azurecred", false, []minterv1.CredentialsRequestCondition{}, defaultAzureProviderConfig),
 			},
-			cloudPlatform: configv1.GCPPlatformType,
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, ""),
-				testConditionWithMessage(configv1.OperatorProgressing, configv1.ConditionFalse, reasonReconcilingComplete, "2 of 2 credentials requests"),
-				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonNoCredentialsFailing),
-			},
-		},
-		{
-			name:         "set upgradeable condition",
-			credRequests: []minterv1.CredentialsRequest{},
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorUpgradeable, configv1.ConditionTrue, ""),
-			},
+			cloudPlatform:      configv1.GCPPlatformType,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{},
 		},
 		{
 			name:              "upgradable false if parent cred removed",
@@ -228,13 +200,9 @@ func TestClusterOperatorStatus(t *testing.T) {
 					testCRCondition(minterv1.CredentialsProvisionFailure, corev1.ConditionTrue),
 				}, nil),
 			},
-			cloudPlatform:    configv1.AWSPlatformType,
-			operatorDisabled: true,
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, reasonOperatorDisabled),
-				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonOperatorDisabled),
-				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonOperatorDisabled),
-			},
+			cloudPlatform:      configv1.AWSPlatformType,
+			operatorDisabled:   true,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{},
 		},
 	}
 
@@ -242,15 +210,14 @@ func TestClusterOperatorStatus(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-
-			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests,
+			clusterOperatorConditions := computeStatusConditions(test.credRequests,
 				test.cloudPlatform, test.operatorDisabled,
 				!test.parentCredRemoved,
 				types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName},
 				log.WithField("test", test.name))
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
-				if assert.NotNil(t, c) {
+				if assert.NotNil(t, c, "unexpected nil for condition %s", ec.Type) {
 					assert.Equal(t, string(ec.Status), string(c.Status), "unexpected status for condition %s", ec.Type)
 					assert.Equal(t, ec.Reason, c.Reason, "unexpected reason for condition %s", ec.Type)
 
@@ -355,11 +322,8 @@ func testClusterOperator(version string, progressingLastTransition metav1.Time) 
 			},
 			Conditions: []configv1.ClusterOperatorStatusCondition{
 				{
-					Type:   configv1.OperatorProgressing,
-					Status: "False",
-					Reason: reasonReconcilingComplete,
-					// Warning: must match what the controller status would check, otherwise we might get a false positive on this test.
-					Message:            "0 of 0 credentials requests provisioned and reconciled.",
+					Type:               configv1.OperatorProgressing,
+					Status:             configv1.ConditionFalse,
 					LastTransitionTime: progressingLastTransition,
 				},
 			},
@@ -386,26 +350,6 @@ func testCRCondition(condType minterv1.CredentialsRequestConditionType, status c
 	return minterv1.CredentialsRequestCondition{
 		Type:   condType,
 		Status: status,
-	}
-}
-
-func testUnknownConditions() []configv1.ClusterOperatorStatusCondition {
-	return []configv1.ClusterOperatorStatusCondition{
-		{
-			Type:   configv1.OperatorAvailable,
-			Status: configv1.ConditionUnknown,
-			Reason: "",
-		},
-		{
-			Type:   configv1.OperatorProgressing,
-			Status: configv1.ConditionUnknown,
-			Reason: "",
-		},
-		{
-			Type:   configv1.OperatorDegraded,
-			Status: configv1.ConditionUnknown,
-			Reason: "",
-		},
 	}
 }
 
