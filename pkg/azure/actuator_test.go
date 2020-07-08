@@ -27,8 +27,10 @@ import (
 	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2015-11-01/resources"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
+
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 	openshiftapiv1 "github.com/openshift/api/config/v1"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	azuremock "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"

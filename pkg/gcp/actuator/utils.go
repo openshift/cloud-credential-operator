@@ -26,7 +26,7 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 )
 
 type gcpAuthJSON struct {

@@ -32,14 +32,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	"github.com/openshift/api/cloudcredential"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 	configv1 "github.com/openshift/api/config/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
@@ -85,7 +85,7 @@ func init() {
 }
 
 func TestCredentialsRequestGCPReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	cloudcredential.Install(scheme.Scheme)
 	configv1.Install(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()

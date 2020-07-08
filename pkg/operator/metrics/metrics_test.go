@@ -13,9 +13,9 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	credreqv1 "github.com/openshift/api/cloudcredential/v1"
 	configv1 "github.com/openshift/api/config/v1"
 
-	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 

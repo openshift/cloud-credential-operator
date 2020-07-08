@@ -34,10 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	"github.com/openshift/api/cloudcredential"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 	configv1 "github.com/openshift/api/config/v1"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 )
@@ -49,7 +49,7 @@ var (
 )
 
 func TestClusterOperatorStatus(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	cloudcredential.Install(scheme.Scheme)
 	configv1.Install(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
@@ -231,7 +231,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 }
 
 func TestClusterOperatorVersion(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	cloudcredential.Install(scheme.Scheme)
 	configv1.Install(scheme.Scheme)
 
 	twentyHoursAgo := metav1.Time{

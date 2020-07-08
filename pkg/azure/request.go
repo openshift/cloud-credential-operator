@@ -16,7 +16,7 @@ limitations under the License.
 
 package azure
 
-import minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+import minterv1 "github.com/openshift/api/cloudcredential/v1"
 
 type request struct {
 	*minterv1.CredentialsRequest

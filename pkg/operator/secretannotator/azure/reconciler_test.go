@@ -17,13 +17,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	"github.com/openshift/api/cloudcredential"
 	configv1 "github.com/openshift/api/config/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 
 	ccazure "github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -51,7 +50,7 @@ var (
 )
 
 func TestAzureSecretAnnotatorReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	cloudcredential.Install(scheme.Scheme)
 	configv1.Install(scheme.Scheme)
 
 	tests := []struct {

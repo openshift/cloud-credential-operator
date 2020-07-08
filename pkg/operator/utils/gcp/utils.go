@@ -22,7 +22,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
+
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"

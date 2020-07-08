@@ -24,7 +24,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -33,6 +32,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 	configv1 "github.com/openshift/api/config/v1"
 
 	"github.com/aws/aws-sdk-go/aws"

@@ -20,7 +20,8 @@ import (
 	"context"
 	"fmt"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
+
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 

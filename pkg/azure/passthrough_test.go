@@ -20,8 +20,9 @@ import (
 	"context"
 	"testing"
 
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 	openshiftapiv1 "github.com/openshift/api/config/v1"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/stretchr/testify/assert"

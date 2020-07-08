@@ -16,9 +16,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	credreqv1 "github.com/openshift/api/cloudcredential/v1"
 	configv1 "github.com/openshift/api/config/v1"
 
-	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"

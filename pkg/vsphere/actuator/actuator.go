@@ -22,7 +22,6 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 
@@ -32,6 +31,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 )
 
 var _ actuatoriface.Actuator = (*VSphereActuator)(nil)

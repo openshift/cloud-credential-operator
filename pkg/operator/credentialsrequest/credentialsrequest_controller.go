@@ -25,7 +25,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
@@ -33,6 +32,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 	configv1 "github.com/openshift/api/config/v1"
 
 	corev1 "k8s.io/api/core/v1"

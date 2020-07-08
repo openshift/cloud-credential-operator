@@ -20,7 +20,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/types"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
+
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 

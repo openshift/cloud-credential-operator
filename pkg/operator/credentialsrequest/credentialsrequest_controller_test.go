@@ -34,14 +34,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	"github.com/openshift/api/cloudcredential"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
 	configv1 "github.com/openshift/api/config/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
@@ -77,7 +77,7 @@ type ExpectedCOCondition struct {
 }
 
 func TestCredentialsRequestReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	cloudcredential.Install(scheme.Scheme)
 	configv1.Install(scheme.Scheme)
 
 	// Utility function to get the test credentials request from the fake client

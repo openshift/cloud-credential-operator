@@ -32,8 +32,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/api/cloudcredential"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
+
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -63,7 +64,7 @@ func (a *awsClientBuilderRecorder) ClientBuilder(accessKeyID, secretAccessKey []
 }
 
 func TestCredentialsFetching(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	cloudcredential.Install(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {

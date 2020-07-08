@@ -28,7 +28,8 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	yaml "k8s.io/apimachinery/pkg/util/yaml"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	minterv1 "github.com/openshift/api/cloudcredential/v1"
+
 	assets "github.com/openshift/cloud-credential-operator/pkg/assets/bootstrap"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
