@@ -46,6 +46,8 @@ const (
 // CredentialsRequestSpec defines the desired state of CredentialsRequest
 type CredentialsRequestSpec struct {
 	// SecretRef points to the secret where the credentials should be stored once generated.
+	// +kubebuilder:validation:Required
+	// +required
 	SecretRef corev1.ObjectReference `json:"secretRef"`
 
 	// ProviderSpec contains the cloud provider specific credentials specification.
@@ -55,6 +57,8 @@ type CredentialsRequestSpec struct {
 // CredentialsRequestStatus defines the observed state of CredentialsRequest
 type CredentialsRequestStatus struct {
 	// Provisioned is true once the credentials have been initially provisioned.
+	// +kubebuilder:validation:Required
+	// +required
 	Provisioned bool `json:"provisioned"`
 
 	// LastSyncTimestamp is the time that the credentials were last synced.
@@ -63,6 +67,8 @@ type CredentialsRequestStatus struct {
 	// LastSyncGeneration is the generation of the credentials request resource
 	// that was last synced. Used to determine if the object has changed and
 	// requires a sync.
+	// +kubebuilder:validation:Required
+	// +required
 	LastSyncGeneration int64 `json:"lastSyncGeneration"`
 
 	// ProviderStatus contains cloud provider specific status.
@@ -83,6 +89,8 @@ type CredentialsRequest struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
 
+	// +kubebuilder:validation:Required
+	// +required
 	Spec   CredentialsRequestSpec   `json:"spec"`
 	Status CredentialsRequestStatus `json:"status,omitempty"`
 }
@@ -99,8 +107,12 @@ type CredentialsRequestList struct {
 // CredentialsRequestCondition contains details for any of the conditions on a CredentialsRequest object
 type CredentialsRequestCondition struct {
 	// Type is the specific type of the condition
+	// +kubebuilder:validation:Required
+	// +required
 	Type CredentialsRequestConditionType `json:"type"`
 	// Status is the status of the condition
+	// +kubebuilder:validation:Required
+	// +required
 	Status corev1.ConditionStatus `json:"status"`
 	// LastProbeTime is the last time we probed the condition
 	LastProbeTime metav1.Time `json:"lastProbeTime,omitempty"`
