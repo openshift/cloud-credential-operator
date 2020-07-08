@@ -5,7 +5,6 @@ all: build
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
 	targets/openshift/bindata.mk \
-	targets/openshift/crd-schema-gen.mk \
 	targets/openshift/deps.mk \
 )
 
@@ -68,24 +67,14 @@ $(call add-bindata,v4.1.0,./bindata/v4.1.0/...,bindata,v410_00_assets,pkg/assets
 # $4 - context directory for image build
 $(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/ocp/4.5:cloud-credential-operator, ./Dockerfile,.)
 
-# This will call a macro called "add-crd-gen" will will generate crd manifests based on the parameters:
-# $1 - target name
-# $2 - apis
-# $3 - manifests
-# $4 - output
-$(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
-$(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
-
 update: update-codegen
 
-update-codegen: update-codegen-crds
-	./hack/update-codegen.sh
+update-codegen:
 .PHONY: update-codegen
 
 verify: verify-codegen
 
-verify-codegen: verify-codegen-crds
-	./hack/verify-codegen.sh
+verify-codegen:
 .PHONY: verify-codegen
 
 clean:
