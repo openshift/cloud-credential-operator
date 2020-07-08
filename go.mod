@@ -39,3 +39,5 @@ require (
 	k8s.io/code-generator v0.18.3
 	sigs.k8s.io/controller-runtime v0.6.0
 )
+
+replace github.com/openshift/api => github.com/joelddiaz/api v0.0.0-20200709114332-a68340a89e61
