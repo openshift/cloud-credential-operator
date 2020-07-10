@@ -34,13 +34,15 @@ import (
 
 	"github.com/openshift/cloud-credential-operator/pkg/assets/v410_00_assets"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 )
 
 const (
-	controllerName    = "awspodidentity"
-	deploymentName    = "cloud-credential-operator"
-	operatorNamespace = "openshift-cloud-credential-operator"
-	retryInterval     = 10 * time.Second
+	controllerName                      = "awspodidentity"
+	deploymentName                      = "cloud-credential-operator"
+	operatorNamespace                   = "openshift-cloud-credential-operator"
+	retryInterval                       = 10 * time.Second
+	reasonStaticResourceReconcileFailed = "StaticResourceReconcileFailed"
 )
 
 var (
@@ -57,6 +59,51 @@ var (
 	templateFiles = []string{
 		"v4.1.0/aws-pod-identity-webhook/deployment.yaml",
 		"v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml",
+	}
+	relatedObjects = []configv1.ObjectReference{
+		{
+			Resource:  "serviceaccounts",
+			Namespace: operatorNamespace,
+			Name:      "pod-identity-webhook",
+		},
+		{
+			Group:    "rbac.authorization.k8s.io",
+			Resource: "clusteroles",
+			Name:     "pod-identity-webhook",
+		},
+		{
+			Group:    "rbac.authorization.k8s.io",
+			Resource: "clusterolebindings",
+			Name:     "pod-identity-webhook",
+		},
+		{
+			Group:     "rbac.authorization.k8s.io",
+			Resource:  "roles",
+			Namespace: operatorNamespace,
+			Name:      "pod-identity-webhook",
+		},
+		{
+			Group:     "rbac.authorization.k8s.io",
+			Resource:  "rolebindings",
+			Namespace: operatorNamespace,
+			Name:      "pod-identity-webhook",
+		},
+		{
+			Resource:  "services",
+			Namespace: operatorNamespace,
+			Name:      "pod-identity-webhook",
+		},
+		{
+			Group:     "apps",
+			Resource:  "deployments",
+			Namespace: operatorNamespace,
+			Name:      "pod-identity-webhook",
+		},
+		{
+			Group:    "admissionregistration.k8s.io",
+			Resource: "mutatingwebhookconfigurations",
+			Name:     "pod-identity-webhook",
+		},
 	}
 )
 
@@ -118,6 +165,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		logger:        logger,
 		eventRecorder: eventRecorder,
 		imagePullSpec: imagePullSpec,
+		conditions:    []configv1.ClusterOperatorStatusCondition{},
 	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
@@ -162,6 +210,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		}
 	}
 
+	clusteroperator.AddStatusHandler(r)
 	mgr.Add(&awsPodIdentityController{reconciler: r, cache: cache, logger: logger})
 
 	return nil
@@ -181,6 +230,7 @@ type staticResourceReconciler struct {
 	eventRecorder        events.Recorder
 	deploymentGeneration int64
 	imagePullSpec        string
+	conditions           []configv1.ClusterOperatorStatusCondition
 }
 
 var _ reconcile.Reconciler = &staticResourceReconciler{}
@@ -190,8 +240,17 @@ func (r *staticResourceReconciler) Reconcile(request reconcile.Request) (reconci
 	err := r.ReconcileResources()
 	if err != nil {
 		r.logger.Errorf("reconciliation failed, retrying in %s", retryInterval.String())
+		r.conditions = []configv1.ClusterOperatorStatusCondition{
+			{
+				Type:    configv1.OperatorDegraded,
+				Status:  configv1.ConditionTrue,
+				Reason:  reasonStaticResourceReconcileFailed,
+				Message: fmt.Sprintf("static resource reconciliation failed: %v", err),
+			},
+		}
 		return reconcile.Result{RequeueAfter: retryInterval}, err
 	}
+	r.conditions = []configv1.ClusterOperatorStatusCondition{}
 	return reconcile.Result{}, nil
 }
 
@@ -296,4 +355,18 @@ func reportUpdateEvent(recorder events.Recorder, obj runtime.Object, originalErr
 	default:
 		recorder.Eventf(fmt.Sprintf("%sUpdated", gvk.Kind), "Updated %s:\n%s", resourcehelper.FormatResourceForCLI(obj), strings.Join(details, "\n"))
 	}
+}
+
+var _ clusteroperator.StatusHandler = &staticResourceReconciler{}
+
+func (r *staticResourceReconciler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+	return r.conditions, nil
+}
+
+func (r *staticResourceReconciler) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {
+	return relatedObjects, nil
+}
+
+func (r *staticResourceReconciler) Name() string {
+	return controllerName
 }
