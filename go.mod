@@ -28,6 +28,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+	golang.org/x/text v0.3.3 // indirect; pull in infinite loop fix
 	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
 	google.golang.org/api v0.21.0
 	google.golang.org/genproto v0.0.0-20200406120821-33397c535dc2
