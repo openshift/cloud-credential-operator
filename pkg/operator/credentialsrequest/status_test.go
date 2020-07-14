@@ -25,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -36,10 +37,10 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 var (
@@ -49,8 +50,7 @@ var (
 )
 
 func TestClusterOperatorStatus(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -231,8 +231,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 }
 
 func TestClusterOperatorVersion(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	twentyHoursAgo := metav1.Time{
 		Time: time.Now().Add(-20 * time.Hour),
@@ -273,7 +272,7 @@ func TestClusterOperatorVersion(t *testing.T) {
 				Actuator: &actuator.DummyActuator{},
 			}
 
-			assert.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
+			require.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
 			err := rcr.syncOperatorStatus()
 
 			if err != nil {
@@ -296,7 +295,7 @@ func TestClusterOperatorVersion(t *testing.T) {
 
 			progCond := findClusterOperatorCondition(clusterop.Status.Conditions,
 				configv1.OperatorProgressing)
-			assert.NotNil(t, progCond)
+			require.NotNil(t, progCond)
 			if test.expectProgressingTransition {
 				assert.True(t, progCond.LastTransitionTime.Time.After(
 					test.currentProgressingLastTransition.Time))
