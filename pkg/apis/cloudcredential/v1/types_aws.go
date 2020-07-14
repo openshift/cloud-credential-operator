@@ -23,7 +23,7 @@ import (
 // TODO: these types should eventually be broken out, along with the actuator, to a separate repo.
 
 // AWSProviderSpec contains the required information to create a user policy in AWS.
-// +k8s:deepcopy-gen=false
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type AWSProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 	// StatementEntries contains a list of policy statements that should be associated with this credentials access key.
@@ -31,7 +31,6 @@ type AWSProviderSpec struct {
 }
 
 // StatementEntry models an AWS policy statement entry.
-// +k8s:deepcopy-gen=false
 type StatementEntry struct {
 	// Effect indicates if this policy statement is to Allow or Deny.
 	Effect string `json:"effect"`
