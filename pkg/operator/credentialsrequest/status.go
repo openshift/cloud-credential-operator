@@ -10,6 +10,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
@@ -117,12 +118,12 @@ func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (
 			"failed to list CredentialsRequests: %v", err)
 	}
 
-	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, logger)
+	mode, _, err := utils.GetOperatorConfiguration(r.Client, logger)
 	if err != nil {
 		return nil, nil, false, fmt.Errorf("error checking if operator is disabled: %v", err)
 	}
 
-	return ns, credRequestList.Items, operatorIsDisabled, nil
+	return ns, credRequestList.Items, mode == operatorv1.CloudCredentialsModeManual, nil
 }
 
 func computeClusterOperatorVersions() []configv1.OperandVersion {

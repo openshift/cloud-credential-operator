@@ -7,6 +7,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metaerrors "k8s.io/apimachinery/pkg/api/meta"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
@@ -16,6 +17,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 )
@@ -142,20 +144,16 @@ func GenerateNameWithFieldLimits(infraName string, infraNameMaxLen int, crName s
 	return fmt.Sprintf("%s%s", infraPrefix, crName), nil
 }
 
-// IsOperatorDisabled checks the cloud-credential-operator-config ConfigMap for a
+// IsOperatorDisabledViaConfigmap checks the cloud-credential-operator-config ConfigMap for a
 // "disabled" property set to true. If the configmap or property do not exist, we assume
 // false and continue normal operation. This should be used in all controllers to shutdown
 // functionality in environments where admins want to manage their credentials themselves.
-func IsOperatorDisabled(kubeClient client.Client, logger log.FieldLogger) (bool, error) {
-	cm := &corev1.ConfigMap{}
-	err := kubeClient.Get(context.TODO(),
-		types.NamespacedName{
-			Namespace: minterv1.CloudCredOperatorNamespace,
-			Name:      minterv1.CloudCredOperatorConfigMap,
-		}, cm)
+// DEPRECATED (and unexported), use GetOperatorConfiguration to determine disabled state.
+func isOperatorDisabledViaConfigmap(kubeClient client.Client, logger log.FieldLogger) (bool, error) {
+	cm, err := GetLegacyConfigMap(kubeClient)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.Debugf("%s ConfigMap does not exist, assuming default behavior", minterv1.CloudCredOperatorConfigMap)
+			logger.Debugf("%s ConfigMap does not exist, assuming default behavior", constants.CloudCredOperatorConfigMap)
 			return OperatorDisabledDefault, nil
 		}
 		return OperatorDisabledDefault, err
@@ -164,8 +162,85 @@ func IsOperatorDisabled(kubeClient client.Client, logger log.FieldLogger) (bool,
 	return CCODisabledCheck(cm, logger)
 }
 
+func GetLegacyConfigMap(kubeClient client.Client) (*corev1.ConfigMap, error) {
+	cm := &corev1.ConfigMap{}
+	err := kubeClient.Get(context.TODO(),
+		types.NamespacedName{
+			Namespace: minterv1.CloudCredOperatorNamespace,
+			Name:      minterv1.CloudCredOperatorConfigMap,
+		}, cm)
+	return cm, err
+}
+
+// GetOperatorConfiguration will return the value in the operator config (reporting "manual" mode if necessary),
+// and whether there is a conflict between the legacy ConfigMap and CCO config (in the even of a conflict, the
+// operator mode will be reported to reflect the actual value in the operator config).
+func GetOperatorConfiguration(kubeClient client.Client, logger log.FieldLogger) (
+	operatorMode operatorv1.CloudCredentialsMode,
+	configurationConflict bool,
+	err error) {
+	operatorMode, err = getOperatorMode(kubeClient, logger)
+	if err != nil {
+		return
+	}
+	disabledViaOperatorConfig := operatorMode == operatorv1.CloudCredentialsModeManual
+
+	var disabledViaConfigMap bool
+	disabledViaConfigMap, err = isOperatorDisabledViaConfigmap(kubeClient, logger)
+	if err != nil {
+		return
+	}
+
+	if operatorMode == operatorv1.CloudCredentialsModeDefault {
+		// if no mode is set, then only the value in the configmap can end up disabling CCO
+		// so report back that the operator mode is manual (via the configmap setting)
+		if disabledViaConfigMap {
+			operatorMode = operatorv1.CloudCredentialsModeManual
+		}
+		return
+	}
+
+	// else see if there is a disconnect between the operator mode and the
+	// opt-in value of 'disabled: "true"' in the ConfigMap
+	if disabledViaConfigMap && disabledViaConfigMap != disabledViaOperatorConfig {
+		log.Errorf("legacy configmap disabled set to %v conflict with operator CR mode of %s",
+			disabledViaConfigMap, operatorMode)
+		// Allow the actual CCO config to be returned as that should take
+		// precedence for the purpose of reporting metrics data, but indicate the conflict.
+		configurationConflict = true
+	}
+
+	return
+
+}
+
+func getOperatorMode(kubeClient client.Client, logger log.FieldLogger) (operatorv1.CloudCredentialsMode, error) {
+	conf := &operatorv1.CloudCredential{}
+
+	err := kubeClient.Get(context.TODO(),
+		types.NamespacedName{
+			Name: constants.CloudCredOperatorConfig,
+		}, conf)
+	if err != nil {
+		// SHOULD WE BE WATCHING FOR THIS ERROR???
+		if metaerrors.IsNoMatchError(err) {
+			logger.WithError(err).Debug("no config CRD found")
+			return operatorv1.CloudCredentialsModeDefault, nil
+		}
+		if errors.IsNotFound(err) {
+			logger.Debugf("%s CCO operator config does not exist, assuming default behavior", constants.CloudCredOperatorConfig)
+			return operatorv1.CloudCredentialsModeDefault, nil
+		}
+		return "", err
+	}
+
+	return conf.Spec.CredentialsMode, nil
+}
+
 // CCODisabledCheck will take the operator configuration ConfigMap and return
 // whether the CCO operator is set to enabled or disabled.
+// TODO: investigate unexporting this once the bootstrap render process can
+// deal with the new config CR
 func CCODisabledCheck(cm *corev1.ConfigMap, logger log.FieldLogger) (bool, error) {
 	disabled, ok := cm.Data[operatorConfigMapDisabledKey]
 	if !ok {
@@ -173,4 +248,29 @@ func CCODisabledCheck(cm *corev1.ConfigMap, logger log.FieldLogger) (bool, error
 		return OperatorDisabledDefault, nil
 	}
 	return strconv.ParseBool(disabled)
+}
+
+// ModeToAnnotation converts a CCO operator mode to a CCO secret annotation
+// or errors if the mode is not one that converts to a secret annotation.
+func ModeToAnnotation(operatorMode operatorv1.CloudCredentialsMode) (string, error) {
+	switch operatorMode {
+	case operatorv1.CloudCredentialsModeMint:
+		return constants.MintAnnotation, nil
+	case operatorv1.CloudCredentialsModePassthrough:
+		return constants.PassthroughAnnotation, nil
+	default:
+		return "", fmt.Errorf("no annotation for operator mode: %s", operatorMode)
+	}
+}
+
+func IsValidMode(operatorMode operatorv1.CloudCredentialsMode) bool {
+	switch operatorMode {
+	case operatorv1.CloudCredentialsModeDefault,
+		operatorv1.CloudCredentialsModeManual,
+		operatorv1.CloudCredentialsModeMint,
+		operatorv1.CloudCredentialsModePassthrough:
+		return true
+	default:
+		return false
+	}
 }

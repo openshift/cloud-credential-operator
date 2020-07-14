@@ -34,12 +34,12 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
@@ -47,6 +47,8 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -76,8 +78,7 @@ type ExpectedCOCondition struct {
 }
 
 func TestCredentialsRequestReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	// Utility function to get the test credentials request from the fake client
 	getCR := func(c client.Client) *minterv1.CredentialsRequest {
@@ -908,11 +909,78 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "new credential but operator disabled",
+			name: "new credential but operator disabled via configmap",
 			existing: []runtime.Object{
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testOperatorConfigMap("true"),
+				testCredentialsRequest(t),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorDegraded,
+					status:        corev1.ConditionFalse,
+				},
+			},
+		},
+		{
+			name: "new credential but operator disabled via config",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+				testCredentialsRequest(t),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorDegraded,
+					status:        corev1.ConditionFalse,
+				},
+			},
+		},
+		{
+			name: "old configmap data ignored because of new config",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+				testOperatorConfigMap("false"),
 				testCredentialsRequest(t),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
@@ -1036,6 +1104,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				},
 				platformType: configv1.AWSPlatformType,
 			}
+			// make sure we clear this test case's handler
+			defer clusteroperator.ClearHandlers()
+			clusteroperator.AddStatusHandler(rcr)
 
 			_, err = rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -1472,4 +1543,17 @@ func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 			"disabled": disabled,
 		},
 	}
+}
+
+func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
+	conf := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: operatorv1.CloudCredentialSpec{
+			CredentialsMode: mode,
+		},
+	}
+
+	return conf
 }

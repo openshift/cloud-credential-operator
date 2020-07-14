@@ -36,11 +36,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	vsphereconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/vsphere"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
+	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 	"github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 )
 
@@ -56,8 +57,7 @@ func init() {
 }
 
 func TestCredentialsRequestVSphereReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -207,6 +207,8 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				},
 				platformType: configv1.VSpherePlatformType,
 			}
+			defer clusteroperator.ClearHandlers()
+			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
