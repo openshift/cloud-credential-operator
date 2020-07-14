@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -118,11 +119,12 @@ func (mc *Calculator) metricsLoop() {
 
 	mc.log.Info("calculating metrics for all CredentialsRequests")
 
-	ccoDisabled, err := utils.IsOperatorDisabled(mc.Client, mc.log)
+	mode, _, err := utils.GetOperatorConfiguration(mc.Client, mc.log)
 	if err != nil {
 		mc.log.WithError(err).Error("failed to determine whether CCO is disabled")
 		return
 	}
+	ccoDisabled := mode == operatorv1.CloudCredentialsModeManual
 
 	credRequests := &credreqv1.CredentialsRequestList{}
 	if err := mc.Client.List(context.TODO(), credRequests); err != nil {

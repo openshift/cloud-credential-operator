@@ -32,6 +32,15 @@ const (
 	// running under (typically just haven't added support for the cloud/platform)
 	ModeUnknown CredentialsMode = "unknown"
 
+	// StatusModeMismatch is used to set a clusteroperator condition when
+	// the legacy configmap setting of disabled: "true" conflicts with the
+	// specified operator config mode.
+	StatusModeMismatch = "ModeMismatch"
+
+	// StatusModeInvalid is used to set a clusteroperator condition when
+	// the operator config CR specifies an invalide mode
+	StatusModeInvalid = "ModeInvalid"
+
 	// secret annoation vars
 
 	// AnnotationKey is the annotation the cloud credentials secret will be annotated with to indicate
@@ -66,6 +75,9 @@ const (
 
 	// CloudCredOperatorConfigMap is an optional ConfigMap that can be used to alter behavior of the operator.
 	CloudCredOperatorConfigMap = "cloud-credential-operator-config"
+
+	// CloudCredOperatorConfig is the name of the credentialsrequest.operator.openshift.io CR holding CCO's config
+	CloudCredOperatorConfig = "cluster"
 
 	// CloudCredSecretNamespace is where the cloud credentials can be found
 	CloudCredSecretNamespace = "kube-system"
