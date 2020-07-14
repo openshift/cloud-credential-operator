@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -39,10 +40,11 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/iam"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 
 	annaws "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
@@ -83,8 +85,7 @@ func init() {
 }
 
 func TestSecretAnnotatorReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	tests := []struct {
 		name                    string
@@ -106,11 +107,14 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			validateAnnotationValue: constants.MintAnnotation,
 		},
 		{
-			name:     "operator disabled",
+			name:     "operator disabled via configmap",
 			existing: []runtime.Object{testSecret(), testOperatorConfigMap("true")},
-			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				return mockAWSClient
+		},
+		{
+			name: "operator disabled",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
 			},
 		},
 		{
@@ -187,6 +191,22 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				},
 			}},
 		},
+		{
+			name: "annotation matches forced mode",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(operatorv1.CloudCredentialsModeMint),
+			},
+			validateAnnotationValue: constants.MintAnnotation,
+		},
+		{
+			name: "unknown mode",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig("notARealMode"),
+			},
+			expectErr: true,
+		},
 	}
 
 	for _, test := range tests {
@@ -228,8 +248,8 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 			_, err := rcc.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      testSecretName,
-					Namespace: testNamespace,
+					Name:      constants2.AWSCloudCredSecretName,
+					Namespace: constants.CloudCredSecretNamespace,
 				},
 			})
 
@@ -247,8 +267,8 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 func testSecret() *corev1.Secret {
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      testSecretName,
-			Namespace: testNamespace,
+			Name:      constants2.AWSCloudCredSecretName,
+			Namespace: constants.CloudCredSecretNamespace,
 		},
 		Data: map[string][]byte{
 			annaws.AwsAccessKeyName:       []byte(testAWSAccessKeyID),
@@ -268,6 +288,19 @@ func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 			"disabled": disabled,
 		},
 	}
+}
+
+func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
+	conf := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constants2.CloudCredOperatorConfig,
+		},
+		Spec: operatorv1.CloudCredentialSpec{
+			CredentialsMode: mode,
+		},
+	}
+
+	return conf
 }
 
 func mockGetRootUser(mockAWSClient *mockaws.MockClient) {
@@ -357,7 +390,7 @@ func validateAnnotation(t *testing.T, secret *corev1.Secret, annotation string) 
 
 func getCredSecret(c client.Client) *corev1.Secret {
 	secret := &corev1.Secret{}
-	if err := c.Get(context.TODO(), client.ObjectKey{Name: testSecretName, Namespace: testNamespace}, secret); err != nil {
+	if err := c.Get(context.TODO(), client.ObjectKey{Name: constants2.AWSCloudCredSecretName, Namespace: constants.CloudCredSecretNamespace}, secret); err != nil {
 		return nil
 	}
 	return secret

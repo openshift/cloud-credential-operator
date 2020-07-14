@@ -17,18 +17,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	configv1 "github.com/openshift/api/config/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
-
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 
 	ccazure "github.com/openshift/cloud-credential-operator/pkg/azure"
 	. "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -51,8 +48,7 @@ var (
 )
 
 func TestAzureSecretAnnotatorReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	tests := []struct {
 		name  string
@@ -90,6 +86,7 @@ func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 			defer mockCtrl.Finish()
 			mockAdalClient := mock.NewMockAdalService(mockCtrl)
 			setupAdalMock(mockAdalClient.EXPECT(), test.roles)
+
 			rcc := &ReconcileCloudCredSecret{
 				Client: fakeClient,
 				Logger: log.WithField("controller", "testController"),

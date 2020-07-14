@@ -33,6 +33,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -280,12 +281,15 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
 
-	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, logger)
+	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
 	if err != nil {
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
-	} else if operatorIsDisabled {
-		logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
+	} else if conflict {
+		logger.Error("configuration conflict betwen legacy configmap and operator config")
+		return reconcile.Result{}, fmt.Errorf("configuration conflict")
+	} else if mode == operatorv1.CloudCredentialsModeManual {
+		logger.Infof("operator set to disabled / manual mode")
 		return reconcile.Result{}, err
 	}
 

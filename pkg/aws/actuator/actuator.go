@@ -27,6 +27,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
@@ -287,22 +288,21 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.InsufficientAnnotation {
+	switch cloudCredsSecret.Annotations[constants.AnnotationKey] {
+	case constants.InsufficientAnnotation:
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
 			Message:   msg,
 		}
-	}
-
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
+	case constants.PassthroughAnnotation:
 		logger.Debugf("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
 			return err
 		}
-	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.MintAnnotation {
+	case constants.MintAnnotation:
 		logger.Debugf("provisioning with cred minting")
 		err := a.syncMint(ctx, cr, region, infraName, logger)
 		if err != nil {
@@ -312,6 +312,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 				ErrReason: minterv1.CredentialsProvisionFailure,
 				Message:   fmt.Sprintf("%v: %v", msg, err),
 			}
+		}
+	default:
+		msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
+		logger.Info(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   msg,
 		}
 	}
 

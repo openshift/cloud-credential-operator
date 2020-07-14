@@ -14,6 +14,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/metrics"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
+
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
@@ -60,6 +62,7 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 	mc := &Calculator{
 		Client:   mgr.GetClient(),
 		Interval: 2 * time.Minute,
+		log:      log.WithField("controller", controllerName),
 	}
 	err := mgr.Add(mc)
 	if err != nil {
@@ -79,6 +82,8 @@ type Calculator struct {
 
 	// Interval is the length of time we sleep between metrics calculations.
 	Interval time.Duration
+
+	log log.FieldLogger
 }
 
 // Start begins the metrics calculation loop.
@@ -86,38 +91,40 @@ func (mc *Calculator) Start(stopCh <-chan struct{}) error {
 	log.Info("started metrics calculator goroutine")
 
 	// Run forever, sleep at the end:
-	wait.Until(func() {
-		start := time.Now()
-		mcLog := log.WithField("controller", controllerName)
-		defer func() {
-			dur := time.Since(start)
-			MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
-			mcLog.WithField("elapsed", dur).Info("reconcile complete")
-		}()
-
-		mcLog.Info("calculating metrics for all CredentialsRequests")
-
-		ccoDisabled, err := utils.IsOperatorDisabled(mc.Client, mcLog)
-		if err != nil {
-			mcLog.WithError(err).Error("failed to determine whether CCO is disabled")
-			return
-		}
-
-		credRequests := &credreqv1.CredentialsRequestList{}
-		if err := mc.Client.List(context.TODO(), credRequests); err != nil {
-			mcLog.WithError(err).Error("error listing CredentialsRequests")
-			return
-		}
-
-		accumulator := newAccumulator(mcLog)
-		for _, cr := range credRequests.Items {
-			accumulator.processCR(&cr, ccoDisabled)
-		}
-
-		accumulator.setMetrics()
-	}, mc.Interval, stopCh)
+	wait.Until(mc.metricsLoop, mc.Interval, stopCh)
 
 	return nil
+}
+
+func (mc *Calculator) metricsLoop() {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start)
+		MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
+		mc.log.WithField("elapsed", dur).Info("reconcile complete")
+	}()
+
+	mc.log.Info("calculating metrics for all CredentialsRequests")
+
+	mode, _, err := utils.GetOperatorConfiguration(mc.Client, mc.log)
+	if err != nil {
+		mc.log.WithError(err).Error("failed to determine whether CCO is disabled")
+		return
+	}
+	ccoDisabled := mode == operatorv1.CloudCredentialsModeManual
+
+	credRequests := &credreqv1.CredentialsRequestList{}
+	if err := mc.Client.List(context.TODO(), credRequests); err != nil {
+		mc.log.WithError(err).Error("error listing CredentialsRequests")
+		return
+	}
+
+	accumulator := newAccumulator(mc.log)
+	for _, cr := range credRequests.Items {
+		accumulator.processCR(&cr, ccoDisabled)
+	}
+
+	accumulator.setMetrics()
 }
 
 func cloudProviderSpecToMetricsKey(cloud string) string {

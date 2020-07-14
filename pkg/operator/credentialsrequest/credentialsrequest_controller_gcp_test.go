@@ -37,7 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
@@ -45,9 +47,7 @@ import (
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -83,8 +83,7 @@ func init() {
 }
 
 func TestCredentialsRequestGCPReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
