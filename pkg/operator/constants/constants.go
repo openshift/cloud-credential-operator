@@ -70,6 +70,12 @@ const (
 	// CloudCredSecretNamespace is where the cloud credentials can be found
 	CloudCredSecretNamespace = "kube-system"
 
+	// OpenShiftConfigNamespace is where the OpenShift configuration can be found
+	OpenShiftConfigNamespace = "openshift-config"
+
+	// CloudProvderConfigMapName is the name of the configmap where cloudprovider config is stored
+	CloudProvderConfigMapName = "cloud-provider-config"
+
 	// GCPCloudCredSecretName is the name of the secret created by the installer containing cloud creds.
 	GCPCloudCredSecretName = "gcp-credentials"
 

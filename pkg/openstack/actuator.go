@@ -36,6 +36,7 @@ import (
 
 const (
 	rootOpenStackCredsSecretKey = "clouds.yaml"
+	rootOpenStackCACertKey      = "ca-bundle.pem"
 )
 
 type OpenStackActuator struct {
@@ -101,13 +102,19 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 		return err
 	}
 
+	cacert, err := a.getRootCACertData(ctx, logger)
+	if err != nil {
+		logger.WithError(err).Error("issue with cacert configmap")
+		return err
+	}
+
 	logger.Debugf("provisioning secret")
 	existingSecret, err := a.loadExistingSecret(cr)
 	if err != nil {
 		return err
 	}
 
-	err = a.syncCredentialSecret(cr, clouds, existingSecret, "", logger)
+	err = a.syncCredentialSecret(cr, clouds, cacert, existingSecret, "", logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -120,7 +127,7 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 	return nil
 }
 
-func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, clouds string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
+func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, clouds, cacert string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -136,6 +143,12 @@ func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest
 			}
 		}
 		sLog.Info("creating secret")
+		data := map[string][]byte{rootOpenStackCredsSecretKey: []byte(clouds)}
+		if cacert != "" {
+			// Inject cacert if it was provided
+			data[rootOpenStackCACertKey] = []byte(cacert)
+		}
+
 		secret := &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.SecretRef.Name,
@@ -144,7 +157,7 @@ func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest
 					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 				},
 			},
-			Data: map[string][]byte{rootOpenStackCredsSecretKey: []byte(clouds)},
+			Data: data,
 		}
 
 		err := a.Client.Create(context.TODO(), secret)
@@ -165,6 +178,9 @@ func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	if clouds != "" {
 		existingSecret.Data[rootOpenStackCredsSecretKey] = []byte(clouds)
+	}
+	if cacert != "" {
+		existingSecret.Data[rootOpenStackCACertKey] = []byte(cacert)
 	}
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
@@ -202,7 +218,7 @@ func (a *OpenStackActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) 
 	if _, ok := existingSecret.Data[rootOpenStackCredsSecretKey]; !ok {
 		logger.Warning("secret did not have expected key: " + rootOpenStackCredsSecretKey)
 	} else {
-		logger.Debug("found clouds.yaml in existing secret")
+		logger.Debugf("found %v in existing secret", rootOpenStackCredsSecretKey)
 	}
 
 	return existingSecret, nil
@@ -211,6 +227,11 @@ func (a *OpenStackActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *OpenStackActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.OpenStackCloudCredsSecretName}
+}
+
+// GetCredentialsRootSecretLocation returns the namespace and name where the CACert is stored.
+func (a *OpenStackActuator) GetCACertConfigMapLocation() types.NamespacedName {
+	return types.NamespacedName{Namespace: constants.OpenShiftConfigNamespace, Name: constants.CloudProvderConfigMapName}
 }
 
 func (a *OpenStackActuator) getRootCloudCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (string, error) {
@@ -236,9 +257,33 @@ func (a *OpenStackActuator) getRootCloudCredentialsSecretData(ctx context.Contex
 	}
 
 	clouds = string(keyBytes)
-	logger.Debug("found clouds.yaml in target secret")
+	logger.Debugf("found %v in target secret", rootOpenStackCredsSecretKey)
 
 	return clouds, nil
+}
+
+func (a *OpenStackActuator) getRootCACertData(ctx context.Context, logger log.FieldLogger) (string, error) {
+	caCertConfigMap := &corev1.ConfigMap{}
+	if err := a.Client.Get(ctx, a.GetCACertConfigMapLocation(), caCertConfigMap); err != nil {
+		msg := "unable to fetch cacert configmap"
+		logger.WithError(err).Error(msg)
+		return "", &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("%v: %v", msg, err),
+		}
+	}
+
+	keyBytes, ok := caCertConfigMap.Data[rootOpenStackCACertKey]
+	if !ok {
+		// If the key is not found it means that the cloud doesn't use self-signed certificates
+		// and we don't need this value.
+		return "", nil
+	}
+
+	cacert := string(keyBytes)
+	logger.Debugf("found %v in target configmap", rootOpenStackCACertKey)
+
+	return cacert, nil
 }
 
 // Delete credentials
