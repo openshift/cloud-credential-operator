@@ -76,7 +76,13 @@ $(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/ocp/4.5:cloud
 $(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
 $(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
 
-update: update-codegen
+update: update-vendored-crds update-codegen update-bindata
+
+update-vendored-crds:
+	# copy config CRD from openshift/api
+	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/00-config-crd.yaml
+	# ...and into where we generate bindata from
+	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/cloudcredential_v1_operator_config_crd.yaml
 
 update-codegen: update-codegen-crds
 	./hack/update-codegen.sh

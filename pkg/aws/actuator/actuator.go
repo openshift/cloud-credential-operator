@@ -24,20 +24,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
-
-	configv1 "github.com/openshift/api/config/v1"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -46,6 +38,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 )
 
 const (
@@ -225,19 +226,31 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	} else {
 		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
-		region, err := awsutils.LoadInfrastructureRegion(a.Client, logger)
+
+		// but for the case where the operator mode is non-default, then we will avoid performing any
+		// policy simulations and assume that the passthrough creds must be good enough
+		mode, _, err := utils.GetOperatorConfiguration(a.Client, logger)
 		if err != nil {
 			return true, err
 		}
-		simParams := &ccaws.SimulateParams{
-			Region: region,
-		}
-		goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, simParams, logger)
-		if err != nil {
-			return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
-		}
-		if !goodEnough {
-			return true, nil
+		if mode == operatorv1.CloudCredentialsModePassthrough {
+			logger.Debug("will not perform permissions simulation because operator in mode %q", mode)
+		} else {
+			region, err := awsutils.LoadInfrastructureRegion(a.Client, logger)
+			if err != nil {
+				return true, err
+			}
+			simParams := &ccaws.SimulateParams{
+				Region: region,
+			}
+
+			goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, simParams, logger)
+			if err != nil {
+				return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
+			}
+			if !goodEnough {
+				return true, nil
+			}
 		}
 	}
 

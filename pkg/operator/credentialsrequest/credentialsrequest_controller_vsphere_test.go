@@ -78,6 +78,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "new credentialsrequest passthrough",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredsSecretPassthrough(),
@@ -113,6 +114,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "new credential no root creds available",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
@@ -138,6 +140,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequestWithDeletionTimestamp(t),
@@ -152,6 +155,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "existing cr up to date",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
 				testVSphereCredsSecretPassthrough(),
@@ -172,6 +176,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "existing secret has old secret content",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
 				testVSphereCredsSecretPassthrough(),

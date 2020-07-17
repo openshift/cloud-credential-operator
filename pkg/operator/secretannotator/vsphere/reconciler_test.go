@@ -31,6 +31,7 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
@@ -61,17 +62,28 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		validateAnnotationValue string
 	}{
 		{
-			name:     "operator disabled",
-			existing: []runtime.Object{testSecret(), testOperatorConfigMap("true")},
+			name: "operator disabled",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfigMap("true"),
+				testOperatorConfig(""),
+			},
 		},
 		{
-			name:     "operator enabled",
-			existing: []runtime.Object{testSecret(), testOperatorConfigMap("false")},
+			name: "operator enabled",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfigMap("false"),
+				testOperatorConfig(""),
+			},
 		},
 		{
 			name: "annotate passthrough mode",
 			// right now only passthrough mode is supported so any secret works
-			existing:                []runtime.Object{testSecret()},
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(""),
+			},
 			validateAnnotationValue: constants.PassthroughAnnotation,
 		},
 		{
@@ -146,6 +158,19 @@ func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 			"disabled": disabled,
 		},
 	}
+}
+
+func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
+	conf := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constants.CloudCredOperatorConfig,
+		},
+		Spec: operatorv1.CloudCredentialSpec{
+			CredentialsMode: mode,
+		},
+	}
+
+	return conf
 }
 
 func validateSecretAnnotation(c client.Client, t *testing.T, value string) {
