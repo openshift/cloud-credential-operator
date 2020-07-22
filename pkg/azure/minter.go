@@ -22,9 +22,10 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
-func getAuthorizer(clientID, clientSecret, tenantID, resourceEndpoint string) (autorest.Authorizer, error) {
+func getAuthorizer(clientID, clientSecret, tenantID string, env azure.Environment, resourceEndpoint string) (autorest.Authorizer, error) {
 	config := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
 	config.Resource = resourceEndpoint
+	config.AADEndpoint = env.ActiveDirectoryEndpoint
 	return config.Authorizer()
 }
 
@@ -57,12 +58,12 @@ func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret st
 	if err != nil {
 		return nil, fmt.Errorf("Unable to determine Azure environment: %w", err)
 	}
-	graphAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env.GraphEndpoint)
+	graphAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env, env.GraphEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to construct GraphEndpoint authorizer: %v", err)
 	}
 
-	rmAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env.ResourceManagerEndpoint)
+	rmAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env, env.ResourceManagerEndpoint)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to construct ResourceManagerEndpoint authorizer: %v", err)
 	}
