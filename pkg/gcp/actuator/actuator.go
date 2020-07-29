@@ -27,11 +27,11 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 
 	// GCP packages
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"

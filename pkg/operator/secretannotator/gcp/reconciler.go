@@ -51,7 +51,6 @@ func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler
 		ProjectName:      projectName,
 	}
 
-
 	return r
 }
 

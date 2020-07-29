@@ -27,7 +27,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
@@ -85,7 +84,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 	}{
 		{
 			name:          "no credentials requests",
-			operatorMode: operatorv1.CloudCredentialsModeMint,
+			operatorMode:  operatorv1.CloudCredentialsModeMint,
 			credRequests:  []minterv1.CredentialsRequest{},
 			cloudPlatform: configv1.AWSPlatformType,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
@@ -95,7 +94,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "progressing no errors",
+			name:         "progressing no errors",
 			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -110,7 +109,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "progressing with errors",
+			name:         "progressing with errors",
 			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -127,7 +126,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "progressing with insufficient creds errors",
+			name:         "progressing with insufficient creds errors",
 			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", false, []minterv1.CredentialsRequestCondition{
@@ -148,7 +147,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "provisioned no errors",
+			name:         "provisioned no errors",
 			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -164,7 +163,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 		},
 		{
 			// Implies the credential was initially provisioned but an update is needed and it's failing:
-			name: "provisioned with errors",
+			name:         "provisioned with errors",
 			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -181,7 +180,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "ignore nonAWS credreqs",
+			name:         "ignore nonAWS credreqs",
 			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -197,7 +196,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "ignore nonGCP credreqs",
+			name:         "ignore nonGCP credreqs",
 			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, defaultGCPProviderConfig),
@@ -228,8 +227,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 					testCRCondition(minterv1.CredentialsProvisionFailure, corev1.ConditionTrue),
 				}, nil),
 			},
-			cloudPlatform:    configv1.AWSPlatformType,
-			operatorMode: operatorv1.CloudCredentialsModeManual,
+			cloudPlatform: configv1.AWSPlatformType,
+			operatorMode:  operatorv1.CloudCredentialsModeManual,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, reasonOperatorDisabled),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonOperatorDisabled),

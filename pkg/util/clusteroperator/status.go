@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	msgConfigConflict        = "Conflict between legacy configmap and operator config"
+	msgConfigConflict = "Conflict between legacy configmap and operator config"
 )
 
 /*

@@ -1428,7 +1428,7 @@ const (
 )
 
 var (
-	testPolicy1                  = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+	testPolicy1              = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
 	testPolicyWithConditions = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\",\"Condition\":{\"StringEquals\":{\"aws:userid\":\"testuser\"}}},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
 
 	testTwentyMinuteOldTimestamp = time.Now().Add(-20 * time.Minute)
