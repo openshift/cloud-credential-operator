@@ -283,20 +283,21 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.InsufficientAnnotation {
+	switch cloudCredsSecret.Annotations[constants.AnnotationKey] {
+	case constants.InsufficientAnnotation:
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
 			Message:   msg,
 		}
-	} else if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
+	case constants.PassthroughAnnotation:
 		logger.Debugf("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
 			return err
 		}
-	} else if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.MintAnnotation {
+	case constants.MintAnnotation:
 		logger.Debugf("provisioning with cred minting")
 		err := a.syncMint(ctx, cr, logger)
 		if err != nil {
@@ -307,8 +308,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 				Message:   fmt.Sprintf("%v: %v", msg, err),
 			}
 		}
-	} else {
-		logger.Infof("unknown or missing %s annotation on admin credentials Secret, skipping reconcile", constants.AnnotationKey)
+	default:
+		msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
+		logger.Info(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   msg,
+		}
 	}
 
 	return nil

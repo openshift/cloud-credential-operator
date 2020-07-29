@@ -112,3 +112,11 @@ rules:
   - subjectaccessreviews
   verbs:
   - create
+- apiGroups:
+  - operator.openshift.io
+  resources:
+  - cloudcredentials
+  verbs:
+  - get
+  - list
+  - watch

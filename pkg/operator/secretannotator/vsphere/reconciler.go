@@ -18,10 +18,15 @@ package vsphere
 
 import (
 	"context"
+	"fmt"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -31,10 +36,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
+
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
+	secretutils "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-	log "github.com/sirupsen/logrus"
 )
 
 const (
@@ -81,6 +88,15 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	err = secretutils.WatchCCOConfig(c, types.NamespacedName{
+		Namespace: constants.CloudCredSecretNamespace,
+		Name:      constants.VSphereCloudCredSecretName,
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -92,21 +108,30 @@ func cloudCredSecretObjectCheck(secret metav1.Object) bool {
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 
-	r.Logger.Info("validating cloud cred secret")
-
-	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, r.Logger)
-	if err != nil {
-		r.Logger.WithError(err).Error("error checking if operator is disabled")
-		return reconcile.Result{}, err
-	} else if operatorIsDisabled {
-		r.Logger.Infof("operator disabled in %s ConfigMap", constants.CloudCredOperatorConfigMap)
-		return reconcile.Result{}, err
-	}
-
 	defer func() {
 		dur := time.Since(start)
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
+
+	r.Logger.Info("validating cloud cred secret")
+
+	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, r.Logger)
+	if err != nil {
+		r.Logger.WithError(err).Error("error checking if operator is disabled")
+		return reconcile.Result{}, err
+	}
+	if !utils.IsValidMode(mode) {
+		r.Logger.Errorf("invalid mode of %s set", mode)
+		return reconcile.Result{}, fmt.Errorf("invalide mode of %s set", mode)
+	}
+	if conflict {
+		r.Logger.Error("configuration conflict between legacy configmap and operator config")
+		return reconcile.Result{}, fmt.Errorf("configuration conflict")
+	}
+	if mode == operatorv1.CloudCredentialsModeManual {
+		r.Logger.Infof("operator disabled in %s ConfigMap", constants.CloudCredOperatorConfigMap)
+		return reconcile.Result{}, err
+	}
 
 	secret := &corev1.Secret{}
 	err = r.Get(context.Background(), request.NamespacedName, secret)
@@ -125,6 +150,17 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 }
 
 func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secret) error {
+	// We only support passthrough so make sure the operator mode is either unset or "passthrough"
+	mode, _, err := utils.GetOperatorConfiguration(r.Client, r.Logger)
+	if err != nil {
+		return err
+	}
+	if mode != operatorv1.CloudCredentialsModeDefault && mode != operatorv1.CloudCredentialsModePassthrough {
+		msg := fmt.Sprintf("operator config value of \"%s\" is invalid", mode)
+		r.Logger.Error(msg)
+		return fmt.Errorf(msg)
+	}
+
 	// Check for any expected keys.
 
 	// TODO: Check whether we can mint new creds?

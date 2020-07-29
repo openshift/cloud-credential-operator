@@ -38,7 +38,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
@@ -46,6 +45,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
@@ -85,8 +85,7 @@ func init() {
 }
 
 func TestCredentialsRequestGCPReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -581,6 +580,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				},
 				platformType: configv1.GCPPlatformType,
 			}
+			defer clusteroperator.ClearHandlers()
 			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{

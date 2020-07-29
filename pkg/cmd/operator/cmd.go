@@ -26,11 +26,9 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
-
-	openshiftapiv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -84,15 +82,7 @@ func NewOperator() *cobra.Command {
 			log.Info("registering components")
 
 			// Setup Scheme for all resources
-			log.Info("setting up scheme")
-			if err := apis.AddToScheme(mgr.GetScheme()); err != nil {
-				log.WithError(err).Fatal("unable to add APIs to scheme")
-			}
-
-			// Setup Openshift API scheme:
-			if err := openshiftapiv1.Install(mgr.GetScheme()); err != nil {
-				log.Fatal(err)
-			}
+			util.SetupScheme(mgr.GetScheme())
 
 			// Setup all Controllers
 			log.Info("setting up controller")
