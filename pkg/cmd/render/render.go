@@ -194,7 +194,7 @@ func render() error {
 
 	// need at least the empty dir so the installer bootkube.sh script works as expected
 	if err := os.Mkdir(filepath.Join(ccoRenderDir, bootstrapManifestsDir), 0775); err != nil {
-		errors.Wrap(err, "error creating bootstrap-manifests directory")
+		return errors.Wrap(err, "error creating bootstrap-manifests directory")
 	}
 	if effectiveMode != operatorv1.CloudCredentialsModeManual {
 		log.Info("Rendering static pod")
