@@ -8,20 +8,23 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 const (
 	cloudCredClusterOperator = "cloud-credential"
 	reasonOperatorDisabled   = "OperatorDisabledByAdmin"
 	msgOperatorDisabled      = "Credential minting is disabled by cluster admin"
+	msgConfigConflict        = "Conflict between legacy configmap and operator config"
 )
 
 // StatusHandler produces conditions and related objects to be reflected
@@ -35,6 +38,11 @@ type StatusHandler interface {
 var (
 	statusHandlers = []StatusHandler{}
 )
+
+// ClearHandlers so that test cases don't endlessly add handlers
+func ClearHandlers() {
+	statusHandlers = []StatusHandler{}
+}
 
 // AddStatusHandler registers a StatusHandler that will be called whenever
 // an update to the ClusterOperator status is requested
@@ -88,12 +96,12 @@ func SyncStatus(client client.Client, logger log.FieldLogger) error {
 	co.Status.Versions = computeClusterOperatorVersions()
 
 	// check if the operator is disabled and reflect that in the Available condition
-	operatorIsDisabled, err := utils.IsOperatorDisabled(client, logger)
+	mode, _, err := utils.GetOperatorConfiguration(client, logger)
 	if err != nil {
 		return fmt.Errorf("error checking if operator is disabled: %v", err)
 	}
-	if operatorIsDisabled {
-		available := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorAvailable)
+	if mode == operatorv1.CloudCredentialsModeManual {
+		available, _ := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorAvailable)
 		if available.Status == configv1.ConditionTrue {
 			available.Reason = reasonOperatorDisabled
 			available.Message = msgOperatorDisabled
@@ -109,7 +117,7 @@ func SyncStatus(client client.Client, logger log.FieldLogger) error {
 			"old": oldVersions,
 			"new": co.Status.Versions,
 		}).Info("version has changed, updating progressing condition lastTransitionTime")
-		progressing := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
+		progressing, _ := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
 		// We know this should be there.
 		progressing.LastTransitionTime = metav1.Now()
 	}
@@ -139,16 +147,16 @@ func SyncStatus(client client.Client, logger log.FieldLogger) error {
 }
 
 func mergeConditions(existing []configv1.ClusterOperatorStatusCondition, new []configv1.ClusterOperatorStatusCondition, logger log.FieldLogger, handlerName string) []configv1.ClusterOperatorStatusCondition {
-	conditions := []configv1.ClusterOperatorStatusCondition{}
 	for _, newCondition := range new {
-		existingCondition := findClusterOperatorCondition(existing, newCondition.Type)
+		existingCondition, index := findClusterOperatorCondition(existing, newCondition.Type)
 		if existingCondition == nil {
-			conditions = append(conditions, newCondition)
+			existing = append(existing, newCondition)
 		} else {
-			logger.Infof("condition already set for type %s by a previous handler, the following condition from handler %s will be dropped: %v", newCondition.Type, handlerName, newCondition)
+			logger.Infof("condition already set for type %s by a previous handler, the new condition from handler %s will be accepted: %v", newCondition.Type, handlerName, newCondition)
+			existing[index] = newCondition
 		}
 	}
-	return conditions
+	return existing
 }
 
 func defaultUnsetConditions(existing []configv1.ClusterOperatorStatusCondition) []configv1.ClusterOperatorStatusCondition {
@@ -159,7 +167,7 @@ func defaultUnsetConditions(existing []configv1.ClusterOperatorStatusCondition) 
 		configv1.OperatorProgressing,
 		configv1.OperatorUpgradeable,
 	} {
-		existingCondition := findClusterOperatorCondition(existing, conditionType)
+		existingCondition, _ := findClusterOperatorCondition(existing, conditionType)
 		if existingCondition != nil {
 			conditions = append(conditions, *existingCondition)
 		} else {
@@ -196,19 +204,19 @@ func computeClusterOperatorVersions() []configv1.OperandVersion {
 
 // findClusterOperatorCondition iterates all conditions on a ClusterOperator looking for the
 // specified condition type. If none exists nil will be returned.
-func findClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCondition, conditionType configv1.ClusterStatusConditionType) *configv1.ClusterOperatorStatusCondition {
+func findClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCondition, conditionType configv1.ClusterStatusConditionType) (*configv1.ClusterOperatorStatusCondition, int) {
 	for i, condition := range conditions {
 		if condition.Type == conditionType {
-			return &conditions[i]
+			return &conditions[i], i
 		}
 	}
-	return nil
+	return nil, 0
 }
 
 func setLastTransitionTime(oldConditions []configv1.ClusterOperatorStatusCondition, newConditions []configv1.ClusterOperatorStatusCondition) {
 	for i := range newConditions {
 		newCondition := &newConditions[i]
-		oldCondition := findClusterOperatorCondition(oldConditions, newCondition.Type)
+		oldCondition, _ := findClusterOperatorCondition(oldConditions, newCondition.Type)
 		if oldCondition == nil || !ConditionEqual(*oldCondition, *newCondition) {
 			newCondition.LastTransitionTime = metav1.Now()
 		} else {
