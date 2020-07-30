@@ -38,7 +38,6 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 	"github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
@@ -306,13 +305,13 @@ func testVSphereCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 
 func testVSphereCredsSecretPassthrough() *corev1.Secret {
 	s := testVSphereCredsSecret()
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
 
 func testVSphereCredsSecret() *corev1.Secret {
 	s := testSecret("kube-system", constants.VSphereCloudCredSecretName, testVSphereCloudCredsSecretData)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.MintAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.MintAnnotation
 
 	return s
 }
@@ -323,7 +322,7 @@ func testSecret(namespace, name string, secretData map[string][]byte) *corev1.Se
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.PassthroughAnnotation,
+				constants.AnnotationKey: constants.PassthroughAnnotation,
 			},
 		},
 		Data: secretData,

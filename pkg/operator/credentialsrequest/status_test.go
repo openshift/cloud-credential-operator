@@ -39,6 +39,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
@@ -80,6 +81,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 		credRequests       []minterv1.CredentialsRequest
 		cloudPlatform      configv1.PlatformType
 		operatorMode       operatorv1.CloudCredentialsMode
+		configConflict     bool
 		expectedConditions []configv1.ClusterOperatorStatusCondition
 	}{
 		{
@@ -235,6 +237,23 @@ func TestClusterOperatorStatus(t *testing.T) {
 				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonOperatorDisabled),
 			},
 		},
+		{
+			name: "operator configmap vs config conflict",
+			credRequests: []minterv1.CredentialsRequest{
+				testCredentialsRequestWithStatus("cred1", false, []minterv1.CredentialsRequestCondition{}, nil),
+				testCredentialsRequestWithStatus("cred2", false, []minterv1.CredentialsRequestCondition{
+					testCRCondition(minterv1.CredentialsProvisionFailure, corev1.ConditionTrue),
+				}, nil),
+			},
+			cloudPlatform:  configv1.AWSPlatformType,
+			operatorMode:   operatorv1.CloudCredentialsModeManual,
+			configConflict: true,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{
+				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, reasonOperatorDisabled),
+				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonOperatorDisabled),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, constants.StatusModeMismatch),
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -242,8 +261,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			// TODO: add tests for config conflict
-			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests, test.cloudPlatform, test.operatorMode, false, log.WithField("test", test.name))
+			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests,
+				test.cloudPlatform, test.operatorMode, test.configConflict, log.WithField("test", test.name))
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
 				if assert.NotNil(t, c) {

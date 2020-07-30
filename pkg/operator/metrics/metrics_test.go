@@ -10,7 +10,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 var (

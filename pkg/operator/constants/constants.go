@@ -1,5 +1,7 @@
 package constants
 
+import minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+
 // CredentialsMode enumerates the possible modes of operation for CCO
 type CredentialsMode string
 
@@ -105,5 +107,16 @@ var (
 		ModeManual,
 		ModeDegraded,
 		ModeUnknown,
+	}
+)
+
+var (
+	// FailureConditionTypes is a list of all conditions where the overall controller status would not
+	// be healthy.
+	FailureConditionTypes = []minterv1.CredentialsRequestConditionType{
+		minterv1.InsufficientCloudCredentials,
+		minterv1.MissingTargetNamespace,
+		minterv1.CredentialsProvisionFailure,
+		minterv1.CredentialsDeprovisionFailure,
 	}
 )

@@ -23,6 +23,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,11 +41,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
-	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	anngcp "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 
@@ -293,7 +290,7 @@ func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
 	conf := &operatorv1.CloudCredential{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: constants2.CloudCredOperatorConfig,
+			Name: constants.CloudCredOperatorConfig,
 		},
 		Spec: operatorv1.CloudCredentialSpec{
 			CredentialsMode: mode,

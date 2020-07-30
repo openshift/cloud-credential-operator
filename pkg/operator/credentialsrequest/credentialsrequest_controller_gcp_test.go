@@ -44,7 +44,7 @@ import (
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
@@ -708,7 +708,7 @@ func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReq
 
 func testGCPCredsSecretPassthrough(namespace, name, jsonAUTH string) *corev1.Secret {
 	s := testGCPCredsSecret(namespace, name, jsonAUTH)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
 
@@ -718,7 +718,7 @@ func testGCPCredsSecret(namespace, name, jsonAUTH string) *corev1.Secret {
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+				constants.AnnotationKey: constants.MintAnnotation,
 			},
 		},
 		Data: map[string][]byte{

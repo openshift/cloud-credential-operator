@@ -25,10 +25,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ccazure "github.com/openshift/cloud-credential-operator/pkg/azure"
-	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	. "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure/mock"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
@@ -148,7 +147,7 @@ func getInputSecret() *corev1.Secret {
 func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
 	conf := &operatorv1.CloudCredential{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: constants2.CloudCredOperatorConfig,
+			Name: constants.CloudCredOperatorConfig,
 		},
 		Spec: operatorv1.CloudCredentialSpec{
 			CredentialsMode: mode,

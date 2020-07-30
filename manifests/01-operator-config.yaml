@@ -4,3 +4,5 @@ metadata:
   name: cluster
   annotations:
     release.openshift.io/create-only: "true"
+spec:
+  credentialsMode: ""
