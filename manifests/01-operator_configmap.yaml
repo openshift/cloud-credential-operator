@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: cloud-credential-operator-config
-  namespace: openshift-cloud-credential-operator
-  annotations:
-    release.openshift.io/create-only: "true"
-data:
-  disabled: "false"
