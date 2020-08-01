@@ -264,7 +264,8 @@ func TestClusterOperatorVersion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			existingCO := testClusterOperator("4.0.0-5", twentyHoursAgo)
-			existing := []runtime.Object{existingCO}
+			operatorConfig := testOperatorConfig("")
+			existing := []runtime.Object{existingCO, operatorConfig}
 			fakeClient := fake.NewFakeClient(existing...)
 
 			rcr := &ReconcileCredentialsRequest{

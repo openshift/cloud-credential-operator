@@ -149,10 +149,9 @@ func GenerateNameWithFieldLimits(infraName string, infraNameMaxLen int, crName s
 	return fmt.Sprintf("%s%s", infraPrefix, crName), nil
 }
 
-// IsOperatorDisabledViaConfigmap checks the cloud-credential-operator-config ConfigMap for a
-// "disabled" property set to true. If the configmap or property do not exist, we assume
-// false and continue normal operation. This should be used in all controllers to shutdown
-// functionality in environments where admins want to manage their credentials themselves.
+// isOperatorDisabledViaConfigmap checks the cloud-credential-operator-config ConfigMap for a
+// "disabled" property set to true. If the configmap or property does not exist, we assume
+// false and continue normal operation.
 // DEPRECATED (and unexported), use GetOperatorConfiguration to determine disabled state.
 func isOperatorDisabledViaConfigmap(kubeClient client.Client, logger log.FieldLogger) (bool, error) {
 	cm, err := GetLegacyConfigMap(kubeClient)
@@ -181,14 +180,14 @@ func GetLegacyConfigMap(kubeClient client.Client) (*corev1.ConfigMap, error) {
 // and whether there is a conflict between the legacy ConfigMap and CCO config (in the even of a conflict, the
 // operator mode will be reported to reflect the actual value in the operator config).
 func GetOperatorConfiguration(kubeClient client.Client, logger log.FieldLogger) (
-	operatorMode operatorv1.CloudCredentialsMode,
+	effectiveOperatorMode operatorv1.CloudCredentialsMode,
 	configurationConflict bool,
 	err error) {
+	var operatorMode operatorv1.CloudCredentialsMode
 	operatorMode, err = getOperatorMode(kubeClient, logger)
 	if err != nil {
 		return
 	}
-	disabledViaOperatorConfig := operatorMode == operatorv1.CloudCredentialsModeManual
 
 	var disabledViaConfigMap bool
 	disabledViaConfigMap, err = isOperatorDisabledViaConfigmap(kubeClient, logger)
@@ -196,26 +195,35 @@ func GetOperatorConfiguration(kubeClient client.Client, logger log.FieldLogger) 
 		return
 	}
 
-	if operatorMode == operatorv1.CloudCredentialsModeDefault {
-		// if no mode is set, then only the value in the configmap can end up disabling CCO
-		// so report back that the operator mode is manual (via the configmap setting)
-		if disabledViaConfigMap {
-			operatorMode = operatorv1.CloudCredentialsModeManual
+	effectiveOperatorMode, configurationConflict = GetEffectiveOperatorMode(disabledViaConfigMap, operatorMode)
+	if configurationConflict {
+		log.Errorf("legacy configmap disabled set to %v conflicts with operator CR mode of %s",
+			disabledViaConfigMap, operatorMode)
+	}
+
+	return
+}
+
+// GetEffectiveOperatorMode will take the legacy configmap and the value in the operator config, and return
+// the effective CCO mode and whether there is a conflict between the legacy and operator config values.
+func GetEffectiveOperatorMode(configMapDisabledValue bool, operatorConfigMode operatorv1.CloudCredentialsMode) (operatorv1.CloudCredentialsMode, bool) {
+
+	// if no mode is set, then only the value in the configmap can end up disabling CCO
+	if operatorConfigMode == "" {
+		if configMapDisabledValue {
+			return operatorv1.CloudCredentialsModeManual, false
 		}
-		return
+		return operatorConfigMode, false
 	}
 
 	// else see if there is a disconnect between the operator mode and the
 	// opt-in value of 'disabled: "true"' in the ConfigMap
-	if disabledViaConfigMap && disabledViaConfigMap != disabledViaOperatorConfig {
-		log.Errorf("legacy configmap disabled set to %v conflict with operator CR mode of %s",
-			disabledViaConfigMap, operatorMode)
-		// Allow the actual CCO config to be returned as that should take
-		// precedence for the purpose of reporting metrics data, but indicate the conflict.
-		configurationConflict = true
+	disabledViaOperatorConfig := operatorConfigMode == operatorv1.CloudCredentialsModeManual
+	if configMapDisabledValue && !disabledViaOperatorConfig {
+		return operatorConfigMode, true
 	}
 
-	return
+	return operatorConfigMode, false
 
 }
 
@@ -227,14 +235,15 @@ func getOperatorMode(kubeClient client.Client, logger log.FieldLogger) (operator
 			Name: constants.CloudCredOperatorConfig,
 		}, conf)
 	if err != nil {
-		// SHOULD WE BE WATCHING FOR THIS ERROR???
+		// TODO: is it valuable to watch for this error, or just return the error
+		// at the bottom of this block???
 		if metaerrors.IsNoMatchError(err) {
 			logger.WithError(err).Debug("no config CRD found")
-			return operatorv1.CloudCredentialsModeDefault, nil
+			return "", err
 		}
 		if errors.IsNotFound(err) {
-			logger.Debugf("%s CCO operator config does not exist, assuming default behavior", constants.CloudCredOperatorConfig)
-			return operatorv1.CloudCredentialsModeDefault, nil
+			logger.Debugf("%s CCO operator config does not exist", constants.CloudCredOperatorConfig)
+			return "", err
 		}
 		return "", err
 	}

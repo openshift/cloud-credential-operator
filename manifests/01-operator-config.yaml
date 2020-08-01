@@ -1,0 +1,8 @@
+apiVersion: operator.openshift.io/v1
+kind: CloudCredential
+metadata:
+  name: cluster
+  annotations:
+    release.openshift.io/create-only: "true"
+spec:
+  credentialsMode: ""
