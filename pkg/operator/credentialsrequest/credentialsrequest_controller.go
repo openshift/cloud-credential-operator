@@ -337,6 +337,7 @@ func isAdminCredSecret(namespace, secretName string) bool {
 			secretName == constants.GCPCloudCredSecretName ||
 			secretName == constants.OpenStackCloudCredsSecretName ||
 			secretName == constants.OvirtCloudCredsSecretName ||
+			secretName == constants.KubevirtCloudCredSecretName ||
 			secretName == constants.VSphereCloudCredSecretName {
 			log.WithField("secret", secretName).WithField("namespace", namespace).Info("observed admin cloud credential secret event")
 			return true
@@ -787,6 +788,8 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 		return cloudType == reflect.TypeOf(minterv1.OvirtProviderSpec{}).Name(), nil
 	case configv1.VSpherePlatformType:
 		return cloudType == reflect.TypeOf(minterv1.VSphereProviderSpec{}).Name(), nil
+	case configv1.KubevirtPlatformType:
+		return cloudType == reflect.TypeOf(minterv1.KubevirtProviderSpec{}).Name(), nil
 	default:
 		return false, fmt.Errorf("unsupported platorm type: %v", clusterCloudPlatform)
 	}

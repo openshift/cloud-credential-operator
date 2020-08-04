@@ -58,6 +58,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&AzureProviderStatus{}, &AzureProviderSpec{},
 		&GCPProviderStatus{}, &GCPProviderSpec{},
 		&VSphereProviderStatus{}, &VSphereProviderSpec{},
+		&KubevirtProviderStatus{}, &KubevirtProviderSpec{},
 	)
 
 	return nil
