@@ -23,7 +23,7 @@ require (
 	github.com/googleapis/gnostic v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.10 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
-	github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
+	github.com/openshift/api v0.0.0-20201012140924-16436fa6166b
 	github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7
 	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
 	github.com/openshift/library-go v0.0.0-20200911100307-610c6e9e90b8
