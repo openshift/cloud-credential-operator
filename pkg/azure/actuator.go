@@ -35,6 +35,7 @@ import (
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 

@@ -31,6 +31,7 @@ import (
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 
 	// GCP packages
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"

@@ -20,6 +20,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 const (
