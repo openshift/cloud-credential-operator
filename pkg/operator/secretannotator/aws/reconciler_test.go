@@ -95,8 +95,11 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		validateAnnotationValue string
 	}{
 		{
-			name:     "cred minter mode",
-			existing: []runtime.Object{testSecret()},
+			name: "cred minter mode",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(""),
+			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
@@ -107,8 +110,12 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			validateAnnotationValue: constants.MintAnnotation,
 		},
 		{
-			name:     "operator disabled via configmap",
-			existing: []runtime.Object{testSecret(), testOperatorConfigMap("true")},
+			name: "operator disabled via configmap",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfigMap("true"),
+				testOperatorConfig(""),
+			},
 		},
 		{
 			name: "operator disabled",
@@ -118,8 +125,11 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			},
 		},
 		{
-			name:     "detect root user creds",
-			existing: []runtime.Object{testSecret()},
+			name: "detect root user creds",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(""),
+			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetRootUser(mockAWSClient)
@@ -129,8 +139,11 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			expectErr: true,
 		},
 		{
-			name:     "cred passthrough mode",
-			existing: []runtime.Object{testSecret()},
+			name: "cred passthrough mode",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(""),
+			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
@@ -144,8 +157,11 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			validateAnnotationValue: constants.PassthroughAnnotation,
 		},
 		{
-			name:     "cred passthrough mode wrong region permission",
-			existing: []runtime.Object{testSecret()},
+			name: "cred passthrough mode wrong region permission",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(""),
+			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
@@ -159,8 +175,11 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			validateAnnotationValue: constants.InsufficientAnnotation,
 		},
 		{
-			name:     "useless creds",
-			existing: []runtime.Object{testSecret()},
+			name: "useless creds",
+			existing: []runtime.Object{
+				testSecret(),
+				testOperatorConfig(""),
+			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
@@ -174,22 +193,28 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			validateAnnotationValue: constants.InsufficientAnnotation,
 		},
 		{
-			name:      "missing secret",
+			name: "missing secret",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+			},
 			expectErr: true,
 		},
 		{
 			name:      "secret missing key",
 			expectErr: true,
-			existing: []runtime.Object{&corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      testSecretName,
-					Namespace: testNamespace,
+			existing: []runtime.Object{
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testSecretName,
+						Namespace: testNamespace,
+					},
+					Data: map[string][]byte{
+						annaws.AwsAccessKeyName:     []byte(testAWSAccessKeyID),
+						"not_aws_secret_access_key": []byte(testAWSSecretAccessKey),
+					},
 				},
-				Data: map[string][]byte{
-					annaws.AwsAccessKeyName:     []byte(testAWSAccessKeyID),
-					"not_aws_secret_access_key": []byte(testAWSSecretAccessKey),
-				},
-			}},
+				testOperatorConfig(""),
+			},
 		},
 		{
 			name: "annotation matches forced mode",
@@ -204,6 +229,13 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing: []runtime.Object{
 				testSecret(),
 				testOperatorConfig("notARealMode"),
+			},
+			expectErr: true,
+		},
+		{
+			name: "error on missing config CR",
+			existing: []runtime.Object{
+				testSecret(),
 			},
 			expectErr: true,
 		},

@@ -17,11 +17,15 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	ccazure "github.com/openshift/cloud-credential-operator/pkg/azure"
+	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	. "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
@@ -81,7 +85,9 @@ func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			base := getInputSecret()
-			fakeClient := fake.NewFakeClient(base)
+			operatorConfig := testOperatorConfig("")
+			infra := &configv1.Infrastructure{ObjectMeta: metav1.ObjectMeta{Name: "cluster"}}
+			fakeClient := fake.NewFakeClient(base, operatorConfig, infra)
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			mockAdalClient := mock.NewMockAdalService(mockCtrl)
@@ -137,6 +143,19 @@ func getInputSecret() *corev1.Secret {
 		},
 	}
 
+}
+
+func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
+	conf := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constants2.CloudCredOperatorConfig,
+		},
+		Spec: operatorv1.CloudCredentialSpec{
+			CredentialsMode: mode,
+		},
+	}
+
+	return conf
 }
 
 func setupAdalMock(r *mock.MockAdalServiceMockRecorder, roles []string) {
