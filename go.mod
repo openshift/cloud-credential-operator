@@ -17,7 +17,7 @@ require (
 	github.com/golang/mock v1.4.3
 	github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
 	github.com/openshift/api v0.0.0-20200210091934-a0e53e94816b
-	github.com/openshift/build-machinery-go v0.0.0-20200211121458-5e3d6e570160
+	github.com/openshift/build-machinery-go v0.0.0-20200424080330-082bf86082cc
 	github.com/prometheus/client_golang v1.5.1
 	github.com/satori/go.uuid v1.2.0
 	github.com/sirupsen/logrus v1.5.0
@@ -29,10 +29,12 @@ require (
 	google.golang.org/api v0.21.0
 	google.golang.org/genproto v0.0.0-20200406120821-33397c535dc2
 	google.golang.org/grpc v1.28.0
-	k8s.io/api v0.17.2
-	k8s.io/apimachinery v0.17.2
+	k8s.io/api v0.18.3
+	k8s.io/apimachinery v0.18.3
 	k8s.io/client-go v0.17.2
 	sigs.k8s.io/controller-runtime v0.5.2
 )
 
 replace github.com/jteeuwen/go-bindata => github.com/jteeuwen/go-bindata v3.0.8-0.20151023091102-a0ff2567cfb7+incompatible
+
+replace github.com/openshift/api => github.com/dgoodwin/api v0.0.0-20200805170921-f6390b450d4e
