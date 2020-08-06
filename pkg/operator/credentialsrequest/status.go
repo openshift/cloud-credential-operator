@@ -30,7 +30,7 @@ const (
 	cloudCredClusterOperator        = "cloud-credential"
 	cloudCredOperatorNamespace      = "openshift-cloud-credential-operator"
 	reasonCredentialsFailing        = "CredentialsFailing"
-	reasonOperatorStateError = "OperatorStateError"
+	reasonOperatorStateError        = "OperatorStateError"
 	reasonNoCredentialsFailing      = "NoCredentialsFailing"
 	reasonReconciling               = "Reconciling"
 	reasonReconcilingComplete       = "ReconcilingComplete"
@@ -333,10 +333,10 @@ func buildExpectedRelatedObjects(credRequests []minterv1.CredentialsRequest) []c
 		})
 	}
 	related = append(related, configv1.ObjectReference{
-			Group:    operatorv1.GroupName,
-			Resource: "CloudCredentials",
-			Name:     constants2.CloudCredOperatorConfig,
-		})
+		Group:    operatorv1.GroupName,
+		Resource: "CloudCredentials",
+		Name:     constants2.CloudCredOperatorConfig,
+	})
 
 	return related
 }
