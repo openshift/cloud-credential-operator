@@ -40,6 +40,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
+	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 
@@ -310,7 +311,7 @@ func mockListPassthroughServicesEnabledSuccess(mockGCPClient *mockgcp.MockClient
 func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
 	conf := &operatorv1.CloudCredential{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: constants.CloudCredOperatorConfig,
+			Name: constants2.CloudCredOperatorConfig,
 		},
 		Spec: operatorv1.CloudCredentialSpec{
 			CredentialsMode: mode,

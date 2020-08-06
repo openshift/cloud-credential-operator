@@ -23,13 +23,12 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/status"
 	secretutils "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 )
 
 const (
@@ -47,24 +46,22 @@ func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler
 	c := mgr.GetClient()
 	r := &ReconcileCloudCredSecret{
 		Client:           c,
-		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
+		Logger:           log.WithField("controller", constants2.SecretAnnotatorControllerName),
 		GCPClientBuilder: ccgcp.NewClient,
 		ProjectName:      projectName,
 	}
 
-	s := status.NewSecretStatusHandler(c)
-	clusteroperator.AddStatusHandler(s)
 
 	return r
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants.GCPCloudCredSecretName
+	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants2.GCPCloudCredSecretName
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(constants2.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -88,7 +85,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	err = secretutils.WatchCCOConfig(c, types.NamespacedName{
 		Namespace: constants.CloudCredSecretNamespace,
-		Name:      constants.GCPCloudCredSecretName,
+		Name:      constants2.GCPCloudCredSecretName,
 	})
 	if err != nil {
 		return err
@@ -119,15 +116,6 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 	defer func() {
 		dur := time.Since(start)
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
-	}()
-
-	defer func() {
-		if err := status.SyncOperatorStatus(r.Client); err != nil {
-			r.Logger.WithError(err).Errorf("failed to sync operator status")
-			if returnErr == nil {
-				returnErr = err
-			}
-		}
 	}()
 
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, r.Logger)

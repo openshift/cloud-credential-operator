@@ -43,6 +43,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 
 	annaws "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
@@ -247,7 +248,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 			_, err := rcc.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
-					Name:      constants.AWSCloudCredSecretName,
+					Name:      constants2.AWSCloudCredSecretName,
 					Namespace: constants.CloudCredSecretNamespace,
 				},
 			})
@@ -266,7 +267,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 func testSecret() *corev1.Secret {
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.AWSCloudCredSecretName,
+			Name:      constants2.AWSCloudCredSecretName,
 			Namespace: constants.CloudCredSecretNamespace,
 		},
 		Data: map[string][]byte{
@@ -292,7 +293,7 @@ func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
 	conf := &operatorv1.CloudCredential{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: constants.CloudCredOperatorConfig,
+			Name: constants2.CloudCredOperatorConfig,
 		},
 		Spec: operatorv1.CloudCredentialSpec{
 			CredentialsMode: mode,
@@ -389,7 +390,7 @@ func validateAnnotation(t *testing.T, secret *corev1.Secret, annotation string) 
 
 func getCredSecret(c client.Client) *corev1.Secret {
 	secret := &corev1.Secret{}
-	if err := c.Get(context.TODO(), client.ObjectKey{Name: constants.AWSCloudCredSecretName, Namespace: constants.CloudCredSecretNamespace}, secret); err != nil {
+	if err := c.Get(context.TODO(), client.ObjectKey{Name: constants2.AWSCloudCredSecretName, Namespace: constants.CloudCredSecretNamespace}, secret); err != nil {
 		return nil
 	}
 	return secret

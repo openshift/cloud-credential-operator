@@ -37,6 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
@@ -45,10 +48,6 @@ import (
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
-
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 )
 
 const (
@@ -579,8 +578,6 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				},
 				platformType: configv1.GCPPlatformType,
 			}
-			defer clusteroperator.ClearHandlers()
-			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{

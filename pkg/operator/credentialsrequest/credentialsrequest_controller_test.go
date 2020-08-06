@@ -40,6 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/iam"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
@@ -48,11 +52,6 @@ import (
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/iam"
 )
 
 var c client.Client
@@ -1104,9 +1103,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				},
 				platformType: configv1.AWSPlatformType,
 			}
-			// make sure we clear this test case's handler
-			defer clusteroperator.ClearHandlers()
-			clusteroperator.AddStatusHandler(rcr)
 
 			_, err = rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{

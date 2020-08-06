@@ -37,11 +37,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
-	vsphereconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/vsphere"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 	"github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 )
 
@@ -207,8 +206,6 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				},
 				platformType: configv1.VSpherePlatformType,
 			}
-			defer clusteroperator.ClearHandlers()
-			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -309,7 +306,7 @@ func testVSphereCredsSecretPassthrough() *corev1.Secret {
 }
 
 func testVSphereCredsSecret() *corev1.Secret {
-	s := testSecret("kube-system", vsphereconst.VSphereCloudCredSecretName, testVSphereCloudCredsSecretData)
+	s := testSecret("kube-system", constants.VSphereCloudCredSecretName, testVSphereCloudCredsSecretData)
 	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.MintAnnotation
 
 	return s

@@ -38,6 +38,7 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	secretutils "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/utils"
@@ -46,10 +47,6 @@ import (
 
 const (
 	controllerName = "secretannotator"
-
-	// VSphereCloudCredSecretName is the name of the secret where credentials
-	// for vSphere are stored.
-	VSphereCloudCredSecretName = "vsphere-creds"
 )
 
 var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
@@ -95,7 +92,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	err = secretutils.WatchCCOConfig(c, types.NamespacedName{
 		Namespace: constants.CloudCredSecretNamespace,
-		Name:      constants.VSphereCloudCredSecretName,
+		Name:      constants2.VSphereCloudCredSecretName,
 	})
 	if err != nil {
 		return err
@@ -105,7 +102,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == VSphereCloudCredSecretName
+	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants2.VSphereCloudCredSecretName
 }
 
 // Reconcile handles annotating the cloud cred secret.
@@ -133,7 +130,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		return reconcile.Result{}, fmt.Errorf("configuration conflict")
 	}
 	if mode == operatorv1.CloudCredentialsModeManual {
-		r.Logger.Infof("operator disabled in %s ConfigMap", constants.CloudCredOperatorConfigMap)
+		r.Logger.Infof("operator disabled in %s ConfigMap", constants2.CloudCredOperatorConfigMap)
 		return reconcile.Result{}, err
 	}
 
