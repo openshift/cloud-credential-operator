@@ -17,8 +17,9 @@ limitations under the License.
 package azure
 
 import (
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	corev1 "k8s.io/api/core/v1"
+
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 type secret struct {
@@ -30,7 +31,7 @@ func (s *secret) HasAnnotation() bool {
 		return false
 	}
 
-	if _, ok := s.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
+	if _, ok := s.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		return false
 	}
 

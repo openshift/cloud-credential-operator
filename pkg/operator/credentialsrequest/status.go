@@ -14,8 +14,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	constants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
@@ -196,11 +195,11 @@ func computeStatusConditions(
 	// shouldn't happen with the server-side enforcement of the CRDs enum specification
 	if !utils.IsValidMode(mode) {
 		degradedCondition.Status = configv1.ConditionTrue
-		degradedCondition.Reason = constants2.StatusModeInvalid
+		degradedCondition.Reason = constants.StatusModeInvalid
 		degradedCondition.Message = fmt.Sprintf("operator mode of %s is invalid", mode)
 	} else if configConflict {
 		degradedCondition.Status = configv1.ConditionTrue
-		degradedCondition.Reason = constants2.StatusModeMismatch
+		degradedCondition.Reason = constants.StatusModeMismatch
 		degradedCondition.Message = fmt.Sprintf("legacy configmap disabled setting conflicts with operator config mode of %s",
 			mode)
 	} else if mode == operatorv1.CloudCredentialsModeManual {
@@ -329,7 +328,7 @@ func buildExpectedRelatedObjects(credRequests []minterv1.CredentialsRequest) []c
 	related = append(related, configv1.ObjectReference{
 		Group:    operatorv1.GroupName,
 		Resource: "CloudCredentials",
-		Name:     constants2.CloudCredOperatorConfig,
+		Name:     constants.CloudCredOperatorConfig,
 	})
 	sort.SliceStable(related, func(i, j int) bool {
 		if related[i].Namespace < related[j].Namespace {

@@ -23,7 +23,8 @@ import (
 	openshiftapiv1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -79,7 +80,7 @@ var (
 			Name:      azure.RootSecretName,
 			Namespace: azure.RootSecretNamespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.PassthroughAnnotation,
+				constants.AnnotationKey: constants.PassthroughAnnotation,
 			},
 		},
 		Data: map[string][]byte{
@@ -98,7 +99,7 @@ var (
 			Name:      azure.RootSecretName,
 			Namespace: azure.RootSecretNamespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: "blah",
+				constants.AnnotationKey: "blah",
 			},
 		},
 	}

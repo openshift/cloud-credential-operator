@@ -26,8 +26,8 @@ import (
 	"golang.org/x/time/rate"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"

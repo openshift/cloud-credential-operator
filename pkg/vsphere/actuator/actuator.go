@@ -23,8 +23,8 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -185,7 +185,7 @@ func (a *VSphereActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequ
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.InsufficientAnnotation {
+	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.InsufficientAnnotation {
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
@@ -194,7 +194,7 @@ func (a *VSphereActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequ
 		}
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
+	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
 		logger.Debugf("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
@@ -335,7 +335,7 @@ func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secr
 
 func (a *VSphereActuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, types.NamespacedName{Name: cloudCredsSecretName, Namespace: annotatorconst.CloudCredSecretNamespace}, cloudCredSecret); err != nil {
+	if err := a.Client.Get(ctx, types.NamespacedName{Name: cloudCredsSecretName, Namespace: constants.CloudCredSecretNamespace}, cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -345,7 +345,7 @@ func (a *VSphereActuator) getCloudCredentialsSecret(ctx context.Context, logger 
 	}
 
 	if !isSecretAnnotated(cloudCredSecret) {
-		logger.WithField("secret", fmt.Sprintf("%s/%s", annotatorconst.CloudCredSecretNamespace, cloudCredsSecretName)).Error("cloud cred secret not yet annotated")
+		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, cloudCredsSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
@@ -360,7 +360,7 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 		return false
 	}
 
-	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		return false
 	}
 

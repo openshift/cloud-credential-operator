@@ -45,7 +45,6 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
@@ -951,7 +950,7 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 		return false
 	}
 
-	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		return false
 	}
 

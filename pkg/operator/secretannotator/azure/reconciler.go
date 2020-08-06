@@ -23,9 +23,8 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
-	constants2 "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	secretutils "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 
@@ -54,7 +53,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	c := mgr.GetClient()
 	r := &ReconcileCloudCredSecret{
 		Client: c,
-		Logger: log.WithField("controller", constants2.SecretAnnotatorControllerName),
+		Logger: log.WithField("controller", constants.SecretAnnotatorControllerName),
 		Adal:   &adalService{},
 	}
 
@@ -63,7 +62,7 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants2.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(constants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -87,14 +86,14 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	secretutils.WatchCCOConfig(c, types.NamespacedName{
 		Namespace: constants.CloudCredSecretNamespace,
-		Name:      constants2.AzureCloudCredSecretName,
+		Name:      constants.AzureCloudCredSecretName,
 	})
 
 	return nil
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants2.AzureCloudCredSecretName
+	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants.AzureCloudCredSecretName
 }
 
 func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnResult reconcile.Result, returnErr error) {
