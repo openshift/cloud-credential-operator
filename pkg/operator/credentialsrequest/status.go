@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -86,6 +87,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	if !clusteroperator.ConditionsEqual(oldConditions, co.Status.Conditions) ||
 		!reflect.DeepEqual(oldVersions, co.Status.Versions) ||
 		!reflect.DeepEqual(oldRelatedObjects, co.Status.RelatedObjects) {
+		log.Infof("full obj: %v", co.Status.Conditions)
 
 		err = r.Client.Status().Update(context.TODO(), co)
 		if err != nil {
@@ -150,31 +152,6 @@ func computeStatusConditions(
 	configConflict bool,
 	logger log.FieldLogger) []configv1.ClusterOperatorStatusCondition {
 
-	// Degraded should be true if we are encountering errors. We consider any credentials request
-	// with either provision or deprovision failure conditions true, to be a degraded condition.
-	degradedCondition := &configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorDegraded,
-		Status: configv1.ConditionFalse,
-	}
-
-	// shouldn't happen with the server-side enforcement of the CRDs enum specification
-	if !utils.IsValidMode(mode) {
-		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
-			Type:    configv1.OperatorDegraded,
-			Status:  configv1.ConditionTrue,
-			Reason:  constants2.StatusModeInvalid,
-			Message: fmt.Sprintf("operator mode of %s is invalid", mode),
-		})
-	} else if configConflict {
-		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
-			Type:   configv1.OperatorDegraded,
-			Status: configv1.ConditionTrue,
-			Reason: constants2.StatusModeMismatch,
-			Message: fmt.Sprintf("legacy configmap disabled setting conflicts with operator config mode of %s",
-				mode),
-		})
-	}
-
 	failingCredRequests := 0
 
 	validCredRequests := []minterv1.CredentialsRequest{}
@@ -209,7 +186,24 @@ func computeStatusConditions(
 
 	}
 
-	if mode == operatorv1.CloudCredentialsModeManual {
+	// Degraded should be true if we are encountering errors. We consider any credentials request
+	// with either provision or deprovision failure conditions true, to be a degraded condition.
+	degradedCondition := &configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorDegraded,
+		Status: configv1.ConditionFalse,
+	}
+
+	// shouldn't happen with the server-side enforcement of the CRDs enum specification
+	if !utils.IsValidMode(mode) {
+		degradedCondition.Status = configv1.ConditionTrue
+		degradedCondition.Reason = constants2.StatusModeInvalid
+		degradedCondition.Message = fmt.Sprintf("operator mode of %s is invalid", mode)
+	} else if configConflict {
+		degradedCondition.Status = configv1.ConditionTrue
+		degradedCondition.Reason = constants2.StatusModeMismatch
+		degradedCondition.Message = fmt.Sprintf("legacy configmap disabled setting conflicts with operator config mode of %s",
+			mode)
+	} else if mode == operatorv1.CloudCredentialsModeManual {
 		degradedCondition.Status = configv1.ConditionFalse
 		degradedCondition.Reason = reasonOperatorDisabled
 	} else {
@@ -336,6 +330,15 @@ func buildExpectedRelatedObjects(credRequests []minterv1.CredentialsRequest) []c
 		Group:    operatorv1.GroupName,
 		Resource: "CloudCredentials",
 		Name:     constants2.CloudCredOperatorConfig,
+	})
+	sort.SliceStable(related, func(i, j int) bool {
+		if related[i].Namespace < related[j].Namespace {
+			return true
+		}
+		if related[i].Namespace > related[j].Namespace {
+			return false
+		}
+		return related[i].Name < related[j].Name
 	})
 
 	return related
