@@ -68,12 +68,12 @@ var (
 		},
 		{
 			Group:    "rbac.authorization.k8s.io",
-			Resource: "clusteroles",
+			Resource: "clusterroles",
 			Name:     "pod-identity-webhook",
 		},
 		{
 			Group:    "rbac.authorization.k8s.io",
-			Resource: "clusterolebindings",
+			Resource: "clusterrolebindings",
 			Name:     "pod-identity-webhook",
 		},
 		{
