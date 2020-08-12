@@ -68,7 +68,7 @@ func (s *SecretStatusHandler) GetRelatedObjects(logger log.FieldLogger) ([]confi
 	related := []configv1.ObjectReference{
 		{
 			Group:    operatorv1.GroupName,
-			Resource: "CloudCredentials",
+			Resource: "cloudcredentials",
 			Name:     constants.CloudCredOperatorConfig,
 		},
 	}
@@ -83,7 +83,7 @@ func (s *SecretStatusHandler) GetRelatedObjects(logger log.FieldLogger) ([]confi
 	// add the configmap if it exists
 	if !errors.IsNotFound(err) {
 		related = append(related, configv1.ObjectReference{
-			Resource:  "ConfigMap",
+			Resource:  "configmap",
 			Namespace: cm.Namespace,
 			Name:      cm.Name,
 		})
