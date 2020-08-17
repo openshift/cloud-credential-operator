@@ -246,7 +246,7 @@ func buildExpectedRelatedObjects(credRequests []minterv1.CredentialsRequest) []c
 	for _, cr := range credRequests {
 		related = append(related, configv1.ObjectReference{
 			Group:     minterv1.SchemeGroupVersion.Group,
-			Resource:  "credentialsrequest",
+			Resource:  "credentialsrequests",
 			Namespace: cr.Namespace,
 			Name:      cr.Name,
 		})
