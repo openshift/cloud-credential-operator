@@ -41,6 +41,6 @@ fi
 GOPATH="${temp_gopath}" GOFLAGS="" bash ${CODEGEN_PKG}/generate-groups.sh "deepcopy" \
 	github.com/openshift/cloud-credential-operator/pkg/client \
 	github.com/openshift/cloud-credential-operator/pkg/apis \
-	"cloudcredential:v1" \
+	"cloudcredential:v1 cloudtypes:v1" \
 	--go-header-file ${REPO_FULL_PATH}/hack/boilerplate.go.txt \
 	${verify}

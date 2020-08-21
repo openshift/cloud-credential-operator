@@ -16,11 +16,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	cloudtypesv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudtypes/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	codecutils "github.com/openshift/cloud-credential-operator/pkg/util/codec"
 )
 
 var (
-	codec *credreqv1.ProviderCodec
+	codec *codecutils.ProviderCodec
 
 	missingTargetNamespaceCond = credreqv1.CredentialsRequestCondition{
 		Type:   credreqv1.MissingTargetNamespace,
@@ -45,7 +47,7 @@ var (
 
 func TestSecretGetter(t *testing.T) {
 	var err error
-	codec, err = credreqv1.NewCodec()
+	codec, err = codecutils.NewCodec()
 	if err != nil {
 		t.Fatalf("failed to create codec: %v", err)
 	}
@@ -129,7 +131,7 @@ func TestSecretGetter(t *testing.T) {
 
 func TestCredentialsRequests2(t *testing.T) {
 	var err error
-	codec, err = credreqv1.NewCodec()
+	codec, err = codecutils.NewCodec()
 	if err != nil {
 		t.Fatalf("failed to create codec: %v", err)
 	}
@@ -329,7 +331,7 @@ func testAWSCredRequest(name string) credreqv1.CredentialsRequest {
 
 func testGCPCredRequest(name string) credreqv1.CredentialsRequest {
 	gcpProviderSpec, err := codec.EncodeProviderSpec(
-		&credreqv1.GCPProviderSpec{
+		&cloudtypesv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},

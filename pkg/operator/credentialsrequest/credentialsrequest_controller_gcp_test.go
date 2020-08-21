@@ -39,6 +39,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	cloudtypesv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudtypes/v1"
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
@@ -47,6 +48,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
+	codecutil "github.com/openshift/cloud-credential-operator/pkg/util/codec"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -87,7 +89,7 @@ func init() {
 func TestCredentialsRequestGCPReconcile(t *testing.T) {
 	schemeutils.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
+	codec, err := codecutil.NewCodec()
 	if err != nil {
 		fmt.Printf("error creating codec: %v", err)
 		t.FailNow()
@@ -638,7 +640,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 func testGCPCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testGCPPassthroughCredentialsRequest(t)
 
-	codec, err := minterv1.NewCodec()
+	codec, err := codecutil.NewCodec()
 	if err != nil {
 		t.Logf("error creating new codec: %v", err)
 		t.FailNow()
@@ -646,7 +648,7 @@ func testGCPCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	}
 
 	gcpStatus, err := codec.EncodeProviderStatus(
-		&minterv1.GCPProviderStatus{
+		&cloudtypesv1.GCPProviderStatus{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},
@@ -672,14 +674,14 @@ func testGCPCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.Cred
 }
 
 func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
+	codec, err := codecutil.NewCodec()
 	if err != nil {
 		t.Logf("error creating new codec: %v", err)
 		t.FailNow()
 		return nil
 	}
 	gcpProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.GCPProviderSpec{
+		&cloudtypesv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},

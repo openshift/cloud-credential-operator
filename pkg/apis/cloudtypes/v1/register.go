@@ -53,10 +53,11 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 	metav1.AddToGroupVersion(scheme, SchemeGroupVersion)
 
 	scheme.AddKnownTypes(SchemeGroupVersion,
-		&CredentialsRequest{}, &CredentialsRequestList{},
-		&AWSProviderStatus{}, &AWSProviderSpec{},
-		&AzureProviderStatus{}, &AzureProviderSpec{},
-		&VSphereProviderStatus{}, &VSphereProviderSpec{},
+		//&CredentialsRequest{}, &CredentialsRequestList{},
+		//&AWSProviderStatus{}, &AWSProviderSpec{},
+		//&AzureProviderStatus{}, &AzureProviderSpec{},
+		&GCPProviderStatus{}, &GCPProviderSpec{},
+		//&VSphereProviderStatus{}, &VSphereProviderSpec{},
 	)
 
 	return nil

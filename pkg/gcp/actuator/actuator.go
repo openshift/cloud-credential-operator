@@ -26,11 +26,13 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	cloudtypesv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudtypes/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
+	codecutils "github.com/openshift/cloud-credential-operator/pkg/util/codec"
 
 	// GCP packages
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -57,13 +59,13 @@ var _ actuatoriface.Actuator = (*Actuator)(nil)
 type Actuator struct {
 	ProjectName      string
 	Client           client.Client
-	Codec            *minterv1.ProviderCodec
+	Codec            *codecutils.ProviderCodec
 	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
 }
 
 // NewActuator initializes and returns a new Actuator for GCP.
 func NewActuator(c client.Client, projectName string) (*Actuator, error) {
-	codec, err := minterv1.NewCodec()
+	codec, err := codecutils.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating GCP codec")
 		return nil, fmt.Errorf("error creating GCP codec: %v", err)
@@ -539,7 +541,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	return client, nil
 }
 
-func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPProviderStatus) error {
+func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *cloudtypesv1.GCPProviderStatus) error {
 	var err error
 	cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(gcpStatus)
 	if err != nil {
@@ -609,7 +611,7 @@ func isGCPCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	isGCP := unknown.Kind == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name()
+	isGCP := unknown.Kind == reflect.TypeOf(cloudtypesv1.GCPProviderSpec{}).Name()
 	if !isGCP {
 		log.WithField("kind", unknown.Kind).
 			Debug("actuator handles only gcp credentials")

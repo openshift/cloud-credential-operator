@@ -38,9 +38,11 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	cloudtypesv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudtypes/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
+	codecutils "github.com/openshift/cloud-credential-operator/pkg/util/codec"
 )
 
 var (
@@ -52,7 +54,7 @@ var (
 func TestClusterOperatorStatus(t *testing.T) {
 	schemeutils.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
+	codec, err := codecutils.NewCodec()
 	if err != nil {
 		t.Logf("error creating new codec: %v", err)
 		t.FailNow()
@@ -377,7 +379,7 @@ func testCredentialsRequestWithStatus(name string, provisioned bool, conditions 
 	}
 }
 
-func testAWSProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
+func testAWSProviderConfig(codec *codecutils.ProviderCodec) (*runtime.RawExtension, error) {
 	awsProvSpec, err := codec.EncodeProviderSpec(
 		&minterv1.AWSProviderSpec{
 			TypeMeta: metav1.TypeMeta{
@@ -399,9 +401,9 @@ func testAWSProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension
 	return awsProvSpec, err
 }
 
-func testGCPProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
+func testGCPProviderConfig(codec *codecutils.ProviderCodec) (*runtime.RawExtension, error) {
 	gcpProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.GCPProviderSpec{
+		&cloudtypesv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
 			},
@@ -413,7 +415,7 @@ func testGCPProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension
 	return gcpProvSpec, err
 }
 
-func testAzureProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
+func testAzureProviderConfig(codec *codecutils.ProviderCodec) (*runtime.RawExtension, error) {
 	azureProviderSpec, err := codec.EncodeProviderSpec(
 		&minterv1.AzureProviderSpec{
 			TypeMeta: metav1.TypeMeta{

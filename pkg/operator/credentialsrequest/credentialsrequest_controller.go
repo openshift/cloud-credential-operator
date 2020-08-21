@@ -26,6 +26,7 @@ import (
 	"golang.org/x/time/rate"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	cloudtypesv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudtypes/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
@@ -768,7 +769,7 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 	case configv1.AzurePlatformType:
 		return cloudType == reflect.TypeOf(minterv1.AzureProviderSpec{}).Name(), nil
 	case configv1.GCPPlatformType:
-		return cloudType == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name(), nil
+		return cloudType == reflect.TypeOf(cloudtypesv1.GCPProviderSpec{}).Name(), nil
 	case configv1.OpenStackPlatformType:
 		return cloudType == reflect.TypeOf(minterv1.OpenStackProviderSpec{}).Name(), nil
 	case configv1.OvirtPlatformType:
