@@ -21,8 +21,8 @@ import (
 	"fmt"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -71,5 +71,5 @@ func (cw *clientWrapper) Mode(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	return rs.Annotations[annotatorconst.AnnotationKey], nil
+	return rs.Annotations[constants.AnnotationKey], nil
 }

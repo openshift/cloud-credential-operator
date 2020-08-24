@@ -31,7 +31,8 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	azuremock "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
@@ -63,7 +64,7 @@ var (
 			Name:      azure.RootSecretName,
 			Namespace: azure.RootSecretNamespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+				constants.AnnotationKey: constants.MintAnnotation,
 			},
 		},
 	}

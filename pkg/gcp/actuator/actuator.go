@@ -27,8 +27,8 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 
@@ -201,22 +201,21 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.InsufficientAnnotation {
+	switch cloudCredsSecret.Annotations[constants.AnnotationKey] {
+	case constants.InsufficientAnnotation:
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
 			Message:   msg,
 		}
-	}
-
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
+	case constants.PassthroughAnnotation:
 		logger.Debug("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
 			return err
 		}
-	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.MintAnnotation {
+	case constants.MintAnnotation:
 		logger.Debug("provisioning with cred minting")
 		err := a.syncMint(ctx, cr, infraName, logger)
 		if err != nil {
@@ -226,6 +225,13 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 				ErrReason: minterv1.CredentialsProvisionFailure,
 				Message:   fmt.Sprintf("%s: %v", msg, err),
 			}
+		}
+	default:
+		msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
+		logger.Info(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   msg,
 		}
 	}
 
@@ -583,7 +589,7 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 		return false
 	}
 
-	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		return false
 	}
 

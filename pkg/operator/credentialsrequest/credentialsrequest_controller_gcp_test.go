@@ -37,17 +37,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -83,8 +83,7 @@ func init() {
 }
 
 func TestCredentialsRequestGCPReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -108,6 +107,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "new credential",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredsSecret("kube-system", gcpconst.GCPCloudCredSecretName, testRootGCPAuth),
@@ -163,6 +163,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "new credential cluster has no infra name",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
@@ -218,6 +219,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "new credential no root creds available",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
@@ -249,6 +251,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "cred missing access key exists", // expect old key(s) deleted, new key created/saved
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
@@ -289,6 +292,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "cred exists access key missing",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
@@ -329,6 +333,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithDeletionTimestamp(t),
@@ -355,6 +360,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "failed to mint condition",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
 				testGCPCredsSecret("kube-system", gcpconst.GCPCloudCredSecretName, testRootGCPAuth),
@@ -388,6 +394,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "cred deletion failure condition",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithDeletionTimestamp(t),
 				testGCPCredsSecret("kube-system", gcpconst.GCPCloudCredSecretName, testRootGCPAuth),
@@ -413,6 +420,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "new cred passthrough",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
 				testGCPCredsSecretPassthrough("kube-system", gcpconst.GCPCloudCredSecretName, testRootGCPAuth),
@@ -446,6 +454,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "new cred passthrough fail permissions",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
 				testGCPCredsSecretPassthrough("kube-system", gcpconst.GCPCloudCredSecretName, testRootGCPAuth),
@@ -482,6 +491,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "existing cr up to date",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPPassthroughCredentialsRequest(t),
 				testGCPCredsSecretPassthrough("kube-system", gcpconst.GCPCloudCredSecretName, testRootGCPAuth),
@@ -514,6 +524,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 		{
 			name: "existing secret has old secret content",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPPassthroughCredentialsRequest(t),
 				testGCPCredsSecretPassthrough("kube-system", gcpconst.GCPCloudCredSecretName, testRootGCPAuth),
@@ -697,7 +708,7 @@ func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReq
 
 func testGCPCredsSecretPassthrough(namespace, name, jsonAUTH string) *corev1.Secret {
 	s := testGCPCredsSecret(namespace, name, jsonAUTH)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
 
@@ -707,7 +718,7 @@ func testGCPCredsSecret(namespace, name, jsonAUTH string) *corev1.Secret {
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+				constants.AnnotationKey: constants.MintAnnotation,
 			},
 		},
 		Data: map[string][]byte{

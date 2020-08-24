@@ -26,6 +26,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,23 +35,23 @@ import (
 	"k8s.io/client-go/kubernetes/scheme"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/iam"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/iam"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 var c client.Client
@@ -76,8 +77,7 @@ type ExpectedCOCondition struct {
 }
 
 func TestCredentialsRequestReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	// Utility function to get the test credentials request from the fake client
 	getCR := func(c client.Client) *minterv1.CredentialsRequest {
@@ -130,6 +130,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "add finalizer",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				func() *minterv1.CredentialsRequest {
@@ -156,6 +157,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "new credential",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -211,6 +213,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "new credential cluster has no infra name",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -267,6 +270,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			// This tests the case where we create our own read only creds initially:
 			name: "new credential no read-only creds available",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -316,6 +320,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			// This indicates an error state.
 			name: "new credential no root creds available",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -358,6 +363,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred and secret exist user tagged",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -393,6 +399,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred and secret exist user missing tag",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -433,6 +440,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred and secret exist no root creds",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -481,6 +489,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred missing access key exists",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -518,6 +527,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred exists access key missing",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -556,6 +566,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequestWithDeletionTimestamp(t),
@@ -595,6 +606,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "new passthrough credential",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
@@ -623,8 +635,85 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "existing passthrough credential",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testPassthroughCredentialsRequest(t),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				// will simulate to check that the creds in the target secret actually satisfy the requested perms
+				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
+				return mockAWSClient
+			},
+			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "existing passthrough credential bypassing simulations",
+			existing: []runtime.Object{
+				testOperatorConfig(operatorv1.CloudCredentialsModePassthrough), // indicates that CCO should not perform permissions simulations
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testPassthroughCredentialsRequest(t),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				return mockAWSClient
+			},
+			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testAWSAccessKeyID,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testAWSSecretAccessKey,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
 			name: "passthrough cred deletion",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
@@ -641,6 +730,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "no namespace condition",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				testInfrastructure(testInfraName),
 				testCredentialsRequest(t),
 			},
@@ -659,6 +749,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "insufficient creds",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -680,6 +771,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "failed to mint condition",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -708,6 +800,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "cred deletion failure condition",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testInfrastructure(testInfraName),
 				testCredentialsRequestWithDeletionTimestamp(t),
@@ -736,6 +829,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "skip AWS if recently synced",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
@@ -754,6 +848,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "regenerate secret if missing",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				testInfrastructure(testInfraName),
 				testClusterVersion(),
@@ -785,6 +880,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			name: "recently synced but modified",
 			existing: func() []runtime.Object {
 				objects := []runtime.Object{}
+				objects = append(objects, testOperatorConfig(""))
 				objects = append(objects, createTestNamespace(testNamespace))
 				objects = append(objects, createTestNamespace(testSecretNamespace))
 
@@ -819,6 +915,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "skip nonAWS credreq",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				testGCPCredentialsRequest(t),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -839,6 +936,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "clear conditions when ignoring cred request",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				func() runtime.Object {
 					cr := testGCPCredentialsRequest(t)
 					for _, cond := range constants.FailureConditionTypes {
@@ -868,6 +966,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "pass along any existing permissions boundary",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
@@ -908,8 +1007,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "new credential but operator disabled",
+			name: "new credential but operator disabled via configmap",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testOperatorConfigMap("true"),
@@ -941,8 +1041,76 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "new credential but operator disabled via config",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+				testCredentialsRequest(t),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorDegraded,
+					status:        corev1.ConditionFalse,
+				},
+			},
+		},
+		{
+			name: "old configmap data ignored because of new config",
+			existing: []runtime.Object{
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+				testOperatorConfigMap("false"),
+				testCredentialsRequest(t),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorAvailable,
+					status:        corev1.ConditionTrue,
+				},
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionFalse,
+				},
+				{
+					conditionType: configv1.OperatorDegraded,
+					status:        corev1.ConditionFalse,
+				},
+			},
+		},
+		{
 			name: "recently synced but with error condition set",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequestWithRecentLastSync(t)
 					cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions,
@@ -975,6 +1143,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		{
 			name: "recently synced but not provisioned",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequestWithRecentLastSync(t)
 					cr.Status.Provisioned = false
@@ -998,6 +1167,162 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
+		},
+		{
+			name: "provision with aws policy condition",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				func() *minterv1.CredentialsRequest {
+					cr := testCredentialsRequest(t)
+					awsProvSpec, err := codec.EncodeProviderSpec(
+						&minterv1.AWSProviderSpec{
+							TypeMeta: metav1.TypeMeta{
+								Kind: "AWSProviderSpec",
+							},
+							StatementEntries: []minterv1.StatementEntry{
+								{
+									Effect: "Allow",
+									Action: []string{
+										"iam:GetUser",
+										"iam:GetUserPolicy",
+										"iam:ListAccessKeys",
+									},
+									Resource: "*",
+									PolicyCondition: minterv1.IAMPolicyCondition{
+										"StringEquals": minterv1.IAMPolicyConditionKeyValue{
+											"aws:userid": "testuser",
+										},
+									},
+								},
+							},
+						})
+					require.NoError(t, err, "unexpected error encoding AWSProviderSpec")
+
+					cr.Spec.ProviderSpec = awsProvSpec
+					return cr
+				}(),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				// Just mock up GetUser that doesn't fail for the read-only account test
+				// And it is set up for AnyTimes() so that the next check for whether the credreq user
+				// exists forces the actuator to create a new user.
+				mockGetUserNotFound(mockAWSClient)
+
+				mockGetUserPolicyMissing(mockAWSClient)
+
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockCreateUser(mockAWSClient)
+				mockTagUser(mockAWSClient)
+				mockPutUserPolicyWithExpectedPolicy(mockAWSClient, testPolicyWithConditions)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "already provisioned with aws policy condition",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				func() *minterv1.CredentialsRequest {
+					cr := testCredentialsRequest(t)
+					awsProvSpec, err := codec.EncodeProviderSpec(
+						&minterv1.AWSProviderSpec{
+							TypeMeta: metav1.TypeMeta{
+								Kind: "AWSProviderSpec",
+							},
+							StatementEntries: []minterv1.StatementEntry{
+								{
+									Effect: "Allow",
+									Action: []string{
+										"iam:GetUser",
+										"iam:GetUserPolicy",
+										"iam:ListAccessKeys",
+									},
+									Resource: "*",
+									PolicyCondition: minterv1.IAMPolicyCondition{
+										"StringEquals": minterv1.IAMPolicyConditionKeyValue{
+											"aws:userid": "testuser",
+										},
+									},
+								},
+							},
+						})
+					require.NoError(t, err, "unexpected error encoding AWSProviderSpec")
+
+					cr.Spec.ProviderSpec = awsProvSpec
+
+					awsStatus, err := codec.EncodeProviderStatus(
+						&minterv1.AWSProviderStatus{
+							User:   testAWSUser,
+							Policy: testAWSUser + "-policy",
+						})
+					require.NoError(t, err, "unexpected error creating aws provider status")
+
+					cr.Status.ProviderStatus = awsStatus
+					cr.Status.Provisioned = true
+
+					return cr
+				}(),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+
+				// Already provisioned secret for cred req
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				// Just mock up GetUser that doesn't fail for the read-only account test
+				// And it is set up for AnyTimes() so that the next check for whether the credreq user
+				// exists forces the actuator to handle an already provisioned user.
+				mockGetUser(mockAWSClient)
+
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+
+				mockGetUserPolicy(mockAWSClient, testPolicyWithConditions)
+				return mockAWSClient
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+
+				// no expected calls as we are just verifying that the cred request is still valid
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
+		{
+			name: "error reconcile without operator config",
+			existing: []runtime.Object{
+				testCredentialsRequest(t),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			expectErr: true,
 		},
 	}
 
@@ -1049,7 +1374,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			}
 
 			if err != nil && !test.expectErr {
-				t.Errorf("Unexpected error: %v", err)
+				require.NoError(t, err, "Unexpected error: %v", err)
 			}
 			if err == nil && test.expectErr {
 				t.Errorf("Expected error but got none")
@@ -1058,14 +1383,14 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			cr := getCR(fakeClient)
 			for _, condition := range test.expectedConditions {
 				foundCondition := utils.FindCredentialsRequestCondition(cr.Status.Conditions, condition.conditionType)
-				assert.NotNil(t, foundCondition)
+				require.NotNil(t, foundCondition, "unexpected unable to find condition")
 				assert.Exactly(t, condition.status, foundCondition.Status)
 				assert.Exactly(t, condition.reason, foundCondition.Reason)
 			}
 
 			for _, condition := range test.expectedCOConditions {
 				co := getClusterOperator(fakeClient)
-				assert.NotNil(t, co)
+				require.NotNil(t, co)
 				foundCondition := findClusterOperatorCondition(co.Status.Conditions, condition.conditionType)
 				assert.NotNil(t, foundCondition)
 				assert.Equal(t, string(condition.status), string(foundCondition.Status), "condition %s had unexpected status", condition.conditionType)
@@ -1087,7 +1412,7 @@ const (
 	testSecretName             = "test-secret"
 	testSecretNamespace        = "myproject"
 	testAWSUser                = "mycluster-test-aws-user"
-	testAWSARN                 = "some:fake:ARN:1234"
+	testAWSARN                 = "arn:aws:iam::1234:user/testuser"
 	testAWSUserID              = "FAKEAWSUSERID"
 	testAWSAccessKeyID         = "FAKEAWSACCESSKEYID"
 	testAWSAccessKeyID2        = "FAKEAWSACCESSKEYID2"
@@ -1102,7 +1427,9 @@ const (
 )
 
 var (
-	testPolicy1                  = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+	testPolicy1              = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\"},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+	testPolicyWithConditions = fmt.Sprintf("{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\",\"iam:GetUserPolicy\",\"iam:ListAccessKeys\"],\"Resource\":\"*\",\"Condition\":{\"StringEquals\":{\"aws:userid\":\"testuser\"}}},{\"Effect\":\"Allow\",\"Action\":[\"iam:GetUser\"],\"Resource\":\"%s\"}]}", testAWSARN)
+
 	testTwentyMinuteOldTimestamp = time.Now().Add(-20 * time.Minute)
 )
 
@@ -1213,13 +1540,13 @@ func createTestNamespace(namespace string) *corev1.Namespace {
 
 func testInsufficientAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.InsufficientAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.InsufficientAnnotation
 	return s
 }
 
 func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
 
@@ -1229,7 +1556,7 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.MintAnnotation,
+				constants.AnnotationKey: constants.MintAnnotation,
 			},
 		},
 		Data: map[string][]byte{
@@ -1411,6 +1738,15 @@ func mockDeleteAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID string) 
 			AccessKeyId: aws.String(accessKeyID),
 		}).Return(&iam.DeleteAccessKeyOutput{}, nil)
 }
+
+func mockPutUserPolicyWithExpectedPolicy(mockAWSClient *mockaws.MockClient, policyDoc string) {
+	mockAWSClient.EXPECT().PutUserPolicy(&iam.PutUserPolicyInput{
+		UserName:       aws.String(testAWSUser),
+		PolicyName:     aws.String(testAWSUser + "-policy"),
+		PolicyDocument: aws.String(policyDoc),
+	}).Return(&iam.PutUserPolicyOutput{}, nil)
+}
+
 func mockPutUserPolicy(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any()).Return(&iam.PutUserPolicyOutput{}, nil)
 }
@@ -1435,6 +1771,10 @@ func testClusterVersion() *configv1.ClusterVersion {
 			ClusterID: testClusterID,
 		},
 	}
+}
+
+func mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
 }
 
 func mockSimulatePrincipalPolicySuccess(mockAWSClient *mockaws.MockClient) {
@@ -1472,4 +1812,17 @@ func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 			"disabled": disabled,
 		},
 	}
+}
+
+func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
+	conf := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: operatorv1.CloudCredentialSpec{
+			CredentialsMode: mode,
+		},
+	}
+
+	return conf
 }

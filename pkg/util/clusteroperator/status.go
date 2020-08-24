@@ -2,8 +2,11 @@ package clusteroperator
 
 import (
 	configv1 "github.com/openshift/api/config/v1"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+)
+
+const (
+	msgConfigConflict = "Conflict between legacy configmap and operator config"
 )
 
 // SetStatusCondition returns the result of setting the specified condition in

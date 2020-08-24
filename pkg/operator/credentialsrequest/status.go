@@ -5,14 +5,16 @@ import (
 	"fmt"
 	"os"
 	"reflect"
+	"sort"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/constants"
+	constants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
@@ -28,6 +30,7 @@ const (
 	cloudCredClusterOperator        = "cloud-credential"
 	cloudCredOperatorNamespace      = "openshift-cloud-credential-operator"
 	reasonCredentialsFailing        = "CredentialsFailing"
+	reasonOperatorStateError        = "OperatorStateError"
 	reasonNoCredentialsFailing      = "NoCredentialsFailing"
 	reasonReconciling               = "Reconciling"
 	reasonReconcilingComplete       = "ReconcilingComplete"
@@ -47,7 +50,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 		return fmt.Errorf("failed to get clusteroperator %s: %v", co.Name, err)
 	}
 
-	_, credRequests, operatorIsDisabled, err := r.getOperatorState(logger)
+	_, credRequests, operatorMode, configConflict, err := r.getOperatorState(logger)
 	if err != nil {
 		return fmt.Errorf("failed to get operator state: %v", err)
 	}
@@ -55,7 +58,8 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	oldConditions := co.Status.Conditions
 	oldVersions := co.Status.Versions
 	oldRelatedObjects := co.Status.RelatedObjects
-	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType, operatorIsDisabled, logger)
+	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType,
+		operatorMode, configConflict, logger)
 	co.Status.Versions = computeClusterOperatorVersions()
 	co.Status.RelatedObjects = buildExpectedRelatedObjects(credRequests)
 
@@ -82,6 +86,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	if !clusteroperator.ConditionsEqual(oldConditions, co.Status.Conditions) ||
 		!reflect.DeepEqual(oldVersions, co.Status.Versions) ||
 		!reflect.DeepEqual(oldRelatedObjects, co.Status.RelatedObjects) {
+		log.Infof("full obj: %v", co.Status.Conditions)
 
 		err = r.Client.Status().Update(context.TODO(), co)
 		if err != nil {
@@ -95,15 +100,16 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 
 // getOperatorState gets and returns the resources necessary to compute the
 // operator's current state.
-func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest, bool, error) {
+func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest,
+	operatorv1.CloudCredentialsMode, bool, error) {
 
 	ns := &corev1.Namespace{}
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: minterv1.CloudCredOperatorNamespace}, ns); err != nil {
 		if errors.IsNotFound(err) {
-			return nil, nil, false, nil
+			return nil, nil, "", false, nil
 		}
 
-		return nil, nil, false, fmt.Errorf(
+		return nil, nil, "", false, fmt.Errorf(
 			"error getting Namespace %s: %v", minterv1.CloudCredOperatorNamespace, err)
 	}
 
@@ -113,16 +119,16 @@ func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (
 	credRequestList := &minterv1.CredentialsRequestList{}
 	err := r.Client.List(context.TODO(), credRequestList, client.InNamespace(minterv1.CloudCredOperatorNamespace))
 	if err != nil {
-		return nil, nil, false, fmt.Errorf(
+		return nil, nil, "", false, fmt.Errorf(
 			"failed to list CredentialsRequests: %v", err)
 	}
 
-	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, logger)
+	mode, configConflict, err := utils.GetOperatorConfiguration(r.Client, logger)
 	if err != nil {
-		return nil, nil, false, fmt.Errorf("error checking if operator is disabled: %v", err)
+		return nil, nil, "", false, fmt.Errorf("error checking if operator is disabled: %v", err)
 	}
 
-	return ns, credRequestList.Items, operatorIsDisabled, nil
+	return ns, credRequestList.Items, mode, configConflict, nil
 }
 
 func computeClusterOperatorVersions() []configv1.OperandVersion {
@@ -141,15 +147,9 @@ func computeStatusConditions(
 	conditions []configv1.ClusterOperatorStatusCondition,
 	credRequests []minterv1.CredentialsRequest,
 	clusterCloudPlatform configv1.PlatformType,
-	operatorIsDisabled bool,
+	mode operatorv1.CloudCredentialsMode,
+	configConflict bool,
 	logger log.FieldLogger) []configv1.ClusterOperatorStatusCondition {
-
-	// Degraded should be true if we are encountering errors. We consider any credentials request
-	// with either provision or deprovision failure conditions true, to be a degraded condition.
-	degradedCondition := &configv1.ClusterOperatorStatusCondition{
-		Type:   configv1.OperatorDegraded,
-		Status: configv1.ConditionFalse,
-	}
 
 	failingCredRequests := 0
 
@@ -185,7 +185,24 @@ func computeStatusConditions(
 
 	}
 
-	if operatorIsDisabled {
+	// Degraded should be true if we are encountering errors. We consider any credentials request
+	// with either provision or deprovision failure conditions true, to be a degraded condition.
+	degradedCondition := &configv1.ClusterOperatorStatusCondition{
+		Type:   configv1.OperatorDegraded,
+		Status: configv1.ConditionFalse,
+	}
+
+	// shouldn't happen with the server-side enforcement of the CRDs enum specification
+	if !utils.IsValidMode(mode) {
+		degradedCondition.Status = configv1.ConditionTrue
+		degradedCondition.Reason = constants.StatusModeInvalid
+		degradedCondition.Message = fmt.Sprintf("operator mode of %s is invalid", mode)
+	} else if configConflict {
+		degradedCondition.Status = configv1.ConditionTrue
+		degradedCondition.Reason = constants.StatusModeMismatch
+		degradedCondition.Message = fmt.Sprintf("legacy configmap disabled setting conflicts with operator config mode of %s",
+			mode)
+	} else if mode == operatorv1.CloudCredentialsModeManual {
 		degradedCondition.Status = configv1.ConditionFalse
 		degradedCondition.Reason = reasonOperatorDisabled
 	} else {
@@ -213,7 +230,7 @@ func computeStatusConditions(
 		Status: configv1.ConditionUnknown,
 	}
 
-	if operatorIsDisabled {
+	if mode == operatorv1.CloudCredentialsModeManual {
 		progressingCondition.Status = configv1.ConditionFalse
 		progressingCondition.Reason = reasonOperatorDisabled
 	} else {
@@ -251,7 +268,7 @@ func computeStatusConditions(
 		Status: configv1.ConditionTrue,
 		Type:   configv1.OperatorAvailable,
 	}
-	if operatorIsDisabled {
+	if mode == operatorv1.CloudCredentialsModeManual {
 		availableCondition.Reason = reasonOperatorDisabled
 	}
 	conditions = clusteroperator.SetStatusCondition(conditions,
@@ -308,5 +325,20 @@ func buildExpectedRelatedObjects(credRequests []minterv1.CredentialsRequest) []c
 			Name:      cr.Name,
 		})
 	}
+	related = append(related, configv1.ObjectReference{
+		Group:    operatorv1.GroupName,
+		Resource: "CloudCredentials",
+		Name:     constants.CloudCredOperatorConfig,
+	})
+	sort.SliceStable(related, func(i, j int) bool {
+		if related[i].Namespace < related[j].Namespace {
+			return true
+		}
+		if related[i].Namespace > related[j].Namespace {
+			return false
+		}
+		return related[i].Name < related[j].Name
+	})
+
 	return related
 }

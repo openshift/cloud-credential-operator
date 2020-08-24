@@ -9,6 +9,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -19,10 +20,12 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
+	secretutils "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 )
@@ -39,21 +42,24 @@ const (
 )
 
 func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler {
-	return &ReconcileCloudCredSecret{
-		Client:           mgr.GetClient(),
-		Logger:           log.WithField("controller", constants.ControllerName),
+	c := mgr.GetClient()
+	r := &ReconcileCloudCredSecret{
+		Client:           c,
+		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
 		GCPClientBuilder: ccgcp.NewClient,
 		ProjectName:      projectName,
 	}
+
+	return r
 }
 
 func cloudCredSecretObjectCheck(secret metav1.Object) bool {
-	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == GCPCloudCredSecretName
+	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants.GCPCloudCredSecretName
 }
 
 func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.ControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(constants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -74,6 +80,15 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	if err != nil {
 		return err
 	}
+
+	err = secretutils.WatchCCOConfig(c, types.NamespacedName{
+		Namespace: constants.CloudCredSecretNamespace,
+		Name:      constants.GCPCloudCredSecretName,
+	})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -86,29 +101,38 @@ type ReconcileCloudCredSecret struct {
 	GCPClientBuilder func(projectName string, authJSON []byte) (ccgcp.Client, error)
 }
 
-// Reconcile will annotate the cloud cred secret to indicate the capabilities of the cloud credentials:
+// Reconcile will typically annotate the cloud cred secret to indicate the capabilities of the cloud credentials:
 // 1) 'mint' for indicating that the creds can be used to create new sub-creds
 // 2) 'passthrough' for indicating that the creds are capable enough to potentially be used as-is
 // 3) 'insufficient' for indicating that the creds are not usable for the cluster
+// In the event that the operator config resource has specified a mode to operate under (mint/passthrough)
+// then skip trying to determine the capabilities, and just annotate the secret.
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;update
-func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnResult reconcile.Result, returnErr error) {
 	start := time.Now()
-
-	r.Logger.Info("validating cloud cred secret")
-
-	operatorIsDisabled, err := utils.IsOperatorDisabled(r.Client, r.Logger)
-	if err != nil {
-		r.Logger.WithError(err).Error("error checking if operator is disabled")
-		return reconcile.Result{}, err
-	} else if operatorIsDisabled {
-		r.Logger.Infof("operator disabled in %s ConfigMap", minterv1.CloudCredOperatorConfigMap)
-		return reconcile.Result{}, err
-	}
 
 	defer func() {
 		dur := time.Since(start)
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
+
+	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, r.Logger)
+	if err != nil {
+		r.Logger.WithError(err).Error("error checking operator configuration")
+		return reconcile.Result{}, err
+	}
+	if !utils.IsValidMode(mode) {
+		r.Logger.Errorf("invalid mode of %s set", mode)
+		return reconcile.Result{}, fmt.Errorf("invalide mode of %s set", mode)
+	}
+	if conflict {
+		r.Logger.Error("configuration conflict between legacy configmap and operator config")
+		return reconcile.Result{}, fmt.Errorf("configuration conflict")
+	}
+	if mode == operatorv1.CloudCredentialsModeManual {
+		r.Logger.Info("operator in disabled / manual mode")
+		return reconcile.Result{}, err
+	}
 
 	secret := &corev1.Secret{}
 	err = r.Get(context.Background(), request.NamespacedName, secret)
@@ -116,6 +140,21 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (reconci
 		r.Logger.Debugf("secret not found: %v", err)
 		return reconcile.Result{}, err
 	}
+
+	if mode != operatorv1.CloudCredentialsModeDefault {
+		annotation, err := utils.ModeToAnnotation(mode)
+		if err != nil {
+			r.Logger.WithError(err).Errorf("failed to convert operator mode to annotation")
+			return reconcile.Result{}, err
+		}
+		err = r.updateSecretAnnotations(secret, annotation)
+		if err != nil {
+			r.Logger.WithError(err).Error("errored while annotating secret")
+		}
+		return reconcile.Result{}, err
+	}
+
+	r.Logger.Info("validating cloud cred secret")
 
 	err = r.validateCloudCredsSecret(secret)
 	if err != nil {

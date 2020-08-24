@@ -24,19 +24,12 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-
-	configv1 "github.com/openshift/api/config/v1"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -45,6 +38,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 const (
@@ -223,15 +224,31 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	} else {
 		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
-		simParams := &ccaws.SimulateParams{
-			Region: region,
-		}
-		goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, simParams, logger)
+
+		// but for the case where the operator mode is non-default, then we will avoid performing any
+		// policy simulations and assume that the passthrough creds must be good enough
+		mode, _, err := utils.GetOperatorConfiguration(a.Client, logger)
 		if err != nil {
-			return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
+			return true, err
 		}
-		if !goodEnough {
-			return true, nil
+		if mode == operatorv1.CloudCredentialsModePassthrough {
+			logger.Debug("will not perform permissions simulation because operator in mode %q", mode)
+		} else {
+			region, err := utils.LoadInfrastructureRegion(a.Client, logger)
+			if err != nil {
+				return true, err
+			}
+			simParams := &ccaws.SimulateParams{
+				Region: region,
+			}
+
+			goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, simParams, logger)
+			if err != nil {
+				return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
+			}
+			if !goodEnough {
+				return true, nil
+			}
 		}
 	}
 
@@ -287,22 +304,21 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.InsufficientAnnotation {
+	switch cloudCredsSecret.Annotations[constants.AnnotationKey] {
+	case constants.InsufficientAnnotation:
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.InsufficientCloudCredentials,
 			Message:   msg,
 		}
-	}
-
-	if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.PassthroughAnnotation {
+	case constants.PassthroughAnnotation:
 		logger.Debugf("provisioning with passthrough")
 		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
 		if err != nil {
 			return err
 		}
-	} else if cloudCredsSecret.Annotations[annotatorconst.AnnotationKey] == annotatorconst.MintAnnotation {
+	case constants.MintAnnotation:
 		logger.Debugf("provisioning with cred minting")
 		err := a.syncMint(ctx, cr, region, infraName, logger)
 		if err != nil {
@@ -312,6 +328,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 				ErrReason: minterv1.CredentialsProvisionFailure,
 				Message:   fmt.Sprintf("%v: %v", msg, err),
 			}
+		}
+	default:
+		msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
+		logger.Info(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   msg,
 		}
 	}
 
@@ -927,7 +950,7 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 		return false
 	}
 
-	if _, ok := secret.ObjectMeta.Annotations[annotatorconst.AnnotationKey]; !ok {
+	if _, ok := secret.ObjectMeta.Annotations[constants.AnnotationKey]; !ok {
 		return false
 	}
 

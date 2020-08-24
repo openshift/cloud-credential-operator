@@ -36,11 +36,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	annotatorconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/constants"
-	vsphereconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/vsphere"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 	"github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 )
 
@@ -56,8 +55,7 @@ func init() {
 }
 
 func TestCredentialsRequestVSphereReconcile(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -79,6 +77,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "new credentialsrequest passthrough",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredsSecretPassthrough(),
@@ -114,6 +113,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "new credential no root creds available",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
@@ -139,6 +139,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequestWithDeletionTimestamp(t),
@@ -153,6 +154,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "existing cr up to date",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
 				testVSphereCredsSecretPassthrough(),
@@ -173,6 +175,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 		{
 			name: "existing secret has old secret content",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
 				testVSphereCredsSecretPassthrough(),
@@ -302,13 +305,13 @@ func testVSphereCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 
 func testVSphereCredsSecretPassthrough() *corev1.Secret {
 	s := testVSphereCredsSecret()
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.PassthroughAnnotation
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
 
 func testVSphereCredsSecret() *corev1.Secret {
-	s := testSecret("kube-system", vsphereconst.VSphereCloudCredSecretName, testVSphereCloudCredsSecretData)
-	s.Annotations[annotatorconst.AnnotationKey] = annotatorconst.MintAnnotation
+	s := testSecret("kube-system", constants.VSphereCloudCredSecretName, testVSphereCloudCredsSecretData)
+	s.Annotations[constants.AnnotationKey] = constants.MintAnnotation
 
 	return s
 }
@@ -319,7 +322,7 @@ func testSecret(namespace, name string, secretData map[string][]byte) *corev1.Se
 			Name:      name,
 			Namespace: namespace,
 			Annotations: map[string]string{
-				annotatorconst.AnnotationKey: annotatorconst.PassthroughAnnotation,
+				constants.AnnotationKey: constants.PassthroughAnnotation,
 			},
 		},
 		Data: secretData,

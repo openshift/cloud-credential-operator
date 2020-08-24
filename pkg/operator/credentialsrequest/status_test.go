@@ -25,6 +25,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -35,9 +36,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
-	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 var (
@@ -47,8 +50,7 @@ var (
 )
 
 func TestClusterOperatorStatus(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -78,11 +80,13 @@ func TestClusterOperatorStatus(t *testing.T) {
 		name               string
 		credRequests       []minterv1.CredentialsRequest
 		cloudPlatform      configv1.PlatformType
-		operatorDisabled   bool
+		operatorMode       operatorv1.CloudCredentialsMode
+		configConflict     bool
 		expectedConditions []configv1.ClusterOperatorStatusCondition
 	}{
 		{
 			name:          "no credentials requests",
+			operatorMode:  operatorv1.CloudCredentialsModeMint,
 			credRequests:  []minterv1.CredentialsRequest{},
 			cloudPlatform: configv1.AWSPlatformType,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
@@ -92,7 +96,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "progressing no errors",
+			name:         "progressing no errors",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
 				testCredentialsRequestWithStatus("cred2", false, []minterv1.CredentialsRequestCondition{}, nil),
@@ -106,7 +111,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "progressing with errors",
+			name:         "progressing with errors",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
 				testCredentialsRequestWithStatus("cred2", false, []minterv1.CredentialsRequestCondition{
@@ -122,7 +128,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "progressing with insufficient creds errors",
+			name:         "progressing with insufficient creds errors",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", false, []minterv1.CredentialsRequestCondition{
 					testCRCondition(minterv1.InsufficientCloudCredentials, corev1.ConditionTrue),
@@ -142,7 +149,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "provisioned no errors",
+			name:         "provisioned no errors",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
 				testCredentialsRequestWithStatus("cred2", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -157,7 +165,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 		},
 		{
 			// Implies the credential was initially provisioned but an update is needed and it's failing:
-			name: "provisioned with errors",
+			name:         "provisioned with errors",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
 				testCredentialsRequestWithStatus("cred2", true, []minterv1.CredentialsRequestCondition{
@@ -173,7 +182,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "ignore nonAWS credreqs",
+			name:         "ignore nonAWS credreqs",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
 				testCredentialsRequestWithStatus("cred2", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -188,7 +198,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "ignore nonGCP credreqs",
+			name:         "ignore nonGCP credreqs",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, defaultGCPProviderConfig),
 				testCredentialsRequestWithStatus("cred2", true, []minterv1.CredentialsRequestCondition{}, defaultGCPProviderConfig),
@@ -204,6 +215,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 		},
 		{
 			name:         "set upgradeable condition",
+			operatorMode: operatorv1.CloudCredentialsModeMint,
 			credRequests: []minterv1.CredentialsRequest{},
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorUpgradeable, configv1.ConditionTrue, ""),
@@ -217,12 +229,29 @@ func TestClusterOperatorStatus(t *testing.T) {
 					testCRCondition(minterv1.CredentialsProvisionFailure, corev1.ConditionTrue),
 				}, nil),
 			},
-			cloudPlatform:    configv1.AWSPlatformType,
-			operatorDisabled: true,
+			cloudPlatform: configv1.AWSPlatformType,
+			operatorMode:  operatorv1.CloudCredentialsModeManual,
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{
 				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, reasonOperatorDisabled),
 				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonOperatorDisabled),
 				testCondition(configv1.OperatorDegraded, configv1.ConditionFalse, reasonOperatorDisabled),
+			},
+		},
+		{
+			name: "operator configmap vs config conflict",
+			credRequests: []minterv1.CredentialsRequest{
+				testCredentialsRequestWithStatus("cred1", false, []minterv1.CredentialsRequestCondition{}, nil),
+				testCredentialsRequestWithStatus("cred2", false, []minterv1.CredentialsRequestCondition{
+					testCRCondition(minterv1.CredentialsProvisionFailure, corev1.ConditionTrue),
+				}, nil),
+			},
+			cloudPlatform:  configv1.AWSPlatformType,
+			operatorMode:   operatorv1.CloudCredentialsModeManual,
+			configConflict: true,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{
+				testCondition(configv1.OperatorAvailable, configv1.ConditionTrue, reasonOperatorDisabled),
+				testCondition(configv1.OperatorProgressing, configv1.ConditionFalse, reasonOperatorDisabled),
+				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, constants.StatusModeMismatch),
 			},
 		},
 	}
@@ -232,7 +261,8 @@ func TestClusterOperatorStatus(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests, test.cloudPlatform, test.operatorDisabled, log.WithField("test", test.name))
+			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests,
+				test.cloudPlatform, test.operatorMode, test.configConflict, log.WithField("test", test.name))
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
 				if assert.NotNil(t, c) {
@@ -249,8 +279,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 }
 
 func TestClusterOperatorVersion(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
-	configv1.Install(scheme.Scheme)
+	schemeutils.SetupScheme(scheme.Scheme)
 
 	twentyHoursAgo := metav1.Time{
 		Time: time.Now().Add(-20 * time.Hour),
@@ -283,14 +312,15 @@ func TestClusterOperatorVersion(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 
 			existingCO := testClusterOperator("4.0.0-5", twentyHoursAgo)
-			existing := []runtime.Object{existingCO}
+			operatorConfig := testOperatorConfig("")
+			existing := []runtime.Object{existingCO, operatorConfig}
 			fakeClient := fake.NewFakeClient(existing...)
 
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 			}
 
-			assert.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
+			require.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
 			err := rcr.syncOperatorStatus()
 
 			if err != nil {
@@ -313,7 +343,7 @@ func TestClusterOperatorVersion(t *testing.T) {
 
 			progCond := findClusterOperatorCondition(clusterop.Status.Conditions,
 				configv1.OperatorProgressing)
-			assert.NotNil(t, progCond)
+			require.NotNil(t, progCond)
 			if test.expectProgressingTransition {
 				assert.True(t, progCond.LastTransitionTime.Time.After(
 					test.currentProgressingLastTransition.Time))
