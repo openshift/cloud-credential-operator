@@ -1,79 +1,50 @@
 package v1
 
-import (
-	"k8s.io/apimachinery/pkg/runtime"
-)
-
-// DeepCopyInto will perform a DeepCopy into the provided AWSProviderSpec
-func (in *AWSProviderSpec) DeepCopyInto(out *AWSProviderSpec) {
-	*out = *in
-	out.TypeMeta = in.TypeMeta
-	if in.StatementEntries != nil {
-		in, out := &in.StatementEntries, &out.StatementEntries
-		*out = make([]StatementEntry, len(*in))
-		for i := range *in {
-			(*in)[i].DeepCopyInto(&(*out)[i])
-		}
-	}
-	return
-}
-
-// DeepCopy will DeepCopy and return a pointer to a
-// new AWSProviderSpec
-func (in *AWSProviderSpec) DeepCopy() *AWSProviderSpec {
+// DeepCopy is a deepcopy function, copying the receiver, creating a new IAMPolicyCondition.
+func (in *IAMPolicyCondition) DeepCopy() *IAMPolicyCondition {
 	if in == nil {
 		return nil
 	}
-	out := new(AWSProviderSpec)
+	out := new(IAMPolicyCondition)
 	in.DeepCopyInto(out)
 	return out
 }
 
-// DeepCopyObject will return a DeepCopied AWSProviderSpec
-// as a runtime.Object
-func (in *AWSProviderSpec) DeepCopyObject() runtime.Object {
-	if c := in.DeepCopy(); c != nil {
-		return c
+// DeepCopyInto is a deepcopy function, copying the receiver, writing into out. in must be non-nil.
+func (in *IAMPolicyCondition) DeepCopyInto(out *IAMPolicyCondition) {
+	if *in == nil {
+		return
 	}
-	return nil
-}
 
-func deepCopyIAMPolicyCondition(ipc IAMPolicyCondition) IAMPolicyCondition {
-	cp := make(IAMPolicyCondition)
-	for key, val := range ipc {
+	*out = make(IAMPolicyCondition, len(*in))
+	tgt := *out
+
+	for key, val := range *in {
 		if val != nil {
-			cp[key] = make(IAMPolicyConditionKeyValue)
+			tgt[key] = make(IAMPolicyConditionKeyValue, len(val))
 			for subKey, subVal := range val {
-				cp[key][subKey] = subVal
+				tgt[key][subKey] = copyStringOrStringSlice(subVal)
 			}
 		}
 	}
-
-	return cp
 }
 
-// DeepCopyInto will perform a DeepCopy into the provided StatementEntry
-func (in *StatementEntry) DeepCopyInto(out *StatementEntry) {
-	*out = *in
-	if in.Action != nil {
-		in, out := &in.Action, &out.Action
-		*out = make([]string, len(*in))
-		copy(*out, *in)
-	}
-	if in.PolicyCondition != nil {
-		out.PolicyCondition = deepCopyIAMPolicyCondition(in.PolicyCondition)
+func copyStringOrStringSlice(from interface{}) interface{} {
+	var to interface{}
+
+	switch v := from.(type) {
+	case string:
+		// simple assignment creates copy
+		to = from
+	case []string:
+		toSlice := make([]string, len(v))
+		copy(toSlice, v)
+		to = toSlice
+	default:
+		// unexpected type, this could mean we're not
+		// doing a deepcopy
+		to = from
 	}
 
-	return
-}
-
-// DeepCopy will DeepCopy and return a pointer to a
-// new StatementEntry
-func (in *StatementEntry) DeepCopy() *StatementEntry {
-	if in == nil {
-		return nil
-	}
-	out := new(StatementEntry)
-	in.DeepCopyInto(out)
-	return out
+	return to
 }
