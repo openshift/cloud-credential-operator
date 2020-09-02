@@ -47,6 +47,17 @@ import (
 )
 
 const (
+	validNamespace = "valid-namespace"
+	validName      = "valid-name"
+	
+	rootClientID       = "root_client_id"
+	rootClientSecret   = "root_client_secret"
+	rootRegion         = "root_region"
+	rootResourceGroup  = "root_resource_group"
+	rootResourcePrefix = "root_resource_prefix"
+	rootSubscriptionID = "root_subscription_id"
+	rootTenantID       = "root_tenant_id"
+
 	testNamespace        = "default"
 	testAppRegName       = "Test App Reg"
 	testAppRegID         = "some-unique-app-id"
@@ -55,6 +66,8 @@ const (
 	testRandomSuffix     = "rando"
 	testRoleName         = "Contributor"
 	testRoleDefinitionID = "some-role-def-id"
+	testResourceGroupName  = "Test Resource Group"
+	testInfrastructureName = "test-cluster-abcd"
 )
 
 var (
@@ -72,6 +85,76 @@ var (
 		RoleBindings: []minterv1.RoleBinding{
 			{
 				Role: testRoleName,
+			},
+		},
+	}
+
+	validRootSecret = corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      constants.AzureCloudCredSecretName,
+			Namespace: constants.CloudCredSecretNamespace,
+			Annotations: map[string]string{
+				constants.AnnotationKey: constants.PassthroughAnnotation,
+			},
+		},
+		Data: map[string][]byte{
+			azure.AzureClientID:       []byte(rootClientID),
+			azure.AzureClientSecret:   []byte(rootClientSecret),
+			azure.AzureRegion:         []byte(rootRegion),
+			azure.AzureResourceGroup:  []byte(rootResourceGroup),
+			azure.AzureResourcePrefix: []byte(rootResourcePrefix),
+			azure.AzureSubscriptionID: []byte(rootSubscriptionID),
+			azure.AzureTenantID:       []byte(rootTenantID),
+		},
+	}
+
+	rootSecretBadAnnotation = corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      constants.AzureCloudCredSecretName,
+			Namespace: constants.CloudCredSecretNamespace,
+			Annotations: map[string]string{
+				constants.AnnotationKey: "blah",
+			},
+		},
+	}
+
+	rootSecretNoAnnotation = corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        constants.AzureCloudCredSecretName,
+			Namespace:   constants.CloudCredSecretNamespace,
+			Annotations: map[string]string{},
+		},
+	}
+
+	validSecret = corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      validName,
+			Namespace: validNamespace,
+		},
+	}
+
+	clusterInfra = openshiftapiv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Status: openshiftapiv1.InfrastructureStatus{
+			InfrastructureName: testInfrastructureName,
+			PlatformStatus: &openshiftapiv1.PlatformStatus{
+				Azure: &openshiftapiv1.AzurePlatformStatus{
+					ResourceGroupName: testResourceGroupName,
+				},
+			},
+		},
+	}
+
+	testDNSResourceGroupName = "os4-common"
+	clusterDNS               = openshiftapiv1.DNS{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: openshiftapiv1.DNSSpec{
+			PublicZone: &openshiftapiv1.DNSZone{
+				ID: "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/" + testDNSResourceGroupName + "/providers/Microsoft.Network/dnszones/devcluster.openshift.com",
 			},
 		},
 	}
