@@ -238,6 +238,8 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
+      serviceAccount: default
+      serviceAccountName: default
       terminationGracePeriodSeconds: 10
       tolerations:
       - effect: NoSchedule
