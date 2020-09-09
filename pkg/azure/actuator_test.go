@@ -49,7 +49,7 @@ import (
 const (
 	validNamespace = "valid-namespace"
 	validName      = "valid-name"
-	
+
 	rootClientID       = "root_client_id"
 	rootClientSecret   = "root_client_secret"
 	rootRegion         = "root_region"
@@ -58,14 +58,14 @@ const (
 	rootSubscriptionID = "root_subscription_id"
 	rootTenantID       = "root_tenant_id"
 
-	testNamespace        = "default"
-	testAppRegName       = "Test App Reg"
-	testAppRegID         = "some-unique-app-id"
-	testAppRegObjID      = "some-unique-app-obj-id"
-	testCredRequestName  = "testCredRequest"
-	testRandomSuffix     = "rando"
-	testRoleName         = "Contributor"
-	testRoleDefinitionID = "some-role-def-id"
+	testNamespace          = "default"
+	testAppRegName         = "Test App Reg"
+	testAppRegID           = "some-unique-app-id"
+	testAppRegObjID        = "some-unique-app-obj-id"
+	testCredRequestName    = "testCredRequest"
+	testRandomSuffix       = "rando"
+	testRoleName           = "Contributor"
+	testRoleDefinitionID   = "some-role-def-id"
 	testResourceGroupName  = "Test Resource Group"
 	testInfrastructureName = "test-cluster-abcd"
 )
@@ -89,7 +89,7 @@ var (
 		},
 	}
 
-	validRootSecret = corev1.Secret{
+	validPassthroughRootSecret = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      constants.AzureCloudCredSecretName,
 			Namespace: constants.CloudCredSecretNamespace,
@@ -187,7 +187,7 @@ func TestAnnotations(t *testing.T) {
 		in        corev1.Secret
 		errRegexp string
 	}{
-		{"TestValidSecretAnnotation", validRootSecret, ""},
+		{"TestValidSecretAnnotation", validPassthroughRootSecret, ""},
 		{"TestBadSecretAnnotation", rootSecretBadAnnotation, "invalid mode"},
 		{"TestMissingSecretAnnotation", rootSecretNoAnnotation, "cannot proceed without cloud cred secret annotation.*"},
 	}
