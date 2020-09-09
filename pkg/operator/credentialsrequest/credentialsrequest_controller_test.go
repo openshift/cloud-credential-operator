@@ -557,6 +557,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
 				testPassthroughCredentialsRequest(t),
+				testPassthroughAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
@@ -596,6 +597,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testInfrastructure(testInfraName),
 				createTestNamespace(testSecretNamespace),
 				testPassthroughCredentialsRequest(t),
+				testPassthroughAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
@@ -1197,6 +1199,56 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			expectErr: true,
 		},
+		{
+			name: "root creds updated in passthrough mode",
+			existing: func() []runtime.Object {
+				objects := []runtime.Object{}
+				objects = append(objects, testOperatorConfig(operatorv1.CloudCredentialsModePassthrough))
+				objects = append(objects, createTestNamespace(testNamespace))
+				objects = append(objects, createTestNamespace(testSecretNamespace))
+
+				cr := testPassthroughCredentialsRequest(t)
+				cr.Generation = cr.Generation + 1                       // rev the generation to trigger the sync
+				cr.Status.LastSyncCloudCredsSecretResourceVersion = "1" // resource version of root creds before update
+				objects = append(objects, cr)
+
+				credentialsRootSecret := testPassthroughAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey)
+				credentialsRootSecret.ResourceVersion = testCredRootSecretResourceVersion // resource version of root creds after update
+				objects = append(objects, credentialsRootSecret)
+				objects = append(objects, testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey))
+				objects = append(objects, testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey))
+				objects = append(objects, testClusterVersion())
+				objects = append(objects, testInfrastructure(testInfraName))
+
+				return objects
+			}(),
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				return mockAWSClient
+			},
+			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				if assert.NotNil(t, targetSecret) {
+					assert.Equal(t, testRootAWSAccessKeyID,
+						string(targetSecret.Data["aws_access_key_id"]))
+					assert.Equal(t, testRootAWSSecretAccessKey,
+						string(targetSecret.Data["aws_secret_access_key"]))
+				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, testCredRootSecretResourceVersion, cr.Status.LastSyncCloudCredsSecretResourceVersion)
+			},
+		},
 	}
 
 	for _, test := range tests {
@@ -1280,27 +1332,28 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 }
 
 const (
-	testCRGeneration           = 1 // just non-zero
-	testCRName                 = "openshift-component-a"
-	testNamespace              = "openshift-cloud-credential-operator"
-	testClusterName            = "testcluster"
-	testClusterID              = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
-	testInfraName              = "testcluster-abc123"
-	testSecretName             = "test-secret"
-	testSecretNamespace        = "myproject"
-	testAWSUser                = "mycluster-test-aws-user"
-	testAWSARN                 = "arn:aws:iam::1234:user/testuser"
-	testAWSUserID              = "FAKEAWSUSERID"
-	testAWSAccessKeyID         = "FAKEAWSACCESSKEYID"
-	testAWSAccessKeyID2        = "FAKEAWSACCESSKEYID2"
-	testAWSSecretAccessKey     = "KEEPITSECRET"
-	testAWSSecretAccessKey2    = "KEEPITSECRET2"
-	testRootAWSAccessKeyID     = "rootaccesskey"
-	testRootAWSSecretAccessKey = "rootsecretkey"
-	testReadAWSAccessKeyID     = "readaccesskey"
-	testReadAWSSecretAccessKey = "readsecretkey"
-	testPermissionsBoundaryARN = "some:boundary:ARN:1234"
-	testPermissionBoundaryType = "Policy" // currently the only allowed value in AWS
+	testCRGeneration                  = 1 // just non-zero
+	testCredRootSecretResourceVersion = "123"
+	testCRName                        = "openshift-component-a"
+	testNamespace                     = "openshift-cloud-credential-operator"
+	testClusterName                   = "testcluster"
+	testClusterID                     = "e415fe1c-f894-11e8-8eb2-f2801f1b9fd1"
+	testInfraName                     = "testcluster-abc123"
+	testSecretName                    = "test-secret"
+	testSecretNamespace               = "myproject"
+	testAWSUser                       = "mycluster-test-aws-user"
+	testAWSARN                        = "arn:aws:iam::1234:user/testuser"
+	testAWSUserID                     = "FAKEAWSUSERID"
+	testAWSAccessKeyID                = "FAKEAWSACCESSKEYID"
+	testAWSAccessKeyID2               = "FAKEAWSACCESSKEYID2"
+	testAWSSecretAccessKey            = "KEEPITSECRET"
+	testAWSSecretAccessKey2           = "KEEPITSECRET2"
+	testRootAWSAccessKeyID            = "rootaccesskey"
+	testRootAWSSecretAccessKey        = "rootsecretkey"
+	testReadAWSAccessKeyID            = "readaccesskey"
+	testReadAWSSecretAccessKey        = "readsecretkey"
+	testPermissionsBoundaryARN        = "some:boundary:ARN:1234"
+	testPermissionBoundaryType        = "Policy" // currently the only allowed value in AWS
 )
 
 var (
