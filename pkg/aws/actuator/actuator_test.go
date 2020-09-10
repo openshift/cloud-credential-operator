@@ -22,6 +22,8 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	configv1 "github.com/openshift/api/config/v1"
+	v1 "github.com/openshift/api/operator/v1"
 	"github.com/stretchr/testify/assert"
 
 	corev1 "k8s.io/api/core/v1"
@@ -35,6 +37,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 const (
@@ -269,11 +272,104 @@ func TestGenerateUserName(t *testing.T) {
 	}
 }
 
+func TestUpgradeable(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		t.Fatalf("failed to set up codec for tests: %v", err)
+	}
+
+	tests := []struct {
+		name           string
+		mode           v1.CloudCredentialsMode
+		existing       []runtime.Object
+		expectedStatus configv1.ConditionStatus
+		expectedReason string
+	}{
+		{
+			name: "mint mode with root cred",
+			mode: v1.CloudCredentialsModeMint,
+			existing: []runtime.Object{
+				testRootSecret(),
+			},
+			expectedStatus: configv1.ConditionTrue,
+		},
+		{
+			name: "implicit mint mode with root cred",
+			mode: v1.CloudCredentialsModeDefault,
+			existing: []runtime.Object{
+				testRootSecret(),
+			},
+			expectedStatus: configv1.ConditionTrue,
+		},
+		{
+			name:           "mint mode with missing root cred",
+			mode:           v1.CloudCredentialsModeMint,
+			existing:       []runtime.Object{},
+			expectedStatus: configv1.ConditionFalse,
+			expectedReason: constants.MissingRootCredentialUpgradeableReason,
+		},
+		{
+			name:           "implicit mint mode with missing root cred",
+			mode:           v1.CloudCredentialsModeDefault,
+			existing:       []runtime.Object{},
+			expectedStatus: configv1.ConditionFalse,
+			expectedReason: constants.MissingRootCredentialUpgradeableReason,
+		},
+		{
+			name: "manual mode with 4.6 secrets pre-provisioned",
+			mode: v1.CloudCredentialsModeManual,
+			existing: []runtime.Object{
+				testSecret("openshift-cloud-credential-operator", "cloud-credential-operator-s3"),
+				testSecret("openshift-cluster-csi-drivers", "ebs-cloud-credentials"),
+			},
+			expectedStatus: configv1.ConditionTrue,
+		},
+		{
+			name:           "manual mode without 4.6 secrets pre-provisioned",
+			mode:           v1.CloudCredentialsModeManual,
+			existing:       []runtime.Object{},
+			expectedStatus: configv1.ConditionFalse,
+			expectedReason: constants.MissingSecretsForUpgradeReason,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewFakeClient(test.existing...)
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			a := &AWSActuator{
+				Client: fakeClient,
+				Codec:  codec,
+			}
+			cond := a.Upgradeable(test.mode)
+			assert.Equal(t, test.expectedStatus, cond.Status)
+			assert.Equal(t, test.expectedReason, cond.Reason)
+		})
+	}
+}
 func testReadOnlySecret() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      roAWSCredsSecret,
 			Namespace: roAWSCredsSecretNamespace,
+		},
+		Data: map[string][]byte{
+			"aws_access_key_id":     []byte(testROAccessKeyID),
+			"aws_secret_access_key": []byte(testROSecretAccessKey),
+		},
+	}
+}
+
+func testSecret(namespace, name string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
 		},
 		Data: map[string][]byte{
 			"aws_access_key_id":     []byte(testROAccessKeyID),

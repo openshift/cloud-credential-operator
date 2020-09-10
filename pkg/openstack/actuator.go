@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
@@ -265,4 +267,16 @@ func (a *OpenStackActuator) getLogger(cr *minterv1.CredentialsRequest) log.Field
 		"actuator": "openstack",
 		"cr":       fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
+}
+
+func (a *OpenStackActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	return upgradeableCondition
+}
+
+func (a *OpenStackActuator) GetUpcomingCredSecrets() []types.NamespacedName {
+	return []types.NamespacedName{}
 }

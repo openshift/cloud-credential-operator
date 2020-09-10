@@ -18,6 +18,10 @@ package actuator
 import (
 	"context"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	"k8s.io/apimachinery/pkg/types"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 )
 
@@ -32,6 +36,12 @@ type Actuator interface {
 	Update(context.Context, *minterv1.CredentialsRequest) error
 	// Checks if the credentials currently exists.
 	Exists(context.Context, *minterv1.CredentialsRequest) (bool, error)
+	// Upgradeable returns a ClusterOperator Upgradeable condition to indicate whether or not this cluster can
+	// be safely upgraded to the next "minor" (4.y) Openshift release.
+	Upgradeable(operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition
+	// GetUpcomingCredSecrets returns a slice of NamespacedNames for secrets holding credentials that we know are coming in the next OpenShift release.
+	// Used to pre-check if Upgradeable condition should be true or false for manual mode deployments of the credentials operator.
+	GetUpcomingCredSecrets() []types.NamespacedName
 }
 
 type DummyActuator struct {
@@ -51,6 +61,18 @@ func (a *DummyActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequ
 
 func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	return nil
+}
+
+func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	return upgradeableCondition
+}
+
+func (a *DummyActuator) GetUpcomingCredSecrets() []types.NamespacedName {
+	return []types.NamespacedName{}
 }
 
 type ActuatorError struct {

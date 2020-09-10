@@ -68,6 +68,10 @@ const (
 	cloudCredDeprovisionSuccess = "CloudCredDeprovisionSuccess"
 
 	credentialsRequestInfraMismatch = "InfrastructureMismatch"
+
+	// Hack for 4.5 to get us a status update when we don't have a cred request to reconcile.
+	fakeCredRequestName     = "no-op-fake-cred-request"
+	fakeCredReuestNamespace = "no-op-fake-cred-request-namespace"
 )
 
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
@@ -84,6 +88,16 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 		Actuator:     actuator,
 		platformType: platType,
 	}
+}
+
+// isFutureCredRequestSecret is used to identify if a given secret namespace + name is one we're expecting in a future
+func isFutureCredRequestSecret(a actuator.Actuator, namespace, name string) bool {
+	for _, nsn := range a.GetUpcomingCredSecrets() {
+		if nsn.Namespace == namespace && nsn.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
@@ -126,12 +140,26 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	actuator := (r.(*ReconcileCredentialsRequest)).Actuator
+
 	// Define a mapping for secrets to the credentials requests that created them. (if applicable)
 	// We use an annotation on secrets that refers back to their owning credentials request because
 	// the normal owner reference is not namespaced, and we want to support credentials requests being
 	// in a centralized namespace, but writing secrets into component namespaces.
 	mapFn := handler.ToRequestsFunc(
 		func(a handler.MapObject) []reconcile.Request {
+
+			// Hack for 4.5, reconcile a fake cred request we're watching for in the Reconcile loop, intended to be
+			// a no-op so we can get a status update. (remove once we break status out into it's own controller)
+			if isFutureCredRequestSecret(actuator, a.Meta.GetNamespace(), a.Meta.GetName()) {
+				return []reconcile.Request{
+					{NamespacedName: types.NamespacedName{
+						Name:      fakeCredRequestName,
+						Namespace: fakeCredReuestNamespace,
+					}},
+				}
+			}
+
 			// Predicate below should ensure this map function is not called if the
 			// secret does not have our label:
 			namespace, name, err := cache.SplitMetaNamespaceKey(a.Meta.GetAnnotations()[minterv1.AnnotationCredentialsRequest])
@@ -151,9 +179,15 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			}
 		})
 
-	// These functions are used to determine if a event for the given object should trigger a sync:
+	// These functions are used to determine if a event for the given Secret should trigger a sync:
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
+
+			// Watch for Secrets from future release cred requests:
+			if isFutureCredRequestSecret(actuator, e.MetaNew.GetNamespace(), e.MetaNew.GetName()) {
+				return true
+			}
+
 			// The object doesn't contain our label, so we have nothing to reconcile.
 			if _, ok := e.MetaOld.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
@@ -161,12 +195,22 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return true
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
+			// Watch for Secrets from future release cred requests:
+			if isFutureCredRequestSecret(actuator, e.Meta.GetNamespace(), e.Meta.GetName()) {
+				return true
+			}
+
 			if _, ok := e.Meta.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
 			}
 			return true
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
+			// Watch for Secrets from future release cred requests:
+			if isFutureCredRequestSecret(actuator, e.Meta.GetNamespace(), e.Meta.GetName()) {
+				return true
+			}
+
 			if _, ok := e.Meta.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
 			}
@@ -271,7 +315,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	})
 
 	// Ensure we always sync operator status after reconciling, even if an error occurred.
-	// TODO: Should this be another controller?
+	// TODO: Move to another controller:
 	defer func() {
 		err := r.syncOperatorStatus()
 		if err != nil {
@@ -280,6 +324,13 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		dur := time.Since(start)
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
+
+	// Hack for 4.5, reconcile a fake cred request we're watching for in the Reconcile loop, intended to be
+	// a no-op so we can get a status update. (remove once we break status out into it's own controller)
+	if request.NamespacedName.Namespace == fakeCredReuestNamespace && request.NamespacedName.Name == fakeCredRequestName {
+		logger.Info("detected reconcile of fake credentials request name for status update purposes, returning")
+		return reconcile.Result{}, nil
+	}
 
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
 	if err != nil {
