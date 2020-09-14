@@ -1,4 +1,4 @@
-FROM registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-openshift-4.6 as builder
+FROM registry.svc.ci.openshift.org/ocp/builder:rhel-8-golang-1.15-openshift-4.6 as builder
 WORKDIR /go/src/github.com/openshift/cloud-credential-operator
 COPY . .
 ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
