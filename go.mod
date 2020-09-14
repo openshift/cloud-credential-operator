@@ -23,10 +23,10 @@ require (
 	github.com/googleapis/gnostic v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.10 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
-	github.com/openshift/api v0.0.0-20200728181127-fc1d675671df
-	github.com/openshift/build-machinery-go v0.0.0-20200713135615-1f43d26dccc7
-	github.com/openshift/client-go v0.0.0-20200722173614-5a1b0aaeff15
-	github.com/openshift/library-go v0.0.0-20200724235449-b4f9ae5f0c51
+	github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
+	github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7
+	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
+	github.com/openshift/library-go v0.0.0-20200911100307-610c6e9e90b8
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.7.1
 	github.com/satori/go.uuid v1.2.0
@@ -44,7 +44,6 @@ require (
 	google.golang.org/grpc v1.28.0
 	gopkg.in/square/go-jose.v2 v2.2.2
 	k8s.io/api v0.19.0
-	k8s.io/apiextensions-apiserver v0.19.0 // indirect
 	k8s.io/apimachinery v0.19.0
 	k8s.io/client-go v0.19.0
 	k8s.io/code-generator v0.19.0
