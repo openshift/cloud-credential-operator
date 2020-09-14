@@ -14,9 +14,15 @@ require (
 	github.com/aws/aws-sdk-go v1.30.5
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
+	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6 // indirect
+	github.com/go-logr/zapr v0.2.0 // indirect
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/mock v1.4.3
+	github.com/google/go-cmp v0.5.1 // indirect
 	github.com/google/uuid v1.1.1
+	github.com/googleapis/gnostic v0.5.1 // indirect
+	github.com/imdario/mergo v0.3.10 // indirect
+	github.com/onsi/ginkgo v1.14.0 // indirect
 	github.com/openshift/api v0.0.0-20200728181127-fc1d675671df
 	github.com/openshift/build-machinery-go v0.0.0-20200713135615-1f43d26dccc7
 	github.com/openshift/client-go v0.0.0-20200722173614-5a1b0aaeff15
@@ -28,17 +34,19 @@ require (
 	github.com/spf13/cobra v1.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.5.1
+	go.uber.org/zap v1.15.0 // indirect
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/time v0.0.0-20191024005414-555d28b269f0
+	golang.org/x/time v0.0.0-20200630173020-3af7569d3a1e
+	gomodules.xyz/jsonpatch/v2 v2.1.0 // indirect
 	google.golang.org/api v0.21.0
+	google.golang.org/appengine v1.6.6 // indirect
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 	google.golang.org/grpc v1.28.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	k8s.io/api v0.19.0-rc.2
-	k8s.io/apimachinery v0.19.0-rc.2
-	k8s.io/client-go v0.19.0-rc.2
-	k8s.io/code-generator v0.19.0-rc.2
-	sigs.k8s.io/controller-runtime v0.6.0
+	k8s.io/api v0.19.0
+	k8s.io/apiextensions-apiserver v0.19.0 // indirect
+	k8s.io/apimachinery v0.19.0
+	k8s.io/client-go v0.19.0
+	k8s.io/code-generator v0.19.0
+	sigs.k8s.io/controller-runtime v0.6.2
 )
-
-replace sigs.k8s.io/controller-runtime => github.com/joelanford/controller-runtime v0.2.0-beta.1.0.20200723141319-3249b9ca8d12
