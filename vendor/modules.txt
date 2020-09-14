@@ -171,7 +171,7 @@ github.com/mitchellh/go-homedir
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
-# github.com/openshift/api v0.0.0-20200728181127-fc1d675671df
+# github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
 github.com/openshift/api
 github.com/openshift/api/apps
 github.com/openshift/api/apps/v1
@@ -181,6 +181,8 @@ github.com/openshift/api/build
 github.com/openshift/api/build/v1
 github.com/openshift/api/config
 github.com/openshift/api/config/v1
+github.com/openshift/api/helm
+github.com/openshift/api/helm/v1beta1
 github.com/openshift/api/image
 github.com/openshift/api/image/docker10
 github.com/openshift/api/image/dockerpre012
@@ -220,7 +222,7 @@ github.com/openshift/api/template
 github.com/openshift/api/template/v1
 github.com/openshift/api/user
 github.com/openshift/api/user/v1
-# github.com/openshift/build-machinery-go v0.0.0-20200713135615-1f43d26dccc7
+# github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7
 github.com/openshift/build-machinery-go
 github.com/openshift/build-machinery-go/make
 github.com/openshift/build-machinery-go/make/lib
