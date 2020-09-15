@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -766,4 +768,16 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 	}
 
 	return serviceAPIsEnabled, nil
+}
+
+func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	return upgradeableCondition
+}
+
+func (a *Actuator) GetUpcomingCredSecrets() []types.NamespacedName {
+	return []types.NamespacedName{}
 }

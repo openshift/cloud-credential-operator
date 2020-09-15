@@ -157,7 +157,6 @@ func isOperatorDisabledViaConfigmap(kubeClient client.Client, logger log.FieldLo
 	cm, err := GetLegacyConfigMap(kubeClient)
 	if err != nil {
 		if errors.IsNotFound(err) {
-			logger.Debugf("%s ConfigMap does not exist, assuming default behavior", constants.CloudCredOperatorConfigMap)
 			return OperatorDisabledDefault, nil
 		}
 		return OperatorDisabledDefault, err

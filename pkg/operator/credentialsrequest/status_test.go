@@ -23,6 +23,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	v1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,7 +39,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
@@ -81,7 +81,6 @@ func TestClusterOperatorStatus(t *testing.T) {
 		credRequests       []minterv1.CredentialsRequest
 		cloudPlatform      configv1.PlatformType
 		operatorDisabled   bool
-		parentCredRemoved  bool
 		expectedConditions []configv1.ClusterOperatorStatusCondition
 	}{
 		{
@@ -185,14 +184,6 @@ func TestClusterOperatorStatus(t *testing.T) {
 			expectedConditions: []configv1.ClusterOperatorStatusCondition{},
 		},
 		{
-			name:              "upgradable false if parent cred removed",
-			credRequests:      []minterv1.CredentialsRequest{},
-			parentCredRemoved: true,
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorUpgradeable, configv1.ConditionFalse, reasonCredentialsRootSecretMissing),
-			},
-		},
-		{
 			name: "operator disabled",
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", false, []minterv1.CredentialsRequestCondition{}, nil),
@@ -210,11 +201,18 @@ func TestClusterOperatorStatus(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			clusterOperatorConditions := computeStatusConditions(test.credRequests,
-				test.cloudPlatform, test.operatorDisabled,
-				!test.parentCredRemoved,
-				types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName},
+			dummyActuator := &actuator.DummyActuator{}
+			operatorMode := v1.CloudCredentialsModeMint
+			if test.operatorDisabled {
+				operatorMode = v1.CloudCredentialsModeManual
+			}
+			clusterOperatorConditions := computeStatusConditions(
+				dummyActuator,
+				operatorMode,
+				test.credRequests,
+				test.cloudPlatform,
 				log.WithField("test", test.name))
+
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
 				if assert.NotNil(t, c, "unexpected nil for condition %s", ec.Type) {

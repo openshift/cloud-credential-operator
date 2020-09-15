@@ -41,6 +41,18 @@ const (
 	// the operator config CR specifies an invalide mode
 	StatusModeInvalid = "ModeInvalid"
 
+	// MissingSecretsForUpgradeReason is used when a manual mode cluster is not upgradable due to missing
+	// secrets the operator knows will be required for the next minor release of OpenShift.
+	MissingSecretsForUpgradeReason = "ManualModeMissingSecrets"
+
+	// ErrorDeterminingUpgradeableReason is used when we encounter unexpected errors checking if a cluster can
+	// be updated.
+	ErrorDeterminingUpgradeableReason = "ErrorDeterminingUpgradeable"
+
+	// MissingRootCredentialUpgradeableReason is used a cluster is in mint mode with the root credential removed.
+	// In this state the root credential must be resotred before we can upgrade to the next minor release of OpenShift.
+	MissingRootCredentialUpgradeableReason = "MissingRootCredential"
+
 	// secret annoation vars
 
 	// AnnotationKey is the annotation the cloud credentials secret will be annotated with to indicate
