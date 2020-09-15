@@ -1237,10 +1237,9 @@ func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv
 			upgradeableCondition.Status = configv1.ConditionFalse
 			upgradeableCondition.Reason = constants.MissingSecretsForUpgradeReason
 			upgradeableCondition.Message = fmt.Sprintf(
-				"Cannot upgrade manual mode cluster to %s due to missing secret(s): %v Please see documentation at: %s",
+				"Cannot upgrade manual mode cluster to %s due to missing secret(s): %v Please see the Manually Creating IAM for AWS OpenShift documentation.",
 				toRelease,
-				missingSecrets,
-				"https://docs.openshift.com/container-platform/4.5/installing/installing_aws/manually-creating-iam.html")
+				missingSecrets)
 		}
 	} else {
 		// If in mint or passthrough, make sure the root cred secret exists, if not it must be restored prior to upgrade.
