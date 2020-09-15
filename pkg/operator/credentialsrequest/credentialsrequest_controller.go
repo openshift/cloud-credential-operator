@@ -284,6 +284,33 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Mapper to reconcile all CredRequests any time something we're watching changes.
+	allCredRequestsMapFn := handler.ToRequestsFunc(
+		func(a handler.MapObject) []reconcile.Request {
+			crs := &minterv1.CredentialsRequestList{}
+			mgr.GetClient().List(context.TODO(), crs)
+			requests := []reconcile.Request{}
+			for _, cr := range crs.Items {
+				requests = append(requests, reconcile.Request{
+					NamespacedName: types.NamespacedName{
+						Name:      cr.Name,
+						Namespace: cr.Namespace,
+					},
+				})
+			}
+			return requests
+		})
+
+	// Watch the CloudCredential config object and reconcile everything on changes.
+	err = c.Watch(
+		&source.Kind{Type: &operatorv1.CloudCredential{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: allCredRequestsMapFn,
+		})
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
