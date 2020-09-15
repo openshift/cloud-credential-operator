@@ -20,6 +20,8 @@ import (
 	"fmt"
 	"reflect"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -384,4 +386,16 @@ func isVSphereCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 			Info("actuator handles only vsphere credentials")
 	}
 	return isVSphere, nil
+}
+
+func (a *VSphereActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	return upgradeableCondition
+}
+
+func (a *VSphereActuator) GetUpcomingCredSecrets() []types.NamespacedName {
+	return []types.NamespacedName{}
 }

@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
@@ -40,15 +40,16 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 var _ clusteroperator.StatusHandler = &ReconcileCredentialsRequest{}
 
 func (r *ReconcileCredentialsRequest) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
-	_, credRequests, operatorIsDisabled, err := r.getOperatorState(logger)
+	_, credRequests, mode, err := r.getOperatorState(logger)
 	if err != nil {
 		return []configv1.ClusterOperatorStatusCondition{}, fmt.Errorf("failed to get operator state: %v", err)
 	}
-	parentSecretExists, err := r.parentSecretExists()
-	if err != nil {
-		return []configv1.ClusterOperatorStatusCondition{}, errors.Wrap(err, "error checking if parent secret exists")
-	}
-	return computeStatusConditions(credRequests, r.platformType, operatorIsDisabled, parentSecretExists, r.Actuator.GetCredentialsRootSecretLocation(), logger), nil
+	return computeStatusConditions(
+		r.Actuator,
+		mode,
+		credRequests,
+		r.platformType,
+		logger), nil
 }
 
 func (r *ReconcileCredentialsRequest) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {
@@ -63,28 +64,17 @@ func (r *ReconcileCredentialsRequest) Name() string {
 	return controllerName
 }
 
-func (r *ReconcileCredentialsRequest) parentSecretExists() (bool, error) {
-	parentSecret := &corev1.Secret{}
-	if err := r.Client.Get(context.TODO(), r.Actuator.GetCredentialsRootSecretLocation(), parentSecret); err != nil {
-		if apierrors.IsNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
-}
-
 // getOperatorState gets and returns the resources necessary to compute the
 // operator's current state.
-func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest, bool, error) {
+func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest, operatorv1.CloudCredentialsMode, error) {
 
 	ns := &corev1.Namespace{}
 	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: minterv1.CloudCredOperatorNamespace}, ns); err != nil {
 		if apierrors.IsNotFound(err) {
-			return nil, nil, false, nil
+			return nil, nil, operatorv1.CloudCredentialsModeDefault, nil
 		}
 
-		return nil, nil, false, fmt.Errorf(
+		return nil, nil, operatorv1.CloudCredentialsModeDefault, fmt.Errorf(
 			"error getting Namespace %s: %v", minterv1.CloudCredOperatorNamespace, err)
 	}
 
@@ -94,16 +84,16 @@ func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (
 	credRequestList := &minterv1.CredentialsRequestList{}
 	err := r.Client.List(context.TODO(), credRequestList, client.InNamespace(minterv1.CloudCredOperatorNamespace))
 	if err != nil {
-		return nil, nil, false, fmt.Errorf(
+		return nil, nil, operatorv1.CloudCredentialsModeDefault, fmt.Errorf(
 			"failed to list CredentialsRequests: %v", err)
 	}
 
 	mode, _, err := utils.GetOperatorConfiguration(r.Client, logger)
 	if err != nil {
-		return nil, nil, false, fmt.Errorf("error checking if operator is disabled: %v", err)
+		return nil, nil, mode, fmt.Errorf("error checking if operator is disabled: %v", err)
 	}
 
-	return ns, credRequestList.Items, mode == operatorv1.CloudCredentialsModeManual, nil
+	return ns, credRequestList.Items, mode, nil
 }
 
 func computeClusterOperatorVersions() []configv1.OperandVersion {
@@ -119,12 +109,19 @@ func computeClusterOperatorVersions() []configv1.OperandVersion {
 
 // computeStatusConditions computes the operator's current state.
 func computeStatusConditions(
+	actuator actuator.Actuator,
+	mode operatorv1.CloudCredentialsMode,
 	credRequests []minterv1.CredentialsRequest,
 	clusterCloudPlatform configv1.PlatformType,
-	operatorIsDisabled bool, parentCredExists bool, parentCredLocation types.NamespacedName,
 	logger log.FieldLogger) []configv1.ClusterOperatorStatusCondition {
+	operatorIsDisabled := mode == operatorv1.CloudCredentialsModeManual
 
 	var conditions []configv1.ClusterOperatorStatusCondition
+
+	upgradeableCondition := actuator.Upgradeable(mode)
+	log.WithField("condition", upgradeableCondition).Info("calculated upgradeable condition")
+	conditions = append(conditions, *upgradeableCondition)
+
 	if operatorIsDisabled {
 		return conditions
 	}
@@ -185,6 +182,7 @@ func computeStatusConditions(
 			credRequestsNotProvisioned = credRequestsNotProvisioned + 1
 		}
 	}
+
 	if credRequestsNotProvisioned > 0 || failingCredRequests > 0 {
 		var progressingCondition configv1.ClusterOperatorStatusCondition
 		progressingCondition.Type = configv1.OperatorProgressing
@@ -194,19 +192,6 @@ func computeStatusConditions(
 			"%d of %d credentials requests provisioned, %d reporting errors.",
 			len(validCredRequests)-credRequestsNotProvisioned, len(validCredRequests), failingCredRequests)
 		conditions = append(conditions, progressingCondition)
-	}
-
-	// If the operator is not disabled, and we do not have a parent cred in kube-system, we are not
-	// upgradable. Admin cred removal is a valid mode to run in but it should be restored before
-	// you can upgrade.
-	if !operatorIsDisabled && !parentCredExists {
-		var upgradeableCondition configv1.ClusterOperatorStatusCondition
-		upgradeableCondition.Type = configv1.OperatorUpgradeable
-		upgradeableCondition.Status = configv1.ConditionFalse
-		upgradeableCondition.Reason = reasonCredentialsRootSecretMissing
-		upgradeableCondition.Message = fmt.Sprintf("Parent credential secret %s/%s must be restored prior to upgrade",
-			parentCredLocation.Namespace, parentCredLocation.Name)
-		conditions = append(conditions, upgradeableCondition)
 	}
 
 	// Log all conditions we set:
