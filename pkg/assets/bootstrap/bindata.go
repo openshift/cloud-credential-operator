@@ -1,7 +1,7 @@
 // Code generated for package bootstrap by go-bindata DO NOT EDIT. (@generated)
 // sources:
 // bindata/bootstrap/cloudcredential_v1_credentialsrequest_crd.yaml
-// bindata/bootstrap/cloudcredential_v1_operator_config_crd.yaml
+// bindata/bootstrap/cloudcredential_v1_operator_config_custresdef.yaml
 // bindata/bootstrap/namespace.yaml
 package bootstrap
 
@@ -219,174 +219,177 @@ func bootstrapCloudcredential_v1_credentialsrequest_crdYaml() (*asset, error) {
 	return a, nil
 }
 
-var _bootstrapCloudcredential_v1_operator_config_crdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1beta1
+var _bootstrapCloudcredential_v1_operator_config_custresdefYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   name: cloudcredentials.operator.openshift.io
 spec:
   scope: Cluster
-  preserveUnknownFields: false
   group: operator.openshift.io
   names:
     kind: CloudCredential
     listKind: CloudCredentialList
     plural: cloudcredentials
     singular: cloudcredential
-  subresources:
-    status: {}
   versions:
   - name: v1
     served: true
     storage: true
-  validation:
-    openAPIV3Schema:
-      description: CloudCredential provides a means to configure an operator to manage
-        CredentialsRequests.
-      type: object
-      required:
-      - spec
-      properties:
-        apiVersion:
-          description: 'APIVersion defines the versioned schema of this representation
-            of an object. Servers should convert recognized schemas to the latest
-            internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-          type: string
-        kind:
-          description: 'Kind is a string value representing the REST resource this
-            object represents. Servers may infer this from the endpoint the client
-            submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-          type: string
-        metadata:
-          type: object
-        spec:
-          description: CloudCredentialSpec is the specification of the desired behavior
-            of the cloud-credential-operator.
-          type: object
-          properties:
-            credentialsMode:
-              description: CredentialsMode allows informing CCO that it should not
-                attempt to dynamically determine the root cloud credentials capabilities,
-                and it should just run in the specified mode. It also allows putting
-                the operator into "manual" mode if desired. Leaving the field in default
-                mode runs CCO so that the cluster's cloud credentials will be dynamically
-                probed for capabilities (on supported clouds/platforms).
-              type: string
-              enum:
-              - ""
-              - Manual
-              - Mint
-              - Passthrough
-            logLevel:
-              description: logLevel is an intent based logging for an overall component.  It
-                does not give fine grained control, but it is a simple way to manage
-                coarse grained logging choices that operators have to interpret for
-                their operands.
-              type: string
-            managementState:
-              description: managementState indicates whether and how the operator
-                should manage the component
-              type: string
-              pattern: ^(Managed|Unmanaged|Force|Removed)$
-            observedConfig:
-              description: observedConfig holds a sparse config that controller has
-                observed from the cluster state.  It exists in spec because it is
-                an input to the level for the operator
-              type: object
-              nullable: true
-              x-kubernetes-preserve-unknown-fields: true
-            operatorLogLevel:
-              description: operatorLogLevel is an intent based logging for the operator
-                itself.  It does not give fine grained control, but it is a simple
-                way to manage coarse grained logging choices that operators have to
-                interpret for themselves.
-              type: string
-            unsupportedConfigOverrides:
-              description: 'unsupportedConfigOverrides holds a sparse config that
-                will override any previously set options.  It only needs to be the
-                fields to override it will end up overlaying in the following order:
-                1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
-              type: object
-              nullable: true
-              x-kubernetes-preserve-unknown-fields: true
-        status:
-          description: CloudCredentialStatus defines the observed status of the cloud-credential-operator.
-          type: object
-          properties:
-            conditions:
-              description: conditions is a list of conditions and their status
-              type: array
-              items:
-                description: OperatorCondition is just the standard condition fields.
+    subresources:
+      status: {}
+    schema:
+      openAPIV3Schema:
+        description: CloudCredential provides a means to configure an operator to
+          manage CredentialsRequests.
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CloudCredentialSpec is the specification of the desired behavior
+              of the cloud-credential-operator.
+            type: object
+            properties:
+              credentialsMode:
+                description: CredentialsMode allows informing CCO that it should not
+                  attempt to dynamically determine the root cloud credentials capabilities,
+                  and it should just run in the specified mode. It also allows putting
+                  the operator into "manual" mode if desired. Leaving the field in
+                  default mode runs CCO so that the cluster's cloud credentials will
+                  be dynamically probed for capabilities (on supported clouds/platforms).
+                type: string
+                enum:
+                - ""
+                - Manual
+                - Mint
+                - Passthrough
+              logLevel:
+                description: "logLevel is an intent based logging for an overall component.
+                  \ It does not give fine grained control, but it is a simple way
+                  to manage coarse grained logging choices that operators have to
+                  interpret for their operands. \n Valid values are: \"Normal\", \"Debug\",
+                  \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                type: string
+                default: Normal
+              managementState:
+                description: managementState indicates whether and how the operator
+                  should manage the component
+                type: string
+                pattern: ^(Managed|Unmanaged|Force|Removed)$
+              observedConfig:
+                description: observedConfig holds a sparse config that controller
+                  has observed from the cluster state.  It exists in spec because
+                  it is an input to the level for the operator
                 type: object
-                properties:
-                  lastTransitionTime:
-                    type: string
-                    format: date-time
-                  message:
-                    type: string
-                  reason:
-                    type: string
-                  status:
-                    type: string
-                  type:
-                    type: string
-            generations:
-              description: generations are used to determine when an item needs to
-                be reconciled or has changed in a way that needs a reaction.
-              type: array
-              items:
-                description: GenerationStatus keeps track of the generation for a
-                  given resource so that decisions about forced updates can be made.
+                nullable: true
+                x-kubernetes-preserve-unknown-fields: true
+              operatorLogLevel:
+                description: operatorLogLevel is an intent based logging for the operator
+                  itself.  It does not give fine grained control, but it is a simple
+                  way to manage coarse grained logging choices that operators have
+                  to interpret for themselves.
+                type: string
+              unsupportedConfigOverrides:
+                description: 'unsupportedConfigOverrides holds a sparse config that
+                  will override any previously set options.  It only needs to be the
+                  fields to override it will end up overlaying in the following order:
+                  1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
                 type: object
-                properties:
-                  group:
-                    description: group is the group of the thing you're tracking
-                    type: string
-                  hash:
-                    description: hash is an optional field set for resources without
-                      generation that are content sensitive like secrets and configmaps
-                    type: string
-                  lastGeneration:
-                    description: lastGeneration is the last generation of the workload
-                      controller involved
-                    type: integer
-                    format: int64
-                  name:
-                    description: name is the name of the thing you're tracking
-                    type: string
-                  namespace:
-                    description: namespace is where the thing you're tracking is
-                    type: string
-                  resource:
-                    description: resource is the resource type of the thing you're
-                      tracking
-                    type: string
-            observedGeneration:
-              description: observedGeneration is the last generation change you've
-                dealt with
-              type: integer
-              format: int64
-            readyReplicas:
-              description: readyReplicas indicates how many replicas are ready and
-                at the desired state
-              type: integer
-              format: int32
-            version:
-              description: version is the level this availability applies to
-              type: string
+                nullable: true
+                x-kubernetes-preserve-unknown-fields: true
+          status:
+            description: CloudCredentialStatus defines the observed status of the
+              cloud-credential-operator.
+            type: object
+            properties:
+              conditions:
+                description: conditions is a list of conditions and their status
+                type: array
+                items:
+                  description: OperatorCondition is just the standard condition fields.
+                  type: object
+                  properties:
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+              generations:
+                description: generations are used to determine when an item needs
+                  to be reconciled or has changed in a way that needs a reaction.
+                type: array
+                items:
+                  description: GenerationStatus keeps track of the generation for
+                    a given resource so that decisions about forced updates can be
+                    made.
+                  type: object
+                  properties:
+                    group:
+                      description: group is the group of the thing you're tracking
+                      type: string
+                    hash:
+                      description: hash is an optional field set for resources without
+                        generation that are content sensitive like secrets and configmaps
+                      type: string
+                    lastGeneration:
+                      description: lastGeneration is the last generation of the workload
+                        controller involved
+                      type: integer
+                      format: int64
+                    name:
+                      description: name is the name of the thing you're tracking
+                      type: string
+                    namespace:
+                      description: namespace is where the thing you're tracking is
+                      type: string
+                    resource:
+                      description: resource is the resource type of the thing you're
+                        tracking
+                      type: string
+              observedGeneration:
+                description: observedGeneration is the last generation change you've
+                  dealt with
+                type: integer
+                format: int64
+              readyReplicas:
+                description: readyReplicas indicates how many replicas are ready and
+                  at the desired state
+                type: integer
+                format: int32
+              version:
+                description: version is the level this availability applies to
+                type: string
 `)
 
-func bootstrapCloudcredential_v1_operator_config_crdYamlBytes() ([]byte, error) {
-	return _bootstrapCloudcredential_v1_operator_config_crdYaml, nil
+func bootstrapCloudcredential_v1_operator_config_custresdefYamlBytes() ([]byte, error) {
+	return _bootstrapCloudcredential_v1_operator_config_custresdefYaml, nil
 }
 
-func bootstrapCloudcredential_v1_operator_config_crdYaml() (*asset, error) {
-	bytes, err := bootstrapCloudcredential_v1_operator_config_crdYamlBytes()
+func bootstrapCloudcredential_v1_operator_config_custresdefYaml() (*asset, error) {
+	bytes, err := bootstrapCloudcredential_v1_operator_config_custresdefYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootstrap/cloudcredential_v1_operator_config_crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "bootstrap/cloudcredential_v1_operator_config_custresdef.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -469,9 +472,9 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"bootstrap/cloudcredential_v1_credentialsrequest_crd.yaml": bootstrapCloudcredential_v1_credentialsrequest_crdYaml,
-	"bootstrap/cloudcredential_v1_operator_config_crd.yaml":    bootstrapCloudcredential_v1_operator_config_crdYaml,
-	"bootstrap/namespace.yaml":                                 bootstrapNamespaceYaml,
+	"bootstrap/cloudcredential_v1_credentialsrequest_crd.yaml":     bootstrapCloudcredential_v1_credentialsrequest_crdYaml,
+	"bootstrap/cloudcredential_v1_operator_config_custresdef.yaml": bootstrapCloudcredential_v1_operator_config_custresdefYaml,
+	"bootstrap/namespace.yaml":                                     bootstrapNamespaceYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -516,8 +519,8 @@ type bintree struct {
 
 var _bintree = &bintree{nil, map[string]*bintree{
 	"bootstrap": {nil, map[string]*bintree{
-		"cloudcredential_v1_credentialsrequest_crd.yaml": {bootstrapCloudcredential_v1_credentialsrequest_crdYaml, map[string]*bintree{}},
-		"cloudcredential_v1_operator_config_crd.yaml":    {bootstrapCloudcredential_v1_operator_config_crdYaml, map[string]*bintree{}},
+		"cloudcredential_v1_credentialsrequest_crd.yaml":     {bootstrapCloudcredential_v1_credentialsrequest_crdYaml, map[string]*bintree{}},
+		"cloudcredential_v1_operator_config_custresdef.yaml": {bootstrapCloudcredential_v1_operator_config_custresdefYaml, map[string]*bintree{}},
 		"namespace.yaml": {bootstrapNamespaceYaml, map[string]*bintree{}},
 	}},
 }}
