@@ -81,9 +81,9 @@ update: update-vendored-crds update-codegen update-bindata
 
 update-vendored-crds:
 	# copy config CRD from openshift/api
-	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/00-config-crd.yaml
+	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/00-config-custresdef.yaml
 	# ...and into where we generate bindata from
-	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/cloudcredential_v1_operator_config_crd.yaml
+	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/cloudcredential_v1_operator_config_custresdef.yaml
 .PHONY: update-vendored-crds
 
 update-codegen: update-codegen-crds
@@ -97,8 +97,8 @@ verify-codegen: verify-codegen-crds
 .PHONY: verify-codegen
 
 verify-vendored-crds:
-	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/00-config-crd.yaml
-	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/cloudcredential_v1_operator_config_crd.yaml
+	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/00-config-custresdef.yaml
+	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/cloudcredential_v1_operator_config_custresdef.yaml
 .PHONY: verify-vendored-crds
 
 clean:
