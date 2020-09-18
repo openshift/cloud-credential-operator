@@ -60,10 +60,11 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
-	Client           client.Client
-	Codec            *minterv1.ProviderCodec
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
-	Scheme           *runtime.Scheme
+	Client              client.Client
+	Codec               *minterv1.ProviderCodec
+	AWSClientBuilder    func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
+	Scheme              *runtime.Scheme
+	testUpcomingSecrets []types.NamespacedName
 }
 
 // NewAWSActuator creates a new AWSActuator.
@@ -1194,4 +1195,86 @@ func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 			Info("actuator handles only aws credentials")
 	}
 	return isAWS, nil
+}
+
+func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	toRelease := "4.7"
+	if mode == operatorv1.CloudCredentialsModeManual {
+		// Check for the existence of credentials we know are coming in 4.6. If any do not exist, then we consider
+		// ourselves upgradable=false and inform the user why.
+		missingSecrets := []types.NamespacedName{}
+		for _, nsSecret := range a.GetUpcomingCredSecrets() {
+
+			secLog := log.WithField("secret", nsSecret).WithField("toRelease", toRelease)
+			secLog.Debug("checking that secrets exist for manual mode cluster upgrade")
+			secret := &corev1.Secret{}
+
+			err := a.Client.Get(context.Background(), nsSecret, secret)
+			if err != nil {
+				if errors.IsNotFound(err) {
+					secLog.Info("identified missing secret for upgrade")
+					missingSecrets = append(missingSecrets, nsSecret)
+				} else {
+					// If we can't figure out if you're upgradeable, you're not upgradeable:
+					secLog.WithError(err).Error("unexpected error looking up secret, marking upgradeable=false")
+					upgradeableCondition.Status = configv1.ConditionFalse
+					upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
+					upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgraded to %s: %v",
+						toRelease, err)
+					return upgradeableCondition
+				}
+			}
+		}
+
+		if len(missingSecrets) > 0 {
+			log.Infof("%d secrets missing, marking upgradeable=false", len(missingSecrets))
+			upgradeableCondition.Status = configv1.ConditionFalse
+			upgradeableCondition.Reason = constants.MissingSecretsForUpgradeReason
+			upgradeableCondition.Message = fmt.Sprintf(
+				"Cannot upgrade manual mode cluster to %s due to missing secret(s): %v Please see the Manually Creating IAM for AWS OpenShift documentation.",
+				toRelease,
+				missingSecrets)
+		}
+	} else {
+		// If in mint or passthrough, make sure the root cred secret exists, if not it must be restored prior to upgrade.
+		rootCred := a.GetCredentialsRootSecretLocation()
+		secret := &corev1.Secret{}
+
+		err := a.Client.Get(context.Background(), rootCred, secret)
+		if err != nil {
+
+			if errors.IsNotFound(err) {
+				log.WithField("secret", rootCred).Info("parent cred secret must be restored prior to upgrade, marking upgradeable=false")
+				upgradeableCondition.Status = configv1.ConditionFalse
+				upgradeableCondition.Reason = constants.MissingRootCredentialUpgradeableReason
+				upgradeableCondition.Message = fmt.Sprintf("Parent credential secret must be restored prior to upgrade: %s/%s",
+					rootCred.Namespace, rootCred.Name)
+				return upgradeableCondition
+			}
+
+			log.WithError(err).Error("unexpected error looking up parent secret, marking upgradeable=false")
+			// If we can't figure out if you're upgradeable, you're not upgradeable:
+			upgradeableCondition.Status = configv1.ConditionFalse
+			upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
+			upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgraded to %s: %v",
+				toRelease, err)
+			return upgradeableCondition
+		}
+	}
+
+	return upgradeableCondition
+}
+
+func (a *AWSActuator) GetUpcomingCredSecrets() []types.NamespacedName {
+	// For unit testing only, otherwise we want these to be a static list.
+	if a.testUpcomingSecrets != nil {
+		return a.testUpcomingSecrets
+	}
+	return []types.NamespacedName{
+		// Add new 4.7 credentials here, but none are known yet.
+	}
 }

@@ -21,6 +21,8 @@ import (
 	"fmt"
 	"reflect"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
@@ -98,4 +100,16 @@ func copySecret(cr *minterv1.CredentialsRequest, src *secret, dest *secret) {
 		AzureSubscriptionID: src.Data[AzureSubscriptionID],
 		AzureTenantID:       src.Data[AzureTenantID],
 	}
+}
+
+func (a *passthrough) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	return upgradeableCondition
+}
+
+func (a *passthrough) GetUpcomingCredSecrets() []types.NamespacedName {
+	return []types.NamespacedName{}
 }

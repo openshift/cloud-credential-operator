@@ -6,6 +6,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
@@ -143,6 +144,10 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 	secret := &corev1.Secret{}
 	err = r.Get(context.Background(), request.NamespacedName, secret)
 	if err != nil {
+		if errors.IsNotFound(err) {
+			r.Logger.Info("parent credential secret does not exist")
+			return reconcile.Result{}, nil
+		}
 		r.Logger.WithError(err).Error("failed to fetch secret")
 		return reconcile.Result{}, err
 	}
