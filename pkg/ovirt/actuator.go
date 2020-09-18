@@ -21,6 +21,8 @@ import (
 	"reflect"
 	"strconv"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -344,4 +346,16 @@ func secretDataFrom(ovirtCreds *OvirtCreds) map[string][]byte {
 		insecureKey: []byte(strconv.FormatBool(ovirtCreds.Insecure)),
 		cabundleKey: []byte(ovirtCreds.CABundle),
 	}
+}
+
+func (a *OvirtActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	return upgradeableCondition
+}
+
+func (a *OvirtActuator) GetUpcomingCredSecrets() []types.NamespacedName {
+	return []types.NamespacedName{}
 }
