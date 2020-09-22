@@ -201,6 +201,7 @@ metadata:
 webhooks:
 - name: pod-identity-webhook.amazonaws.com
   failurePolicy: Ignore
+  sideEffects: None
   clientConfig:
     service:
       name: pod-identity-webhook
