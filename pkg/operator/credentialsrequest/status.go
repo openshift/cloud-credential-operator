@@ -15,6 +15,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	constants "github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
@@ -58,7 +59,7 @@ func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
 	oldConditions := co.Status.Conditions
 	oldVersions := co.Status.Versions
 	oldRelatedObjects := co.Status.RelatedObjects
-	co.Status.Conditions = computeStatusConditions(oldConditions, credRequests, r.platformType,
+	co.Status.Conditions = computeStatusConditions(r.Actuator, oldConditions, credRequests, r.platformType,
 		operatorMode, configConflict, logger)
 	co.Status.Versions = computeClusterOperatorVersions()
 	co.Status.RelatedObjects = buildExpectedRelatedObjects(credRequests)
@@ -144,6 +145,7 @@ func computeClusterOperatorVersions() []configv1.OperandVersion {
 
 // computeStatusConditions computes the operator's current state.
 func computeStatusConditions(
+	actuator actuator.Actuator,
 	conditions []configv1.ClusterOperatorStatusCondition,
 	credRequests []minterv1.CredentialsRequest,
 	clusterCloudPlatform configv1.PlatformType,
@@ -274,12 +276,7 @@ func computeStatusConditions(
 	conditions = clusteroperator.SetStatusCondition(conditions,
 		availableCondition)
 
-	// CCO doesn't have the idea of upgradeable vs not-upgradeable, but should report that condition nevertheless.
-	// Always be upgradeable.
-	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
-	}
+	upgradeableCondition := actuator.Upgradeable(mode)
 	conditions = clusteroperator.SetStatusCondition(conditions,
 		upgradeableCondition)
 

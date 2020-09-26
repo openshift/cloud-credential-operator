@@ -23,6 +23,7 @@ import (
 	"reflect"
 	"time"
 
+	operatorv1 "github.com/openshift/api/operator/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -645,4 +646,16 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 		"actuator": "azure",
 		"cr":       fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
+}
+
+func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+	return upgradeableCondition
+}
+
+func (a *Actuator) GetUpcomingCredSecrets() []types.NamespacedName {
+	return []types.NamespacedName{}
 }

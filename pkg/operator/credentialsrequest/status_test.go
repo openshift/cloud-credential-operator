@@ -40,6 +40,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
@@ -261,7 +262,9 @@ func TestClusterOperatorStatus(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			clusterOperatorConditions := computeStatusConditions(testUnknownConditions(), test.credRequests,
+			schemeutils.SetupScheme(scheme.Scheme)
+			dummyActuator := &actuator.DummyActuator{}
+			clusterOperatorConditions := computeStatusConditions(dummyActuator, testUnknownConditions(), test.credRequests,
 				test.cloudPlatform, test.operatorMode, test.configConflict, log.WithField("test", test.name))
 			for _, ec := range test.expectedConditions {
 				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
@@ -317,7 +320,8 @@ func TestClusterOperatorVersion(t *testing.T) {
 			fakeClient := fake.NewFakeClient(existing...)
 
 			rcr := &ReconcileCredentialsRequest{
-				Client: fakeClient,
+				Client:   fakeClient,
+				Actuator: &actuator.DummyActuator{},
 			}
 
 			require.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
