@@ -311,6 +311,28 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	adminCredSecretPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return isAdminCredSecret(e.MetaNew.GetNamespace(), e.MetaNew.GetName())
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			return isAdminCredSecret(e.Meta.GetNamespace(), e.Meta.GetName())
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return isAdminCredSecret(e.Meta.GetNamespace(), e.Meta.GetName())
+		},
+	}
+	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
+	err = c.Watch(
+		&source.Kind{Type: &corev1.Secret{}},
+		&handler.EnqueueRequestsFromMapFunc{
+			ToRequests: allCredRequestsMapFn,
+		},
+		adminCredSecretPredicate)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -770,6 +792,21 @@ func checkForFailureConditions(cr *minterv1.CredentialsRequest) bool {
 	for _, t := range constants.FailureConditionTypes {
 		failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
 		if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
+			return true
+		}
+	}
+	return false
+}
+
+func isAdminCredSecret(namespace, secretName string) bool {
+	if namespace == constants.CloudCredSecretNamespace {
+		if secretName == constants.AWSCloudCredSecretName ||
+			secretName == constants.AzureCloudCredSecretName ||
+			secretName == constants.GCPCloudCredSecretName ||
+			secretName == constants.OpenStackCloudCredsSecretName ||
+			secretName == constants.OvirtCloudCredsSecretName ||
+			secretName == constants.VSphereCloudCredSecretName {
+			log.WithField("secret", secretName).WithField("namespace", namespace).Info("observed admin cloud credential secret event")
 			return true
 		}
 	}
