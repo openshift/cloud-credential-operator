@@ -100,6 +100,7 @@ spec:
               description: ProviderSpec contains the cloud provider specific credentials
                 specification.
               type: object
+              x-kubernetes-preserve-unknown-fields: true
             secretRef:
               description: SecretRef points to the secret where the credentials should
                 be stored once generated.
@@ -198,6 +199,7 @@ spec:
             providerStatus:
               description: ProviderStatus contains cloud provider specific status.
               type: object
+              x-kubernetes-preserve-unknown-fields: true
             provisioned:
               description: Provisioned is true once the credentials have been initially
                 provisioned.
