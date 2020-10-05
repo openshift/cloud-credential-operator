@@ -362,8 +362,13 @@ func TestUpgradeable(t *testing.T) {
 				a.testUpcomingSecrets = test.overrideUpcomingSecrets
 			}
 			cond := a.Upgradeable(test.mode)
-			assert.Equal(t, test.expectedStatus, cond.Status)
-			assert.Equal(t, test.expectedReason, cond.Reason)
+
+			if test.expectedStatus == configv1.ConditionTrue {
+				assert.Nil(t, cond, "expect no condition when state is upgradable")
+			} else {
+				assert.Equal(t, test.expectedStatus, cond.Status)
+				assert.Equal(t, test.expectedReason, cond.Reason)
+			}
 		})
 	}
 }

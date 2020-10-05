@@ -7,13 +7,8 @@ import (
 	"strings"
 	"time"
 
-	configv1 "github.com/openshift/api/config/v1"
-	"github.com/openshift/library-go/pkg/operator/events"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
-	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 	log "github.com/sirupsen/logrus"
+
 	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -23,6 +18,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
 	admissionregistrationclientv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
+
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
@@ -32,9 +28,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
+	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/library-go/pkg/operator/events"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
+	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
+	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
+
 	"github.com/openshift/cloud-credential-operator/pkg/assets/v410_00_assets"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
 )
 
 const (
@@ -210,7 +213,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		}
 	}
 
-	clusteroperator.AddStatusHandler(r)
+	status.AddHandler(controllerName, r)
 	mgr.Add(&awsPodIdentityController{reconciler: r, cache: cache, logger: logger})
 
 	return nil
@@ -357,7 +360,7 @@ func reportUpdateEvent(recorder events.Recorder, obj runtime.Object, originalErr
 	}
 }
 
-var _ clusteroperator.StatusHandler = &staticResourceReconciler{}
+var _ status.Handler = &staticResourceReconciler{}
 
 func (r *staticResourceReconciler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	return r.conditions, nil
