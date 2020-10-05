@@ -126,6 +126,7 @@ The default and recommended best practice for running OpenShift is to run the in
 Pros:
   * Each cluster component has only the permissions it needs.
   * Automatic on-going reconciliation for cloud credentials including upgrades, which may require additional credentials or permissions.
+
 Cons:
   * Requires admin credential storage in a cluster kube-system secret. (however if a user has access to all secrets in your cluster, you are severely compromised regardless)
 
@@ -139,6 +140,7 @@ Prior to upgrade, the admin credential should be restored. In the future upgrade
 
 Pros:
   * Admin credential is not stored in the cluster permanently and does not need to be long lived.
+
 Cons:
   * Still requires admin credential in the cluster for brief periods of time.
   * Requires manually re-instating the Secret with admin credentials for each upgrade.
@@ -155,6 +157,7 @@ By default the permissions needed only for installation are required, however it
 
 Pros:
   * Does not require installing or running with an admin credential.
+
 Cons:
   * Includes broad permissions only needed at install time, unless manual action is taken to reduce permissions post-install.
   * Credential permissions may need to be manually updated prior to any upgrade.
@@ -169,6 +172,7 @@ In this mode a user manually performs the job of the cloud credential operator. 
 Pros:
   * Admin credential never stored in the cluster.
   * Each cluster component has only the permissions it needs.
+
 Cons:
   * Manual process required for install and every upgrade to reconcile permissions with the new release image.
 
@@ -185,6 +189,7 @@ This future enhancement will allow the use of short lived Amazon STS tokens. In 
 Pros:
   * Each cluster component has only the permissions it needs.
   * Automatic on-going reconciliation for cloud credentials including upgrades.
+
 Cons:
   * Requires admin credential storage in a cluster kube-system secret. (if this is readable however, your cluster is severely compromised regardless)
 
