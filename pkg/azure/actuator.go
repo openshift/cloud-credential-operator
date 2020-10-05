@@ -656,14 +656,9 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 	})
 }
 
+// Upgradeable returns a ClusterOperator status condition for the upgradeable type
+// if the system is considered not upgradeable. Otherwise, return nil as the default
+// value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
-	}
-	return upgradeableCondition
-}
-
-func (a *Actuator) GetUpcomingCredSecrets() []types.NamespacedName {
-	return []types.NamespacedName{}
+	return nil
 }

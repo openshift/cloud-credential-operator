@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -21,17 +22,9 @@ import (
 	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/s3"
 
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
-	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
-
-	configv1 "github.com/openshift/api/config/v1"
-	configset "github.com/openshift/client-go/config/clientset/versioned"
-	"github.com/openshift/library-go/pkg/operator/events"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
@@ -43,6 +36,17 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 	"sigs.k8s.io/controller-runtime/pkg/source"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	configset "github.com/openshift/client-go/config/clientset/versioned"
+	"github.com/openshift/library-go/pkg/operator/events"
+
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
+	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 )
 
 const (
@@ -172,7 +176,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		return err
 	}
 
-	clusteroperator.AddStatusHandler(r)
+	status.AddHandler(controllerName, r)
 	mgr.Add(&oidcDiscoveryEndpointController{reconciler: r, cache: cache, logger: logger})
 
 	return nil
@@ -199,13 +203,24 @@ type s3EndpointReconciler struct {
 
 var _ reconcile.Reconciler = &s3EndpointReconciler{}
 
-func (r *s3EndpointReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *s3EndpointReconciler) Reconcile(request reconcile.Request) (returnResult reconcile.Result, returnErr error) {
 	r.logger.Info("reconciling AWS S3 OIDC discovery endpoint")
 
 	// SyncStatus only if our degraded condition changed
 	defer func(initialDegradedCondition configv1.ClusterOperatorStatusCondition) {
-		if !clusteroperator.ConditionEqual(initialDegradedCondition, r.degraded) {
-			clusteroperator.SyncStatus(r.controllerRuntimeClient, r.logger)
+		if !status.ConditionEqual(initialDegradedCondition, r.degraded) {
+			// There are situations that cause this controller to go degraded that the status controller
+			// cannot watch for. So just update the config CR (which the status controller does watch)
+			// to trigger a status recalculation.
+			if err := r.updateConfigCRTimestamp(); err != nil {
+				r.logger.WithError(err).Error("failed to updated config CR to trigger status calculation")
+				// make sure we force a re-reconcile if we were unable to calculate status by preserving
+				// the previous degraded condition, and returning an error
+				r.degraded = initialDegradedCondition
+				if returnErr == nil {
+					returnErr = err
+				}
+			}
 		}
 	}(r.degraded)
 
@@ -242,7 +257,7 @@ func (r *s3EndpointReconciler) Reconcile(request reconcile.Request) (reconcile.R
 }
 
 // reconcileServiceAccountIssuer sets the ServiceAccountIssuer in the cluster Authentication
-// config if it is not set already.  Returned boolean indicates whether are not the rest of
+// config if it is not set already.  Returned boolean indicates whether or not the rest of
 // the reconciliation should be skipped in the event the cluster is configured with a different
 // OIDC endpoint.
 func (r *s3EndpointReconciler) reconcileServiceAccountIssuer() (bool, error) {
@@ -472,7 +487,7 @@ func encodeKeys(pemKeys [][]byte) ([]byte, error) {
 	return json.MarshalIndent(keyResponse, "", "    ")
 }
 
-var _ clusteroperator.StatusHandler = &s3EndpointReconciler{}
+var _ status.Handler = &s3EndpointReconciler{}
 
 func (r *s3EndpointReconciler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	var conditions []configv1.ClusterOperatorStatusCondition
@@ -488,4 +503,27 @@ func (r *s3EndpointReconciler) GetRelatedObjects(logger log.FieldLogger) ([]conf
 
 func (r *s3EndpointReconciler) Name() string {
 	return controllerName
+}
+
+// updateConfigCRTimestamp will annotate the CCO config CR with the current timestamp to trigger a status calculation
+func (r *s3EndpointReconciler) updateConfigCRTimestamp() error {
+	operatorConfig := &operatorv1.CloudCredential{}
+	if err := r.controllerRuntimeClient.Get(context.TODO(),
+		types.NamespacedName{Name: constants.CloudCredOperatorConfig},
+		operatorConfig); err != nil {
+		return err
+	}
+
+	// Hack: the operator config does not allow the managementState to be an empty string
+	// yet the operator config stored in etcd can in fact have no data for the managementState.
+	if operatorConfig.Spec.ManagementState == "" {
+		operatorConfig.Spec.ManagementState = operatorv1.Managed
+	}
+
+	if operatorConfig.Annotations == nil {
+		operatorConfig.Annotations = map[string]string{}
+	}
+	operatorConfig.Annotations[constants.CloudCredOperatorConfigTimestampAnnotation] = time.Now().Format(time.StampMilli)
+
+	return r.controllerRuntimeClient.Update(context.TODO(), operatorConfig)
 }

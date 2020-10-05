@@ -23,6 +23,7 @@ import (
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -40,7 +41,6 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 	"github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
 )
 
@@ -96,20 +96,6 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
 				assert.NotNil(t, cr.Status.LastSyncTimestamp)
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			name: "new credential no root creds available",
@@ -127,10 +113,6 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				assert.False(t, cr.Status.Provisioned)
 			},
 			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
 				{
 					conditionType: configv1.OperatorProgressing,
 					status:        corev1.ConditionTrue,
@@ -211,8 +193,6 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				},
 				platformType: configv1.VSpherePlatformType,
 			}
-			defer clusteroperator.ClearHandlers()
-			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -240,14 +220,18 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				assert.Exactly(t, condition.reason, foundCondition.Reason)
 			}
 
-			for _, condition := range test.expectedCOConditions {
-				co := getClusterOperator(fakeClient)
-				assert.NotNil(t, co)
-				foundCondition := findClusterOperatorCondition(co.Status.Conditions, condition.conditionType)
-				assert.NotNil(t, foundCondition)
-				assert.Equal(t, string(condition.status), string(foundCondition.Status), "condition %s had unexpected status", condition.conditionType)
-				if condition.reason != "" {
-					assert.Exactly(t, condition.reason, foundCondition.Reason)
+			if test.expectedCOConditions != nil {
+				logger := log.WithFields(log.Fields{"controller": controllerName})
+				currentConditions, err := rcr.GetConditions(logger)
+				require.NoError(t, err, "failed getting conditions")
+
+				for _, expectedCondition := range test.expectedCOConditions {
+					foundCondition := findClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
+					require.NotNil(t, foundCondition)
+					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
+					if expectedCondition.reason != "" {
+						assert.Exactly(t, expectedCondition.reason, foundCondition.Reason)
+					}
 				}
 			}
 		})

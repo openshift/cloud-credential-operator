@@ -12,8 +12,8 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 )
 
 type SecretStatusHandler struct {
@@ -26,14 +26,7 @@ func NewSecretStatusHandler(kubeClient client.Client) *SecretStatusHandler {
 	}
 }
 
-var _ clusteroperator.StatusHandler = &SecretStatusHandler{}
-
-// SyncOperatorStatus computes the operator's current status and
-// creates or updates the ClusterOperator resource for the operator accordingly.
-func SyncOperatorStatus(kubeClient client.Client) error {
-	logger := log.WithField("controller", "secretannotator_status")
-	return clusteroperator.SyncStatus(kubeClient, logger)
-}
+var _ status.Handler = &SecretStatusHandler{}
 
 func (s *SecretStatusHandler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	conditions := []configv1.ClusterOperatorStatusCondition{}
