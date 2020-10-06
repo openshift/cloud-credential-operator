@@ -250,7 +250,12 @@ func setCredentialsMode(ccoDisabled bool, secret *corev1.Secret, notFound bool, 
 	crMode[detectedMode] = 1
 
 	for k, v := range crMode {
-		metricCredentialsMode.WithLabelValues(string(k)).Set(float64(v))
+		if v > 0 {
+			metricCredentialsMode.WithLabelValues(string(k)).Set(float64(v))
+		} else {
+			// Ensure unused modes are cleared if we've recently changed mode:
+			metricCredentialsMode.Delete(map[string]string{"mode": string(k)})
+		}
 	}
 }
 
