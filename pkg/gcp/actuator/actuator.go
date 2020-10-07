@@ -48,7 +48,7 @@ import (
 
 const (
 	roGCPCredsSecretNamespace = "openshift-cloud-credential-operator"
-	roGCPCredsSecret          = "cloud-credential-operator-iam-ro-creds"
+	roGCPCredsSecret          = "cloud-credential-operator-gcp-ro-creds"
 
 	gcpSecretJSONKey = "service_account.json"
 )
@@ -320,16 +320,23 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		return fmt.Errorf("error gathering permissions for each role: %v", err)
 	}
 
-	// check that service APIs are enabled before we bother to make a
-	// new serviceaccount
-	serviceAPIsEnabled, err := checkServicesEnabled(rootGCPClient, permList, logger)
-	if err != nil {
-		return err
+	var serviceAPIsEnabled bool
+	if gcpSpec.SkipServiceCheck {
+		// Since we are skipping the checks, we will assume that the APIS are enabled.
+		serviceAPIsEnabled = true
+	} else {
+		// check that service APIs are enabled before we bother to make a
+		// new serviceaccount
+		var err error
+		serviceAPIsEnabled, err = checkServicesEnabled(rootGCPClient, permList, logger)
+		if err != nil {
+			return err
+		}
 	}
-	if !gcpSpec.SkipServiceCheck && !serviceAPIsEnabled {
+
+	if !serviceAPIsEnabled {
 		return fmt.Errorf("not all required service APIs are enabled")
 	}
-	serviceAPIsEnabled = true
 
 	// Create service account if necessary
 	var serviceAccount *iamadminpb.ServiceAccount
@@ -389,7 +396,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 }
 
 // needsUpdate will return a bool indicated that all the applicable service APIs are enabled,
-// a bool indicat whether any update to existing perms are needed, and any error encountered.
+// a bool indicating whether any update to existing perms are needed, and any error encountered.
 func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, bool, error) {
 	logger := a.getLogger(cr)
 
@@ -403,8 +410,7 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		return true, false, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
 
-	// TODO: change to a real read-only client once we have ro-creds solution
-	readClient, err := a.buildRootGCPClient(cr)
+	readClient, err := a.buildReadGCPClient(cr)
 	if err != nil {
 		log.WithError(err).Error("error creating GCP client")
 		return false, true, fmt.Errorf("unable to check whether credentialsRequest needs update")
@@ -416,16 +422,22 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		return false, true, fmt.Errorf("error gathering permissions for each role: %v", err)
 	}
 
+	var serviceAPIsEnabled bool
 	// Are the service APIs enabled
-	serviceAPIsEnabled, err := checkServicesEnabled(readClient, permList, logger)
-	if err != nil {
-		return false, true, fmt.Errorf("error checking whether service APIs are enabled: %v", err)
+	if gcpSpec.SkipServiceCheck {
+		// Since we are skipping the checks, we will assume that the APIs are enabled.
+		serviceAPIsEnabled = true
+	} else {
+		var err error
+		serviceAPIsEnabled, err = checkServicesEnabled(readClient, permList, logger)
+		if err != nil {
+			return false, true, fmt.Errorf("error checking whether service APIs are enabled: %v", err)
+		}
 	}
 
-	if !gcpSpec.SkipServiceCheck && !serviceAPIsEnabled {
+	if !serviceAPIsEnabled {
 		return serviceAPIsEnabled, true, nil
 	}
-	serviceAPIsEnabled = true
 
 	// If the secret simply doesn't exist, we definitely need an update
 	exists, err := a.Exists(ctx, cr)
@@ -493,6 +505,31 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 	return serviceAPIsEnabled, false, nil
 }
 
+// buildReadGCPClient will return a GCP client using the scaled down read only GCP creds
+// for CCO, which are expected to live in openshift-cloud-credential-perator/cloud-credential-operator-gcp-ro-creds.
+// These creds would normally be created by CCO itself, via a CredentialsRequest created
+// while installing CCO.
+//
+// If these are not available but root creds are, we will use the root creds instead.
+// This allows us to create the read creds initially.
+func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Client, error) {
+	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", roGCPCredsSecretNamespace, roGCPCredsSecret))
+	logger.Debug("loading GCP read-only credentials from secret")
+
+	jsonBytes, err := loadCredsFromSecret(a.Client, roGCPCredsSecretNamespace, roGCPCredsSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Warn("read-only creds not found, using root creds client")
+			return a.buildRootGCPClient(cr)
+		}
+		logger.WithError(err).Error("failed to load in read-only creds Secret")
+		return nil, err
+	}
+
+	logger.Debug("creating read GCP client")
+	return a.GCPClientBuilder(a.ProjectName, jsonBytes)
+}
+
 func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Client, error) {
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.GCPCloudCredSecretName))
 
@@ -504,41 +541,6 @@ func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 
 	logger.Debug("creating root GCP client")
 	return a.GCPClientBuilder(a.ProjectName, jsonBytes)
-}
-
-func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Client, error) {
-	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", roGCPCredsSecretNamespace, roGCPCredsSecret))
-	logger.Debug("loading GCP credentials from secret")
-
-	var err error
-	var jsonBytes []byte
-
-	if cr.Spec.SecretRef.Name == roGCPCredsSecret && cr.Spec.SecretRef.Namespace == roGCPCredsSecretNamespace {
-		log.Debug("operating our own RO creds, using root creds for GCP client operator")
-		jsonBytes, err = loadCredsFromSecret(a.Client, constants.CloudCredSecretNamespace, constants.GCPCloudCredSecretName)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		jsonBytes, err = loadCredsFromSecret(a.Client, roGCPCredsSecretNamespace, roGCPCredsSecret)
-		if err != nil {
-			if errors.IsNotFound(err) {
-				logger.Warn("read-only creds not found, using root creds client")
-				return a.buildRootGCPClient(cr)
-			} else {
-				logger.Errorf("error reading in read-only creds: %v", err)
-				return nil, err
-			}
-		}
-	}
-
-	logger.Debug("creating read GCP client")
-	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
 }
 
 func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPProviderStatus) error {
@@ -775,6 +777,30 @@ func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.C
 		Status: configv1.ConditionTrue,
 		Type:   configv1.OperatorUpgradeable,
 	}
+	toRelease := "4.7"
+
+	rootCred := a.GetCredentialsRootSecretLocation()
+	secret := &corev1.Secret{}
+
+	err := a.Client.Get(context.TODO(), rootCred, secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			log.WithField("secret", rootCred).Info("parent cred secret must be restored prior to upgrade, marking upgradable=false")
+			upgradeableCondition.Status = configv1.ConditionFalse
+			upgradeableCondition.Reason = constants.MissingRootCredentialUpgradeableReason
+			upgradeableCondition.Message = fmt.Sprintf("Parent credential secret must be restored prior to upgrade: %s/%s",
+				rootCred.Namespace, rootCred.Name)
+			return upgradeableCondition
+		}
+
+		log.WithError(err).Error("unexpected error looking up parent secret, marking upgradeable=false")
+		// If we can't figure out if you're upgradeable, you're not upgradeable:
+		upgradeableCondition.Status = configv1.ConditionFalse
+		upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
+		upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgraded to %s: %v", toRelease, err)
+		return upgradeableCondition
+	}
+
 	return upgradeableCondition
 }
 
