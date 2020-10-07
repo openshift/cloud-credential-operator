@@ -758,7 +758,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.Client)
 }
 
-// buildReadAWSCreds will return an AWS client using the the scaled down read only AWS creds
+// buildReadAWSClient will return an AWS client using the the scaled down read only AWS creds
 // for cred minter, which are expected to live in openshift-cloud-credential-operator/cloud-credential-operator-iam-ro-creds.
 // These creds would normally be created by cred minter itself, via a CredentialsRequest created
 // by the cred minter operator.
@@ -780,6 +780,8 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 			logger.Warn("read-only creds not found, using root creds client")
 			return a.buildRootAWSClient(cr)
 		}
+		logger.WithError(err).Error("unexpected error while trying to load in read-only creds Secret")
+		return nil, err
 	}
 
 	logger.Debug("creating read AWS client")
@@ -1204,7 +1206,7 @@ func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv
 	}
 	toRelease := "4.7"
 	if mode == operatorv1.CloudCredentialsModeManual {
-		// Check for the existence of credentials we know are coming in 4.6. If any do not exist, then we consider
+		// Check for the existence of credentials we know are coming in the future. If any do not exist, then we consider
 		// ourselves upgradable=false and inform the user why.
 		missingSecrets := []types.NamespacedName{}
 		for _, nsSecret := range a.GetUpcomingCredSecrets() {
