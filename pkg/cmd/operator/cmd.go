@@ -139,32 +139,36 @@ func NewOperator() *cobra.Command {
 				},
 			}
 
-			// start the leader election code loop
-			leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
-				Lock:            lock,
-				ReleaseOnCancel: true,
-				LeaseDuration:   360 * time.Second,
-				RenewDeadline:   270 * time.Second,
-				RetryPeriod:     90 * time.Second,
-				Callbacks: leaderelection.LeaderCallbacks{
-					OnStartedLeading: func(ctx context.Context) {
-						run(ctx)
+			if os.Getenv("CCO_SKIP_LEADER_ELECTION") != "" {
+				run(ctx)
+			} else {
+				// start the leader election code loop
+				leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
+					Lock:            lock,
+					ReleaseOnCancel: true,
+					LeaseDuration:   360 * time.Second,
+					RenewDeadline:   270 * time.Second,
+					RetryPeriod:     90 * time.Second,
+					Callbacks: leaderelection.LeaderCallbacks{
+						OnStartedLeading: func(ctx context.Context) {
+							run(ctx)
+						},
+						OnStoppedLeading: func() {
+							// we can do cleanup here if necessary
+							leLog.Infof("leader lost")
+							os.Exit(0)
+						},
+						OnNewLeader: func(identity string) {
+							if identity == id {
+								// We just became the leader
+								leLog.Info("became leader")
+								return
+							}
+							log.Infof("current leader: %s", identity)
+						},
 					},
-					OnStoppedLeading: func() {
-						// we can do cleanup here if necessary
-						leLog.Infof("leader lost")
-						os.Exit(0)
-					},
-					OnNewLeader: func(identity string) {
-						if identity == id {
-							// We just became the leader
-							leLog.Info("became leader")
-							return
-						}
-						log.Infof("current leader: %s", identity)
-					},
-				},
-			})
+				})
+			}
 		},
 	}
 
