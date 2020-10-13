@@ -145,7 +145,7 @@ Cons:
   * Still requires admin credential in the cluster for brief periods of time.
   * Requires manually re-instating the Secret with admin credentials for each upgrade.
 
-Supported clouds: AWS
+Supported clouds: AWS, GCP
 
 ## 2. Passthrough Mode
 
@@ -200,7 +200,7 @@ Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 --- | --- | --- | --- | --- | ---
 AWS | Y | 4.4+ | Y | 4.3+ | 4.6+ (expected)
 Azure | Y | N | Y | unknown | N
-GCP | Y | N | Y | unknown | N
+GCP | Y | 4.7+ | Y | unknown | N
 OpenStack | N | N | Y | N | N
 oVirt | N | N | Y | N | N
 VMWare | N | N | Y | N | N

@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	log "github.com/sirupsen/logrus"
@@ -54,6 +55,7 @@ import (
 
 const (
 	testRootGCPAuth                  = "ROOTAUTH"
+	testReadOnlyGCPAuth              = "READONLYAUTH"
 	testServiceAccountKeyPrivateData = "SECRET SERVICE ACCOUNT KEY DATA"
 	testOldPassthroughPrivateData    = "OLD SERVICE ACCOUNT KEY DATA"
 	testGCPServiceAccountID          = "a-test-svc-acct"
@@ -95,12 +97,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                        string
-		existing                    []runtime.Object
-		expectErr                   bool
-		mockRootGCPClient           func(mockCtrl *gomock.Controller) *mockgcp.MockClient
-		mockCredRequestSecretClient func(mockCtrl *gomock.Controller) *mockgcp.MockClient
-		validate                    func(client.Client, *testing.T)
+		name              string
+		existing          []runtime.Object
+		expectErr         bool
+		mockRootGCPClient func(mockCtrl *gomock.Controller) *mockgcp.MockClient
+		mockReadGCPClient func(mockCtrl *gomock.Controller) *mockgcp.MockClient
+		validate          func(client.Client, *testing.T)
 		// Expected conditions on the credentials request:
 		expectedConditions []ExpectedCondition
 		// Expected conditions on the credentials cluster operator:
@@ -251,6 +253,49 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "new credential only read-only creds available",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testGCPCredentialsRequest(t),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+
+				// only the read-only creds exist
+				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
+			},
+			mockReadGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+
+				// needs update
+				mockGetRole(mockGCPClient)
+				mockListServicesEnabled(mockGCPClient)
+
+				return mockGCPClient
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				assert.Nil(t, targetSecret)
+				cr := getCredRequest(c)
+				assert.False(t, cr.Status.Provisioned)
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionTrue,
+				},
+			},
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        "CredentialsProvisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
 			name: "cred missing access key exists", // expect old key(s) deleted, new key created/saved
 			existing: []runtime.Object{
 				testOperatorConfig(""),
@@ -332,6 +377,112 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				assert.True(t, cr.Status.Provisioned)
 			},
 		},
+		{
+			name: "cred minted and up to date and secret exist without root creds",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+
+				// already minted, last synced 2 hours ago
+				func() *minterv1.CredentialsRequest {
+					cr := testGCPCredentialsRequest(t)
+					cr.Status.Provisioned = true
+					cr.Status.LastSyncTimestamp = &metav1.Time{Time: time.Now().Add(-2 * time.Hour)}
+
+					return cr
+				}(),
+
+				// target secret exists
+				createTestNamespace(testSecretNamespace),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, `{"private_key_id": "fakeServiceAccountID"}`),
+
+				// only the read-only creds exist
+				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
+			},
+			mockReadGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+
+				// needs update
+				mockGetRole(mockGCPClient)
+				mockListServicesEnabled(mockGCPClient)
+				mockGetProjectName(mockGCPClient)
+				mockListServiceAccountKeys(mockGCPClient, "fakeServiceAccountID")
+				mockGetServiceAccount(mockGCPClient)
+				mockGetProjectIamPolicy(mockGCPClient, testValidPolicyBindings)
+
+				return mockGCPClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCredRequest(c)
+
+				lastSynced := cr.Status.LastSyncTimestamp.Time
+				assert.WithinDuration(t, time.Now(), lastSynced, time.Second*5, "expected a recent last synced status")
+			},
+		},
+		{
+			name: "updated cred with only read only creds",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+
+				// already minted, last synced 2 hours ago
+				func() *minterv1.CredentialsRequest {
+					cr := testGCPCredentialsRequest(t)
+					cr.Status.Provisioned = true
+					cr.Status.LastSyncTimestamp = &metav1.Time{Time: time.Now().Add(-2 * time.Hour)}
+
+					return cr
+				}(),
+
+				// target secret exists
+				createTestNamespace(testSecretNamespace),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, `{"private_key_id": "fakeServiceAccountID"}`),
+
+				// only the read-only creds exist
+				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
+			},
+			mockReadGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+
+				// needs update
+				mockGetRole(mockGCPClient)
+				mockListServicesEnabled(mockGCPClient)
+				mockGetProjectName(mockGCPClient)
+				mockListServiceAccountKeys(mockGCPClient, "fakeServiceAccountID")
+				mockGetServiceAccount(mockGCPClient)
+
+				// return a present IAM policy binding list that doesn't match the current credReq spec
+				// so that we need the root creds to perform IAM modifications
+				mockGetProjectIamPolicy(mockGCPClient, []*cloudresourcemanager.Binding{
+					{
+						Members: []string{
+							fmt.Sprintf("serviceAccount:%s@%s.iam.gserviceaccount.com", testGCPServiceAccountID, testGCPProjectName),
+						},
+						Role: "role/outOfDateRoleBinding",
+					},
+				})
+
+				return mockGCPClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCredRequest(c)
+
+				assert.False(t, cr.Status.Provisioned, "expected credreq to be marked unprovisioned")
+			},
+			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        "CredentialsProvisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
@@ -569,11 +720,14 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			mockRootGCPClient := test.mockRootGCPClient(mockCtrl)
+			mockRootGCPClient := mockgcp.NewMockClient(mockCtrl)
+			if test.mockRootGCPClient != nil {
+				mockRootGCPClient = test.mockRootGCPClient(mockCtrl)
+			}
 
-			mockSecretClient := mockgcp.NewMockClient(mockCtrl)
-			if test.mockCredRequestSecretClient != nil {
-				mockSecretClient = test.mockCredRequestSecretClient(mockCtrl)
+			mockReadGCPClient := mockgcp.NewMockClient(mockCtrl)
+			if test.mockReadGCPClient != nil {
+				mockReadGCPClient = test.mockReadGCPClient(mockCtrl)
 			}
 
 			fakeClient := fake.NewFakeClient(test.existing...)
@@ -585,9 +739,10 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 					GCPClientBuilder: func(name string, jsonAUTH []byte) (mintergcp.Client, error) {
 						if string(jsonAUTH) == testRootGCPAuth {
 							return mockRootGCPClient, nil
-						} else {
-							return mockSecretClient, nil
+						} else if string(jsonAUTH) == testReadOnlyGCPAuth {
+							return mockReadGCPClient, nil
 						}
+						return nil, fmt.Errorf("unknown client to return for provided auth data")
 					},
 				},
 				platformType: configv1.GCPPlatformType,
