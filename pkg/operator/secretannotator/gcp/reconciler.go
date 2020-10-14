@@ -27,9 +27,9 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/status"
 	secretutils "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/utils"
+	statuscontroller "github.com/openshift/cloud-credential-operator/pkg/operator/status"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 )
 
 const (
@@ -50,7 +50,7 @@ func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler
 	}
 
 	s := status.NewSecretStatusHandler(c)
-	clusteroperator.AddStatusHandler(s)
+	statuscontroller.AddHandler(controllerName, s)
 
 	return r
 }
@@ -116,15 +116,6 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 	defer func() {
 		dur := time.Since(start)
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
-	}()
-
-	defer func() {
-		if err := status.SyncOperatorStatus(r.Client); err != nil {
-			r.Logger.WithError(err).Errorf("failed to sync operator status")
-			if returnErr == nil {
-				returnErr = err
-			}
-		}
 	}()
 
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, r.Logger)

@@ -17,26 +17,20 @@ limitations under the License.
 package credentialsrequest
 
 import (
-	"context"
-	"os"
 	"testing"
-	"time"
 
 	"github.com/golang/mock/gomock"
-	v1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	runtime "k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
@@ -202,9 +196,9 @@ func TestClusterOperatorStatus(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 			dummyActuator := &actuator.DummyActuator{}
-			operatorMode := v1.CloudCredentialsModeMint
+			operatorMode := operatorv1.CloudCredentialsModeMint
 			if test.operatorDisabled {
-				operatorMode = v1.CloudCredentialsModeManual
+				operatorMode = operatorv1.CloudCredentialsModeManual
 			}
 			clusterOperatorConditions := computeStatusConditions(
 				dummyActuator,
@@ -228,120 +222,12 @@ func TestClusterOperatorStatus(t *testing.T) {
 	}
 }
 
-func TestClusterOperatorVersion(t *testing.T) {
-	schemeutils.SetupScheme(scheme.Scheme)
-
-	twentyHoursAgo := metav1.Time{
-		Time: time.Now().Add(-20 * time.Hour),
-	}
-
-	tests := []struct {
-		name                             string
-		releaseVersionEnv                string
-		currentProgressingLastTransition metav1.Time
-		currentVersion                   string
-		expectProgressingTransition      bool
-	}{
-		{
-			name:                             "test version upgraded",
-			currentProgressingLastTransition: twentyHoursAgo,
-			currentVersion:                   "4.0.0-5",
-			releaseVersionEnv:                "4.0.0-10",
-			expectProgressingTransition:      true,
-		},
-		{
-			name:                             "test version constant",
-			currentProgressingLastTransition: twentyHoursAgo,
-			currentVersion:                   "4.0.0-5",
-			releaseVersionEnv:                "4.0.0-5",
-			expectProgressingTransition:      false,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-
-			existingCO := testClusterOperator("4.0.0-5", twentyHoursAgo)
-			operatorConfig := testOperatorConfig("")
-			existing := []runtime.Object{existingCO, operatorConfig}
-			fakeClient := fake.NewFakeClient(existing...)
-
-			rcr := &ReconcileCredentialsRequest{
-				Client:   fakeClient,
-				Actuator: &actuator.DummyActuator{},
-			}
-
-			require.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
-			err := rcr.syncOperatorStatus()
-
-			if err != nil {
-				t.Errorf("unexpected error: %v", err)
-			}
-
-			clusterop := &configv1.ClusterOperator{}
-
-			err = fakeClient.Get(context.TODO(), client.ObjectKey{Name: cloudCredClusterOperator}, clusterop)
-			assert.NoError(t, err)
-
-			foundVersion := false
-			for _, version := range clusterop.Status.Versions {
-				if version.Name == "operator" {
-					foundVersion = true
-					assert.Equal(t, test.releaseVersionEnv, version.Version)
-				}
-			}
-			assert.True(t, foundVersion, "didn't find an entry named 'operator' in the version list")
-
-			progCond := findClusterOperatorCondition(clusterop.Status.Conditions,
-				configv1.OperatorProgressing)
-			require.NotNil(t, progCond)
-			if test.expectProgressingTransition {
-				assert.True(t, progCond.LastTransitionTime.Time.After(
-					test.currentProgressingLastTransition.Time))
-			} else {
-				assert.Equal(t, test.currentProgressingLastTransition.Time.Format(time.UnixDate),
-					progCond.LastTransitionTime.Time.Format(time.UnixDate))
-			}
-		})
-	}
-}
-
-func testClusterOperator(version string, progressingLastTransition metav1.Time) *configv1.ClusterOperator {
-	return &configv1.ClusterOperator{
-		ObjectMeta: metav1.ObjectMeta{
-			Name: cloudCredClusterOperator,
-		},
-		Status: configv1.ClusterOperatorStatus{
-			Versions: []configv1.OperandVersion{
-				{
-					Name:    "operator",
-					Version: version,
-				},
-			},
-			Conditions: []configv1.ClusterOperatorStatusCondition{
-				{
-					Type:               configv1.OperatorProgressing,
-					Status:             configv1.ConditionFalse,
-					LastTransitionTime: progressingLastTransition,
-				},
-			},
-		},
-	}
-}
-
 func testCondition(condType configv1.ClusterStatusConditionType, status configv1.ConditionStatus, reason string) configv1.ClusterOperatorStatusCondition {
 	return configv1.ClusterOperatorStatusCondition{
 		Type:   condType,
 		Status: status,
 		Reason: reason,
 	}
-}
-
-func testConditionWithMessage(condType configv1.ClusterStatusConditionType, status configv1.ConditionStatus, reason, message string) configv1.ClusterOperatorStatusCondition {
-	cond := testCondition(condType, status, reason)
-	cond.Message = message
-
-	return cond
 }
 
 func testCRCondition(condType minterv1.CredentialsRequestConditionType, status corev1.ConditionStatus) minterv1.CredentialsRequestCondition {

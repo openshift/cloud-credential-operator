@@ -3,41 +3,30 @@ package credentialsrequest
 import (
 	"context"
 	"fmt"
-	"os"
 
 	log "github.com/sirupsen/logrus"
-
-	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
-
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 const (
-	cloudCredClusterOperator           = "cloud-credential"
-	cloudCredOperatorNamespace         = "openshift-cloud-credential-operator"
-	reasonCredentialsFailing           = "CredentialsFailing"
-	reasonReconciling                  = "Reconciling"
-	reasonCredentialsRootSecretMissing = "CredentialsRootSecretMissing"
+	reasonCredentialsFailing = "CredentialsFailing"
+	reasonReconciling        = "Reconciling"
 )
 
-// syncOperatorStatus computes the operator's current status and
-// creates or updates the ClusterOperator resource for the operator accordingly.
-func (r *ReconcileCredentialsRequest) syncOperatorStatus() error {
-	logger := log.WithField("controller", "credreq_status")
-	return clusteroperator.SyncStatus(r.Client, logger)
-}
-
-var _ clusteroperator.StatusHandler = &ReconcileCredentialsRequest{}
+var _ status.Handler = &ReconcileCredentialsRequest{}
 
 func (r *ReconcileCredentialsRequest) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	_, credRequests, mode, err := r.getOperatorState(logger)
@@ -96,17 +85,6 @@ func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (
 	return ns, credRequestList.Items, mode, nil
 }
 
-func computeClusterOperatorVersions() []configv1.OperandVersion {
-	currentVersion := os.Getenv("RELEASE_VERSION")
-	versions := []configv1.OperandVersion{
-		{
-			Name:    "operator",
-			Version: currentVersion,
-		},
-	}
-	return versions
-}
-
 // computeStatusConditions computes the operator's current state.
 func computeStatusConditions(
 	actuator actuator.Actuator,
@@ -118,9 +96,12 @@ func computeStatusConditions(
 
 	var conditions []configv1.ClusterOperatorStatusCondition
 
+	// Only set non-default conditions
 	upgradeableCondition := actuator.Upgradeable(mode)
-	log.WithField("condition", upgradeableCondition).Info("calculated upgradeable condition")
-	conditions = append(conditions, *upgradeableCondition)
+	log.WithField("condition", upgradeableCondition).Debug("calculated upgradeable condition")
+	if upgradeableCondition != nil {
+		conditions = append(conditions, *upgradeableCondition)
+	}
 
 	if operatorIsDisabled {
 		return conditions
@@ -225,7 +206,7 @@ func buildExpectedRelatedObjects(credRequests []minterv1.CredentialsRequest) []c
 	related := []configv1.ObjectReference{
 		{
 			Resource: "namespaces",
-			Name:     cloudCredOperatorNamespace,
+			Name:     minterv1.CloudCredOperatorNamespace,
 		},
 	}
 	for _, cr := range credRequests {

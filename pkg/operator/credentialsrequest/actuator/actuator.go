@@ -43,9 +43,6 @@ type Actuator interface {
 	// Upgradeable returns a ClusterOperator Upgradeable condition to indicate whether or not this cluster can
 	// be safely upgraded to the next "minor" (4.y) Openshift release.
 	Upgradeable(operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition
-	// GetUpcomingCredSecrets returns a slice of NamespacedNames for secrets holding credentials that we know are coming in the next OpenShift release.
-	// Used to pre-check if Upgradeable condition should be true or false for manual mode deployments of the credentials operator.
-	GetUpcomingCredSecrets() []types.NamespacedName
 }
 
 type DummyActuator struct {
@@ -78,10 +75,6 @@ func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *confi
 		Type:   configv1.OperatorUpgradeable,
 	}
 	return upgradeableCondition
-}
-
-func (a *DummyActuator) GetUpcomingCredSecrets() []types.NamespacedName {
-	return []types.NamespacedName{}
 }
 
 type ActuatorError struct {
