@@ -348,14 +348,9 @@ func secretDataFrom(ovirtCreds *OvirtCreds) map[string][]byte {
 	}
 }
 
+// Upgradeable returns a ClusterOperator status condition for the upgradeable type
+// if the system is considered not upgradeable. Otherwise, return nil as the default
+// value is for things to be upgradeable.
 func (a *OvirtActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
-	}
-	return upgradeableCondition
-}
-
-func (a *OvirtActuator) GetUpcomingCredSecrets() []types.NamespacedName {
-	return []types.NamespacedName{}
+	return nil
 }

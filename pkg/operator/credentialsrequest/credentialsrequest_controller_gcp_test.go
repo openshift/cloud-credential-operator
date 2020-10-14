@@ -27,17 +27,20 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	configv1 "github.com/openshift/api/config/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	configv1 "github.com/openshift/api/config/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	mintergcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
@@ -47,10 +50,6 @@ import (
 	gcpconst "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
-
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 )
 
 const (
@@ -149,20 +148,6 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
 				assert.NotNil(t, cr.Status.LastSyncTimestamp)
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			name: "new credential cluster has no infra name",
@@ -205,20 +190,6 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
 				assert.NotNil(t, cr.Status.LastSyncTimestamp)
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			name: "new credential no root creds available",
@@ -242,10 +213,6 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				assert.False(t, cr.Status.Provisioned)
 			},
 			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
 				{
 					conditionType: configv1.OperatorProgressing,
 					status:        corev1.ConditionTrue,
@@ -747,8 +714,6 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				},
 				platformType: configv1.GCPPlatformType,
 			}
-			defer clusteroperator.ClearHandlers()
-			clusteroperator.AddStatusHandler(rcr)
 
 			_, err := rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -776,14 +741,18 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				assert.Exactly(t, condition.reason, foundCondition.Reason)
 			}
 
-			for _, condition := range test.expectedCOConditions {
-				co := getClusterOperator(fakeClient)
-				require.NotNil(t, co)
-				foundCondition := findClusterOperatorCondition(co.Status.Conditions, condition.conditionType)
-				assert.NotNil(t, foundCondition)
-				assert.Equal(t, string(condition.status), string(foundCondition.Status), "condition %s had unexpected status", condition.conditionType)
-				if condition.reason != "" {
-					assert.Exactly(t, condition.reason, foundCondition.Reason)
+			if test.expectedCOConditions != nil {
+				logger := log.WithFields(log.Fields{"controller": controllerName})
+				currentConditions, err := rcr.GetConditions(logger)
+				require.NoError(t, err, "failed getting conditions")
+
+				for _, expectedCondition := range test.expectedCOConditions {
+					foundCondition := findClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
+					require.NotNil(t, foundCondition)
+					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
+					if expectedCondition.reason != "" {
+						assert.Exactly(t, expectedCondition.reason, foundCondition.Reason)
+					}
 				}
 			}
 		})
@@ -1001,7 +970,7 @@ func getCredRequest(c client.Client) *minterv1.CredentialsRequest {
 }
 
 func getClusterOperator(c client.Client) *configv1.ClusterOperator {
-	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredClusterOperator}}
+	co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: constants.CloudCredClusterOperatorName}}
 	err := c.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
 	if err != nil {
 		return nil

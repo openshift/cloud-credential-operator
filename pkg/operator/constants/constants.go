@@ -1,5 +1,7 @@
 package constants
 
+import "k8s.io/apimachinery/pkg/types"
+
 // CredentialsMode enumerates the possible modes of operation for CCO
 type CredentialsMode string
 
@@ -91,6 +93,12 @@ const (
 	// CloudCredOperatorConfig is the name of the credentialsrequest.operator.openshift.io CR holding CCO's config
 	CloudCredOperatorConfig = "cluster"
 
+	// CloudCredOperatorConfigTimestampAnnotation is the annotation controllers can update to trigger a status sync.
+	CloudCredOperatorConfigTimestampAnnotation = "cloudcredential.operator.openshift.io/statussync"
+
+	// CloudCredClusterOperatorName is the name of the CCO's ClusterOperator object
+	CloudCredClusterOperatorName = "cloud-credential"
+
 	// CloudCredSecretNamespace is where the cloud credentials can be found
 	CloudCredSecretNamespace = "kube-system"
 
@@ -118,4 +126,19 @@ var (
 		ModeDegraded,
 		ModeUnknown,
 	}
+
+	// Add known new credentials for next version upgrade
+
+	// AWSUpcomingSecrets contains the list of known new AWS credential secrets for the next version of OpenShift
+	AWSUpcomingSecrets = []types.NamespacedName{}
+	// AzureUpcomingSecrets contains the list of known new Azure credential secrets for the next version of OpenShift
+	AzureUpcomingSecrets = []types.NamespacedName{}
+	// GCPUpcomingSecrets contains the list of known new GCP credential secrets for the next version of OpenShift
+	GCPUpcomingSecrets = []types.NamespacedName{}
+	// OpenStackUpcomingSecrets contains the list of known new OpenStack credential secrets for the next version of OpenShift
+	OpenStackUpcomingSecrets = []types.NamespacedName{}
+	// OvirtUpcomingSecrets contains the list of known new oVirt credential secrets for the next version of OpenShift
+	OvirtUpcomingSecrets = []types.NamespacedName{}
+	// VsphereUpcomingSecrets contains the list of known new vSphere credential secrets for the next version of OpenShift
+	VsphereUpcomingSecrets = []types.NamespacedName{}
 )

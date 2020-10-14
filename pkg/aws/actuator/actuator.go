@@ -1199,17 +1199,19 @@ func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	return isAWS, nil
 }
 
+// Upgradeable returns a ClusterOperator status condition for the upgradeable type
+// if the system is considered not upgradeable. Otherwise, return nil as the default
+// value is for things to be upgradeable.
 func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
+		Type: configv1.OperatorUpgradeable,
 	}
 	toRelease := "4.7"
 	if mode == operatorv1.CloudCredentialsModeManual {
 		// Check for the existence of credentials we know are coming in the future. If any do not exist, then we consider
 		// ourselves upgradable=false and inform the user why.
 		missingSecrets := []types.NamespacedName{}
-		for _, nsSecret := range a.GetUpcomingCredSecrets() {
+		for _, nsSecret := range a.getUpcomingCredSecrets() {
 
 			secLog := log.WithField("secret", nsSecret).WithField("toRelease", toRelease)
 			secLog.Debug("checking that secrets exist for manual mode cluster upgrade")
@@ -1240,6 +1242,7 @@ func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv
 				"Cannot upgrade manual mode cluster to %s due to missing secret(s): %v Please see the Manually Creating IAM for AWS OpenShift documentation.",
 				toRelease,
 				missingSecrets)
+			return upgradeableCondition
 		}
 	} else {
 		// If in mint or passthrough, make sure the root cred secret exists, if not it must be restored prior to upgrade.
@@ -1268,15 +1271,14 @@ func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv
 		}
 	}
 
-	return upgradeableCondition
+	// Only return non-default conditions as the status controller will set defaults.
+	return nil
 }
 
-func (a *AWSActuator) GetUpcomingCredSecrets() []types.NamespacedName {
+func (a *AWSActuator) getUpcomingCredSecrets() []types.NamespacedName {
 	// For unit testing only, otherwise we want these to be a static list.
 	if a.testUpcomingSecrets != nil {
 		return a.testUpcomingSecrets
 	}
-	return []types.NamespacedName{
-		// Add new 4.7 credentials here, but none are known yet.
-	}
+	return constants.AWSUpcomingSecrets
 }

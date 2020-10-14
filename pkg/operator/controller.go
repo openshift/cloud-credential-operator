@@ -29,6 +29,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/oidcdiscoveryendpoint"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
 	"github.com/openshift/cloud-credential-operator/pkg/ovirt"
 	"github.com/openshift/cloud-credential-operator/pkg/util"
 	vsphereactuator "github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
@@ -51,6 +52,7 @@ func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs, secretannotator.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, awspodidentity.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, oidcdiscoveryendpoint.Add)
+	AddToManagerFuncs = append(AddToManagerFuncs, status.Add)
 	AddToManagerWithActuatorFuncs = append(AddToManagerWithActuatorFuncs, credentialsrequest.AddWithActuator)
 }
 

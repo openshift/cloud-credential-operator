@@ -38,12 +38,12 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
-	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
@@ -52,7 +52,6 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
-	"github.com/openshift/cloud-credential-operator/pkg/util/clusteroperator"
 )
 
 var c client.Client
@@ -95,15 +94,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		err := c.Get(context.TODO(), client.ObjectKey{Name: testSecretName, Namespace: testSecretNamespace}, secret)
 		if err == nil {
 			return secret
-		}
-		return nil
-	}
-
-	getClusterOperator := func(c client.Client) *configv1.ClusterOperator {
-		co := &configv1.ClusterOperator{ObjectMeta: metav1.ObjectMeta{Name: cloudCredClusterOperator}}
-		err := c.Get(context.TODO(), types.NamespacedName{Name: co.Name}, co)
-		if err == nil {
-			return co
 		}
 		return nil
 	}
@@ -196,20 +186,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
 				assert.NotNil(t, cr.Status.LastSyncTimestamp)
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			name: "new credential cluster has no infra name",
@@ -252,20 +228,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
 				assert.NotNil(t, cr.Status.LastSyncTimestamp)
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			// This tests the case where we create our own read only creds initially:
@@ -302,20 +264,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			// This indicates an error state.
@@ -346,19 +294,13 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			expectErr: true,
 			expectedCOConditions: []ExpectedCOCondition{
 				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
 					conditionType: configv1.OperatorProgressing,
 					status:        corev1.ConditionTrue,
 				},
-				//  TODO: controller does not currently set any condition for this error
-				// {
-				// 	conditionType: configv1.OperatorFailing,
-				// 	status:        corev1.ConditionTrue,
-				// },
-
+				{
+					conditionType: configv1.OperatorDegraded,
+					status:        corev1.ConditionTrue,
+				},
 			},
 		},
 		{
@@ -472,20 +414,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			name: "cred missing access key exists",
@@ -588,20 +516,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
 				assert.Nil(t, targetSecret)
-			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
 			},
 		},
 		{
@@ -1026,20 +940,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				return mockAWSClient
 			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
-			},
 		},
 		{
 			name: "new credential but operator disabled via config",
@@ -1058,20 +958,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				return mockAWSClient
-			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
 			},
 		},
 		{
@@ -1092,20 +978,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				return mockAWSClient
-			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorAvailable,
-					status:        corev1.ConditionTrue,
-				},
-				{
-					conditionType: configv1.OperatorProgressing,
-					status:        corev1.ConditionFalse,
-				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionFalse,
-				},
 			},
 		},
 		{
@@ -1362,9 +1234,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				},
 				platformType: configv1.AWSPlatformType,
 			}
-			// make sure we clear this test case's handler
-			defer clusteroperator.ClearHandlers()
-			clusteroperator.AddStatusHandler(rcr)
 
 			_, err = rcr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
@@ -1392,14 +1261,18 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.Exactly(t, condition.reason, foundCondition.Reason)
 			}
 
-			for _, condition := range test.expectedCOConditions {
-				co := getClusterOperator(fakeClient)
-				require.NotNil(t, co)
-				foundCondition := findClusterOperatorCondition(co.Status.Conditions, condition.conditionType)
-				assert.NotNil(t, foundCondition)
-				assert.Equal(t, string(condition.status), string(foundCondition.Status), "condition %s had unexpected status", condition.conditionType)
-				if condition.reason != "" {
-					assert.Exactly(t, condition.reason, foundCondition.Reason)
+			if test.expectedCOConditions != nil {
+				logger := log.WithFields(log.Fields{"controller": controllerName})
+				currentConditions, err := rcr.GetConditions(logger)
+				require.NoError(t, err, "failed getting conditions")
+
+				for _, expectedCondition := range test.expectedCOConditions {
+					foundCondition := findClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
+					require.NotNil(t, foundCondition)
+					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
+					if expectedCondition.reason != "" {
+						assert.Exactly(t, expectedCondition.reason, foundCondition.Reason)
+					}
 				}
 			}
 		})
@@ -1821,7 +1694,7 @@ func testOperatorConfigMap(disabled string) *corev1.ConfigMap {
 func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
 	conf := &operatorv1.CloudCredential{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "cluster",
+			Name: constants.CloudCredOperatorConfig,
 		},
 		Spec: operatorv1.CloudCredentialSpec{
 			CredentialsMode: mode,
