@@ -21,6 +21,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -43,6 +44,8 @@ type Actuator interface {
 	// Upgradeable returns a ClusterOperator Upgradeable condition to indicate whether or not this cluster can
 	// be safely upgraded to the next "minor" (4.y) Openshift release.
 	Upgradeable(operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition
+	// GetCredentialsRootSecret returns the credentials root secret.
+	GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error)
 }
 
 type DummyActuator struct {
@@ -75,6 +78,10 @@ func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *confi
 		Type:   configv1.OperatorUpgradeable,
 	}
 	return upgradeableCondition
+}
+
+func (a *DummyActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	return nil, nil
 }
 
 type ActuatorError struct {

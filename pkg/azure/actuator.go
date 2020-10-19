@@ -120,6 +120,41 @@ func isAzureCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	return isAzure, nil
 }
 
+// needsUpdate will return whether the current credentials satisfy what's being requested
+// in the CredentialsRequest
+func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
+	logger := a.getLogger(cr)
+	// If the secret simply doesn't exist, we definitely need an update
+	exists, err := a.Exists(ctx, cr)
+	if err != nil {
+		return true, err
+	}
+	if !exists {
+		return true, nil
+	}
+
+	azureStatus, err := decodeProviderStatus(a.codec, cr)
+	if err != nil {
+		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
+	}
+
+	if azureStatus.ServicePrincipalName == "" {
+		// passthrough-specifc checks here
+
+		credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
+		if err != nil {
+			log.WithError(err).Debug("error retrieving cloud credentials secret")
+			return false, err
+		}
+		// If the cloud credentials secret has been updated in passthrough mode, we need an update
+		if credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion {
+			logger.Debug("root cloud creds have changed, update is needed")
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func (a *Actuator) Create(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	return a.sync(ctx, cr)
 }
@@ -139,7 +174,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 	logger := a.getLogger(cr)
 	logger.Debug("running delete")
 
-	cloudCredsSecret, err := a.getRootCloudCredentialsSecret(ctx, logger)
+	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
@@ -165,7 +200,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return fmt.Errorf("unable to get secret %v/%v: %v", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name, err)
 	}
 
-	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
+	if credentialsRootSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
 		return nil
 	}
 
@@ -189,10 +224,10 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 
 	azureCredentialsMinter, err := a.credentialMinterBuilder(
 		logger,
-		string(cloudCredsSecret.Data[AzureClientID]),
-		string(cloudCredsSecret.Data[AzureClientSecret]),
-		string(cloudCredsSecret.Data[AzureTenantID]),
-		string(cloudCredsSecret.Data[AzureSubscriptionID]),
+		string(credentialsRootSecret.Data[AzureClientID]),
+		string(credentialsRootSecret.Data[AzureClientSecret]),
+		string(credentialsRootSecret.Data[AzureTenantID]),
+		string(credentialsRootSecret.Data[AzureSubscriptionID]),
 	)
 	if err != nil {
 		return fmt.Errorf("unable to create azure cred minter: %v", err)
@@ -215,6 +250,21 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
+	// Should we update anything
+	needsUpdate, err := a.needsUpdate(ctx, cr)
+	if err != nil {
+		logger.WithError(err).Error("error determining whether a credentials update is needed")
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error determining whether a credentials update is needed",
+		}
+	}
+
+	if !needsUpdate {
+		logger.Debug("credentials already up to date")
+		return nil
+	}
+
 	infraName, err := utils.LoadInfrastructureName(a.client.Client, logger)
 	if err != nil {
 		return err
@@ -225,13 +275,13 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return err
 	}
 
-	cloudCredsSecret, err := a.getRootCloudCredentialsSecret(ctx, logger)
+	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
 	}
 
-	switch cloudCredsSecret.Annotations[constants.AnnotationKey] {
+	switch credentialsRootSecret.Annotations[constants.AnnotationKey] {
 	case constants.InsufficientAnnotation:
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
@@ -241,13 +291,13 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		}
 	case constants.PassthroughAnnotation:
 		logger.Debugf("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
+		err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
 		if err != nil {
 			return err
 		}
 	case constants.MintAnnotation:
 		logger.Debugf("provisioning with cred minting")
-		err := a.syncMint(ctx, cr, cloudCredsSecret, infraName, infraResourceGroups, logger)
+		err := a.syncMint(ctx, cr, credentialsRootSecret, infraName, infraResourceGroups, logger)
 		if err != nil {
 			msg := "error syncing creds in mint-mode"
 			logger.WithError(err).Error(msg)
@@ -580,7 +630,8 @@ func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AzureCloudCredSecretName}
 }
 
-func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
+func (a *Actuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.client.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"

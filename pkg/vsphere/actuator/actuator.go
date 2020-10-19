@@ -133,8 +133,12 @@ func (a *VSphereActuator) needsUpdate(ctx context.Context, cr *minterv1.Credenti
 		return true, err
 	}
 
-	cloudCredsSecret, err := a.getCloudCredentialsSecret(context.TODO(), logger)
-	if !reflect.DeepEqual(existingSecret.Data, cloudCredsSecret.Data) {
+	credentialsRootSecret, err := a.GetCredentialsRootSecret(context.TODO(), cr)
+	if err != nil {
+		logger.WithError(err).Error("issue with cloud credentials secret")
+		return true, err
+	}
+	if !reflect.DeepEqual(existingSecret.Data, credentialsRootSecret.Data) {
 		logger.Debug("need update because target secret has different data than cloud creds secret")
 		return true, nil
 	} else {
@@ -168,7 +172,7 @@ func (a *VSphereActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequ
 		logger.WithError(err).Error("error determining whether a credentials update is needed")
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("error determining whether a credentials update is needed: %v", err),
+			Message:   "error determining whether a credentials update is needed",
 		}
 	}
 
@@ -177,13 +181,13 @@ func (a *VSphereActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequ
 		return nil
 	}
 
-	cloudCredsSecret, err := a.getCloudCredentialsSecret(ctx, logger)
+	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
 	}
 
-	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.InsufficientAnnotation {
+	if credentialsRootSecret.Annotations[constants.AnnotationKey] == constants.InsufficientAnnotation {
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
@@ -192,9 +196,9 @@ func (a *VSphereActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequ
 		}
 	}
 
-	if cloudCredsSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
+	if credentialsRootSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
 		logger.Debugf("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
+		err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
 		if err != nil {
 			return err
 		}
@@ -336,7 +340,8 @@ func (a *VSphereActuator) GetCredentialsRootSecretLocation() types.NamespacedNam
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.VSphereCloudCredSecretName}
 }
 
-func (a *VSphereActuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
+func (a *VSphereActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"

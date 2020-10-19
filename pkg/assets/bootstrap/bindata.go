@@ -178,6 +178,12 @@ spec:
                   type:
                     description: Type is the specific type of the condition
                     type: string
+            lastSyncCloudCredsSecretResourceVersion:
+              description: LastSyncCloudCredsSecretResourceVersion is the resource
+                version of the cloud credentials secret resource when the credentials
+                request resource was last synced. Used to determine if the the cloud
+                credentials have been updated since the last sync.
+              type: string
             lastSyncGeneration:
               description: LastSyncGeneration is the generation of the credentials
                 request resource that was last synced. Used to determine if the object
