@@ -23,8 +23,8 @@ require (
 	github.com/googleapis/gnostic v0.5.1 // indirect
 	github.com/imdario/mergo v0.3.10 // indirect
 	github.com/onsi/ginkgo v1.14.0 // indirect
-	github.com/openshift/api v0.0.0-20201012140924-16436fa6166b
-	github.com/openshift/build-machinery-go v0.0.0-20200819073603-48aa266c95f7
+	github.com/openshift/api v0.0.0-20201103184615-27004eede929
+	github.com/openshift/build-machinery-go v0.0.0-20200917070002-f171684f77ab
 	github.com/openshift/client-go v0.0.0-20200827190008-3062137373b5
 	github.com/openshift/library-go v0.0.0-20200911100307-610c6e9e90b8
 	github.com/pkg/errors v0.9.1
@@ -43,9 +43,9 @@ require (
 	google.golang.org/genproto v0.0.0-20200526211855-cb27e3aa2013
 	google.golang.org/grpc v1.28.0
 	gopkg.in/square/go-jose.v2 v2.2.2
-	k8s.io/api v0.19.0
-	k8s.io/apimachinery v0.19.0
-	k8s.io/client-go v0.19.0
-	k8s.io/code-generator v0.19.0
+	k8s.io/api v0.19.2
+	k8s.io/apimachinery v0.19.2
+	k8s.io/client-go v0.19.2
+	k8s.io/code-generator v0.19.2
 	sigs.k8s.io/controller-runtime v0.6.2
 )

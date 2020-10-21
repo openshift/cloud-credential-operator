@@ -229,6 +229,8 @@ var _bootstrapCloudcredential_v1_operator_config_custresdefYaml = []byte(`apiVer
 kind: CustomResourceDefinition
 metadata:
   name: cloudcredentials.operator.openshift.io
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
 spec:
   scope: Cluster
   group: operator.openshift.io
