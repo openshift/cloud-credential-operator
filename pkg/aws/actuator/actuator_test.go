@@ -17,12 +17,14 @@ limitations under the License.
 package actuator
 
 import (
+	"context"
 	"fmt"
 	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	configv1 "github.com/openshift/api/config/v1"
 	v1 "github.com/openshift/api/operator/v1"
@@ -49,6 +51,9 @@ const (
 
 	testRootAccessKeyID     = "TestRootAccessKeyID"
 	testRootSecretAccessKey = "TestRootSecretAccessKey"
+
+	testTargetSecret    = "testTargetSecretName"
+	testTargetNamespace = "testTargetNamespace"
 )
 
 type awsClientBuilderRecorder struct {
@@ -367,6 +372,92 @@ func TestUpgradeable(t *testing.T) {
 		})
 	}
 }
+
+func TestSecretFormat(t *testing.T) {
+	apis.AddToScheme(scheme.Scheme)
+
+	tests := []struct {
+		name            string
+		accessKeyID     string
+		secretAccessKey string
+		existingSecret  *corev1.Secret
+	}{
+		{
+			name:            "new secret with credentials field",
+			accessKeyID:     "AKFIRSTKEY",
+			secretAccessKey: "FIRSTSECRET",
+		},
+		{
+			name:            "existing secret without credentials field",
+			accessKeyID:     "AKFIRSTKEY",
+			secretAccessKey: "FIRSTSECRET",
+			existingSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testTargetSecret,
+					Namespace: testTargetNamespace,
+				},
+				Data: map[string][]byte{
+					"aws_access_key_id":     []byte("SOMEACCESSKEY"),
+					"aws_secret_access_key": []byte("SOMESECRETKEY"),
+				},
+			},
+		},
+		{
+			name:            "existing secret with outdated credentials field",
+			accessKeyID:     "AKFIRSTKEY",
+			secretAccessKey: "FIRSTSECRET",
+			existingSecret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      testTargetSecret,
+					Namespace: testTargetNamespace,
+				},
+				Data: map[string][]byte{
+					"aws_access_key_id":     []byte("SOMEACCESSKEY"),
+					"aws_secret_access_key": []byte("SOMESECRETKEY"),
+					"credentials":           []byte("OLD AWS CONFIG"),
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var fakeClient client.Client
+			if test.existingSecret != nil {
+				fakeClient = fake.NewFakeClient(test.existingSecret)
+			} else {
+				fakeClient = fake.NewFakeClient()
+			}
+
+			a := &AWSActuator{
+				Client: fakeClient,
+			}
+
+			cr := testCredentialsRequest()
+			logger := a.getLogger(cr)
+			err := a.syncAccessKeySecret(cr, test.accessKeyID, test.secretAccessKey, test.existingSecret, "exampleAWSPolicy", logger)
+
+			require.NoError(t, err, "unexpected error creating/updating Secret")
+
+			secret := &corev1.Secret{}
+			secretNSN := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
+
+			err = fakeClient.Get(context.TODO(), secretNSN, secret)
+			require.NoError(t, err, "unexpected error retriving Secret")
+
+			assert.Contains(t, secret.Data, "aws_access_key_id")
+			assert.Equal(t, string(secret.Data["aws_access_key_id"]), test.accessKeyID)
+			assert.Contains(t, secret.Data, "aws_secret_access_key")
+			assert.Equal(t, string(secret.Data["aws_secret_access_key"]), test.secretAccessKey)
+
+			require.Contains(t, secret.Data, "credentials")
+			credentialsConfig := string(secret.Data["credentials"])
+			assert.Contains(t, credentialsConfig, fmt.Sprintf("aws_access_key_id = %s", test.accessKeyID))
+			assert.Contains(t, credentialsConfig, fmt.Sprintf("aws_secret_access_key = %s", test.secretAccessKey))
+		})
+	}
+}
+
 func testReadOnlySecret() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -411,6 +502,12 @@ func testCredentialsRequest() *minterv1.CredentialsRequest {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "testcr",
 			Namespace: "testnamespace",
+		},
+		Spec: minterv1.CredentialsRequestSpec{
+			SecretRef: corev1.ObjectReference{
+				Name:      testTargetSecret,
+				Namespace: testTargetNamespace,
+			},
 		},
 	}
 }
