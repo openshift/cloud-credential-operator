@@ -71,6 +71,13 @@ const (
 	credentialsRequestInfraMismatch = "InfrastructureMismatch"
 )
 
+var (
+	syncPeriod = time.Hour
+	// Set some extra time when requeueing so we are guaranteed that the
+	// syncPeriod has elapsed when we re-reconcile an object.
+	defaultRequeueTime = syncPeriod + time.Minute*10
+)
+
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
 // default RBAC. The Manager will set fields on the Controller and Start it when
 // the Manager is Started.
@@ -537,12 +544,15 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	}
 	cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
 	isStale := cr.Generation != cr.Status.LastSyncGeneration
-	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(time.Hour*1).After(time.Now())
+	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
 	hasActiveFailureConditions := checkForFailureConditions(cr)
 
 	if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
 		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
-		return reconcile.Result{}, nil
+		// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
+		// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
+		// users/permissions/tags/etc.
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 	}
 
 	credsExists, err := r.Actuator.Exists(context.TODO(), cr)
@@ -592,7 +602,10 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		return reconcile.Result{}, err
 	}
 
-	return reconcile.Result{}, syncErr
+	// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
+	// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
+	// users/permissions/tags/etc.
+	return reconcile.Result{RequeueAfter: defaultRequeueTime}, syncErr
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
