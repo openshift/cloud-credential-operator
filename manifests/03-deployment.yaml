@@ -47,7 +47,6 @@ spec:
           name: cloud-credential-operator-serving-cert
       - args:
         - |
-          update-ca-trust extract;
           if [ -s /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem ]; then
               echo "Copying system trust bundle"
               cp -f /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
