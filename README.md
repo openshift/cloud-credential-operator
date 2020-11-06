@@ -17,7 +17,7 @@ instance roles)
 
 # Cloud Providers
 
-Currently the operator supports AWS, GCP, Azure, VMWare, OpenStack and oVirt.
+Currently the operator supports AWS, Azure, GCP, KubeVirt, OpenStack. oVirt and VMWare.
 
 ## Credentials Root Secret Formats
 
@@ -69,6 +69,18 @@ metadata:
   name: gcp-credentials
 data:
   service_account.json: Base64encodeServiceAccount
+```
+
+### Kubevirt
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: kube-system
+  name: kubevirt-credentials
+data:
+  kubeconfig: Base64encodeKubeconfig
 ```
 
 ### OpenStack
@@ -163,7 +175,7 @@ Cons:
   * Credential permissions may need to be manually updated prior to any upgrade.
   * Each component has permissions used by all other components.
 
-Supported clouds: AWS, GCP, Azure, VMWare, OpenStack, oVirt
+Supported clouds: AWS, GCP, Azure, VMWare, OpenStack, oVirt, KubeVirt
 
 ## 3. Manual Credentials Management
 
@@ -201,6 +213,7 @@ Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 AWS | Y | 4.4+ | Y | 4.3+ | 4.6+ (expected)
 Azure | Y | N | Y | unknown | N
 GCP | Y | 4.7+ | Y | unknown | N
+KubeVirt | N | N | Y | N | N
 OpenStack | N | N | Y | N | N
 oVirt | N | N | Y | N | N
 VMWare | N | N | Y | N | N
