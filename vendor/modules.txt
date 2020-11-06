@@ -171,7 +171,7 @@ github.com/mitchellh/go-homedir
 github.com/modern-go/concurrent
 # github.com/modern-go/reflect2 v1.0.1
 github.com/modern-go/reflect2
-# github.com/openshift/api v0.0.0-20200901182017-7ac89ba6b971
+# github.com/openshift/api v0.0.0-20201012140924-16436fa6166b
 github.com/openshift/api
 github.com/openshift/api/apps
 github.com/openshift/api/apps/v1
