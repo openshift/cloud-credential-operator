@@ -17,8 +17,9 @@ limitations under the License.
 package aws
 
 import (
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
-	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -26,6 +27,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/aws/aws-sdk-go/service/s3/s3iface"
+
 	"github.com/openshift/cloud-credential-operator/pkg/version"
 )
 
@@ -60,6 +62,7 @@ type ClientParams struct {
 	InfraName string
 	Region    string
 	Endpoint  string
+	CABundle  string
 }
 
 type awsClient struct {
@@ -132,22 +135,26 @@ func (c *awsClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, er
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
 func NewClient(accessKeyID, secretAccessKey []byte, params *ClientParams) (Client, error) {
-	awsConfig := &awssdk.Config{}
+	var awsOpts session.Options
 
 	if params != nil {
 		if params.Region != "" {
-			awsConfig.Region = aws.String(params.Region)
+			awsOpts.Config.Region = aws.String(params.Region)
 		}
 
 		if params.Endpoint != "" {
-			awsConfig.Endpoint = aws.String(params.Endpoint)
+			awsOpts.Config.Endpoint = aws.String(params.Endpoint)
 		}
 	}
 
-	awsConfig.Credentials = credentials.NewStaticCredentials(
+	awsOpts.Config.Credentials = credentials.NewStaticCredentials(
 		string(accessKeyID), string(secretAccessKey), "")
 
-	s, err := session.NewSession(awsConfig)
+	if params.CABundle != "" {
+		awsOpts.CustomCABundle = strings.NewReader(params.CABundle)
+	}
+
+	s, err := session.NewSessionWithOptions(awsOpts)
 	if err != nil {
 		return nil, err
 	}
