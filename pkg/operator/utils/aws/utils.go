@@ -1,7 +1,12 @@
 package aws
 
 import (
+	"context"
+
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -22,6 +27,12 @@ func ClientBuilder(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.
 	}
 
 	params := setupClientParams(infra)
+
+	caBundle, err := loadCABundle(c)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not load CA bundle")
+	}
+	params.CABundle = caBundle
 
 	return ccaws.NewClient(accessKeyID, secretAccessKey, params)
 }
@@ -68,4 +79,15 @@ func getIAMEndpoint(infra *configv1.Infrastructure) string {
 		}
 	}
 	return ""
+}
+
+func loadCABundle(c client.Client) (string, error) {
+	cm := &corev1.ConfigMap{}
+	switch err := c.Get(context.Background(), client.ObjectKey{Namespace: "openshift-config-managed", Name: "kube-cloud-config"}, cm); {
+	case apierrors.IsNotFound(err):
+		return "", nil
+	case err != nil:
+		return "", errors.Wrap(err, "failed to get kube-cloud-config ConfigMap")
+	}
+	return cm.Data["ca-bundle.pem"], nil
 }
