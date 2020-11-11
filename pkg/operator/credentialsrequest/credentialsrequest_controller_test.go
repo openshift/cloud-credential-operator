@@ -387,7 +387,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testCredentialsRequest(t),
-				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testLegacyAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
 				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
@@ -488,6 +488,41 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						string(targetSecret.Data["aws_secret_access_key"]))
 					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				}
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "cred exists credentials key missing",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testLegacyAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				require.NotNil(t, targetSecret)
+				require.Contains(t, targetSecret.Data, "credentials", "expected Secret to be updated with 'credentials' field")
+				assert.Contains(t, string(targetSecret.Data["credentials"]), testAWSAccessKeyID, "didn't find access key data in credentials field")
+				assert.Contains(t, string(targetSecret.Data["credentials"]), testAWSSecretAccessKey, "didn't find secret key data in credentials field")
+
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -1480,7 +1515,7 @@ func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey
 	return s
 }
 
-func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
+func testLegacyAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -1494,6 +1529,16 @@ func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *c
 			"aws_secret_access_key": []byte(secretAccessKey),
 		},
 	}
+	return s
+}
+
+func testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
+	s := testLegacyAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
+
+	s.Data["credentials"] = []byte(fmt.Sprintf(`[default]
+aws_access_key_id = %s
+aws_secret_access_key = %s`, accessKeyID, secretAccessKey))
+
 	return s
 }
 
