@@ -51,6 +51,7 @@ type CredentialsRequestSpec struct {
 	SecretRef corev1.ObjectReference `json:"secretRef"`
 
 	// ProviderSpec contains the cloud provider specific credentials specification.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	ProviderSpec *runtime.RawExtension `json:"providerSpec,omitempty"`
 }
 
@@ -79,6 +80,7 @@ type CredentialsRequestStatus struct {
 	LastSyncCloudCredsSecretResourceVersion string `json:"lastSyncCloudCredsSecretResourceVersion,omitempty"`
 
 	// ProviderStatus contains cloud provider specific status.
+	// +kubebuilder:pruning:PreserveUnknownFields
 	ProviderStatus *runtime.RawExtension `json:"providerStatus,omitempty"`
 
 	// Conditions includes detailed status for the CredentialsRequest
