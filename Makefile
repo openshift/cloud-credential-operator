@@ -40,7 +40,7 @@ $(eval $(call build-image-internal,$(1),$(2),$(3),$(4)))
 endef
 
 # Set crd-schema-gen variables
-CONTROLLER_GEN_VERSION := v0.2.1
+CONTROLLER_GEN_VERSION := v0.2.5
 CRD_APIS :=./pkg/apis/cloudcredential/v1
 
 # Exclude e2e tests from unit testing
