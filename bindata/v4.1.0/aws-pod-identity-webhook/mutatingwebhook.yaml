@@ -13,6 +13,12 @@ webhooks:
       name: pod-identity-webhook
       namespace: openshift-cloud-credential-operator
       path: "/mutate"
+  namespaceSelector:
+    matchExpressions:
+    - key: openshift.io/run-level
+      operator: NotIn
+      values:
+      - "0"
   rules:
   - operations: [ "CREATE" ]
     apiGroups: [""]
