@@ -226,10 +226,23 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		}
 
 	} else {
-		// for passthrough creds, just see if we have the permissions requested in the credentialsrequest
+		// for passthrough creds, just see if root cloud creds have not changed and
+		// we have the permissions requested in the credentials request
 
 		// but for the case where the operator mode is non-default, then we will avoid performing any
 		// policy simulations and assume that the passthrough creds must be good enough
+
+		credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
+		if err != nil {
+			log.WithError(err).Debug("error retrieving cloud credentials secret")
+			return false, err
+		}
+		// If the cloud credentials secret has been updated in passthrough mode, we need an update
+		if credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion {
+			logger.Debug("root cloud creds have changed, update is needed")
+			return true, nil
+		}
+
 		mode, _, err := utils.GetOperatorConfiguration(a.Client, logger)
 		if err != nil {
 			return true, err
@@ -282,7 +295,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.WithError(err).Error("error determining whether a credentials update is needed")
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("error determining whether a credentials update is needed: %v", err),
+			Message:   "error determining whether a credentials update is needed",
 		}
 	}
 
@@ -291,13 +304,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return nil
 	}
 
-	cloudCredsSecret, err := a.getCloudCredentialsSecret(ctx, logger)
+	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
 	}
 
-	switch cloudCredsSecret.Annotations[constants.AnnotationKey] {
+	switch credentialsRootSecret.Annotations[constants.AnnotationKey] {
 	case constants.InsufficientAnnotation:
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
@@ -307,7 +320,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 	case constants.PassthroughAnnotation:
 		logger.Debugf("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
+		err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
 		if err != nil {
 			return err
 		}
@@ -919,7 +932,8 @@ func (a *AWSActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName}
 }
 
-func (a *AWSActuator) getCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
+func (a *AWSActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
