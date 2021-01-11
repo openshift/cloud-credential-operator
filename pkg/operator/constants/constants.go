@@ -143,5 +143,10 @@ var (
 	// OvirtUpcomingSecrets contains the list of known new oVirt credential secrets for the next version of OpenShift
 	OvirtUpcomingSecrets = []types.NamespacedName{}
 	// VsphereUpcomingSecrets contains the list of known new vSphere credential secrets for the next version of OpenShift
-	VsphereUpcomingSecrets = []types.NamespacedName{}
+	VsphereUpcomingSecrets = []types.NamespacedName{
+		{
+			Namespace: "openshift-cluster-storage-operator",
+			Name:      "openshift-vsphere-problem-detector",
+		},
+	}
 )
