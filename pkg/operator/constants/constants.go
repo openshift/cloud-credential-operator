@@ -139,7 +139,12 @@ var (
 		},
 	}
 	// OpenStackUpcomingSecrets contains the list of known new OpenStack credential secrets for the next version of OpenShift
-	OpenStackUpcomingSecrets = []types.NamespacedName{}
+	OpenStackUpcomingSecrets = []types.NamespacedName{
+		{
+			Namespace: "openshift-cluster-csi-drivers",
+			Name:      "openstack-cloud-credentials",
+		},
+	}
 	// OvirtUpcomingSecrets contains the list of known new oVirt credential secrets for the next version of OpenShift
 	OvirtUpcomingSecrets = []types.NamespacedName{}
 	// VsphereUpcomingSecrets contains the list of known new vSphere credential secrets for the next version of OpenShift

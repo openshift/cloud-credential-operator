@@ -20,10 +20,6 @@ import (
 	"fmt"
 	"reflect"
 
-	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
-	log "github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -31,9 +27,14 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	log "github.com/sirupsen/logrus"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 const (
@@ -274,13 +275,9 @@ func (a *OpenStackActuator) getLogger(cr *minterv1.CredentialsRequest) log.Field
 }
 
 func (a *OpenStackActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
-	}
-	return upgradeableCondition
+	return utils.UpgradeableCheck(a.Client, mode, "4.7", a.GetUpcomingCredSecrets(), a.GetCredentialsRootSecretLocation())
 }
 
 func (a *OpenStackActuator) GetUpcomingCredSecrets() []types.NamespacedName {
-	return []types.NamespacedName{}
+	return constants.OpenStackUpcomingSecrets
 }
