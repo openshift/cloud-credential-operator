@@ -1,5 +1,7 @@
 package constants
 
+import "k8s.io/apimachinery/pkg/types"
+
 // CredentialsMode enumerates the possible modes of operation for CCO
 type CredentialsMode string
 
@@ -118,4 +120,28 @@ var (
 		ModeDegraded,
 		ModeUnknown,
 	}
+
+	// Add known new credentials for next version upgrade
+
+	// AWSUpcomingSecrets contains the list of known new AWS credential secrets for the next version of OpenShift
+	AWSUpcomingSecrets = []types.NamespacedName{}
+	// AzureUpcomingSecrets contains the list of known new Azure credential secrets for the next version of OpenShift
+	AzureUpcomingSecrets = []types.NamespacedName{}
+	// GCPUpcomingSecrets contains the list of known new GCP credential secrets for the next version of OpenShift
+	GCPUpcomingSecrets = []types.NamespacedName{
+		{
+			Namespace: "openshift-cluster-csi-drivers",
+			Name:      "gcp-pd-cloud-credentials",
+		},
+		{
+			Namespace: "openshift-cloud-credential-operator",
+			Name:      "cloud-credential-operator-gcp-ro-creds",
+		},
+	}
+	// OpenStackUpcomingSecrets contains the list of known new OpenStack credential secrets for the next version of OpenShift
+	OpenStackUpcomingSecrets = []types.NamespacedName{}
+	// OvirtUpcomingSecrets contains the list of known new oVirt credential secrets for the next version of OpenShift
+	OvirtUpcomingSecrets = []types.NamespacedName{}
+	// VsphereUpcomingSecrets contains the list of known new vSphere credential secrets for the next version of OpenShift
+	VsphereUpcomingSecrets = []types.NamespacedName{}
 )

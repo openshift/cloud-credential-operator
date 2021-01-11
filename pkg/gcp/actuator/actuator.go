@@ -21,18 +21,7 @@ import (
 	"fmt"
 	"reflect"
 
-	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
-
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 
 	// GCP packages
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -44,6 +33,18 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 )
 
 const (
@@ -771,13 +772,9 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 }
 
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
-	}
-	return upgradeableCondition
+	return utils.UpgradeableCheck(a.Client, mode, "4.7", a.GetUpcomingCredSecrets(), a.GetCredentialsRootSecretLocation())
 }
 
 func (a *Actuator) GetUpcomingCredSecrets() []types.NamespacedName {
-	return []types.NamespacedName{}
+	return constants.GCPUpcomingSecrets
 }
