@@ -127,6 +127,10 @@ const (
 	// for Kubevirt are stored.
 	KubevirtCloudCredSecretName = "kubevirt-credentials"
 
+	// EquinixMetalCloudCredSecretName is the name of the secret where credentials
+	// for EquinixMetal are stored.
+	EquinixMetalCloudCredSecretName = "equinix-metal-credentials"
+
 	// UpgradeableAnnotation is the annotation CCO will check for on the cloudcredential.operator.openshift.io
 	// CR when determining upgradeability.
 	UpgradeableAnnotation = "cloudcredential.openshift.io/upgradeable-to"

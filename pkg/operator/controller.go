@@ -19,6 +19,7 @@ package controller
 import (
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
+	equinixmetalactuator "github.com/openshift/cloud-credential-operator/pkg/equinixmetal/actuator"
 	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/kubevirt"
 	"github.com/openshift/cloud-credential-operator/pkg/openstack"
@@ -126,6 +127,12 @@ func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 		case configv1.KubevirtPlatformType:
 			log.Info("initializing Kubevirt actuator")
 			a, err = kubevirt.NewActuator(m.GetClient())
+			if err != nil {
+				return err
+			}
+		case configv1.EquinixMetalPlatformType:
+			log.Info("initializing Equinix Metal actuator")
+			a, err = equinixmetalactuator.NewEquinixMetalActuator(m.GetClient())
 			if err != nil {
 				return err
 			}

@@ -59,6 +59,18 @@ data:
   azure_region: Base64encodeRegion
 ```
 
+### Equinix Metal
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: kube-system
+  name: equinix-metal-credentials
+data:
+  api_key: EquinixMetalAPIKey
+```
+
 ### GCP
 
 ```yaml
@@ -211,6 +223,7 @@ Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 --- | --- | --- | --- | --- | ---
 AWS | Y | 4.4+ | Y | 4.3+ | 4.6+ (expected)
 Azure | Y | N | Y | Y | N
+EquinixMetal | N | N | 4.x+ (expected) | N | N
 GCP | Y | 4.7+ | Y | Y | N
 KubeVirt | N | N | Y | N | N
 OpenStack | N | N | Y | N | N

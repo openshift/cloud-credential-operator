@@ -400,6 +400,8 @@ func getWatchedSecrets(platformType configv1.PlatformType) []types.NamespacedNam
 		rootSecret.Name = constants.OvirtCloudCredsSecretName
 	case configv1.VSpherePlatformType:
 		rootSecret.Name = constants.VSphereCloudCredSecretName
+	case configv1.EquinixMetalPlatformType:
+		rootSecret.Name = constants.EquinixMetalCloudCredSecretName
 	default:
 		log.Infof("unable to provide upcoming secrets for unknown platform: %v", platformType)
 		return []types.NamespacedName{}

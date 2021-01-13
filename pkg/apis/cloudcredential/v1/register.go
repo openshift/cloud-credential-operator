@@ -59,6 +59,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&GCPProviderStatus{}, &GCPProviderSpec{},
 		&VSphereProviderStatus{}, &VSphereProviderSpec{},
 		&KubevirtProviderStatus{}, &KubevirtProviderSpec{},
+		&EquinixMetalProviderStatus{}, &EquinixMetalProviderSpec{},
 	)
 
 	return nil
