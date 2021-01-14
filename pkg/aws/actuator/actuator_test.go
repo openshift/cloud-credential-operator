@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	configv1 "github.com/openshift/api/config/v1"
-	v1 "github.com/openshift/api/operator/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,6 +43,7 @@ import (
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -72,7 +73,7 @@ func (a *awsClientBuilderRecorder) ClientBuilder(accessKeyID, secretAccessKey []
 }
 
 func TestCredentialsFetching(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	util.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -281,7 +282,7 @@ func TestGenerateUserName(t *testing.T) {
 }
 
 func TestUpgradeable(t *testing.T) {
-	apis.AddToScheme(scheme.Scheme)
+	util.SetupScheme(scheme.Scheme)
 
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -289,72 +290,73 @@ func TestUpgradeable(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                    string
-		mode                    v1.CloudCredentialsMode
-		existing                []runtime.Object
-		expectedStatus          configv1.ConditionStatus
-		expectedReason          string
-		overrideUpcomingSecrets []types.NamespacedName
+		name           string
+		mode           operatorv1.CloudCredentialsMode
+		existing       []runtime.Object
+		expectedStatus configv1.ConditionStatus
+		expectedReason string
 	}{
 		{
 			name: "mint mode with root cred",
-			mode: v1.CloudCredentialsModeMint,
+			mode: operatorv1.CloudCredentialsModeMint,
 			existing: []runtime.Object{
 				testRootSecret(),
+				testCloudCredentialConfig(),
 			},
 			expectedStatus: configv1.ConditionTrue,
 		},
 		{
 			name: "implicit mint mode with root cred",
-			mode: v1.CloudCredentialsModeDefault,
+			mode: operatorv1.CloudCredentialsModeDefault,
 			existing: []runtime.Object{
 				testRootSecret(),
+				testCloudCredentialConfig(),
 			},
 			expectedStatus: configv1.ConditionTrue,
 		},
 		{
-			name:           "mint mode with missing root cred",
-			mode:           v1.CloudCredentialsModeMint,
-			existing:       []runtime.Object{},
-			expectedStatus: configv1.ConditionFalse,
-			expectedReason: constants.MissingRootCredentialUpgradeableReason,
-		},
-		{
-			name:           "implicit mint mode with missing root cred",
-			mode:           v1.CloudCredentialsModeDefault,
-			existing:       []runtime.Object{},
-			expectedStatus: configv1.ConditionFalse,
-			expectedReason: constants.MissingRootCredentialUpgradeableReason,
-		},
-		{
-			name: "manual mode with future version secrets pre-provisioned",
-			mode: v1.CloudCredentialsModeManual,
+			name: "mint mode with missing root cred",
+			mode: operatorv1.CloudCredentialsModeMint,
 			existing: []runtime.Object{
-				testSecret("kube-system", "foo"),
-				testSecret("kube-system", "bar"),
+				testCloudCredentialConfig(),
 			},
-			expectedStatus: configv1.ConditionTrue,
-			overrideUpcomingSecrets: []types.NamespacedName{
-				{Namespace: "kube-system", Name: "foo"},
-				{Namespace: "kube-system", Name: "bar"},
-			},
+			expectedStatus: configv1.ConditionFalse,
+			expectedReason: constants.MissingRootCredentialUpgradeableReason,
 		},
 		{
-			name:           "manual mode without future version secrets pre-provisioned",
-			mode:           v1.CloudCredentialsModeManual,
-			existing:       []runtime.Object{},
-			expectedStatus: configv1.ConditionFalse,
-			expectedReason: constants.MissingSecretsForUpgradeReason,
-			overrideUpcomingSecrets: []types.NamespacedName{
-				{Namespace: "kube-system", Name: "foo"},
-				{Namespace: "kube-system", Name: "bar"},
+			name: "implicit mint mode with missing root cred",
+			mode: operatorv1.CloudCredentialsModeDefault,
+			existing: []runtime.Object{
+				testCloudCredentialConfig(),
 			},
+			expectedStatus: configv1.ConditionFalse,
+			expectedReason: constants.MissingRootCredentialUpgradeableReason,
+		},
+		{
+			name: "manual mode with annotation override",
+			mode: operatorv1.CloudCredentialsModeManual,
+			existing: []runtime.Object{
+				testCloudCredentialConfigWithAnnotation(map[string]string{constants.UpgradeableAnnotation: "4.99"}),
+			},
+			expectedStatus: configv1.ConditionTrue,
+		},
+		{
+			name: "manual mode missing annotation",
+			mode: operatorv1.CloudCredentialsModeManual,
+			existing: []runtime.Object{
+				testCloudCredentialConfig(),
+			},
+			expectedStatus: configv1.ConditionFalse,
+			expectedReason: constants.MissingUpgradeableAnnotationReason,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
+
 			fakeClient := fake.NewFakeClient(test.existing...)
+
+			fakeClient.Create(context.TODO(), testClusterVersion())
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -363,9 +365,7 @@ func TestUpgradeable(t *testing.T) {
 				Client: fakeClient,
 				Codec:  codec,
 			}
-			if test.overrideUpcomingSecrets != nil {
-				a.testUpcomingSecrets = test.overrideUpcomingSecrets
-			}
+
 			cond := a.Upgradeable(test.mode)
 
 			if test.expectedStatus == configv1.ConditionTrue {
@@ -376,6 +376,23 @@ func TestUpgradeable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func testClusterVersion() *configv1.ClusterVersion {
+	clusterVersion := &configv1.ClusterVersion{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "version",
+		},
+		Status: configv1.ClusterVersionStatus{
+			History: []configv1.UpdateHistory{
+				{
+					State:   configv1.CompletedUpdate,
+					Version: "4.7.7",
+				},
+			},
+		},
+	}
+	return clusterVersion
 }
 
 func TestSecretFormat(t *testing.T) {
@@ -500,6 +517,25 @@ func testRootSecret() *corev1.Secret {
 			"aws_secret_access_key": []byte(testRootSecretAccessKey),
 		},
 	}
+}
+
+func testCloudCredentialConfigWithAnnotation(annotations map[string]string) *operatorv1.CloudCredential {
+	credConfig := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        "cluster",
+			Annotations: annotations,
+		},
+	}
+	return credConfig
+}
+
+func testCloudCredentialConfig() *operatorv1.CloudCredential {
+	credConfig := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+	}
+	return credConfig
 }
 
 func testCredentialsRequest() *minterv1.CredentialsRequest {

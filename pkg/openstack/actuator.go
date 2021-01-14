@@ -288,9 +288,5 @@ func (a *OpenStackActuator) getLogger(cr *minterv1.CredentialsRequest) log.Field
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *OpenStackActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, "4.7", a.getUpcomingCredSecrets(), a.GetCredentialsRootSecretLocation())
-}
-
-func (a *OpenStackActuator) getUpcomingCredSecrets() []types.NamespacedName {
-	return constants.OpenStackUpcomingSecrets
+	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
 }
