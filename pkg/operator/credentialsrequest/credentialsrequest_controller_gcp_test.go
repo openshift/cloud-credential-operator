@@ -712,7 +712,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 						return nil, fmt.Errorf("unknown client to return for provided auth data")
 					},
 				},
-				platformType: configv1.GCPPlatformType,
+				PlatformType: configv1.GCPPlatformType,
 			}
 
 			_, err := rcr.Reconcile(reconcile.Request{
@@ -747,7 +747,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				require.NoError(t, err, "failed getting conditions")
 
 				for _, expectedCondition := range test.expectedCOConditions {
-					foundCondition := findClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
+					foundCondition := utils.FindClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
 					require.NotNil(t, foundCondition)
 					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
 					if expectedCondition.reason != "" {

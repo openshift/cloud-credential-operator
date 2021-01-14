@@ -90,7 +90,7 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 	r := &ReconcileCredentialsRequest{
 		Client:       mgr.GetClient(),
 		Actuator:     actuator,
-		platformType: platType,
+		PlatformType: platType,
 	}
 	status.AddHandler(controllerName, r)
 
@@ -359,7 +359,7 @@ var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
 type ReconcileCredentialsRequest struct {
 	client.Client
 	Actuator     actuator.Actuator
-	platformType configv1.PlatformType
+	PlatformType configv1.PlatformType
 }
 
 // Reconcile reads that state of the cluster for a CredentialsRequest object and
@@ -416,15 +416,15 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	cr = cr.DeepCopy()
 
 	// Ignore CR if it's for a different cloud/infra
-	infraMatch, err := crInfraMatches(cr, r.platformType)
+	infraMatch, err := crInfraMatches(cr, r.PlatformType)
 	if err != nil {
 		logger.WithError(err).Error("failed to determine cloud platform type")
 		return reconcile.Result{}, err
 	}
 	if !infraMatch {
 		logger.Debug("ignoring cr as it is for a different cloud")
-		setIgnoredCondition(cr, r.platformType)
-		err := r.updateStatus(origCR, cr, logger)
+		setIgnoredCondition(cr, r.PlatformType)
+		err := r.UpdateStatus(origCR, cr, logger)
 		if err != nil {
 			logger.WithError(err).Error("failed to update conditions")
 		}
@@ -439,14 +439,14 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 				logger.WithError(err).Error("actuator error deleting credentials exist")
 
 				setCredentialsDeprovisionFailureCondition(cr, true, err)
-				if err := r.updateStatus(origCR, cr, logger); err != nil {
+				if err := r.UpdateStatus(origCR, cr, logger); err != nil {
 					logger.WithError(err).Error("failed to update condition")
 					return reconcile.Result{}, err
 				}
 				return reconcile.Result{}, err
 			} else {
 				setCredentialsDeprovisionFailureCondition(cr, false, nil)
-				if err := r.updateStatus(origCR, cr, logger); err != nil {
+				if err := r.UpdateStatus(origCR, cr, logger); err != nil {
 					// Just a warning, since on deprovision we're just tearing down
 					// the CredentialsRequest object anyway
 					logger.Warnf("unable to update condition: %v", err)
@@ -509,7 +509,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			// was then deleted.
 			logger.Warn("secret namespace does not yet exist")
 			setMissingTargetNamespaceCondition(cr, true)
-			if err := r.updateStatus(origCR, cr, logger); err != nil {
+			if err := r.UpdateStatus(origCR, cr, logger); err != nil {
 				logger.WithError(err).Error("error updating condition")
 				return reconcile.Result{}, err
 			}
@@ -597,7 +597,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		}
 	}
 
-	err = r.updateStatus(origCR, cr, logger)
+	err = r.UpdateStatus(origCR, cr, logger)
 	if err != nil {
 		logger.Errorf("error updating status: %v", err)
 		return reconcile.Result{}, err
@@ -730,7 +730,7 @@ func setIgnoredCondition(cr *minterv1.CredentialsRequest, clusterPlatform config
 	}
 }
 
-func (r *ReconcileCredentialsRequest) updateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
+func (r *ReconcileCredentialsRequest) UpdateStatus(origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	logger.Debug("updating credentials request status")
 
 	// Update cluster deployment status if changed:

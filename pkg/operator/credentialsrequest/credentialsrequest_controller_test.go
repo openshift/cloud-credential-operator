@@ -1319,7 +1319,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						}
 					},
 				},
-				platformType: configv1.AWSPlatformType,
+				PlatformType: configv1.AWSPlatformType,
 			}
 
 			_, err = rcr.Reconcile(reconcile.Request{
@@ -1354,7 +1354,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				require.NoError(t, err, "failed getting conditions")
 
 				for _, expectedCondition := range test.expectedCOConditions {
-					foundCondition := findClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
+					foundCondition := utils.FindClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
 					require.NotNil(t, foundCondition)
 					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
 					if expectedCondition.reason != "" {
