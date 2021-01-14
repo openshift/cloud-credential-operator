@@ -191,7 +191,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 					Client: fakeClient,
 					Codec:  codec,
 				},
-				platformType: configv1.VSpherePlatformType,
+				PlatformType: configv1.VSpherePlatformType,
 			}
 
 			_, err := rcr.Reconcile(reconcile.Request{
@@ -226,7 +226,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				require.NoError(t, err, "failed getting conditions")
 
 				for _, expectedCondition := range test.expectedCOConditions {
-					foundCondition := findClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
+					foundCondition := utils.FindClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
 					require.NotNil(t, foundCondition)
 					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
 					if expectedCondition.reason != "" {

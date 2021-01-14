@@ -158,6 +158,8 @@ const (
 	// possible clouds/infrastructure, and cloud-credential-operator will only act on the
 	// CredentialsRequests where the cloud/infra matches.
 	Ignored CredentialsRequestConditionType = "Ignored"
+	// StaleCredentials is true when CredentialsRequest is no longer required and has to be cleaned ip
+	StaleCredentials CredentialsRequestConditionType = "StaleCredentials"
 )
 
 var (
