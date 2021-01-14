@@ -63,11 +63,10 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
-	Client              client.Client
-	Codec               *minterv1.ProviderCodec
-	AWSClientBuilder    func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
-	Scheme              *runtime.Scheme
-	testUpcomingSecrets []types.NamespacedName
+	Client           client.Client
+	Codec            *minterv1.ProviderCodec
+	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
+	Scheme           *runtime.Scheme
 }
 
 // NewAWSActuator creates a new AWSActuator.
@@ -1239,15 +1238,7 @@ func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, "4.7", a.getUpcomingCredSecrets(), a.GetCredentialsRootSecretLocation())
-}
-
-func (a *AWSActuator) getUpcomingCredSecrets() []types.NamespacedName {
-	// For unit testing only, otherwise we want these to be a static list.
-	if a.testUpcomingSecrets != nil {
-		return a.testUpcomingSecrets
-	}
-	return constants.AWSUpcomingSecrets
+	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
 }
 
 func generateAWSCredentialsConfig(accessKeyID, secretAccessKey string) []byte {
