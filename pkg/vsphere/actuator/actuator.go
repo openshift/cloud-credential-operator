@@ -20,20 +20,23 @@ import (
 	"fmt"
 	"reflect"
 
-	configv1 "github.com/openshift/api/config/v1"
-	operatorv1 "github.com/openshift/api/operator/v1"
 	log "github.com/sirupsen/logrus"
-
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 var _ actuatoriface.Actuator = (*VSphereActuator)(nil)
@@ -397,5 +400,9 @@ func isVSphereCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *VSphereActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return nil
+	return utils.UpgradeableCheck(a.Client, mode, "4.7", a.getUpcomingCredSecrets(), a.GetCredentialsRootSecretLocation())
+}
+
+func (a *VSphereActuator) getUpcomingCredSecrets() []types.NamespacedName {
+	return constants.VsphereUpcomingSecrets
 }
