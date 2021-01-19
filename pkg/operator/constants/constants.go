@@ -168,5 +168,10 @@ var (
 	// Add known stale credentials requests here
 
 	// StaleCredentialsRequests contains the list of known stale credentials requests for the next version of OpenShift
-	StaleCredentialsRequests = []types.NamespacedName{}
+	StaleCredentialsRequests = []types.NamespacedName{
+		{
+			Name:      "cloud-credential-operator-s3",
+			Namespace: "openshift-cloud-credential-operator",
+		},
+	}
 )
