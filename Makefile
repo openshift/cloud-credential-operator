@@ -46,7 +46,7 @@ CRD_APIS :=./pkg/apis/cloudcredential/v1
 # Exclude e2e tests from unit testing
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
-IMAGE_REGISTRY :=registry.svc.ci.openshift.org
+IMAGE_REGISTRY :=registry.ci.openshift.org
 
 # This will call a macro called "add-bindata" which will generate bindata specific targets based on the parameters:
 # $0 - macro name
