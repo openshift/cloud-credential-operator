@@ -218,6 +218,10 @@ OpenStack | N | N | Y | N | N
 oVirt | N | N | Y | N | N
 VMWare | N | N | Y | N | N
 
+# Short lived Credentials with AWS Security Token Service
+
+OpenShift can be configured to use short lived credentials for different components with AWS Security Token Service. It also eliminates the need to have root credentials inside the cluster. This feature is still in development. For more information please refer [here](./docs/sts.md).
+
 # Developer Instructions
 
 Login to a cluster with admin credentials:
