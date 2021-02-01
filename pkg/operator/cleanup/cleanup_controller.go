@@ -41,7 +41,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 			Client: mgr.GetClient(),
 		},
 	}
-	status.AddHandler(controllerName, &r.ReconcileCredentialsRequest)
+	status.AddHandler(controllerName, r)
 	return r
 }
 
