@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/types"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -23,7 +24,6 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
@@ -37,9 +37,7 @@ const (
 // newReconciler returns a new reconcile.Reconciler
 func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileStaleCredentialsRequest{
-		ReconcileCredentialsRequest: credentialsrequest.ReconcileCredentialsRequest{
-			Client: mgr.GetClient(),
-		},
+		Client: mgr.GetClient(),
 	}
 	status.AddHandler(controllerName, r)
 	return r
@@ -105,7 +103,7 @@ var _ reconcile.Reconciler = &ReconcileStaleCredentialsRequest{}
 
 // ReconcileStaleCredentialsRequest reconciles a stale CredentialsRequest object
 type ReconcileStaleCredentialsRequest struct {
-	ReconcileCredentialsRequest credentialsrequest.ReconcileCredentialsRequest
+	client.Client
 }
 
 // Reconcile marks the stale CredentialsRequest object for deletion
@@ -122,7 +120,7 @@ func (r *ReconcileStaleCredentialsRequest) Reconcile(request reconcile.Request) 
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
 
-	mode, conflict, err := utils.GetOperatorConfiguration(r.ReconcileCredentialsRequest.Client, logger)
+	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
 	if err != nil {
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
@@ -133,7 +131,7 @@ func (r *ReconcileStaleCredentialsRequest) Reconcile(request reconcile.Request) 
 
 	logger.Info("syncing stale credentials request")
 	cr := &minterv1.CredentialsRequest{}
-	err = r.ReconcileCredentialsRequest.Get(context.TODO(), request.NamespacedName, cr)
+	err = r.Get(context.TODO(), request.NamespacedName, cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debug("credentials request no longer exists")
@@ -160,7 +158,7 @@ func (r *ReconcileStaleCredentialsRequest) Reconcile(request reconcile.Request) 
 		cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.StaleCredentials,
 			status, reason, msg, updateCheck)
 
-		err := r.ReconcileCredentialsRequest.UpdateStatus(origCR, cr, logger)
+		err := utils.UpdateStatus(r.Client, origCR, cr, logger)
 		if err != nil {
 			logger.WithError(err).Error("failed to update conditions")
 		}
@@ -170,7 +168,7 @@ func (r *ReconcileStaleCredentialsRequest) Reconcile(request reconcile.Request) 
 
 	// Delete stale credentials request
 	if cr.DeletionTimestamp == nil {
-		err = r.ReconcileCredentialsRequest.Client.Delete(context.TODO(), cr)
+		err = r.Client.Delete(context.TODO(), cr)
 	}
 
 	return reconcile.Result{

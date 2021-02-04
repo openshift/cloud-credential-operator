@@ -1319,7 +1319,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 						}
 					},
 				},
-				PlatformType: configv1.AWSPlatformType,
+				platformType: configv1.AWSPlatformType,
 			}
 
 			_, err = rcr.Reconcile(reconcile.Request{

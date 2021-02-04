@@ -191,7 +191,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 					Client: fakeClient,
 					Codec:  codec,
 				},
-				PlatformType: configv1.VSpherePlatformType,
+				platformType: configv1.VSpherePlatformType,
 			}
 
 			_, err := rcr.Reconcile(reconcile.Request{
