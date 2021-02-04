@@ -38,7 +38,7 @@ func (r *ReconcileCredentialsRequest) GetConditions(logger log.FieldLogger) ([]c
 		r.Actuator,
 		mode,
 		credRequests,
-		r.PlatformType,
+		r.platformType,
 		logger), nil
 }
 
@@ -152,7 +152,7 @@ func computeStatusConditions(
 			degradedCondition.Reason = reasonStaleCredentials
 			degradedCondition.Message = fmt.Sprintf(
 				"%d of %d credentials requests are stale and should be deleted.",
-				failingCredRequests, len(validCredRequests))
+				staleCredRequests, len(validCredRequests))
 			conditions = append(conditions, degradedCondition)
 		}
 		return conditions

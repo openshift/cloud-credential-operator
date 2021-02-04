@@ -712,7 +712,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 						return nil, fmt.Errorf("unknown client to return for provided auth data")
 					},
 				},
-				PlatformType: configv1.GCPPlatformType,
+				platformType: configv1.GCPPlatformType,
 			}
 
 			_, err := rcr.Reconcile(reconcile.Request{

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -24,11 +23,8 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	"github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
@@ -73,19 +69,13 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 		return nil
 	}
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to set up codec for tests: %v", err)
-	}
-
 	tests := []struct {
-		name                 string
-		existing             []runtime.Object
-		expectErr            bool
-		expectDeletion       bool
-		mockRootAWSClient    func(mockCtrl *gomock.Controller) *mockaws.MockClient
-		expectedConditions   []ExpectedCondition
-		expectedCOConditions []ExpectedCOCondition
+		name               string
+		existing           []runtime.Object
+		expectErr          bool
+		expectDeletion     bool
+		mockRootAWSClient  func(mockCtrl *gomock.Controller) *mockaws.MockClient
+		expectedConditions []ExpectedCondition
 	}{
 		{
 			name: "cleanup stale credentials request",
@@ -100,10 +90,6 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 				testInfrastructure(testInfraName),
 			},
 			expectDeletion: true,
-			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				return mockAWSClient
-			},
 		},
 		{
 			name: "cleanup stale credentials request in a manual mode",
@@ -117,20 +103,10 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 				testInfrastructure(testInfraName),
 			},
 			expectDeletion: false,
-			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				return mockAWSClient
-			},
 			expectedConditions: []ExpectedCondition{
 				{
 					conditionType: minterv1.StaleCredentials,
 					reason:        "CredentialsNoLongerRequired",
-					status:        corev1.ConditionTrue,
-				},
-			},
-			expectedCOConditions: []ExpectedCOCondition{
-				{
-					conditionType: configv1.OperatorDegraded,
 					status:        corev1.ConditionTrue,
 				},
 			},
@@ -142,25 +118,12 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			mockRootAWSClient := test.mockRootAWSClient(mockCtrl)
-
 			fakeClient := fake.NewFakeClient(test.existing...)
 			rscr := &ReconcileStaleCredentialsRequest{
-				ReconcileCredentialsRequest: credentialsrequest.ReconcileCredentialsRequest{
-					Client: fakeClient,
-					Actuator: &actuator.AWSActuator{
-						Client: fakeClient,
-						Codec:  codec,
-						Scheme: scheme.Scheme,
-						AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, c client.Client) (minteraws.Client, error) {
-							return mockRootAWSClient, nil
-						},
-					},
-					PlatformType: configv1.AWSPlatformType,
-				},
+				Client: fakeClient,
 			}
 
-			_, err = rscr.Reconcile(reconcile.Request{
+			_, err := rscr.Reconcile(reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testStaleCRName,
 					Namespace: testNamespace,
@@ -184,21 +147,6 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 					require.NotNil(t, foundCondition, "unexpected unable to find condition")
 					assert.Exactly(t, condition.status, foundCondition.Status)
 					assert.Exactly(t, condition.reason, foundCondition.Reason)
-				}
-			}
-
-			if test.expectedCOConditions != nil {
-				logger := log.WithFields(log.Fields{"controller": controllerName})
-				currentConditions, err := rscr.ReconcileCredentialsRequest.GetConditions(logger)
-				require.NoError(t, err, "failed getting conditions")
-
-				for _, expectedCondition := range test.expectedCOConditions {
-					foundCondition := utils.FindClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
-					require.NotNil(t, foundCondition)
-					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
-					if expectedCondition.reason != "" {
-						assert.Exactly(t, expectedCondition.reason, foundCondition.Reason)
-					}
 				}
 			}
 		})

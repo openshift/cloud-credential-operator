@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -374,5 +375,24 @@ func FindClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCon
 			return &conditions[i]
 		}
 	}
+	return nil
+}
+
+// UpdateStatus updates the status of the credentials request
+func UpdateStatus(client client.Client, origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
+	logger.Debug("updating credentials request status")
+
+	// Update Credentials Request status if changed:
+	if !reflect.DeepEqual(newCR.Status, origCR.Status) {
+		logger.Infof("status has changed, updating")
+		err := client.Status().Update(context.TODO(), newCR)
+		if err != nil {
+			logger.WithError(err).Error("error updating credentials request")
+			return err
+		}
+	} else {
+		logger.Debugf("status unchanged")
+	}
+
 	return nil
 }
