@@ -164,4 +164,14 @@ var (
 			Name:      "openshift-vsphere-problem-detector",
 		},
 	}
+
+	// Add known stale credentials requests here
+
+	// StaleCredentialsRequests contains the list of known stale credentials requests for the next version of OpenShift
+	StaleCredentialsRequests = []types.NamespacedName{
+		{
+			Name:      "cloud-credential-operator-s3",
+			Namespace: "openshift-cloud-credential-operator",
+		},
+	}
 )

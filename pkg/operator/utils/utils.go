@@ -3,6 +3,7 @@ package utils
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strconv"
 
 	corev1 "k8s.io/api/core/v1"
@@ -363,5 +364,35 @@ func UpgradeableCheck(kubeClient client.Client,
 	}
 
 	// Only return non-default conditions as the status controller will set defaults
+	return nil
+}
+
+// FindClusterOperatorCondition iterates all conditions on a ClusterOperator looking for the
+// specified condition type. If none exists nil will be returned.
+func FindClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCondition, conditionType configv1.ClusterStatusConditionType) *configv1.ClusterOperatorStatusCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
+
+// UpdateStatus updates the status of the credentials request
+func UpdateStatus(client client.Client, origCR, newCR *minterv1.CredentialsRequest, logger log.FieldLogger) error {
+	logger.Debug("updating credentials request status")
+
+	// Update Credentials Request status if changed:
+	if !reflect.DeepEqual(newCR.Status, origCR.Status) {
+		logger.Infof("status has changed, updating")
+		err := client.Status().Update(context.TODO(), newCR)
+		if err != nil {
+			logger.WithError(err).Error("error updating credentials request")
+			return err
+		}
+	} else {
+		logger.Debugf("status unchanged")
+	}
+
 	return nil
 }

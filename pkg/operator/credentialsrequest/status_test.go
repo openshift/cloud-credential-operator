@@ -34,6 +34,7 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
@@ -156,6 +157,21 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
+			name: "stale credentials request that is no longer required",
+			credRequests: []minterv1.CredentialsRequest{
+				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
+				testCredentialsRequestWithStatus("cred2", true, []minterv1.CredentialsRequestCondition{
+					testCRCondition(minterv1.StaleCredentials, corev1.ConditionTrue),
+				}, nil),
+				testCredentialsRequestWithStatus("cred3", true, []minterv1.CredentialsRequestCondition{}, nil),
+			},
+			cloudPlatform:    configv1.AWSPlatformType,
+			operatorDisabled: true,
+			expectedConditions: []configv1.ClusterOperatorStatusCondition{
+				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonStaleCredentials),
+			},
+		},
+		{
 			name: "ignore nonAWS credreqs",
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
@@ -208,7 +224,7 @@ func TestClusterOperatorStatus(t *testing.T) {
 				log.WithField("test", test.name))
 
 			for _, ec := range test.expectedConditions {
-				c := findClusterOperatorCondition(clusterOperatorConditions, ec.Type)
+				c := utils.FindClusterOperatorCondition(clusterOperatorConditions, ec.Type)
 				if assert.NotNil(t, c, "unexpected nil for condition %s", ec.Type) {
 					assert.Equal(t, string(ec.Status), string(c.Status), "unexpected status for condition %s", ec.Type)
 					assert.Equal(t, ec.Reason, c.Reason, "unexpected reason for condition %s", ec.Type)
