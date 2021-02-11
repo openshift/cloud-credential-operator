@@ -332,7 +332,7 @@ func UpgradeableCheck(kubeClient client.Client,
 			upgradeableCondition.Status = configv1.ConditionFalse
 			upgradeableCondition.Reason = constants.MissingSecretsForUpgradeReason
 			upgradeableCondition.Message = fmt.Sprintf(
-				"Cannot upgrade manual mode cluster to %s due to missing secret(s): %v Please see Manualy Creating IAM documentation for the cluster's platform.",
+				"Cannot upgrade manual mode cluster to %s due to missing secret(s): %v Please see Manually Creating IAM documentation for the cluster's platform.",
 				toRelease,
 				missingSecrets)
 			return upgradeableCondition
