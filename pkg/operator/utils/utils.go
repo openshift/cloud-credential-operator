@@ -287,3 +287,81 @@ func IsValidMode(operatorMode operatorv1.CloudCredentialsMode) bool {
 		return false
 	}
 }
+
+// UpgradeableCheck will take a list of expected secrets and the platform-specific root secret and
+// check the cluster to determine whether it is ready to perform an upgrade.
+// Note: the upgradeable flag can only stop upgrades from 4.x to 4.y, not 4.x.y to 4.x.z.
+func UpgradeableCheck(kubeClient client.Client,
+	mode operatorv1.CloudCredentialsMode,
+	toRelease string,
+	newSecrets []types.NamespacedName,
+	rootSecret types.NamespacedName) *configv1.ClusterOperatorStatusCondition {
+	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
+		Status: configv1.ConditionTrue,
+		Type:   configv1.OperatorUpgradeable,
+	}
+
+	if mode == operatorv1.CloudCredentialsModeManual {
+		// Check for the existence of credentials we know are coming in the future. If any do not exist, then we cosider
+		// ourselves upgradeable=false and inform the user why.
+		missingSecrets := []types.NamespacedName{}
+		for _, nsSecret := range newSecrets {
+
+			secLog := log.WithField("secret", nsSecret).WithField("toRelease", toRelease)
+			secLog.Debug("checking that secrets exist for manual mode cluster upgrade")
+			secret := &corev1.Secret{}
+
+			if err := kubeClient.Get(context.Background(), nsSecret, secret); err != nil {
+				if errors.IsNotFound(err) {
+					secLog.Info("identified missing secret for upgrade")
+					missingSecrets = append(missingSecrets, nsSecret)
+				} else {
+					// If we can't figure out if you're upgradeable, you're not upgradeable:
+					secLog.WithError(err).Error("unexpected error looking up secret, marking upgradeable=false")
+					upgradeableCondition.Status = configv1.ConditionFalse
+					upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
+					upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgradead to %s: %s",
+						toRelease, err)
+					return upgradeableCondition
+				}
+			}
+
+		}
+
+		if len(missingSecrets) > 0 {
+			log.Infof("%d secrets missing, marking upgradeable=false", len(missingSecrets))
+			upgradeableCondition.Status = configv1.ConditionFalse
+			upgradeableCondition.Reason = constants.MissingSecretsForUpgradeReason
+			upgradeableCondition.Message = fmt.Sprintf(
+				"Cannot upgrade manual mode cluster to %s due to missing secret(s): %v Please see Manually Creating IAM documentation for the cluster's platform.",
+				toRelease,
+				missingSecrets)
+			return upgradeableCondition
+		}
+	} else {
+		// if in mint or passthrough, make sure the root cred secret exists, if not it must be restored prior to upgrade.
+		secret := &corev1.Secret{}
+
+		err := kubeClient.Get(context.Background(), rootSecret, secret)
+		if err != nil {
+			if errors.IsNotFound(err) {
+				log.WithField("secret", rootSecret).Info("parent cred secret must be restored prior to upgrade, marking upgradeable=false")
+				upgradeableCondition.Status = configv1.ConditionFalse
+				upgradeableCondition.Reason = constants.MissingRootCredentialUpgradeableReason
+				upgradeableCondition.Message = fmt.Sprintf("Parent credentials secret must be restored prior to upgrade: %s/%s",
+					rootSecret.Namespace, rootSecret.Name)
+				return upgradeableCondition
+			}
+
+			log.WithError(err).Error("unexpected error looking up parent secret, marking upgradeable=false")
+			// If we can't figure out if you're upgradeable, you're not upgradeable:
+			upgradeableCondition.Status = configv1.ConditionFalse
+			upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
+			upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgraded to %s: %v",
+				toRelease, err)
+			return upgradeableCondition
+		}
+	}
+
+	return upgradeableCondition
+}
