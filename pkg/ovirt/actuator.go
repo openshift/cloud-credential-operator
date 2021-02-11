@@ -111,7 +111,13 @@ func (a *OvirtActuator) sync(ctx context.Context, cr *minterv1.CredentialsReques
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
-	ovirtCreds, err := a.getCredentialsSecretData(ctx, logger)
+	credentialsRootSecret, err := a.GetCredentialsRootSecret(context.TODO(), cr)
+	if err != nil {
+		logger.WithError(err).Error("issue with cloud credentials secret")
+		return err
+	}
+
+	ovirtCreds, err := a.getCredentialsSecretData(credentialsRootSecret, logger)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
@@ -242,17 +248,21 @@ func (a *OvirtActuator) GetCredentialsRootSecretLocation() types.NamespacedName 
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.OvirtCloudCredsSecretName}
 }
 
-func (a *OvirtActuator) getCredentialsSecretData(ctx context.Context, logger log.FieldLogger) (OvirtCreds, error) {
+func (a *OvirtActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
-		return OvirtCreds{}, &actuatoriface.ActuatorError{
+		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
 			Message:   fmt.Sprintf("%v: %v", msg, err),
 		}
 	}
+	return cloudCredSecret, nil
+}
 
+func (a *OvirtActuator) getCredentialsSecretData(cloudCredSecret *corev1.Secret, logger log.FieldLogger) (OvirtCreds, error) {
 	out, err := secretToCreds(cloudCredSecret)
 	if err != nil {
 		logger.Warnf("secret did not have expected key: %s", constants.OvirtCloudCredsSecretName)

@@ -177,7 +177,7 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		logger.WithError(err).Error("error determining whether a credentials update is needed")
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("error determining whether a credentials update is needed: %v", err),
+			Message:   "error determining whether a credentials update is needed",
 		}
 	}
 
@@ -195,13 +195,13 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return nil
 	}
 
-	cloudCredsSecret, err := a.getRootCloudCredentialsSecret(ctx, logger)
+	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return err
 	}
 
-	switch cloudCredsSecret.Annotations[constants.AnnotationKey] {
+	switch credentialsRootSecret.Annotations[constants.AnnotationKey] {
 	case constants.InsufficientAnnotation:
 		msg := "cloud credentials insufficient to satisfy credentials request"
 		logger.Error(msg)
@@ -211,7 +211,7 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		}
 	case constants.PassthroughAnnotation:
 		logger.Debug("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, cloudCredsSecret, logger)
+		err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
 		if err != nil {
 			return err
 		}
@@ -469,6 +469,17 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 	} else {
 		// passthrough-specifc check here
 
+		credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
+		if err != nil {
+			log.WithError(err).Debug("error retrieving cloud credentials secret")
+			return serviceAPIsEnabled, false, err
+		}
+		// If the cloud credentials secret has been updated in passthrough mode, we need an update
+		if credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion {
+			logger.Debug("root cloud creds have changed, update is needed")
+			return serviceAPIsEnabled, true, nil
+		}
+
 		allowed, err := gcputils.CheckPermissionsAgainstPermissionList(readClient, permList, logger)
 		if err != nil {
 			return serviceAPIsEnabled, true, fmt.Errorf("error checking whether GCP client has sufficient permissions: %v", err)
@@ -566,8 +577,9 @@ func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.GCPCloudCredSecretName}
 }
 
-// getRootCloudCredentialsSecret will return the cluster's root GCP cloud cred secret if it exists and is properly annotated
-func (a *Actuator) getRootCloudCredentialsSecret(ctx context.Context, logger log.FieldLogger) (*corev1.Secret, error) {
+// GetCredentialsRootSecret will return the cluster's root GCP cloud cred secret if it exists and is properly annotated
+func (a *Actuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
@@ -639,7 +651,7 @@ func (a *Actuator) secretAlreadySynced(cr *minterv1.CredentialsRequest) (bool, e
 		return false, err
 	}
 
-	rootSecret, err := a.getRootCloudCredentialsSecret(context.TODO(), logger)
+	rootSecret, err := a.GetCredentialsRootSecret(context.TODO(), cr)
 	if err != nil {
 		logger.WithError(err).Error("error retrieving cluster cloud creds")
 		return false, err

@@ -21,6 +21,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -46,6 +47,8 @@ type Actuator interface {
 	// GetUpcomingCredSecrets returns a slice of NamespacedNames for secrets holding credentials that we know are coming in the next OpenShift release.
 	// Used to pre-check if Upgradeable condition should be true or false for manual mode deployments of the credentials operator.
 	GetUpcomingCredSecrets() []types.NamespacedName
+	// GetCredentialsRootSecret returns the credentials root secret.
+	GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error)
 }
 
 type DummyActuator struct {
@@ -82,6 +85,10 @@ func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *confi
 
 func (a *DummyActuator) GetUpcomingCredSecrets() []types.NamespacedName {
 	return []types.NamespacedName{}
+}
+
+func (a *DummyActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	return nil, nil
 }
 
 type ActuatorError struct {

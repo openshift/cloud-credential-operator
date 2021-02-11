@@ -593,11 +593,16 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 		crSecretExists = true
 	}
 
+	credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(context.TODO(), cr)
+	if err != nil {
+		log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
+	}
+	cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
 	isStale := cr.Generation != cr.Status.LastSyncGeneration
 	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
 	hasActiveFailureConditions := checkForFailureConditions(cr)
 
-	if !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
+	if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
 		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
 		// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
 		// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
@@ -641,6 +646,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 			Time: time.Now(),
 		}
 		cr.Status.LastSyncGeneration = origCR.Generation
+		if credentialsRootSecret != nil {
+			cr.Status.LastSyncCloudCredsSecretResourceVersion = credentialsRootSecret.ResourceVersion
+		}
 	}
 
 	err = r.updateStatus(origCR, cr, logger)
