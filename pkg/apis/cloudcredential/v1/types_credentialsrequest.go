@@ -53,6 +53,13 @@ type CredentialsRequestSpec struct {
 	// ProviderSpec contains the cloud provider specific credentials specification.
 	// +kubebuilder:pruning:PreserveUnknownFields
 	ProviderSpec *runtime.RawExtension `json:"providerSpec,omitempty"`
+
+	// ServiceAccountNames contains a list of ServiceAccounts that will use permissions associated with this
+	// CredentialsRequest. This is not used by CCO, but the information is needed for being able to properly
+	// set up access control in the cloud provider when the ServiceAccounts are used as part of the cloud
+	// credentials flow.
+	// +optional
+	ServiceAccountNames []string `json:"serviceAccountNames,omitempty"`
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest

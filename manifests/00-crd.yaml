@@ -84,6 +84,15 @@ spec:
                 uid:
                   description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
                   type: string
+            serviceAccountNames:
+              description: ServiceAccountNames contains a list of ServiceAccounts
+                that will use permissions associated with this CredentialsRequest.
+                This is not used by CCO, but the information is needed for being able
+                to properly set up access control in the cloud provider when the ServiceAccounts
+                are used as part of the cloud credentials flow.
+              type: array
+              items:
+                type: string
         status:
           description: CredentialsRequestStatus defines the observed state of CredentialsRequest
           type: object
