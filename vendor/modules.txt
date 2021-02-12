@@ -260,11 +260,11 @@ github.com/prometheus/procfs/internal/util
 github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.6.0
 github.com/sirupsen/logrus
-# github.com/spf13/cobra v1.0.0
+# github.com/spf13/cobra v1.1.1
 github.com/spf13/cobra
 # github.com/spf13/pflag v1.0.5
 github.com/spf13/pflag
-# github.com/stretchr/testify v1.5.1
+# github.com/stretchr/testify v1.7.0
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/require
 # go.opencensus.io v0.22.3
@@ -470,7 +470,7 @@ google.golang.org/protobuf/types/known/timestamppb
 gopkg.in/inf.v0
 # gopkg.in/yaml.v2 v2.3.0
 gopkg.in/yaml.v2
-# gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
+# gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 gopkg.in/yaml.v3
 # k8s.io/api v0.19.2
 k8s.io/api/admission/v1beta1
