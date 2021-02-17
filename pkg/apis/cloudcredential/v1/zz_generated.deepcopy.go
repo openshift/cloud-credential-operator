@@ -208,6 +208,11 @@ func (in *CredentialsRequestSpec) DeepCopyInto(out *CredentialsRequestSpec) {
 		*out = new(runtime.RawExtension)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.ServiceAccountNames != nil {
+		in, out := &in.ServiceAccountNames, &out.ServiceAccountNames
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
