@@ -11,7 +11,7 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.2.0
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
-	github.com/aws/aws-sdk-go v1.30.5
+	github.com/aws/aws-sdk-go v1.37.14
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-logr/logr v0.2.1-0.20200730175230-ee2de8da5be6 // indirect
