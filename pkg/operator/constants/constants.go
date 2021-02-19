@@ -34,6 +34,10 @@ const (
 	// running under (typically just haven't added support for the cloud/platform)
 	ModeUnknown CredentialsMode = "unknown"
 
+	// ModeManualPodIdentity is used to indicate that CCO has found at least one CredentialsRequest
+	// secret with content indicating Pod-level identity/credentials in use (eg AWS STS with WebIdentity).
+	ModeManualPodIdentity CredentialsMode = "manualpodidentity"
+
 	// StatusModeMismatch is used to set a clusteroperator condition when
 	// the legacy configmap setting of disabled: "true" conflicts with the
 	// specified operator config mode.
@@ -79,10 +83,14 @@ const (
 	// will use for logging purposes.
 	SecretAnnotatorControllerName = "secretannotator"
 
-	// cloud credential secret infor
+	// cloud credential secret info
 
 	// AWSCloudCredSecretName is the name of the secret created by the installer containing cloud creds.
 	AWSCloudCredSecretName = "aws-creds"
+
+	// AWSSecretDataCredentialsKey is the name of the key used to store the AWS config data in the Secret
+	// specified in the CredentialsRequest.Spec.SecretRef
+	AWSSecretDataCredentialsKey = "credentials"
 
 	// AzureCloudCredSecretName is the name of the secret created by the install containing cloud creds.
 	AzureCloudCredSecretName = "azure-credentials"
@@ -129,6 +137,7 @@ var (
 		ModeManual,
 		ModeDegraded,
 		ModeUnknown,
+		ModeManualPodIdentity,
 	}
 
 	// Add known new credentials for next version upgrade

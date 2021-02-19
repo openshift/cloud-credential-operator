@@ -55,9 +55,8 @@ const (
 	openshiftClusterIDKey     = "openshiftClusterID"
 	clusterVersionObjectName  = "version"
 
-	secretDataAccessKey      = "aws_access_key_id"
-	secretDataSecretKey      = "aws_secret_access_key"
-	secretDataCredentialsKey = "credentials"
+	secretDataAccessKey = "aws_access_key_id"
+	secretDataSecretKey = "aws_secret_access_key"
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
@@ -165,7 +164,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	// Make sure we update old Secrets that don't have the new "credentials" field
 	if credentialsKey == "" || credentialsKey != string(generateAWSCredentialsConfig(accessKey, secretKey)) {
-		logger.Infof("Secret %s key needs updating, will update Secret contents", secretDataCredentialsKey)
+		logger.Infof("Secret %s key needs updating, will update Secret contents", constants.AWSSecretDataCredentialsKey)
 		return true, nil
 	}
 
@@ -737,9 +736,9 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 			existingSecretAccessKey = string(secretBytes)
 		}
 
-		credentialsKey, ok := existingSecret.Data[secretDataCredentialsKey]
+		credentialsKey, ok := existingSecret.Data[constants.AWSSecretDataCredentialsKey]
 		if !ok {
-			logger.Warningf("secret did not have expected key: %s, will be updated", secretDataCredentialsKey)
+			logger.Warningf("secret did not have expected key: %s, will be updated", constants.AWSSecretDataCredentialsKey)
 		} else {
 			existingCredentialsKey = string(credentialsKey)
 		}
@@ -877,9 +876,9 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 				},
 			},
 			Data: map[string][]byte{
-				secretDataAccessKey:      []byte(accessKeyID),
-				secretDataSecretKey:      []byte(secretAccessKey),
-				secretDataCredentialsKey: generateAWSCredentialsConfig(accessKeyID, secretAccessKey),
+				secretDataAccessKey:                   []byte(accessKeyID),
+				secretDataSecretKey:                   []byte(secretAccessKey),
+				constants.AWSSecretDataCredentialsKey: generateAWSCredentialsConfig(accessKeyID, secretAccessKey),
 			},
 		}
 
@@ -906,7 +905,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	}
 
 	// Make sure credentials config data is synced with the stored access key / secret key
-	existingSecret.Data[secretDataCredentialsKey] = generateAWSCredentialsConfig(string(existingSecret.Data[secretDataAccessKey]), string(existingSecret.Data[secretDataSecretKey]))
+	existingSecret.Data[constants.AWSSecretDataCredentialsKey] = generateAWSCredentialsConfig(string(existingSecret.Data[secretDataAccessKey]), string(existingSecret.Data[secretDataSecretKey]))
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
 		sLog.Info("target secret has changed, updating")

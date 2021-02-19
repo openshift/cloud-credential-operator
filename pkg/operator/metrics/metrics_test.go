@@ -9,11 +9,13 @@ import (
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes/scheme"
 
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -84,7 +86,7 @@ func TestSecretGetter(t *testing.T) {
 			cloudCredsSecret: testCloudCredSecret(constants.GCPCloudCredSecretName, "anyAnnotation"),
 			validate: func(t *testing.T, secret *corev1.Secret, err error) {
 				assert.NoError(t, err, "unexpected error")
-				assert.NotNil(t, secret, "secret shout not be nil")
+				assert.NotNil(t, secret, "secret should not be nil")
 			},
 		},
 		{
@@ -127,7 +129,7 @@ func TestSecretGetter(t *testing.T) {
 
 }
 
-func TestCredentialsRequests2(t *testing.T) {
+func TestCredentialsRequests(t *testing.T) {
 	var err error
 	codec, err = credreqv1.NewCodec()
 	if err != nil {
@@ -140,10 +142,11 @@ func TestCredentialsRequests2(t *testing.T) {
 	logger := log.WithField("controller", "metricscontrollertest")
 
 	tests := []struct {
-		name        string
-		credReqs    []credreqv1.CredentialsRequest
-		ccoDisabled bool
-		validate    func(*testing.T, *credRequestAccumulator)
+		name            string
+		existingObjects []runtime.Object
+		credReqs        []credreqv1.CredentialsRequest
+		ccoDisabled     bool
+		validate        func(*testing.T, *credRequestAccumulator)
 	}{
 		{
 			name: "mixed credentials",
@@ -206,11 +209,33 @@ func TestCredentialsRequests2(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:        "cco manual mode with AWS STS",
+			ccoDisabled: true,
+			existingObjects: []runtime.Object{
+				testSecret("sts-namespace", "sts-name", map[string][]byte{
+					"credentials": []byte("[default]\nweb_identity_token_file=/path/to/token"),
+				}),
+				testSecret("notsts-namespace", "notsts-name", map[string][]byte{
+					"credentials": []byte("[default]\naws_access_key_id=AKSOMETHING\naws_secret_access_key=somesecretaccesskey"),
+				}),
+			},
+			credReqs: []credreqv1.CredentialsRequest{
+				testCredRequestWithSecretRef(testAWSCredRequest("stsstyle"), "sts-namespace", "sts-name"),
+				testCredRequestWithSecretRef(testAWSCredRequest("notsts"), "notsts-namespace", "notsts-name"),
+			},
+			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
+				assert.Equal(t, 2, accumulator.crTotals["aws"])
+				assert.Equal(t, 1, accumulator.podIdentityCredentials)
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			accumulator := newAccumulator(logger)
+			fakeClient := fake.NewFakeClient(test.existingObjects...)
+
+			accumulator := newAccumulator(fakeClient, logger)
 
 			for _, cr := range test.credReqs {
 				accumulator.processCR(&cr, test.ccoDisabled)
@@ -229,11 +254,12 @@ func TestCredentialsMode(t *testing.T) {
 	logger := log.WithField("controller", "metricscontrollertest")
 
 	tests := []struct {
-		name            string
-		cloudCredSecret *corev1.Secret
-		secretMissing   bool
-		ccoDisabled     bool
-		expectedMode    constants.CredentialsMode
+		name                        string
+		cloudCredSecret             *corev1.Secret
+		secretMissing               bool
+		ccoMode                     operatorv1.CloudCredentialsMode
+		foundPodIdentityCredentials bool
+		expectedMode                constants.CredentialsMode
 	}{
 		{
 			name:            "mint mode",
@@ -252,7 +278,7 @@ func TestCredentialsMode(t *testing.T) {
 		},
 		{
 			name:          "manual mode",
-			ccoDisabled:   true,
+			ccoMode:       operatorv1.CloudCredentialsModeManual,
 			secretMissing: true,
 			expectedMode:  constants.ModeManual,
 		},
@@ -271,12 +297,24 @@ func TestCredentialsMode(t *testing.T) {
 			cloudCredSecret: testCloudCredSecret(constants.AWSCloudCredSecretName, ""),
 			expectedMode:    constants.ModeUnknown,
 		},
+		{
+			name:                        "sts secret found",
+			ccoMode:                     operatorv1.CloudCredentialsModeManual,
+			foundPodIdentityCredentials: true,
+			expectedMode:                constants.ModeManualPodIdentity,
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			detectedMode := determineCredentialsMode(test.ccoDisabled, test.cloudCredSecret, test.secretMissing, logger)
+			state := &clusterState{
+				mode:                        test.ccoMode,
+				rootSecret:                  test.cloudCredSecret,
+				rootSecretNotFound:          test.secretMissing,
+				foundPodIdentityCredentials: test.foundPodIdentityCredentials,
+			}
+			detectedMode := determineCredentialsMode(state, logger)
 			assert.Equal(t, test.expectedMode, detectedMode)
 		})
 	}
@@ -286,7 +324,7 @@ func TestCredentialsMode(t *testing.T) {
 func TestMetricsInitialization(t *testing.T) {
 	logger := log.WithField("controller", "metricscontrollertest")
 
-	accumulator := newAccumulator(logger)
+	accumulator := newAccumulator(nil, logger)
 
 	// Assert that all possible conditions have explicit '0' values
 	// after initializing the accumulator.
@@ -297,6 +335,24 @@ func TestMetricsInitialization(t *testing.T) {
 	for _, m := range constants.CredentialsModeList {
 		assert.Zero(t, accumulator.crMode[m])
 	}
+}
+
+func testSecret(namespace, name string, data map[string][]byte) *corev1.Secret {
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+		Data: data,
+	}
+	return secret
+}
+func testCredRequestWithSecretRef(cr credreqv1.CredentialsRequest, secretNamespace, secretName string) credreqv1.CredentialsRequest {
+	cr.Spec.SecretRef = corev1.ObjectReference{
+		Name:      secretName,
+		Namespace: secretNamespace,
+	}
+	return cr
 }
 
 func testCredReqWithConditions(cr credreqv1.CredentialsRequest, conditions []credreqv1.CredentialsRequestCondition) credreqv1.CredentialsRequest {
