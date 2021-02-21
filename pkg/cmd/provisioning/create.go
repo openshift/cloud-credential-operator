@@ -9,7 +9,10 @@ import (
 )
 
 type options struct {
-	TargetDir string
+	TargetDir     string
+	PublicKeyPath string
+	Region        string
+	InfraName     string
 }
 
 var (
@@ -20,7 +23,7 @@ var (
 	}
 )
 
-// NewCreateCmd implementes the "create" command for the credentials provisioning
+// NewCreateCmd implements the "create" command for the credentials provisioning
 func NewCreateCmd() *cobra.Command {
 	createCmd := &cobra.Command{
 		Use:              "create",
@@ -30,6 +33,8 @@ func NewCreateCmd() *cobra.Command {
 	}
 
 	createCmd.AddCommand(NewKeyProvision())
+	createCmd.AddCommand(NewIdentityProviderSetup())
+
 	return createCmd
 }
 
