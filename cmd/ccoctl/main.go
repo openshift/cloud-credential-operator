@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/cloud-credential-operator/pkg/provisioning"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 func main() {

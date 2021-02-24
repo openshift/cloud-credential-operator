@@ -15,3 +15,16 @@ $ ccoctl create key-pair
 ```
 
 This will write out public/private key files named `serviceaccount-signer.private` and `serviceaccount-signer.public`.
+
+## Creating OpenID Connect Provider
+
+To set up an OpenID Connect provider in the cloud, run
+
+```bash
+$ ccoctl create identity-provider --infra-name=<infra-name> --region=<aws-region> --public-key=/path/to/public/key/file
+
+```
+
+where `infra-name` is the name used to tag and account cloud resources that are created. `region` is the aws region in which cloud resources will be created and `public-key` is the path to a public key file generated using `ccoctl create key-pair` command.
+
+The above command will write out discovery document file named `oidc-configuration` and JSON web key set file named `keys.json`.
