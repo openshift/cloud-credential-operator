@@ -13,11 +13,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const (
-	privateKeyFile = "serviceaccount-signer.private"
-	publicKeyFile  = "serviceaccount-signer.public"
-)
-
 func createKeys(prefixDir string) error {
 
 	privateKeyFilePath := filepath.Join(prefixDir, privateKeyFile)

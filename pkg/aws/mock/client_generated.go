@@ -228,6 +228,66 @@ func (mr *MockClientMockRecorder) TagUser(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagUser", reflect.TypeOf((*MockClient)(nil).TagUser), arg0)
 }
 
+// ListOpenIDConnectProviders mocks base method
+func (m *MockClient) ListOpenIDConnectProviders(arg0 *iam.ListOpenIDConnectProvidersInput) (*iam.ListOpenIDConnectProvidersOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListOpenIDConnectProviders", arg0)
+	ret0, _ := ret[0].(*iam.ListOpenIDConnectProvidersOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListOpenIDConnectProviders indicates an expected call of ListOpenIDConnectProviders
+func (mr *MockClientMockRecorder) ListOpenIDConnectProviders(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOpenIDConnectProviders", reflect.TypeOf((*MockClient)(nil).ListOpenIDConnectProviders), arg0)
+}
+
+// CreateOpenIDConnectProvider mocks base method
+func (m *MockClient) CreateOpenIDConnectProvider(arg0 *iam.CreateOpenIDConnectProviderInput) (*iam.CreateOpenIDConnectProviderOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateOpenIDConnectProvider", arg0)
+	ret0, _ := ret[0].(*iam.CreateOpenIDConnectProviderOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateOpenIDConnectProvider indicates an expected call of CreateOpenIDConnectProvider
+func (mr *MockClientMockRecorder) CreateOpenIDConnectProvider(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).CreateOpenIDConnectProvider), arg0)
+}
+
+// TagOpenIDConnectProvider mocks base method
+func (m *MockClient) TagOpenIDConnectProvider(arg0 *iam.TagOpenIDConnectProviderInput) (*iam.TagOpenIDConnectProviderOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "TagOpenIDConnectProvider", arg0)
+	ret0, _ := ret[0].(*iam.TagOpenIDConnectProviderOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// TagOpenIDConnectProvider indicates an expected call of TagOpenIDConnectProvider
+func (mr *MockClientMockRecorder) TagOpenIDConnectProvider(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).TagOpenIDConnectProvider), arg0)
+}
+
+// GetOpenIDConnectProvider mocks base method
+func (m *MockClient) GetOpenIDConnectProvider(input *iam.GetOpenIDConnectProviderInput) (*iam.GetOpenIDConnectProviderOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetOpenIDConnectProvider", input)
+	ret0, _ := ret[0].(*iam.GetOpenIDConnectProviderOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetOpenIDConnectProvider indicates an expected call of GetOpenIDConnectProvider
+func (mr *MockClientMockRecorder) GetOpenIDConnectProvider(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).GetOpenIDConnectProvider), input)
+}
+
 // CreateBucket mocks base method
 func (m *MockClient) CreateBucket(arg0 *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
 	m.ctrl.T.Helper()
