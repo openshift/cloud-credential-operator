@@ -65,7 +65,7 @@ type JSONWebKeySet struct {
 }
 
 func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath, targetDir string) error {
-	bucketName := fmt.Sprintf("%s-installer", namePrefix)
+	bucketName := fmt.Sprintf("%s-oidc", namePrefix)
 	issuerURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
 
 	var bucketTagValue string
