@@ -49,6 +49,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 		setup         func(*testing.T) string
 		verify        func(t *testing.T, tempDirName string)
 		cleanup       func(*testing.T)
+		generateOnly  bool
 		expectError   bool
 	}{
 		{
@@ -88,9 +89,27 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 				return tempDirName
 			},
+			verify:      func(t *testing.T, tempDirName string) {},
+			expectError: false,
+		},
+		{
+			name: "generate files only",
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+
+				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				require.NoError(t, err, "errored while setting up environment for test")
+
+				return tempDirName
+			},
 			verify: func(t *testing.T, tempDirName string) {
 				// Validating the issuer URL in the discovery document
-				discoveryDocument, err := ioutil.ReadFile(filepath.Join(tempDirName, "oidc-configuration"))
+				discoveryDocument, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcConfigurationFilename))
 				require.NoError(t, err, "error reading in discovery document")
 
 				var discoveryDocumentJSON map[string]interface{}
@@ -99,7 +118,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 				issuerURL, ok := discoveryDocumentJSON["issuer"]
 				require.True(t, ok, "issuer field absent in discovery document")
-				bucketName := fmt.Sprintf("%s-installer", testInfraName)
+				bucketName := fmt.Sprintf("%s-oidc", testInfraName)
 				assert.Equal(t, fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, testRegionName), issuerURL, "unexpected issuer url")
 
 				jwksURI, ok := discoveryDocumentJSON["jwks_uri"]
@@ -107,7 +126,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 				assert.Equal(t, fmt.Sprintf("%s/%s", issuerURL, keysURI), jwksURI, "unexpected jwks uri")
 
 				// Comparing key ID from the JSON web key with the one generated from the public key
-				jwks, err := ioutil.ReadFile(filepath.Join(tempDirName, "keys.json"))
+				jwks, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcKeysFilename))
 				require.NoError(t, err, "error reading in JSON web key set (JWKS)")
 
 				var jwksJSON map[string]interface{}
@@ -126,7 +145,8 @@ func TestCreateIdentityProvider(t *testing.T) {
 				require.NoError(t, err, "error calculating expected key id")
 				assert.Equalf(t, expectedKeyID, kid, "unexpected key id")
 			},
-			expectError: false,
+			generateOnly: true,
+			expectError:  false,
 		},
 	}
 
@@ -142,7 +162,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
 
-			err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName)
+			err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName, test.generateOnly)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
