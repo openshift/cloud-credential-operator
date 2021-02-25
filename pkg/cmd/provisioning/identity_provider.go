@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"crypto"
 	"crypto/rsa"
+	"crypto/sha1"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -11,6 +13,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -87,7 +90,7 @@ var (
 		"sts.amazonaws.com"
 	],
 	"ThumbprintList": [
-		"A9D53002E97E00E043244F3D170D6F4C414104FD"
+		"%s"
 	]
 }
 `
@@ -123,9 +126,38 @@ func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath
 	return nil
 }
 
+func getTLSFingerprint(bucketURL string) (string, error) {
+	u, err := url.Parse(bucketURL)
+	if err != nil {
+		return "", err
+	}
+
+	urlWithPort := fmt.Sprintf("%s:443", u.Host)
+
+	conn, err := tls.Dial("tcp", urlWithPort, &tls.Config{})
+	if err != nil {
+		return "", err
+	}
+
+	certs := conn.ConnectionState().PeerCertificates
+	numCerts := len(certs)
+
+	fingerprint := sha1.Sum(certs[numCerts-1].Raw)
+	var buf bytes.Buffer
+	for _, f := range fingerprint {
+		fmt.Fprintf(&buf, "%02X", f)
+	}
+	return buf.String(), nil
+}
+
 func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetDir string, generateOnly bool) error {
+	fingerprint, err := getTLSFingerprint(issuerURL)
+	if err != nil {
+		return errors.Wrap(err, "failed to get fingerprint")
+	}
+
 	if generateOnly {
-		oidcIdentityProviderJSON := fmt.Sprintf(iamIdentityProviderTemplate, issuerURL)
+		oidcIdentityProviderJSON := fmt.Sprintf(iamIdentityProviderTemplate, issuerURL, fingerprint)
 
 		err := saveToFile("AWS IAM Identity Provider", filepath.Join(targetDir, iamIdentityProviderFilename), []byte(oidcIdentityProviderJSON))
 		if err != nil {
@@ -159,7 +191,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 					awssdk.String("sts.amazonaws.com"),
 				},
 				ThumbprintList: []*string{
-					awssdk.String("A9D53002E97E00E043244F3D170D6F4C414104FD"), // root CA thumbprint for Amazon S3 (DigiCert)
+					awssdk.String(fingerprint),
 				},
 				Url: awssdk.String(issuerURL),
 			})
