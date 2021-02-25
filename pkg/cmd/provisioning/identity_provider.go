@@ -12,6 +12,7 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 
@@ -308,7 +309,12 @@ func identityProviderCmd(cmd *cobra.Command, args []string) {
 
 	awsClient := aws.NewClientFromSession(s)
 
-	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, CreateOpts.PublicKeyPath, CreateOpts.TargetDir)
+	publicKeyPath := CreateOpts.PublicKeyPath
+	if publicKeyPath == "" {
+		publicKeyPath = path.Join(CreateOpts.TargetDir, publicKeyFile)
+	}
+
+	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, publicKeyPath, CreateOpts.TargetDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -325,8 +331,7 @@ func NewIdentityProviderSetup() *cobra.Command {
 	identityProviderSetupCmd.MarkPersistentFlagRequired("name-prefix")
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
 	identityProviderSetupCmd.MarkPersistentFlagRequired("region")
-	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.PublicKeyPath, "public-key", "", "Path to public ServiceAccount signing key")
-	identityProviderSetupCmd.MarkPersistentFlagRequired("public-key")
+	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 
 	return identityProviderSetupCmd
 }
