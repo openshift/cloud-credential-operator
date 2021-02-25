@@ -306,10 +306,7 @@ func identityProviderCmd(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	awsClient := &aws.AWSClient{
-		IAMClient: iam.New(s),
-		S3Client:  s3.New(s),
-	}
+	awsClient := aws.NewClientFromSession(s)
 
 	err = createIdentityProvider(awsClient, CreateOpts.InfraName, CreateOpts.Region, CreateOpts.PublicKeyPath, CreateOpts.TargetDir)
 	if err != nil {
