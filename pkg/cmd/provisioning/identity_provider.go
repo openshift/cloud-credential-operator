@@ -30,7 +30,7 @@ import (
 var (
 	// IdentityProviderOpts captures the options that affect creation of the identity provider
 	IdentityProviderOpts = options{
-		InfraName:     "",
+		NamePrefix:    "",
 		Region:        "",
 		PublicKeyPath: "",
 	}
@@ -63,8 +63,8 @@ type JSONWebKeySet struct {
 	Keys []jose.JSONWebKey `json:"keys"`
 }
 
-func createIdentityProvider(client aws.Client, infraName, region, publicKeyPath, targetDir string) error {
-	bucketName := fmt.Sprintf("%s-installer", infraName)
+func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath, targetDir string) error {
+	bucketName := fmt.Sprintf("%s-installer", namePrefix)
 	issuerURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
 
 	var bucketTagValue string
@@ -94,7 +94,7 @@ func createIdentityProvider(client aws.Client, infraName, region, publicKeyPath,
 		Tagging: &s3.Tagging{
 			TagSet: []*s3.Tag{
 				{
-					Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, infraName)),
+					Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
 					Value: awssdk.String(bucketTagValue),
 				},
 			},
@@ -110,7 +110,7 @@ func createIdentityProvider(client aws.Client, infraName, region, publicKeyPath,
 		Body:    awssdk.ReadSeekCloser(strings.NewReader(discoveryDocumentJSON)),
 		Bucket:  awssdk.String(bucketName),
 		Key:     awssdk.String(discoveryDocumentURI),
-		Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, infraName, ownedCcoctlAWSResourceTagValue)),
+		Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, namePrefix, ownedCcoctlAWSResourceTagValue)),
 	})
 	if err != nil {
 		return errors.Wrapf(err, "Failed to upload discovery document in the S3 bucket %s", bucketName)
@@ -132,7 +132,7 @@ func createIdentityProvider(client aws.Client, infraName, region, publicKeyPath,
 		Body:    awssdk.ReadSeekCloser(bytes.NewReader(jwks)),
 		Bucket:  awssdk.String(bucketName),
 		Key:     awssdk.String(keysURI),
-		Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, infraName, ownedCcoctlAWSResourceTagValue)),
+		Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, namePrefix, ownedCcoctlAWSResourceTagValue)),
 	})
 
 	if err != nil {
@@ -152,7 +152,7 @@ func createIdentityProvider(client aws.Client, infraName, region, publicKeyPath,
 
 	var providerARN string
 	for _, provider := range oidcProviderList.OpenIDConnectProviderList {
-		ok, err := isExistingIdentifyProvider(client, *provider.Arn, infraName)
+		ok, err := isExistingIdentifyProvider(client, *provider.Arn, namePrefix)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to check existing Identity Provider %s", *provider.Arn)
 		}
@@ -185,7 +185,7 @@ func createIdentityProvider(client aws.Client, infraName, region, publicKeyPath,
 			OpenIDConnectProviderArn: &providerARN,
 			Tags: []*iam.Tag{
 				{
-					Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, infraName)),
+					Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
 					Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
 				},
 			},
@@ -308,7 +308,7 @@ func identityProviderCmd(cmd *cobra.Command, args []string) {
 
 	awsClient := aws.NewClientFromSession(s)
 
-	err = createIdentityProvider(awsClient, CreateOpts.InfraName, CreateOpts.Region, CreateOpts.PublicKeyPath, CreateOpts.TargetDir)
+	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, CreateOpts.PublicKeyPath, CreateOpts.TargetDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -321,8 +321,8 @@ func NewIdentityProviderSetup() *cobra.Command {
 		Run: identityProviderCmd,
 	}
 
-	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.InfraName, "infra-name", "", "Name prefix for all created AWS resources")
-	identityProviderSetupCmd.MarkPersistentFlagRequired("infra-name")
+	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.NamePrefix, "name-prefix", "", "Name prefix for all created AWS resources")
+	identityProviderSetupCmd.MarkPersistentFlagRequired("name-prefix")
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
 	identityProviderSetupCmd.MarkPersistentFlagRequired("region")
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.PublicKeyPath, "public-key", "", "Path to public ServiceAccount signing key")
