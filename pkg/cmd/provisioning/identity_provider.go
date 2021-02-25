@@ -36,6 +36,12 @@ var (
 		PublicKeyPath: "",
 	}
 
+	// Generated files
+	oidcBucketFilename          = "01-oidc-bucket.json"
+	oidcConfigurationFilename   = "02-openid-configuration"
+	oidcKeysFilename            = "03-keys.json"
+	iamIdentityProviderFilename = "04-iam-identity-provider.json"
+
 	// discoveryDocumentTemplate is a template of the discovery document that needs to be populated with appropriate values
 	discoveryDocumentTemplate = `{
 	"issuer": "%s",
@@ -58,145 +64,244 @@ var (
         "sub"
     ]
 }`
+
+	// S3 bucket template (usable with aws CLI --cli-input-json param)
+	oidcBucketTemplateWithLocation = `{
+	"ACL": "private",
+	"Bucket": "%s",
+	"CreateBucketConfiguration": {
+		"LocationConstraint": "%s"
+	}
+}`
+	// 'us-east-1' is the default region, and AWS returns an error if you try to set it
+	oidcBucketTemplateWithoutLocation = `{
+	"ACL": "private",
+	"Bucket": "%s"
+}`
+
+	// iam identity provider with "openshift" and "sts.amazonaws.com" as static audiences
+	iamIdentityProviderTemplate = `{
+	"Url": "%s",
+	"ClientIDList": [
+		"openshift",
+		"sts.amazonaws.com"
+	],
+	"ThumbprintList": [
+		"A9D53002E97E00E043244F3D170D6F4C414104FD"
+	]
+}
+`
 )
 
 type JSONWebKeySet struct {
 	Keys []jose.JSONWebKey `json:"keys"`
 }
 
-func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath, targetDir string) error {
+func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath, targetDir string, generateOnly bool) error {
+	// Create the S3 bucket
 	bucketName := fmt.Sprintf("%s-oidc", namePrefix)
+	if err := createOIDCBucket(client, bucketName, namePrefix, region, targetDir, generateOnly); err != nil {
+		return err
+	}
 	issuerURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
 
-	var bucketTagValue string
-	_, err := client.CreateBucket(&s3.CreateBucketInput{
-		Bucket: awssdk.String(bucketName),
-	})
-	if err != nil {
-		var aerr awserr.Error
-		if errors.As(err, &aerr) {
-			switch aerr.Code() {
-			case s3.ErrCodeBucketAlreadyOwnedByYou:
-				bucketTagValue = sharedCcoctlAWSResourceTagValue
-				log.Printf("Bucket %s already exists and is owned by the user", bucketName)
-			default:
-				return errors.Wrap(aerr, "Failed to create a bucket to store OpenID Connect configuration")
-			}
-		} else {
-			return errors.Wrap(err, "Failed to create a bucket to store OpenID Connect configuration")
-		}
-	} else {
-		bucketTagValue = ownedCcoctlAWSResourceTagValue
-		log.Print("Bucket ", bucketName, " created")
-	}
-
-	_, err = client.PutBucketTagging(&s3.PutBucketTaggingInput{
-		Bucket: awssdk.String(bucketName),
-		Tagging: &s3.Tagging{
-			TagSet: []*s3.Tag{
-				{
-					Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
-					Value: awssdk.String(bucketTagValue),
-				},
-			},
-		},
-	})
-	if err != nil {
-		return errors.Wrapf(err, "Failed to tag the bucket %s", bucketName)
-	}
-
-	discoveryDocumentJSON := fmt.Sprintf(discoveryDocumentTemplate, issuerURL, issuerURL, keysURI)
-	_, err = client.PutObject(&s3.PutObjectInput{
-		ACL:     awssdk.String("public-read"),
-		Body:    awssdk.ReadSeekCloser(strings.NewReader(discoveryDocumentJSON)),
-		Bucket:  awssdk.String(bucketName),
-		Key:     awssdk.String(discoveryDocumentURI),
-		Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, namePrefix, ownedCcoctlAWSResourceTagValue)),
-	})
-	if err != nil {
-		return errors.Wrapf(err, "Failed to upload discovery document in the S3 bucket %s", bucketName)
-	}
-	log.Printf("OpenID Connect discovery document in the S3 bucket %s at %s updated", bucketName, discoveryDocumentURI)
-
-	err = saveToFile("discovery document", filepath.Join(targetDir, "oidc-configuration"), []byte(discoveryDocumentJSON))
-	if err != nil {
+	// Create the OIDC config file
+	if err := createOIDCConfiguration(client, bucketName, issuerURL, namePrefix, targetDir, generateOnly); err != nil {
 		return err
 	}
 
-	jwks, err := buildJsonWebKeySet(publicKeyPath)
+	// Create the OIDC key list
+	if err := createJSONWebKeySet(client, publicKeyPath, bucketName, namePrefix, targetDir, generateOnly); err != nil {
+		return err
+	}
+
+	// Create the IAM Identity Provider
+	if err := createIAMIdentityProvider(client, issuerURL, namePrefix, targetDir, generateOnly); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetDir string, generateOnly bool) error {
+	if generateOnly {
+		oidcIdentityProviderJSON := fmt.Sprintf(iamIdentityProviderTemplate, issuerURL)
+
+		err := saveToFile("AWS IAM Identity Provider", filepath.Join(targetDir, iamIdentityProviderFilename), []byte(oidcIdentityProviderJSON))
+		if err != nil {
+			errors.Wrap(err, "failed to save IAM Identity Provider file")
+		}
+
+	} else {
+		oidcProviderList, err := client.ListOpenIDConnectProviders(&iam.ListOpenIDConnectProvidersInput{})
+		if err != nil {
+			return errors.Wrap(err, "Failed to fetch list of Identity Providers")
+		}
+
+		var providerARN string
+		for _, provider := range oidcProviderList.OpenIDConnectProviderList {
+			ok, err := isExistingIdentifyProvider(client, *provider.Arn, namePrefix)
+			if err != nil {
+				return errors.Wrapf(err, "Failed to check existing Identity Provider %s", *provider.Arn)
+			}
+
+			if ok {
+				providerARN = *provider.Arn
+				log.Printf("Existing Identity Provider found with ARN: %s", providerARN)
+				break
+			}
+		}
+
+		if len(providerARN) == 0 {
+			oidcOutput, err := client.CreateOpenIDConnectProvider(&iam.CreateOpenIDConnectProviderInput{
+				ClientIDList: []*string{
+					awssdk.String("openshift"),
+					awssdk.String("sts.amazonaws.com"),
+				},
+				ThumbprintList: []*string{
+					awssdk.String("A9D53002E97E00E043244F3D170D6F4C414104FD"), // root CA thumbprint for Amazon S3 (DigiCert)
+				},
+				Url: awssdk.String(issuerURL),
+			})
+			if err != nil {
+				return errors.Wrap(err, "Failed to create Identity Provider")
+			}
+
+			providerARN = *oidcOutput.OpenIDConnectProviderArn
+
+			_, err = client.TagOpenIDConnectProvider(&iam.TagOpenIDConnectProviderInput{
+				OpenIDConnectProviderArn: &providerARN,
+				Tags: []*iam.Tag{
+					{
+						Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
+						Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
+					},
+				},
+			})
+			if err != nil {
+				return errors.Wrapf(err, "Failed to tag the identity provider with arn: %s", providerARN)
+			}
+
+			log.Printf("Identity Provider created with ARN: %s", providerARN)
+		}
+	}
+	return nil
+}
+
+func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, namePrefix, targetDir string, generateOnly bool) error {
+	jwks, err := buildJsonWebKeySet(publicKeyFilepath)
 	if err != nil {
 		return errors.Wrap(err, "Failed to build JSON web key set from the public key")
 	}
 
-	_, err = client.PutObject(&s3.PutObjectInput{
-		ACL:     awssdk.String("public-read"),
-		Body:    awssdk.ReadSeekCloser(bytes.NewReader(jwks)),
-		Bucket:  awssdk.String(bucketName),
-		Key:     awssdk.String(keysURI),
-		Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, namePrefix, ownedCcoctlAWSResourceTagValue)),
-	})
-
-	if err != nil {
-		return errors.Wrapf(err, "Failed to upload JSON web key set (JWKS) in the S3 bucket %s", bucketName)
-	}
-	log.Printf("JSON web key set (JWKS) in the S3 bucket %s at %s updated", bucketName, keysURI)
-
-	err = saveToFile("JSON web key set (JWKS)", filepath.Join(targetDir, "keys.json"), jwks)
-	if err != nil {
-		return err
-	}
-
-	oidcProviderList, err := client.ListOpenIDConnectProviders(&iam.ListOpenIDConnectProvidersInput{})
-	if err != nil {
-		return errors.Wrap(err, "Failed to fetch list of Identity Providers")
-	}
-
-	var providerARN string
-	for _, provider := range oidcProviderList.OpenIDConnectProviderList {
-		ok, err := isExistingIdentifyProvider(client, *provider.Arn, namePrefix)
+	if generateOnly {
+		err = saveToFile("JSON web key set (JWKS)", filepath.Join(targetDir, oidcKeysFilename), jwks)
 		if err != nil {
-			return errors.Wrapf(err, "Failed to check existing Identity Provider %s", *provider.Arn)
+			return errors.Wrap(err, "failed to save keys.json file")
 		}
+	} else {
+		_, err = client.PutObject(&s3.PutObjectInput{
+			ACL:     awssdk.String("public-read"),
+			Body:    awssdk.ReadSeekCloser(bytes.NewReader(jwks)),
+			Bucket:  awssdk.String(bucketName),
+			Key:     awssdk.String(keysURI),
+			Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, namePrefix, ownedCcoctlAWSResourceTagValue)),
+		})
 
-		if ok {
-			providerARN = *provider.Arn
-			log.Printf("Existing Identity Provider found with ARN: %s", providerARN)
-			break
+		if err != nil {
+			return errors.Wrapf(err, "Failed to upload JSON web key set (JWKS) in the S3 bucket %s", bucketName)
 		}
+		log.Printf("JSON web key set (JWKS) in the S3 bucket %s at %s updated", bucketName, keysURI)
 	}
+	return nil
+}
 
-	if len(providerARN) == 0 {
-		oidcOutput, err := client.CreateOpenIDConnectProvider(&iam.CreateOpenIDConnectProviderInput{
-			ClientIDList: []*string{
-				awssdk.String("openshift"),
-				awssdk.String("sts.amazonaws.com"),
-			},
-			ThumbprintList: []*string{
-				awssdk.String("A9D53002E97E00E043244F3D170D6F4C414104FD"), // root CA thumbprint for Amazon S3 (DigiCert)
-			},
-			Url: awssdk.String(issuerURL),
+func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, namePrefix, targetDir string, generateOnly bool) error {
+	discoveryDocumentJSON := fmt.Sprintf(discoveryDocumentTemplate, issuerURL, issuerURL, keysURI)
+	if generateOnly {
+		err := saveToFile("discovery document", filepath.Join(targetDir, oidcConfigurationFilename), []byte(discoveryDocumentJSON))
+		if err != nil {
+			return errors.Wrap(err, "failed to save oidc configuration file")
+		}
+	} else {
+		_, err := client.PutObject(&s3.PutObjectInput{
+			ACL:     awssdk.String("public-read"),
+			Body:    awssdk.ReadSeekCloser(strings.NewReader(discoveryDocumentJSON)),
+			Bucket:  awssdk.String(bucketName),
+			Key:     awssdk.String(discoveryDocumentURI),
+			Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, namePrefix, ownedCcoctlAWSResourceTagValue)),
 		})
 		if err != nil {
-			return errors.Wrap(err, "Failed to create Identity Provider")
+			return errors.Wrapf(err, "Failed to upload discovery document in the S3 bucket %s", bucketName)
+		}
+		log.Printf("OpenID Connect discovery document in the S3 bucket %s at %s updated", bucketName, discoveryDocumentURI)
+	}
+	return nil
+}
+
+func createOIDCBucket(client aws.Client, bucketName, namePrefix, region, targetDir string, generateOnly bool) error {
+
+	if generateOnly {
+		oidcBucketFilepath := filepath.Join(targetDir, oidcBucketFilename)
+		var oidcBucketJSON string
+		switch region {
+		case "us-east-1":
+			oidcBucketJSON = fmt.Sprintf(oidcBucketTemplateWithoutLocation, bucketName)
+		default:
+			oidcBucketJSON = fmt.Sprintf(oidcBucketTemplateWithLocation, bucketName, region)
 		}
 
-		providerARN = *oidcOutput.OpenIDConnectProviderArn
+		err := saveToFile("OIDC S3 bucket", oidcBucketFilepath, []byte(oidcBucketJSON))
+		if err != nil {
+			return errors.Wrap(err, "failed to save oidc bucket JSON file")
+		}
+	} else {
+		var bucketTagValue string
+		s3BucketInput := &s3.CreateBucketInput{
+			Bucket: awssdk.String(bucketName),
+		}
+		// can't constrain to 'us-east-1'...it is the default and will error if you specify it
+		if region != "us-east-1" {
+			s3BucketInput.CreateBucketConfiguration = &s3.CreateBucketConfiguration{
+				LocationConstraint: awssdk.String(region),
+			}
+		}
 
-		_, err = client.TagOpenIDConnectProvider(&iam.TagOpenIDConnectProviderInput{
-			OpenIDConnectProviderArn: &providerARN,
-			Tags: []*iam.Tag{
-				{
-					Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
-					Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
+		_, err := client.CreateBucket(s3BucketInput)
+		if err != nil {
+			var aerr awserr.Error
+			if errors.As(err, &aerr) {
+				switch aerr.Code() {
+				case s3.ErrCodeBucketAlreadyOwnedByYou:
+					bucketTagValue = sharedCcoctlAWSResourceTagValue
+					log.Printf("Bucket %s already exists and is owned by the user", bucketName)
+				default:
+					return errors.Wrap(aerr, "Failed to create a bucket to store OpenID Connect configuration")
+				}
+			} else {
+				return errors.Wrap(err, "Failed to create a bucket to store OpenID Connect configuration")
+			}
+		} else {
+			bucketTagValue = ownedCcoctlAWSResourceTagValue
+			log.Print("Bucket ", bucketName, " created")
+		}
+
+		_, err = client.PutBucketTagging(&s3.PutBucketTaggingInput{
+			Bucket: awssdk.String(bucketName),
+			Tagging: &s3.Tagging{
+				TagSet: []*s3.Tag{
+					{
+						Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
+						Value: awssdk.String(bucketTagValue),
+					},
 				},
 			},
 		})
 		if err != nil {
-			return errors.Wrapf(err, "Failed to tag the identity provider with arn: %s", providerARN)
+			return errors.Wrapf(err, "Failed to tag the bucket %s", bucketName)
 		}
-
-		log.Printf("Identity Provider created with ARN: %s", providerARN)
 	}
+
 	return nil
 }
 
@@ -266,16 +371,16 @@ func keyIDFromPublicKey(publicKey interface{}) (string, error) {
 }
 
 // saveToFile saves the given data to a given file
-func saveToFile(fileName, filePath string, data []byte) error {
-	log.Printf("Saving %s locally at %s", fileName, filePath)
+func saveToFile(filePurpose, filePath string, data []byte) error {
+	log.Printf("Saving %s locally at %s", filePurpose, filePath)
 	f, err := os.Create(filePath)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to create file %s to store %s", filePath, fileName)
+		return errors.Wrapf(err, "Failed to create file %s to store %s", filePath, filePurpose)
 	}
 	_, err = f.Write(data)
 	f.Close()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to write %s to file %s", fileName, filePath)
+		return errors.Wrapf(err, "Failed to write %s to file %s", filePurpose, filePath)
 	}
 	return nil
 }
@@ -314,7 +419,7 @@ func identityProviderCmd(cmd *cobra.Command, args []string) {
 		publicKeyPath = path.Join(CreateOpts.TargetDir, publicKeyFile)
 	}
 
-	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, publicKeyPath, CreateOpts.TargetDir)
+	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, publicKeyPath, CreateOpts.TargetDir, CreateOpts.GenerateOnly)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -332,6 +437,7 @@ func NewIdentityProviderSetup() *cobra.Command {
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
 	identityProviderSetupCmd.MarkPersistentFlagRequired("region")
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
+	identityProviderSetupCmd.PersistentFlags().BoolVar(&CreateOpts.GenerateOnly, "generate-files-only", false, "Skip creating objects, and just save what would have been created into files")
 
 	return identityProviderSetupCmd
 }
