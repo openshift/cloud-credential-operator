@@ -288,7 +288,6 @@ func createOIDCBucket(client aws.Client, bucketName, namePrefix, region, targetD
 			return errors.Wrap(err, "failed to save oidc bucket JSON file")
 		}
 	} else {
-		var bucketTagValue string
 		s3BucketInput := &s3.CreateBucketInput{
 			Bucket: awssdk.String(bucketName),
 		}
@@ -305,7 +304,6 @@ func createOIDCBucket(client aws.Client, bucketName, namePrefix, region, targetD
 			if errors.As(err, &aerr) {
 				switch aerr.Code() {
 				case s3.ErrCodeBucketAlreadyOwnedByYou:
-					bucketTagValue = sharedCcoctlAWSResourceTagValue
 					log.Printf("Bucket %s already exists and is owned by the user", bucketName)
 				default:
 					return errors.Wrap(aerr, "Failed to create a bucket to store OpenID Connect configuration")
@@ -314,23 +312,21 @@ func createOIDCBucket(client aws.Client, bucketName, namePrefix, region, targetD
 				return errors.Wrap(err, "Failed to create a bucket to store OpenID Connect configuration")
 			}
 		} else {
-			bucketTagValue = ownedCcoctlAWSResourceTagValue
 			log.Print("Bucket ", bucketName, " created")
-		}
-
-		_, err = client.PutBucketTagging(&s3.PutBucketTaggingInput{
-			Bucket: awssdk.String(bucketName),
-			Tagging: &s3.Tagging{
-				TagSet: []*s3.Tag{
-					{
-						Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
-						Value: awssdk.String(bucketTagValue),
+			_, err = client.PutBucketTagging(&s3.PutBucketTaggingInput{
+				Bucket: awssdk.String(bucketName),
+				Tagging: &s3.Tagging{
+					TagSet: []*s3.Tag{
+						{
+							Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
+							Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
+						},
 					},
 				},
-			},
-		})
-		if err != nil {
-			return errors.Wrapf(err, "Failed to tag the bucket %s", bucketName)
+			})
+			if err != nil {
+				return errors.Wrapf(err, "Failed to tag the bucket %s", bucketName)
+			}
 		}
 	}
 
@@ -417,8 +413,8 @@ func saveToFile(filePurpose, filePath string, data []byte) error {
 	return nil
 }
 
-// isExistingIdentifyProvider checks if given identity provider is owned by given infra name
-func isExistingIdentifyProvider(client aws.Client, providerARN, infraName string) (bool, error) {
+// isExistingIdentifyProvider checks if given identity provider is owned by given name prefix
+func isExistingIdentifyProvider(client aws.Client, providerARN, namePrefix string) (bool, error) {
 	provider, err := client.GetOpenIDConnectProvider(&iam.GetOpenIDConnectProviderInput{
 		OpenIDConnectProviderArn: awssdk.String(providerARN),
 	})
@@ -427,7 +423,7 @@ func isExistingIdentifyProvider(client aws.Client, providerARN, infraName string
 	}
 
 	for _, tag := range provider.Tags {
-		if tag.Key == awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, infraName)) {
+		if tag.Key == awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)) {
 			return true, nil
 		}
 	}

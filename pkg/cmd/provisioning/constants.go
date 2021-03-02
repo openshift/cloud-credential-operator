@@ -11,8 +11,6 @@ const (
 	keysURI = "keys.json"
 	// ccoctlAWSResourceTagKeyPrefix is the prefix of the tag key applied to the AWS resources created/shared by ccoctl
 	ccoctlAWSResourceTagKeyPrefix = "openshift.io/cloud-credential-operator"
-	// sharedCcoctlAWSResourceTagValue is the value of the tag applied to the AWS resources shared by ccoctl
-	sharedCcoctlAWSResourceTagValue = "shared"
 	// ownedCcoctlAWSResourceTagValue is the value of the tag applied to the AWS resources created by ccoctl
 	ownedCcoctlAWSResourceTagValue = "owned"
 )
