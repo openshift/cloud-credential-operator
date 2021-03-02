@@ -351,7 +351,11 @@ func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string
 	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
 	secret := &corev1.Secret{}
 
-	if err := kubeClient.Get(context.TODO(), secretKey, secret); err != nil {
+	err := kubeClient.Get(context.TODO(), secretKey, secret)
+	if errors.IsNotFound(err) {
+		// Secret for CredReq doesn't exist so we can't query it
+		return false, nil
+	} else if err != nil {
 		return false, err
 	}
 
