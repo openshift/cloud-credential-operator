@@ -47,9 +47,9 @@ const (
 	// the operator config CR specifies an invalide mode
 	StatusModeInvalid = "ModeInvalid"
 
-	// MissingSecretsForUpgradeReason is used when a manual mode cluster is not upgradable due to missing
-	// secrets the operator knows will be required for the next minor release of OpenShift.
-	MissingSecretsForUpgradeReason = "ManualModeMissingSecrets"
+	// MissingUpgradeableAnnotationReason is used when the cluster is not upgradeable due to
+	// the CCO's config object missing the appropriate annotation.
+	MissingUpgradeableAnnotationReason = "MissingUpgradeableAnnotation"
 
 	// ErrorDeterminingUpgradeableReason is used when we encounter unexpected errors checking if a cluster can
 	// be updated.
@@ -126,6 +126,10 @@ const (
 	// KubevirtCloudCredSecretName is the name of the secret where credentials
 	// for Kubevirt are stored.
 	KubevirtCloudCredSecretName = "kubevirt-credentials"
+
+	// UpgradeableAnnotation is the annotation CCO will check for on the cloudcredential.operator.openshift.io
+	// CR when determining upgradeability.
+	UpgradeableAnnotation = "cloudcredential.openshift.io/upgradeable-to"
 )
 
 var (
@@ -138,40 +142,6 @@ var (
 		ModeDegraded,
 		ModeUnknown,
 		ModeManualPodIdentity,
-	}
-
-	// Add known new credentials for next version upgrade
-
-	// AWSUpcomingSecrets contains the list of known new AWS credential secrets for the next version of OpenShift
-	AWSUpcomingSecrets = []types.NamespacedName{}
-	// AzureUpcomingSecrets contains the list of known new Azure credential secrets for the next version of OpenShift
-	AzureUpcomingSecrets = []types.NamespacedName{}
-	// GCPUpcomingSecrets contains the list of known new GCP credential secrets for the next version of OpenShift
-	GCPUpcomingSecrets = []types.NamespacedName{
-		{
-			Namespace: "openshift-cluster-csi-drivers",
-			Name:      "gcp-pd-cloud-credentials",
-		},
-		{
-			Namespace: "openshift-cloud-credential-operator",
-			Name:      "cloud-credential-operator-gcp-ro-creds",
-		},
-	}
-	// OpenStackUpcomingSecrets contains the list of known new OpenStack credential secrets for the next version of OpenShift
-	OpenStackUpcomingSecrets = []types.NamespacedName{
-		{
-			Namespace: "openshift-cluster-csi-drivers",
-			Name:      "openstack-cloud-credentials",
-		},
-	}
-	// OvirtUpcomingSecrets contains the list of known new oVirt credential secrets for the next version of OpenShift
-	OvirtUpcomingSecrets = []types.NamespacedName{}
-	// VsphereUpcomingSecrets contains the list of known new vSphere credential secrets for the next version of OpenShift
-	VsphereUpcomingSecrets = []types.NamespacedName{
-		{
-			Namespace: "openshift-cluster-storage-operator",
-			Name:      "openshift-vsphere-problem-detector",
-		},
 	}
 
 	// Add known stale credentials requests here

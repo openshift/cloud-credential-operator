@@ -390,22 +390,16 @@ func getWatchedSecrets(platformType configv1.PlatformType) []types.NamespacedNam
 	switch platformType {
 	case configv1.AWSPlatformType:
 		rootSecret.Name = constants.AWSCloudCredSecretName
-		secrets = append(secrets, constants.AWSUpcomingSecrets...)
 	case configv1.AzurePlatformType:
 		rootSecret.Name = constants.AzureCloudCredSecretName
-		secrets = append(secrets, constants.AzureUpcomingSecrets...)
 	case configv1.GCPPlatformType:
 		rootSecret.Name = constants.GCPCloudCredSecretName
-		secrets = append(secrets, constants.GCPUpcomingSecrets...)
 	case configv1.OpenStackPlatformType:
 		rootSecret.Name = constants.OpenStackCloudCredsSecretName
-		secrets = append(secrets, constants.OpenStackUpcomingSecrets...)
 	case configv1.OvirtPlatformType:
 		rootSecret.Name = constants.OvirtCloudCredsSecretName
-		secrets = append(secrets, constants.OvirtUpcomingSecrets...)
 	case configv1.VSpherePlatformType:
 		rootSecret.Name = constants.VSphereCloudCredSecretName
-		secrets = append(secrets, constants.VsphereUpcomingSecrets...)
 	default:
 		log.Infof("unable to provide upcoming secrets for unknown platform: %v", platformType)
 		return []types.NamespacedName{}

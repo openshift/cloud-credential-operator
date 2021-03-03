@@ -789,9 +789,5 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, "4.7", a.GetUpcomingCredSecrets(), a.GetCredentialsRootSecretLocation())
-}
-
-func (a *Actuator) GetUpcomingCredSecrets() []types.NamespacedName {
-	return constants.GCPUpcomingSecrets
+	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
 }
