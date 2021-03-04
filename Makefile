@@ -76,8 +76,12 @@ $(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/ocp/4.5:cloud
 $(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
 $(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
 
-update: update-vendored-crds update-codegen update-bindata
+update: update-vendored-crds update-codegen update-bindata generate
 .PHONY: update
+
+generate:
+	go generate ${GO_TEST_PACKAGES}
+.PHONY: generate
 
 update-vendored-crds:
 	# copy config CRD from openshift/api
