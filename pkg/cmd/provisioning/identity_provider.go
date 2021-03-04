@@ -39,12 +39,6 @@ var (
 		PublicKeyPath: "",
 	}
 
-	// Generated files
-	oidcBucketFilename          = "01-oidc-bucket.json"
-	oidcConfigurationFilename   = "02-openid-configuration"
-	oidcKeysFilename            = "03-keys.json"
-	iamIdentityProviderFilename = "04-iam-identity-provider.json"
-
 	// discoveryDocumentTemplate is a template of the discovery document that needs to be populated with appropriate values
 	discoveryDocumentTemplate = `{
 	"issuer": "%s",
