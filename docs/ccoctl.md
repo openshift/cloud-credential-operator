@@ -4,7 +4,9 @@ To assist with the creating and maintenance of cloud credentials from outside of
 
 ## Global flags
 
-By default, the tool will output to the directory the command(s) were run in. To specify a directory, use the `--output-dir` flag.
+By default, the tool will output to the directory the command(s) were run in. To specify a directory, use the `--target-dir` flag.
+
+Commands which would otherwise make AWS API calls can be passed the `--generate-files-only` flag to have `ccoctl` place JSON files on the local filesystem instead of creating/modifying any AWS resources. These JSON files can be reviewed/modified and then applied with the aws CLI tool (using the `--cli-input-json` parameters).
 
 ## Creating RSA keys
 
@@ -21,10 +23,26 @@ This will write out public/private key files named `serviceaccount-signer.privat
 To set up an OpenID Connect provider in the cloud, run
 
 ```bash
-$ ccoctl create identity-provider --infra-name=<infra-name> --region=<aws-region> --public-key=/path/to/public/key/file
+$ ccoctl create identity-provider --name-prefix=<name-prefix> --region=<aws-region> --public-key=/path/to/public/key/file
 
 ```
 
-where `infra-name` is the name used to tag and account cloud resources that are created. `region` is the aws region in which cloud resources will be created and `public-key` is the path to a public key file generated using `ccoctl create key-pair` command.
+where `name-prefix` is the name used to name and tag any account cloud resources that are created. `region` is the aws region in which cloud resources will be created and `public-key` is the path to a public key file generated using `ccoctl create key-pair` command.
 
-The above command will write out discovery document file named `oidc-configuration` and JSON web key set file named `keys.json`.
+The above command will write out discovery document file named `02-openid-configuration` and JSON web key set file named `03-keys.json`.
+
+## Creating IAM Roles
+
+To create IAM Roles for each in-cluster component, you need to first extract the list of CredentialsRequest objects from the OpenShift release image
+
+```bash
+$ oc adm release extract --credentials-requests --cloud=aws --to=./credrequests quay.io/path/to/openshift-release:version
+```
+
+Then you can use `ccoctl` to process each CredentialsRequest object in the `./credrequests` directory (from the example above)
+
+```bash
+$ ccoctl create iam-roles --name-prefix=<name-prefix> --region=<aws-region> --credentials-requests-dir=<path-to-directory-with-list-of-credentials-requests> --identity-provider-arn=<arn-of-identity-provider-created-in-previous-step>
+```
+
+This will create one IAM Role for each CredentialsRequest with a trust policy tied to the provided Identity Provider, and a permissions policy as defined in each CredentialsRequest object from the OpenShift release image.
