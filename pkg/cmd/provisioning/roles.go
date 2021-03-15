@@ -323,13 +323,13 @@ func NewIAMRolesSetup() *cobra.Command {
 		Run: iamRolesCmd,
 	}
 
-	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.NamePrefix, "name-prefix", "", "Name prefix for all created AWS resources")
+	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.NamePrefix, "name-prefix", "", "User-define name prefix for all created AWS resources (can be separate from the cluster's infra-id)")
 	iamRolesSetupCmd.MarkPersistentFlagRequired("name-prefix")
 	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
 	iamRolesSetupCmd.MarkPersistentFlagRequired("region")
-	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for")
+	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=aws' against an OpenShift release image)")
 	iamRolesSetupCmd.MarkPersistentFlagRequired("credentials-requests-dir")
-	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.IdentityProviderARN, "identity-provider-arn", "", "ARN of IAM Identity provider for IAM Role trust relationship")
+	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.IdentityProviderARN, "identity-provider-arn", "", "ARN of IAM Identity provider for IAM Role trust relationship (can be created with the 'create identity-provider' sub-command)")
 	iamRolesSetupCmd.MarkPersistentFlagRequired("identity-provider-arn")
 	iamRolesSetupCmd.PersistentFlags().BoolVar(&CreateOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 
