@@ -13,7 +13,7 @@ type options struct {
 	PublicKeyPath string
 	Region        string
 	NamePrefix    string
-	GenerateOnly  bool
+	DryRun        bool
 }
 
 var (
