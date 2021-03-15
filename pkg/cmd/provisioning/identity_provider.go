@@ -447,7 +447,7 @@ func identityProviderCmd(cmd *cobra.Command, args []string) {
 		publicKeyPath = path.Join(CreateOpts.TargetDir, publicKeyFile)
 	}
 
-	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, publicKeyPath, CreateOpts.TargetDir, CreateOpts.GenerateOnly)
+	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, publicKeyPath, CreateOpts.TargetDir, CreateOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -465,7 +465,7 @@ func NewIdentityProviderSetup() *cobra.Command {
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
 	identityProviderSetupCmd.MarkPersistentFlagRequired("region")
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
-	identityProviderSetupCmd.PersistentFlags().BoolVar(&CreateOpts.GenerateOnly, "generate-files-only", false, "Skip creating objects, and just save what would have been created into files")
+	identityProviderSetupCmd.PersistentFlags().BoolVar(&CreateOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 
 	return identityProviderSetupCmd
 }
