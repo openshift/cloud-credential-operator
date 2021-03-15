@@ -454,7 +454,7 @@ func NewIdentityProviderSetup() *cobra.Command {
 		Run: identityProviderCmd,
 	}
 
-	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.NamePrefix, "name-prefix", "", "Name prefix for all created AWS resources")
+	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.NamePrefix, "name-prefix", "", "User-defined name prefix for all created AWS resources (can be separate from the cluster's infra-id)")
 	identityProviderSetupCmd.MarkPersistentFlagRequired("name-prefix")
 	identityProviderSetupCmd.PersistentFlags().StringVar(&CreateOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
 	identityProviderSetupCmd.MarkPersistentFlagRequired("region")
