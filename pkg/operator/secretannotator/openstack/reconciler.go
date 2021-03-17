@@ -22,6 +22,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	"gopkg.in/yaml.v3"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -38,6 +39,7 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
+	"github.com/openshift/cloud-credential-operator/pkg/openstack"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/status"
@@ -153,6 +155,27 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 		return reconcile.Result{}, err
 	}
 
+	clouds, err := openstack.GetRootCloudCredentialsSecretData(secret, r.Logger)
+	if err != nil {
+		r.Logger.WithError(err).Error("errored getting clouds.yaml from secret")
+		return reconcile.Result{}, err
+	}
+
+	clouds, cloudsUpdated, err := fixInvalidCACertFile(clouds)
+	if err != nil {
+		r.Logger.WithError(err).Error("errored checking clouds.yaml")
+		return reconcile.Result{}, err
+	}
+
+	if cloudsUpdated {
+		openstack.SetRootCloudCredentialsSecretData(secret, clouds)
+		err := r.Update(context.TODO(), secret)
+		if err != nil {
+			r.Logger.WithError(err).Error("error writing updated root secret")
+		}
+		return reconcile.Result{}, err
+	}
+
 	if mode != operatorv1.CloudCredentialsModeDefault {
 		annotation, err := utils.ModeToAnnotation(mode)
 		if err != nil {
@@ -167,6 +190,57 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 	}
 
 	return reconcile.Result{}, nil
+}
+
+// fixInvalidCACertFile ensures that clouds.yaml has the right CACertFile value
+// For more information: https://bugzilla.redhat.com/show_bug.cgi?id=1940142
+//
+// The installer no longer generates an invalid cacert as of 4.7, and this
+// method will fix any invalid secret present during 4.8. We can therefore
+// remove this code in 4.9.
+func fixInvalidCACertFile(content string) (string, bool, error) {
+	clouds := make(map[string]interface{})
+
+	err := yaml.Unmarshal([]byte(content), &clouds)
+	if err != nil {
+		return "", false, err
+	}
+
+	var updatePath func(y map[string]interface{}, path ...string) bool
+	updatePath = func(y map[string]interface{}, path ...string) bool {
+		field, ok := y[path[0]]
+		if !ok {
+			// clouds.yaml doesn't contain this path. Nothing to update
+			return false
+		}
+
+		if len(path) == 1 {
+			y[path[0]] = openstack.CACertFile
+			return true
+		}
+
+		fieldMap, ok := field.(map[string]interface{})
+		if !ok {
+			// clouds.yaml with this non-final path doesn't contain more children. Nothing to update.
+			return false
+		}
+
+		// Descend a level of the struct
+		return updatePath(fieldMap, path[1:]...)
+	}
+
+	// If clouds/openstack/cacert exists in clouds.yaml, set it to caCertFile
+	updated := updatePath(clouds, "clouds", openstack.OpenStackCloudName, "cacert")
+	if !updated {
+		return content, false, nil
+	}
+
+	res, err := yaml.Marshal(clouds)
+	if err != nil {
+		return "", false, err
+	}
+
+	return string(res), true, nil
 }
 
 func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret, value string) error {

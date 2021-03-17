@@ -26,6 +26,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -40,6 +41,22 @@ import (
 
 func init() {
 	log.SetLevel(log.DebugLevel)
+}
+
+// A minimal definition of the clouds.yaml sufficient for the values used in
+// this test
+type openstackCloud struct {
+	Auth               map[string]string `json:"auth"`
+	CACert             string            `json:"cacert,omitempty"`
+	IdentityAPIVersion string            `json:"identity_api_version"`
+	RegionName         string            `json:"region_name"`
+	Verify             string            `json:"verify"`
+}
+
+type openstackClouds struct {
+	Clouds struct {
+		OpenStack openstackCloud `json:"openstack"`
+	} `json:"clouds"`
 }
 
 const (
@@ -185,6 +202,104 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 
 				annotation := reconciledSecret.Annotations["cloudcredential.openshift.io/mode"]
 				assert.Equal(t, annotation, tc.wantAnnotation, "Secret annotation not set correctly")
+			})
+		}
+	})
+
+	/*
+		Test fixing an invalid cacert detected in the root secret.
+
+		* If the root secret clouds.yaml contains invalid YAML we should return an
+		  error
+		* If the root secret clouds.yaml does not contain a CA Cert we should not
+		  modify it
+		* If the root secret clouds.yaml contains the incorrect CA Cert path we
+		  should update it
+		* If the root secret clouds.yaml contains the correct CA Cert path we
+		  should not modify it
+
+	*/
+	t.Run("Test fix cacert path", func(t *testing.T) {
+		parseClouds := func(secret *corev1.Secret) (*openstackClouds, error) {
+			clouds := &openstackClouds{}
+			err := yaml.Unmarshal([]byte(secret.Data["clouds.yaml"]), clouds)
+			return clouds, err
+		}
+
+		passthrough := testOperatorConfig("Passthrough")
+
+		const incorrectCACertFile = "/incorrect/path/to/ca-bundle.pem"
+		const correctCACertFile = "/etc/kubernetes/static-pod-resources/configmaps/cloud-config/ca-bundle.pem"
+
+		for _, tc := range [...]struct {
+			name           string
+			cacert         string
+			expectedCACert string
+			skipDiff       bool
+			wantErr        bool
+		}{
+			{
+				name:     "invalid YAML",
+				cacert:   "\"",
+				skipDiff: true, // Ignore YAML parse error diffing updated secret
+				wantErr:  true,
+			},
+			{
+				name:           "No CA Cert",
+				cacert:         "",
+				expectedCACert: "",
+				wantErr:        false,
+			},
+			{
+				name:           "Incorrect CA Cert",
+				cacert:         incorrectCACertFile,
+				expectedCACert: correctCACertFile,
+				wantErr:        false,
+			},
+			{
+				name:           "Correct CA Cert",
+				cacert:         correctCACertFile,
+				expectedCACert: correctCACertFile,
+				wantErr:        false,
+			},
+		} {
+			t.Run(tc.name, func(t *testing.T) {
+				secret := testSecret(tc.cacert)
+				fakeClient := fake.NewFakeClient(infra, passthrough, secret)
+
+				r := &ReconcileCloudCredSecret{
+					Client: fakeClient,
+					Logger: log.WithField("controller", "testController"),
+				}
+				_, err := r.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{
+					Name:      "openstack-credentials",
+					Namespace: "kube-system",
+				}})
+
+				if tc.wantErr {
+					require.Error(t, err, "ReconcileCloudCredSecret.Reconcile() did not return expected error")
+				} else {
+					require.NoError(t, err, "ReconcileCloudCredSecret.Reconcile() returned unexpected error")
+				}
+
+				reconciledSecret := &corev1.Secret{}
+				err = fakeClient.Get(context.TODO(), client.ObjectKey{
+					Namespace: secret.Namespace,
+					Name:      secret.Name,
+				}, reconciledSecret)
+				require.NoError(t, err, "Failed to fetch secret after ReconcileCloudCredSecret.Reconcile()")
+
+				if !tc.skipDiff {
+					// Update cacert in the input secret to the expected value,
+					// and compare the resulting parsed clouds.yamls
+					origClouds, err := parseClouds(secret)
+					require.NoError(t, err, "Unexpected error parsing original clouds.yaml")
+					origClouds.Clouds.OpenStack.CACert = tc.expectedCACert
+
+					reconciledClouds, err := parseClouds(reconciledSecret)
+					require.NoError(t, err, "Unexpected error parsing updated clouds.yaml")
+					assert.Equal(t, origClouds, reconciledClouds, "Secret was not updated as expected")
+				}
 			})
 		}
 	})
