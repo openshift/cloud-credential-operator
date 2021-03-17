@@ -282,9 +282,7 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 }
 
 func iamRolesCmd(cmd *cobra.Command, args []string) {
-	cfg := &awssdk.Config{
-		//Region: awssdk.String(CreateOpts.Region),
-	}
+	cfg := &awssdk.Config{}
 
 	s, err := session.NewSession(cfg)
 	if err != nil {
