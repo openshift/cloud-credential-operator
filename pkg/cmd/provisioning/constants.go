@@ -25,4 +25,7 @@ const (
 	// role files
 	roleFilenameFormat       = "05-%d-%s-role.json"
 	rolePolicyFilenameFormat = "06-%d-%s-policy.json"
+
+	manifestsDirName = "manifests"
+	tlsDirName       = "tls"
 )

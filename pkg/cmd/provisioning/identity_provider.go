@@ -117,6 +117,11 @@ func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath
 		return err
 	}
 
+	// Create the installer manifest file
+	if err := createClusterAuthentication(issuerURL, targetDir); err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -422,6 +427,23 @@ func isExistingIdentifyProvider(client aws.Client, providerARN, namePrefix strin
 		}
 	}
 	return false, nil
+}
+
+func createClusterAuthentication(issuerURL, targetDir string) error {
+	clusterAuthenticationTemplate := `apiVersion: config.openshift.io/v1
+kind: Authentication
+metadata:
+  name: cluster
+spec:
+  serviceAccountIssuer: %s`
+
+	clusterAuthFile := filepath.Join(targetDir, manifestsDirName, "cluster-authentication-02-config.yaml")
+
+	fileData := fmt.Sprintf(clusterAuthenticationTemplate, issuerURL)
+	if err := ioutil.WriteFile(clusterAuthFile, []byte(fileData), 0600); err != nil {
+		return errors.Wrap(err, "failed to save cluster authentication file")
+	}
+	return nil
 }
 
 func identityProviderCmd(cmd *cobra.Command, args []string) {
