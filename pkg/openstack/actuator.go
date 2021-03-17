@@ -19,6 +19,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -39,6 +40,7 @@ import (
 
 const (
 	rootOpenStackCredsSecretKey = "clouds.yaml"
+	caCertFile                  = "/etc/kubernetes/static-pod-resources/configmaps/cloud-config/ca-bundle.pem"
 )
 
 type OpenStackActuator struct {
@@ -110,6 +112,8 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 		return err
 	}
 
+	clouds = a.fixInvalidCACertFile(clouds)
+
 	logger.Debugf("provisioning secret")
 	existingSecret, err := a.loadExistingSecret(cr)
 	if err != nil {
@@ -127,6 +131,12 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 	}
 
 	return nil
+}
+
+// fixInvalidCACertFile insures that clouds.yaml has the right CACertFile value
+// For more information: https://bugzilla.redhat.com/show_bug.cgi?id=1940142
+func (a *OpenStackActuator) fixInvalidCACertFile(content string) string {
+	return regexp.MustCompile(`cacert: .*`).ReplaceAllString(content, "cacert: "+caCertFile)
 }
 
 func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, clouds string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
