@@ -41,3 +41,11 @@ func GetRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, logger lo
 
 	return clouds, nil
 }
+
+func SetRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, clouds string) {
+	if cloudCredSecret.Data == nil {
+		cloudCredSecret.Data = make(map[string][]byte)
+	}
+
+	cloudCredSecret.Data[RootOpenStackCredsSecretKey] = []byte(clouds)
+}
