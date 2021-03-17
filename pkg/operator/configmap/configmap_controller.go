@@ -20,7 +20,6 @@ import (
 	"context"
 	"crypto/md5"
 	"fmt"
-	"os"
 	"time"
 
 	log "github.com/sirupsen/logrus"
@@ -60,10 +59,12 @@ func NewReconciler(mgr manager.Manager) *ReconcileConfigMap {
 		// Controller only watches this one single configmap.
 		"configmap": fmt.Sprintf("%s/%s", ccoNamespace, configMapName),
 	}
+	context, cancel := context.WithCancel(context.TODO())
 	return &ReconcileConfigMap{
-		Client: mgr.GetClient(),
-		logger: log.WithFields(logFields),
-		exit:   exitFunc,
+		Client:  mgr.GetClient(),
+		logger:  log.WithFields(logFields),
+		context: context,
+		exit:    cancel,
 	}
 }
 
@@ -108,6 +109,7 @@ type ReconcileConfigMap struct {
 	client.Client
 	logger            log.FieldLogger
 	configMapDataHash string
+	context           context.Context
 	// Allow testing to catch an exit call from the controller
 	exit func()
 }
@@ -122,7 +124,7 @@ func (r *ReconcileConfigMap) Reconcile(request reconcile.Request) (reconcile.Res
 	}()
 
 	cm := &corev1.ConfigMap{}
-	if err := r.Get(context.TODO(), request.NamespacedName, cm); err != nil {
+	if err := r.Get(r.context, request.NamespacedName, cm); err != nil {
 		r.logger.WithError(err).Error("failed to read in configmap")
 		return reconcile.Result{}, err
 	}
@@ -140,8 +142,4 @@ func (r *ReconcileConfigMap) Reconcile(request reconcile.Request) (reconcile.Res
 	}
 
 	return reconcile.Result{}, nil
-}
-
-func exitFunc() {
-	os.Exit(0)
 }
