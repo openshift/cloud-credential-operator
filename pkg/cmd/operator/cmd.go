@@ -156,7 +156,7 @@ func NewOperator() *cobra.Command {
 						OnStoppedLeading: func() {
 							// we can do cleanup here if necessary
 							leLog.Infof("leader lost")
-							os.Exit(0)
+							cancel()
 						},
 						OnNewLeader: func(identity string) {
 							if identity == id {
