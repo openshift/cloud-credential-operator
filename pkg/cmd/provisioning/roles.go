@@ -38,6 +38,18 @@ const (
 	"PolicyName": "%s",
 	"PolicyDocument": "%s"
 }`
+
+	secretManifestsTemplate = `apiVersion: v1
+stringData:
+  credentials: |-
+    [default]
+    role_arn = %s
+    web_identity_token_file = /var/run/secrets/openshift/serviceaccount/token
+kind: Secret
+metadata:
+  name: %s
+  namespace: %s
+type: Opaque`
 )
 
 func createIAMRoles(client aws.Client, identityProviderARN, namePrefix, credReqDir, targetDir string, generateOnly bool) error {
@@ -108,7 +120,8 @@ func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.Cred
 
 	rolePolicy := createRolePolicy(awsProviderSpec.StatementEntries)
 
-	if generateOnly {
+	switch generateOnly {
+	case true:
 		// Generate Role
 		// Need to escape all the double quotes in the generated JSON rolePolicyDocument
 		// so that the JSON text file is valid
@@ -129,7 +142,13 @@ func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.Cred
 			return "", errors.Wrap(err, "failed to save Role Policy content JSON")
 		}
 
-	} else {
+		if err := writeCredReqSecret(credReq, targetDir, ""); err != nil {
+			return "", errors.Wrap(err, "failed to save Secret for install manifests")
+		}
+
+		return "", nil
+
+	default:
 		var role *iam.Role
 		outRole, err := awsClient.GetRole(&iam.GetRoleInput{
 			RoleName: awssdk.String(shortenedRoleName),
@@ -188,9 +207,13 @@ func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.Cred
 			return "", errors.Wrap(err, "Failed to put role policy")
 		}
 		log.Printf("Updated Role policy for Role %s", *role.RoleName)
-	}
 
-	return "", nil
+		if err := writeCredReqSecret(credReq, targetDir, *role.Arn); err != nil {
+			return "", errors.Wrap(err, "failed to save Secret for install manifests")
+		}
+
+		return *role.Arn, nil
+	}
 }
 
 func createRolePolicyDocument(oidcProviderARN, issuerURL string, serviceAccountNames []string) (string, error) {
@@ -260,7 +283,7 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 
 func iamRolesCmd(cmd *cobra.Command, args []string) {
 	cfg := &awssdk.Config{
-		Region: awssdk.String(CreateOpts.Region),
+		//Region: awssdk.String(CreateOpts.Region),
 	}
 
 	s, err := session.NewSession(cfg)
@@ -316,6 +339,32 @@ func createRolePolicy(statements []credreqv1.StatementEntry) string {
 	return string(b)
 }
 
+// writeCredReqSecret will take a credentialsRequest and a Role ARN and store
+// a Secret with an AWS config in the 'credentials' field of the Secret.
+func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, roleARN string) error {
+	manifestsDir := filepath.Join(targetDir, manifestsDirName)
+
+	fileName := fmt.Sprintf("%s-%s-credentials.yaml", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
+	filePath := filepath.Join(manifestsDir, fileName)
+
+	fileData := fmt.Sprintf(secretManifestsTemplate, roleARN, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
+
+	// roleARN would be an empty string if ccoctl was in --dry-run mode
+	// so lets make sure we have an invalide Secret until the user
+	// has populated the Secret manually.
+	if roleARN == "" {
+		fileData = fileData + "\nPOPULATE ROLE ARN AND DELETE THIS LINE"
+	}
+
+	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
+		return errors.Wrap(err, "Failed to save Secret file")
+	}
+
+	log.Printf("Saved credentials configuration to: %s", filePath)
+
+	return nil
+}
+
 // NewIAMRolesSetup provides the "create iam-roles" subcommand
 func NewIAMRolesSetup() *cobra.Command {
 	iamRolesSetupCmd := &cobra.Command{
@@ -325,8 +374,6 @@ func NewIAMRolesSetup() *cobra.Command {
 
 	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.NamePrefix, "name-prefix", "", "User-define name prefix for all created AWS resources (can be separate from the cluster's infra-id)")
 	iamRolesSetupCmd.MarkPersistentFlagRequired("name-prefix")
-	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
-	iamRolesSetupCmd.MarkPersistentFlagRequired("region")
 	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=aws' against an OpenShift release image)")
 	iamRolesSetupCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.IdentityProviderARN, "identity-provider-arn", "", "ARN of IAM Identity provider for IAM Role trust relationship (can be created with the 'create identity-provider' sub-command)")

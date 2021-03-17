@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -18,6 +19,8 @@ func createKeys(prefixDir string) error {
 	privateKeyFilePath := filepath.Join(prefixDir, privateKeyFile)
 	publicKeyFilePath := filepath.Join(prefixDir, publicKeyFile)
 	bitSize := 4096
+
+	defer copyPrivateKeyForInstaller(privateKeyFilePath, prefixDir)
 
 	_, err := os.Stat(privateKeyFilePath)
 	if err == nil {
@@ -55,7 +58,7 @@ func createKeys(prefixDir string) error {
 
 	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		errors.Wrap(err, "failed to generate public key from private")
+		return errors.Wrap(err, "failed to generate public key from private")
 	}
 
 	err = pem.Encode(f, &pem.Block{
@@ -65,9 +68,32 @@ func createKeys(prefixDir string) error {
 	})
 	f.Close()
 	if err != nil {
-		errors.Wrap(err, "failed to write out public key data")
+		return errors.Wrap(err, "failed to write out public key data")
 	}
+
 	return nil
+}
+
+func copyPrivateKeyForInstaller(sourceFile, prefixDir string) {
+	privateKeyForInstaller := filepath.Join(prefixDir, tlsDirName, "bound-service-account-signing-key.key")
+
+	log.Print("Copying signing key for use by installer")
+	from, err := os.Open(sourceFile)
+	if err != nil {
+		log.Fatalf("failed to open privatekeyfile for copying: %s", err)
+	}
+	defer from.Close()
+
+	to, err := os.OpenFile(privateKeyForInstaller, os.O_RDWR|os.O_CREATE, 0600)
+	if err != nil {
+		log.Fatalf("failed to open/create target bound serviceaccount file: %s", err)
+	}
+	defer to.Close()
+
+	_, err = io.Copy(to, from)
+	if err != nil {
+		log.Fatalf("failed to copy file: %s", err)
+	}
 }
 
 func keyCmd(cmd *cobra.Command, args []string) {

@@ -59,6 +59,7 @@ func initEnv(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to resolve full path: %s", err)
 	}
 
+	// create target dir if necessary
 	sResult, err := os.Stat(fPath)
 	if os.IsNotExist(err) {
 		if err := os.Mkdir(fPath, 0700); err != nil {
@@ -71,5 +72,40 @@ func initEnv(cmd *cobra.Command, args []string) {
 
 	if !sResult.IsDir() {
 		log.Fatalf("File %s exists and is not a directory", fPath)
+	}
+
+	// create manifests dir if necessary
+	manifestsDir := filepath.Join(fPath, manifestsDirName)
+	sResult, err = os.Stat(manifestsDir)
+	if os.IsNotExist(err) {
+		if err := os.Mkdir(manifestsDir, 0700); err != nil {
+			log.Fatalf("Failed to create manifests directory: %s", err)
+		}
+		sResult, err = os.Stat(manifestsDir)
+	} else if err != nil {
+		log.Fatalf("Failed to stat: %+v", err)
+	}
+
+	if !sResult.IsDir() {
+		log.Fatalf("File %s exists and is not a directory", manifestsDir)
+	}
+
+	tlsDir := filepath.Join(fPath, tlsDirName)
+	ensureDir(tlsDir)
+}
+
+func ensureDir(path string) {
+	sResult, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		if err := os.Mkdir(path, 0700); err != nil {
+			log.Fatalf("Failed to create directory: %s", err)
+		}
+		sResult, err = os.Stat(path)
+	} else if err != nil {
+		log.Fatalf("Failed to stat: %+v", err)
+	}
+
+	if !sResult.IsDir() {
+		log.Fatalf("File %s exists and is not a directory", path)
 	}
 }

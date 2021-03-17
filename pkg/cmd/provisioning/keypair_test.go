@@ -26,10 +26,9 @@ func TestKeyPair(t *testing.T) {
 		{
 			name: "private key file exists",
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), keypairTestDirPrefix)
-				require.NoError(t, err, "Failed to create temp directory")
+				tempDirName := prepTempDir(t)
 
-				err = ioutil.WriteFile(filepath.Join(tempDirName, privateKeyFile), []byte("some data"), 0600)
+				err := ioutil.WriteFile(filepath.Join(tempDirName, privateKeyFile), []byte("some data"), 0600)
 				require.NoError(t, err, "errored while setting up environment for test")
 
 				return tempDirName
@@ -47,8 +46,7 @@ func TestKeyPair(t *testing.T) {
 		{
 			name: "generate keys",
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), keypairTestDirPrefix)
-				require.NoError(t, err, "Failed to create temp directory")
+				tempDirName := prepTempDir(t)
 
 				return tempDirName
 			},
@@ -98,4 +96,16 @@ func TestKeyPair(t *testing.T) {
 			}
 		})
 	}
+}
+
+func prepTempDir(t *testing.T) string {
+	tempDirName, err := ioutil.TempDir(os.TempDir(), keypairTestDirPrefix)
+
+	require.NoError(t, err, "unexpected error setting up temp directory")
+
+	tlsDir := filepath.Join(tempDirName, tlsDirName)
+	err = os.Mkdir(tlsDir, 0770)
+	require.NoError(t, err, "errored trying to create temp tls dir")
+
+	return tempDirName
 }
