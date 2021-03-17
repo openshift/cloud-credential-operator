@@ -15,7 +15,6 @@ import (
 	"log"
 	"net/url"
 	"os"
-	"path"
 	"path/filepath"
 	"strings"
 
@@ -94,35 +93,36 @@ type JSONWebKeySet struct {
 	Keys []jose.JSONWebKey `json:"keys"`
 }
 
-func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath, targetDir string, generateOnly bool) error {
+func createIdentityProvider(client aws.Client, namePrefix, region, publicKeyPath, targetDir string, generateOnly bool) (string, error) {
 	// Create the S3 bucket
 	bucketName := fmt.Sprintf("%s-oidc", namePrefix)
 	if err := createOIDCBucket(client, bucketName, namePrefix, region, targetDir, generateOnly); err != nil {
-		return err
+		return "", err
 	}
 	issuerURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
 
 	// Create the OIDC config file
 	if err := createOIDCConfiguration(client, bucketName, issuerURL, namePrefix, targetDir, generateOnly); err != nil {
-		return err
+		return "", err
 	}
 
 	// Create the OIDC key list
 	if err := createJSONWebKeySet(client, publicKeyPath, bucketName, namePrefix, targetDir, generateOnly); err != nil {
-		return err
+		return "", err
 	}
 
 	// Create the IAM Identity Provider
-	if err := createIAMIdentityProvider(client, issuerURL, namePrefix, targetDir, generateOnly); err != nil {
-		return err
+	identityProviderARN, err := createIAMIdentityProvider(client, issuerURL, namePrefix, targetDir, generateOnly)
+	if err != nil {
+		return "", err
 	}
 
 	// Create the installer manifest file
 	if err := createClusterAuthentication(issuerURL, targetDir); err != nil {
-		return err
+		return "", err
 	}
 
-	return nil
+	return identityProviderARN, nil
 }
 
 func getTLSFingerprint(bucketURL string) (string, error) {
@@ -149,10 +149,12 @@ func getTLSFingerprint(bucketURL string) (string, error) {
 	return buf.String(), nil
 }
 
-func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetDir string, generateOnly bool) error {
+func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetDir string, generateOnly bool) (string, error) {
+	var providerARN string
+
 	fingerprint, err := getTLSFingerprint(issuerURL)
 	if err != nil {
-		return errors.Wrap(err, "failed to get fingerprint")
+		return "", errors.Wrap(err, "failed to get fingerprint")
 	}
 
 	if generateOnly {
@@ -160,20 +162,19 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 
 		err := saveToFile("AWS IAM Identity Provider", filepath.Join(targetDir, iamIdentityProviderFilename), []byte(oidcIdentityProviderJSON))
 		if err != nil {
-			return errors.Wrap(err, "failed to save IAM Identity Provider file")
+			return "", errors.Wrap(err, "failed to save IAM Identity Provider file")
 		}
 
 	} else {
 		oidcProviderList, err := client.ListOpenIDConnectProviders(&iam.ListOpenIDConnectProvidersInput{})
 		if err != nil {
-			return errors.Wrap(err, "failed to fetch list of Identity Providers")
+			return "", errors.Wrap(err, "failed to fetch list of Identity Providers")
 		}
 
-		var providerARN string
 		for _, provider := range oidcProviderList.OpenIDConnectProviderList {
 			ok, err := isExistingIdentifyProvider(client, *provider.Arn, namePrefix)
 			if err != nil {
-				return errors.Wrapf(err, "failed to check existing Identity Provider %s", *provider.Arn)
+				return "", errors.Wrapf(err, "failed to check existing Identity Provider %s", *provider.Arn)
 			}
 
 			if ok {
@@ -195,7 +196,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 				Url: awssdk.String(issuerURL),
 			})
 			if err != nil {
-				return errors.Wrap(err, "failed to create Identity Provider")
+				return "", errors.Wrap(err, "failed to create Identity Provider")
 			}
 
 			providerARN = *oidcOutput.OpenIDConnectProviderArn
@@ -210,13 +211,13 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 				},
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to tag the identity provider with arn: %s", providerARN)
+				return "", errors.Wrapf(err, "failed to tag the identity provider with arn: %s", providerARN)
 			}
 
 			log.Printf("Identity Provider created with ARN: %s", providerARN)
 		}
 	}
-	return nil
+	return providerARN, nil
 }
 
 func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, namePrefix, targetDir string, generateOnly bool) error {
@@ -460,10 +461,10 @@ func identityProviderCmd(cmd *cobra.Command, args []string) {
 
 	publicKeyPath := CreateOpts.PublicKeyPath
 	if publicKeyPath == "" {
-		publicKeyPath = path.Join(CreateOpts.TargetDir, publicKeyFile)
+		publicKeyPath = filepath.Join(CreateOpts.TargetDir, publicKeyFile)
 	}
 
-	err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, publicKeyPath, CreateOpts.TargetDir, CreateOpts.DryRun)
+	_, err = createIdentityProvider(awsClient, CreateOpts.NamePrefix, CreateOpts.Region, publicKeyPath, CreateOpts.TargetDir, CreateOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}

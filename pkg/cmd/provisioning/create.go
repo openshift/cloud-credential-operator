@@ -39,6 +39,8 @@ func NewCreateCmd() *cobra.Command {
 	createCmd.AddCommand(NewIdentityProviderSetup())
 	createCmd.AddCommand(NewIAMRolesSetup())
 
+	createCmd.AddCommand(NewAllSetup())
+
 	return createCmd
 }
 
