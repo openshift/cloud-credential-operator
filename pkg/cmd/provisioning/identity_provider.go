@@ -161,20 +161,20 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 
 		err := saveToFile("AWS IAM Identity Provider", filepath.Join(targetDir, iamIdentityProviderFilename), []byte(oidcIdentityProviderJSON))
 		if err != nil {
-			errors.Wrap(err, "failed to save IAM Identity Provider file")
+			return errors.Wrap(err, "failed to save IAM Identity Provider file")
 		}
 
 	} else {
 		oidcProviderList, err := client.ListOpenIDConnectProviders(&iam.ListOpenIDConnectProvidersInput{})
 		if err != nil {
-			return errors.Wrap(err, "Failed to fetch list of Identity Providers")
+			return errors.Wrap(err, "failed to fetch list of Identity Providers")
 		}
 
 		var providerARN string
 		for _, provider := range oidcProviderList.OpenIDConnectProviderList {
 			ok, err := isExistingIdentifyProvider(client, *provider.Arn, namePrefix)
 			if err != nil {
-				return errors.Wrapf(err, "Failed to check existing Identity Provider %s", *provider.Arn)
+				return errors.Wrapf(err, "failed to check existing Identity Provider %s", *provider.Arn)
 			}
 
 			if ok {
@@ -196,7 +196,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 				Url: awssdk.String(issuerURL),
 			})
 			if err != nil {
-				return errors.Wrap(err, "Failed to create Identity Provider")
+				return errors.Wrap(err, "failed to create Identity Provider")
 			}
 
 			providerARN = *oidcOutput.OpenIDConnectProviderArn
@@ -211,7 +211,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 				},
 			})
 			if err != nil {
-				return errors.Wrapf(err, "Failed to tag the identity provider with arn: %s", providerARN)
+				return errors.Wrapf(err, "failed to tag the identity provider with arn: %s", providerARN)
 			}
 
 			log.Printf("Identity Provider created with ARN: %s", providerARN)
@@ -223,7 +223,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, namePrefix, targetD
 func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, namePrefix, targetDir string, generateOnly bool) error {
 	jwks, err := buildJsonWebKeySet(publicKeyFilepath)
 	if err != nil {
-		return errors.Wrap(err, "Failed to build JSON web key set from the public key")
+		return errors.Wrap(err, "failed to build JSON web key set from the public key")
 	}
 
 	if generateOnly {
@@ -241,7 +241,7 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, nameP
 		})
 
 		if err != nil {
-			return errors.Wrapf(err, "Failed to upload JSON web key set (JWKS) in the S3 bucket %s", bucketName)
+			return errors.Wrapf(err, "failed to upload JSON web key set (JWKS) in the S3 bucket %s", bucketName)
 		}
 		log.Printf("JSON web key set (JWKS) in the S3 bucket %s at %s updated", bucketName, keysURI)
 	}
@@ -264,7 +264,7 @@ func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, namePrefi
 			Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s", ccoctlAWSResourceTagKeyPrefix, namePrefix, ownedCcoctlAWSResourceTagValue)),
 		})
 		if err != nil {
-			return errors.Wrapf(err, "Failed to upload discovery document in the S3 bucket %s", bucketName)
+			return errors.Wrapf(err, "failed to upload discovery document in the S3 bucket %s", bucketName)
 		}
 		log.Printf("OpenID Connect discovery document in the S3 bucket %s at %s updated", bucketName, discoveryDocumentURI)
 	}
@@ -306,10 +306,10 @@ func createOIDCBucket(client aws.Client, bucketName, namePrefix, region, targetD
 				case s3.ErrCodeBucketAlreadyOwnedByYou:
 					log.Printf("Bucket %s already exists and is owned by the user", bucketName)
 				default:
-					return errors.Wrap(aerr, "Failed to create a bucket to store OpenID Connect configuration")
+					return errors.Wrap(aerr, "failed to create a bucket to store OpenID Connect configuration")
 				}
 			} else {
-				return errors.Wrap(err, "Failed to create a bucket to store OpenID Connect configuration")
+				return errors.Wrap(err, "failed to create a bucket to store OpenID Connect configuration")
 			}
 		} else {
 			log.Print("Bucket ", bucketName, " created")
@@ -325,7 +325,7 @@ func createOIDCBucket(client aws.Client, bucketName, namePrefix, region, targetD
 				},
 			})
 			if err != nil {
-				return errors.Wrapf(err, "Failed to tag the bucket %s", bucketName)
+				return errors.Wrapf(err, "failed to tag the bucket %s", bucketName)
 			}
 		}
 	}
@@ -339,17 +339,17 @@ func buildJsonWebKeySet(publicKeyPath string) ([]byte, error) {
 	publicKeyContent, err := ioutil.ReadFile(publicKeyPath)
 
 	if err != nil {
-		return nil, errors.Wrap(err, "Failed to read public key")
+		return nil, errors.Wrap(err, "failed to read public key")
 	}
 
 	block, _ := pem.Decode(publicKeyContent)
 	if block == nil {
-		return nil, errors.Wrap(err, "Error decoding PEM file")
+		return nil, errors.Wrap(err, "frror decoding PEM file")
 	}
 
 	publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		return nil, errors.Wrap(err, "Error parsing key content")
+		return nil, errors.Wrap(err, "error parsing key content")
 	}
 
 	var alg jose.SignatureAlgorithm
@@ -357,7 +357,7 @@ func buildJsonWebKeySet(publicKeyPath string) ([]byte, error) {
 	case *rsa.PublicKey:
 		alg = jose.RS256
 	default:
-		return nil, errors.New("Public key is not of type RSA")
+		return nil, errors.New("public key is not of type RSA")
 	}
 
 	kid, err := keyIDFromPublicKey(publicKey)
@@ -403,12 +403,12 @@ func saveToFile(filePurpose, filePath string, data []byte) error {
 	log.Printf("Saving %s locally at %s", filePurpose, filePath)
 	f, err := os.Create(filePath)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to create file %s to store %s", filePath, filePurpose)
+		return errors.Wrapf(err, "failed to create file %s to store %s", filePath, filePurpose)
 	}
 	_, err = f.Write(data)
 	f.Close()
 	if err != nil {
-		return errors.Wrapf(err, "Failed to write %s to file %s", filePurpose, filePath)
+		return errors.Wrapf(err, "failed to write %s to file %s", filePurpose, filePath)
 	}
 	return nil
 }
@@ -419,7 +419,7 @@ func isExistingIdentifyProvider(client aws.Client, providerARN, namePrefix strin
 		OpenIDConnectProviderArn: awssdk.String(providerARN),
 	})
 	if err != nil {
-		return false, errors.Wrapf(err, "Failed to get Identity Provider with ARN %s", providerARN)
+		return false, errors.Wrapf(err, "failed to get Identity Provider with ARN %s", providerARN)
 	}
 
 	for _, tag := range provider.Tags {
