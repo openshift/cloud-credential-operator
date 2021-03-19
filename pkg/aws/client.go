@@ -45,10 +45,15 @@ type Client interface {
 	DeleteUserPolicy(*iam.DeleteUserPolicyInput) (*iam.DeleteUserPolicyOutput, error)
 	GetOpenIDConnectProvider(input *iam.GetOpenIDConnectProviderInput) (*iam.GetOpenIDConnectProviderOutput, error)
 	GetRole(input *iam.GetRoleInput) (*iam.GetRoleOutput, error)
+	ListRoles(input *iam.ListRolesInput) (*iam.ListRolesOutput, error)
+	DeleteRole(input *iam.DeleteRoleInput) (*iam.DeleteRoleOutput, error)
+	ListRolePolicies(input *iam.ListRolePoliciesInput) (*iam.ListRolePoliciesOutput, error)
+	DeleteRolePolicy(input *iam.DeleteRolePolicyInput) (*iam.DeleteRolePolicyOutput, error)
 	GetUser(*iam.GetUserInput) (*iam.GetUserOutput, error)
 	GetUserPolicy(*iam.GetUserPolicyInput) (*iam.GetUserPolicyOutput, error)
 	ListAccessKeys(*iam.ListAccessKeysInput) (*iam.ListAccessKeysOutput, error)
 	ListOpenIDConnectProviders(*iam.ListOpenIDConnectProvidersInput) (*iam.ListOpenIDConnectProvidersOutput, error)
+	DeleteOpenIDConnectProvider(input *iam.DeleteOpenIDConnectProviderInput) (*iam.DeleteOpenIDConnectProviderOutput, error)
 	ListUserPolicies(*iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error)
 	PutRolePolicy(*iam.PutRolePolicyInput) (*iam.PutRolePolicyOutput, error)
 	PutUserPolicy(*iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error)
@@ -61,7 +66,12 @@ type Client interface {
 	//S3
 	CreateBucket(*s3.CreateBucketInput) (*s3.CreateBucketOutput, error)
 	PutBucketTagging(*s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error)
+	GetBucketTagging(input *s3.GetBucketTaggingInput) (*s3.GetBucketTaggingOutput, error)
+	DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error)
 	PutObject(*s3.PutObjectInput) (*s3.PutObjectOutput, error)
+	ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
+	GetObjectTagging(input *s3.GetObjectTaggingInput) (*s3.GetObjectTaggingOutput, error)
+	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
 }
 
 // ClientParams holds the various optional tunables that can be used to modify the AWS
@@ -161,6 +171,26 @@ func (c *awsClient) GetOpenIDConnectProvider(input *iam.GetOpenIDConnectProvider
 	return c.iamClient.GetOpenIDConnectProvider(input)
 }
 
+func (c *awsClient) DeleteOpenIDConnectProvider(input *iam.DeleteOpenIDConnectProviderInput) (*iam.DeleteOpenIDConnectProviderOutput, error) {
+	return c.iamClient.DeleteOpenIDConnectProvider(input)
+}
+
+func (c *awsClient) ListRoles(input *iam.ListRolesInput) (*iam.ListRolesOutput, error) {
+	return c.iamClient.ListRoles(input)
+}
+
+func (c *awsClient) DeleteRole(input *iam.DeleteRoleInput) (*iam.DeleteRoleOutput, error) {
+	return c.iamClient.DeleteRole(input)
+}
+
+func (c *awsClient) ListRolePolicies(input *iam.ListRolePoliciesInput) (*iam.ListRolePoliciesOutput, error) {
+	return c.iamClient.ListRolePolicies(input)
+}
+
+func (c *awsClient) DeleteRolePolicy(input *iam.DeleteRolePolicyInput) (*iam.DeleteRolePolicyOutput, error) {
+	return c.iamClient.DeleteRolePolicy(input)
+}
+
 func (c *awsClient) CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
 	return c.s3Client.CreateBucket(input)
 }
@@ -169,8 +199,28 @@ func (c *awsClient) PutBucketTagging(input *s3.PutBucketTaggingInput) (*s3.PutBu
 	return c.s3Client.PutBucketTagging(input)
 }
 
+func (c *awsClient) GetBucketTagging(input *s3.GetBucketTaggingInput) (*s3.GetBucketTaggingOutput, error) {
+	return c.s3Client.GetBucketTagging(input)
+}
+
+func (c *awsClient) DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error) {
+	return c.s3Client.DeleteBucket(input)
+}
+
 func (c *awsClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
 	return c.s3Client.PutObject(input)
+}
+
+func (c *awsClient) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
+	return c.s3Client.ListObjects(input)
+}
+
+func (c *awsClient) GetObjectTagging(input *s3.GetObjectTaggingInput) (*s3.GetObjectTaggingOutput, error) {
+	return c.s3Client.GetObjectTagging(input)
+}
+
+func (c *awsClient) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
+	return c.s3Client.DeleteObject(input)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
