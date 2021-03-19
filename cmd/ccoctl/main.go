@@ -17,6 +17,7 @@ func main() {
 	rootCmd.PersistentFlags().StringVar(&provisioning.CreateOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 
 	rootCmd.AddCommand(provisioning.NewCreateCmd())
+	rootCmd.AddCommand(provisioning.NewDeleteCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
