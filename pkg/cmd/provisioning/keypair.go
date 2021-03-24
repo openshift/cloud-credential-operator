@@ -28,13 +28,13 @@ func createKeys(prefixDir string) error {
 	log.Print("Generating RSA keypair")
 	privateKey, err := rsa.GenerateKey(rand.Reader, bitSize)
 	if err != nil {
-		return errors.Wrap(err, "Failed to generate private key")
+		return errors.Wrap(err, "failed to generate private key")
 	}
 
 	log.Print("Writing private key to ", privateKeyFilePath)
 	f, err := os.Create(privateKeyFilePath)
 	if err != nil {
-		return errors.Wrap(err, "Failed to create private key file")
+		return errors.Wrap(err, "failed to create private key file")
 	}
 
 	err = pem.Encode(f, &pem.Block{
@@ -44,18 +44,18 @@ func createKeys(prefixDir string) error {
 	})
 	f.Close()
 	if err != nil {
-		return errors.Wrap(err, "Failed to write out private key data")
+		return errors.Wrap(err, "failed to write out private key data")
 	}
 
 	log.Print("Writing public key to ", publicKeyFilePath)
 	f, err = os.Create(publicKeyFilePath)
 	if err != nil {
-		errors.Wrap(err, "Failed to create public key file")
+		errors.Wrap(err, "failed to create public key file")
 	}
 
 	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&privateKey.PublicKey)
 	if err != nil {
-		errors.Wrap(err, "Failed to generate public key from private")
+		errors.Wrap(err, "failed to generate public key from private")
 	}
 
 	err = pem.Encode(f, &pem.Block{
@@ -65,7 +65,7 @@ func createKeys(prefixDir string) error {
 	})
 	f.Close()
 	if err != nil {
-		errors.Wrap(err, "Failed to write out public key data")
+		errors.Wrap(err, "failed to write out public key data")
 	}
 	return nil
 }

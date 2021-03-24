@@ -69,88 +69,88 @@ type ClientParams struct {
 	CABundle  string
 }
 
-type AWSClient struct {
-	IAMClient iamiface.IAMAPI
-	S3Client  s3iface.S3API
+type awsClient struct {
+	iamClient iamiface.IAMAPI
+	s3Client  s3iface.S3API
 }
 
-func (c *AWSClient) CreateAccessKey(input *iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error) {
-	return c.IAMClient.CreateAccessKey(input)
+func (c *awsClient) CreateAccessKey(input *iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error) {
+	return c.iamClient.CreateAccessKey(input)
 }
 
-func (c *AWSClient) CreateUser(input *iam.CreateUserInput) (*iam.CreateUserOutput, error) {
-	return c.IAMClient.CreateUser(input)
+func (c *awsClient) CreateUser(input *iam.CreateUserInput) (*iam.CreateUserOutput, error) {
+	return c.iamClient.CreateUser(input)
 }
 
-func (c *AWSClient) DeleteAccessKey(input *iam.DeleteAccessKeyInput) (*iam.DeleteAccessKeyOutput, error) {
-	return c.IAMClient.DeleteAccessKey(input)
+func (c *awsClient) DeleteAccessKey(input *iam.DeleteAccessKeyInput) (*iam.DeleteAccessKeyOutput, error) {
+	return c.iamClient.DeleteAccessKey(input)
 }
 
-func (c *AWSClient) DeleteUser(input *iam.DeleteUserInput) (*iam.DeleteUserOutput, error) {
-	return c.IAMClient.DeleteUser(input)
+func (c *awsClient) DeleteUser(input *iam.DeleteUserInput) (*iam.DeleteUserOutput, error) {
+	return c.iamClient.DeleteUser(input)
 }
 
-func (c *AWSClient) DeleteUserPolicy(input *iam.DeleteUserPolicyInput) (*iam.DeleteUserPolicyOutput, error) {
-	return c.IAMClient.DeleteUserPolicy(input)
+func (c *awsClient) DeleteUserPolicy(input *iam.DeleteUserPolicyInput) (*iam.DeleteUserPolicyOutput, error) {
+	return c.iamClient.DeleteUserPolicy(input)
 }
-func (c *AWSClient) GetUser(input *iam.GetUserInput) (*iam.GetUserOutput, error) {
-	return c.IAMClient.GetUser(input)
-}
-
-func (c *AWSClient) ListAccessKeys(input *iam.ListAccessKeysInput) (*iam.ListAccessKeysOutput, error) {
-	return c.IAMClient.ListAccessKeys(input)
+func (c *awsClient) GetUser(input *iam.GetUserInput) (*iam.GetUserOutput, error) {
+	return c.iamClient.GetUser(input)
 }
 
-func (c *AWSClient) ListUserPolicies(input *iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error) {
-	return c.IAMClient.ListUserPolicies(input)
+func (c *awsClient) ListAccessKeys(input *iam.ListAccessKeysInput) (*iam.ListAccessKeysOutput, error) {
+	return c.iamClient.ListAccessKeys(input)
 }
 
-func (c *AWSClient) PutUserPolicy(input *iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error) {
-	return c.IAMClient.PutUserPolicy(input)
+func (c *awsClient) ListUserPolicies(input *iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error) {
+	return c.iamClient.ListUserPolicies(input)
 }
 
-func (c *AWSClient) GetUserPolicy(input *iam.GetUserPolicyInput) (*iam.GetUserPolicyOutput, error) {
-	return c.IAMClient.GetUserPolicy(input)
+func (c *awsClient) PutUserPolicy(input *iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error) {
+	return c.iamClient.PutUserPolicy(input)
 }
 
-func (c *AWSClient) SimulatePrincipalPolicy(input *iam.SimulatePrincipalPolicyInput) (*iam.SimulatePolicyResponse, error) {
-	return c.IAMClient.SimulatePrincipalPolicy(input)
+func (c *awsClient) GetUserPolicy(input *iam.GetUserPolicyInput) (*iam.GetUserPolicyOutput, error) {
+	return c.iamClient.GetUserPolicy(input)
 }
 
-func (c *AWSClient) SimulatePrincipalPolicyPages(input *iam.SimulatePrincipalPolicyInput, fn func(*iam.SimulatePolicyResponse, bool) bool) error {
-	return c.IAMClient.SimulatePrincipalPolicyPages(input, fn)
+func (c *awsClient) SimulatePrincipalPolicy(input *iam.SimulatePrincipalPolicyInput) (*iam.SimulatePolicyResponse, error) {
+	return c.iamClient.SimulatePrincipalPolicy(input)
 }
 
-func (c *AWSClient) TagUser(input *iam.TagUserInput) (*iam.TagUserOutput, error) {
-	return c.IAMClient.TagUser(input)
+func (c *awsClient) SimulatePrincipalPolicyPages(input *iam.SimulatePrincipalPolicyInput, fn func(*iam.SimulatePolicyResponse, bool) bool) error {
+	return c.iamClient.SimulatePrincipalPolicyPages(input, fn)
 }
 
-func (c *AWSClient) ListOpenIDConnectProviders(input *iam.ListOpenIDConnectProvidersInput) (*iam.ListOpenIDConnectProvidersOutput, error) {
-	return c.IAMClient.ListOpenIDConnectProviders(input)
+func (c *awsClient) TagUser(input *iam.TagUserInput) (*iam.TagUserOutput, error) {
+	return c.iamClient.TagUser(input)
 }
 
-func (c *AWSClient) CreateOpenIDConnectProvider(input *iam.CreateOpenIDConnectProviderInput) (*iam.CreateOpenIDConnectProviderOutput, error) {
-	return c.IAMClient.CreateOpenIDConnectProvider(input)
+func (c *awsClient) ListOpenIDConnectProviders(input *iam.ListOpenIDConnectProvidersInput) (*iam.ListOpenIDConnectProvidersOutput, error) {
+	return c.iamClient.ListOpenIDConnectProviders(input)
 }
 
-func (c *AWSClient) TagOpenIDConnectProvider(input *iam.TagOpenIDConnectProviderInput) (*iam.TagOpenIDConnectProviderOutput, error) {
-	return c.IAMClient.TagOpenIDConnectProvider(input)
+func (c *awsClient) CreateOpenIDConnectProvider(input *iam.CreateOpenIDConnectProviderInput) (*iam.CreateOpenIDConnectProviderOutput, error) {
+	return c.iamClient.CreateOpenIDConnectProvider(input)
 }
 
-func (c *AWSClient) GetOpenIDConnectProvider(input *iam.GetOpenIDConnectProviderInput) (*iam.GetOpenIDConnectProviderOutput, error) {
-	return c.IAMClient.GetOpenIDConnectProvider(input)
+func (c *awsClient) TagOpenIDConnectProvider(input *iam.TagOpenIDConnectProviderInput) (*iam.TagOpenIDConnectProviderOutput, error) {
+	return c.iamClient.TagOpenIDConnectProvider(input)
 }
 
-func (c *AWSClient) CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
-	return c.S3Client.CreateBucket(input)
+func (c *awsClient) GetOpenIDConnectProvider(input *iam.GetOpenIDConnectProviderInput) (*iam.GetOpenIDConnectProviderOutput, error) {
+	return c.iamClient.GetOpenIDConnectProvider(input)
 }
 
-func (c *AWSClient) PutBucketTagging(input *s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error) {
-	return c.S3Client.PutBucketTagging(input)
+func (c *awsClient) CreateBucket(input *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
+	return c.s3Client.CreateBucket(input)
 }
 
-func (c *AWSClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
-	return c.S3Client.PutObject(input)
+func (c *awsClient) PutBucketTagging(input *s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error) {
+	return c.s3Client.PutBucketTagging(input)
+}
+
+func (c *awsClient) PutObject(input *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	return c.s3Client.PutObject(input)
 }
 
 // NewClient creates our client wrapper object for the actual AWS clients we use.
@@ -188,8 +188,13 @@ func NewClient(accessKeyID, secretAccessKey []byte, params *ClientParams) (Clien
 		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Get().String(), agentText),
 	})
 
-	return &AWSClient{
-		IAMClient: iam.New(s),
-		S3Client:  s3.New(s),
-	}, nil
+	return NewClientFromSession(s), nil
+}
+
+// NewClientFromSession will return a basic Client using only the provided awsSession
+func NewClientFromSession(sess *session.Session) Client {
+	return &awsClient{
+		iamClient: iam.New(sess),
+		s3Client:  s3.New(sess),
+	}
 }

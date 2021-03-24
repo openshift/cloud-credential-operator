@@ -12,7 +12,8 @@ type options struct {
 	TargetDir     string
 	PublicKeyPath string
 	Region        string
-	InfraName     string
+	NamePrefix    string
+	DryRun        bool
 }
 
 var (
