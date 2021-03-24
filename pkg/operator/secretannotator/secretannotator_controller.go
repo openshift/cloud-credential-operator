@@ -24,6 +24,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/openstack"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/vsphere"
 	log "github.com/sirupsen/logrus"
 )
@@ -49,6 +50,8 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		return gcp.Add(mgr, gcp.NewReconciler(mgr, infraStatus.PlatformStatus.GCP.ProjectID))
 	case configv1.VSpherePlatformType:
 		return vsphere.Add(mgr, vsphere.NewReconciler(mgr))
+	case configv1.OpenStackPlatformType:
+		return openstack.Add(mgr, openstack.NewReconciler(mgr))
 	default: // returning the AWS implementation for default to avoid changing any behavior
 		return aws.Add(mgr, aws.NewReconciler(mgr))
 	}
