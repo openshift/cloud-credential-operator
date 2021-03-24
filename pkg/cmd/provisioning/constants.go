@@ -13,4 +13,16 @@ const (
 	ccoctlAWSResourceTagKeyPrefix = "openshift.io/cloud-credential-operator"
 	// ownedCcoctlAWSResourceTagValue is the value of the tag applied to the AWS resources created by ccoctl
 	ownedCcoctlAWSResourceTagValue = "owned"
+
+	// Generated files
+
+	// identity provider files
+	oidcBucketFilename          = "01-oidc-bucket.json"
+	oidcConfigurationFilename   = "02-openid-configuration"
+	oidcKeysFilename            = "03-keys.json"
+	iamIdentityProviderFilename = "04-iam-identity-provider.json"
+
+	// role files
+	roleFilenameFormat       = "05-%d-%s-role.json"
+	rolePolicyFilenameFormat = "06-%d-%s-policy.json"
 )

@@ -9,11 +9,13 @@ import (
 )
 
 type options struct {
-	TargetDir     string
-	PublicKeyPath string
-	Region        string
-	NamePrefix    string
-	DryRun        bool
+	TargetDir           string
+	PublicKeyPath       string
+	Region              string
+	NamePrefix          string
+	CredRequestDir      string
+	IdentityProviderARN string
+	DryRun              bool
 }
 
 var (
@@ -35,6 +37,7 @@ func NewCreateCmd() *cobra.Command {
 
 	createCmd.AddCommand(NewKeyProvision())
 	createCmd.AddCommand(NewIdentityProviderSetup())
+	createCmd.AddCommand(NewIAMRolesSetup())
 
 	return createCmd
 }
