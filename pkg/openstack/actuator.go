@@ -37,10 +37,6 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
-const (
-	rootOpenStackCredsSecretKey = "clouds.yaml"
-)
-
 type OpenStackActuator struct {
 	Client client.Client
 	Codec  *minterv1.ProviderCodec
@@ -104,10 +100,13 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 		return err
 	}
 
-	clouds, err := a.getRootCloudCredentialsSecretData(credentialsRootSecret, logger)
+	clouds, err := GetRootCloudCredentialsSecretData(credentialsRootSecret, logger)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
-		return err
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.InsufficientCloudCredentials,
+			Message:   err.Error(),
+		}
 	}
 
 	logger.Debugf("provisioning secret")
@@ -153,7 +152,7 @@ func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest
 					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 				},
 			},
-			Data: map[string][]byte{rootOpenStackCredsSecretKey: []byte(clouds)},
+			Data: map[string][]byte{RootOpenStackCredsSecretKey: []byte(clouds)},
 		}
 
 		err := a.Client.Create(context.TODO(), secret)
@@ -173,7 +172,7 @@ func (a *OpenStackActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest
 	}
 	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
 	if clouds != "" {
-		existingSecret.Data[rootOpenStackCredsSecretKey] = []byte(clouds)
+		existingSecret.Data[RootOpenStackCredsSecretKey] = []byte(clouds)
 	}
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
@@ -208,8 +207,8 @@ func (a *OpenStackActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) 
 		}
 	}
 
-	if _, ok := existingSecret.Data[rootOpenStackCredsSecretKey]; !ok {
-		logger.Warning("secret did not have expected key: " + rootOpenStackCredsSecretKey)
+	if _, ok := existingSecret.Data[RootOpenStackCredsSecretKey]; !ok {
+		logger.Warning("secret did not have expected key: " + RootOpenStackCredsSecretKey)
 	} else {
 		logger.Debug("found clouds.yaml in existing secret")
 	}
@@ -234,24 +233,6 @@ func (a *OpenStackActuator) GetCredentialsRootSecret(ctx context.Context, cr *mi
 		}
 	}
 	return cloudCredSecret, nil
-}
-
-func (a *OpenStackActuator) getRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, logger log.FieldLogger) (string, error) {
-	var clouds string
-
-	keyBytes, ok := cloudCredSecret.Data[rootOpenStackCredsSecretKey]
-	if !ok {
-		logger.Warning("secret did not have expected key: " + rootOpenStackCredsSecretKey)
-		return "", &actuatoriface.ActuatorError{
-			ErrReason: minterv1.InsufficientCloudCredentials,
-			Message:   fmt.Sprintf("secret did not have expected key: %v", rootOpenStackCredsSecretKey),
-		}
-	}
-
-	clouds = string(keyBytes)
-	logger.Debug("found clouds.yaml in target secret")
-
-	return clouds, nil
 }
 
 // Delete credentials
