@@ -279,6 +279,15 @@ type ProviderLoadBalancerParameters struct {
 	//
 	// +optional
 	AWS *AWSLoadBalancerParameters `json:"aws,omitempty"`
+
+	// gcp provides configuration settings that are specific to GCP
+	// load balancers.
+	//
+	// If empty, defaults will be applied. See specific gcp fields for
+	// details about their defaults.
+	//
+	// +optional
+	GCP *GCPLoadBalancerParameters `json:"gcp,omitempty"`
 }
 
 // LoadBalancerProviderType is the underlying infrastructure provider for the
@@ -342,6 +351,39 @@ type AWSLoadBalancerType string
 const (
 	AWSClassicLoadBalancer AWSLoadBalancerType = "Classic"
 	AWSNetworkLoadBalancer AWSLoadBalancerType = "NLB"
+)
+
+// GCPLoadBalancerParameters provides configuration settings that are
+// specific to GCP load balancers.
+type GCPLoadBalancerParameters struct {
+	// clientAccess describes how client access is restricted for internal
+	// load balancers.
+	//
+	// Valid values are:
+	// * "Global": Specifying an internal load balancer with Global client access
+	//   allows clients from any region within the VPC to communicate with the load
+	//   balancer.
+	//
+	//     https://cloud.google.com/kubernetes-engine/docs/how-to/internal-load-balancing#global_access
+	//
+	// * "Local": Specifying an internal load balancer with Local client access
+	//   means only clients within the same region (and VPC) as the GCP load balancer
+	//   can communicate with the load balancer. Note that this is the default behavior.
+	//
+	//     https://cloud.google.com/load-balancing/docs/internal#client_access
+	//
+	// +optional
+	ClientAccess GCPClientAccess `json:"clientAccess,omitempty"`
+}
+
+// GCPClientAccess describes how client access is restricted for internal
+// load balancers.
+// +kubebuilder:validation:Enum=Global;Local
+type GCPClientAccess string
+
+const (
+	GCPGlobalAccess GCPClientAccess = "Global"
+	GCPLocalAccess  GCPClientAccess = "Local"
 )
 
 // AWSClassicLoadBalancerParameters holds configuration parameters for an
@@ -815,6 +857,16 @@ type IngressControllerHTTPUniqueIdHeaderPolicy struct {
 	Format string `json:"format,omitempty"`
 }
 
+// IngressControllerHTTPHeaderNameCaseAdjustment is the name of an HTTP header
+// (for example, "X-Forwarded-For") in the desired capitalization.  The value
+// must be a valid HTTP header name as defined in RFC 2616 section 4.2.
+//
+// +optional
+// +kubebuilder:validation:Pattern="^$|^[-!#$%&'*+.0-9A-Z^_`a-z|~]+$"
+// +kubebuilder:validation:MinLength=0
+// +kubebuilder:validation:MaxLength=1024
+type IngressControllerHTTPHeaderNameCaseAdjustment string
+
 // IngressControllerHTTPHeaders specifies how the IngressController handles
 // certain HTTP headers.
 type IngressControllerHTTPHeaders struct {
@@ -851,6 +903,26 @@ type IngressControllerHTTPHeaders struct {
 	//
 	// +optional
 	UniqueId IngressControllerHTTPUniqueIdHeaderPolicy `json:"uniqueId,omitempty"`
+
+	// headerNameCaseAdjustments specifies case adjustments that can be
+	// applied to HTTP header names.  Each adjustment is specified as an
+	// HTTP header name with the desired capitalization.  For example,
+	// specifying "X-Forwarded-For" indicates that the "x-forwarded-for"
+	// HTTP header should be adjusted to have the specified capitalization.
+	//
+	// These adjustments are only applied to cleartext, edge-terminated, and
+	// re-encrypt routes, and only when using HTTP/1.
+	//
+	// For request headers, these adjustments are applied only for routes
+	// that have the haproxy.router.openshift.io/h1-adjust-case=true
+	// annotation.  For response headers, these adjustments are applied to
+	// all HTTP responses.
+	//
+	// If this field is empty, no request headers are adjusted.
+	//
+	// +nullable
+	// +optional
+	HeaderNameCaseAdjustments []IngressControllerHTTPHeaderNameCaseAdjustment `json:"headerNameCaseAdjustments,omitempty"`
 }
 
 var (
