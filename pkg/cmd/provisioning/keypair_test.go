@@ -41,6 +41,11 @@ func TestKeyPair(t *testing.T) {
 				require.NoError(t, err, "unexpected error reading in test private key data")
 
 				assert.Equal(t, []byte("some data"), fileData, "unexpected change in test private key data")
+
+				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, tlsDirName, boundSAKeyFilename))
+				require.NoError(t, err, "unexpected error reading in copied file %s/%s", tlsDirName, boundSAKeyFilename)
+
+				assert.Equal(t, []byte("some data"), tlsFileData, "unexpected file contents for %s/%s", tlsDirName, boundSAKeyFilename)
 			},
 		},
 		{
@@ -76,6 +81,11 @@ func TestKeyPair(t *testing.T) {
 				})
 
 				assert.Equal(t, pubFileBytes, calculatedPubKeyBytes, "Missmatch between written public key file and caluclated public key (from private key)")
+
+				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, tlsDirName, boundSAKeyFilename))
+				require.NoError(t, err, "unexpected error reading in copied file %s/%s", tlsDirName, boundSAKeyFilename)
+
+				assert.Equal(t, privFile, tlsFileData, "unexpected file contents for %s/%s", tlsDirName, boundSAKeyFilename)
 
 			},
 		},

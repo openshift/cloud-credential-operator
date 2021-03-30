@@ -5,10 +5,12 @@ import (
 	"log"
 	"path"
 
+	"github.com/spf13/cobra"
+
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
-	"github.com/spf13/cobra"
 )
 
 func allCmd(cmd *cobra.Command, args []string) {

@@ -14,6 +14,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
+const boundSAKeyFilename = "bound-service-account-signing-key.key"
+
 func createKeys(prefixDir string) error {
 
 	privateKeyFilePath := filepath.Join(prefixDir, privateKeyFile)
@@ -75,7 +77,7 @@ func createKeys(prefixDir string) error {
 }
 
 func copyPrivateKeyForInstaller(sourceFile, prefixDir string) {
-	privateKeyForInstaller := filepath.Join(prefixDir, tlsDirName, "bound-service-account-signing-key.key")
+	privateKeyForInstaller := filepath.Join(prefixDir, tlsDirName, boundSAKeyFilename)
 
 	log.Print("Copying signing key for use by installer")
 	from, err := os.Open(sourceFile)
