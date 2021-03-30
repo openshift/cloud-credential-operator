@@ -4,9 +4,9 @@ To assist with the creating and maintenance of cloud credentials from outside of
 
 ## Global flags
 
-By default, the tool will output to the directory the command(s) were run in. To specify a directory, use the `--target-dir` flag.
+By default, the tool will output to the directory the command(s) were run in. To specify a directory, use the `--output-dir` flag.
 
-Commands which would otherwise make AWS API calls can be passed the `--generate-files-only` flag to have `ccoctl` place JSON files on the local filesystem instead of creating/modifying any AWS resources. These JSON files can be reviewed/modified and then applied with the aws CLI tool (using the `--cli-input-json` parameters).
+Commands which would otherwise make AWS API calls can be passed the `--dry-run` flag to have `ccoctl` place JSON files on the local filesystem instead of creating/modifying any AWS resources. These JSON files can be reviewed/modified and then applied with the aws CLI tool (using the `--cli-input-json` parameters).
 
 ## Creating RSA keys
 
