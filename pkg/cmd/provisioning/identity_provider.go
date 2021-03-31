@@ -417,7 +417,7 @@ func isExistingIdentifyProvider(client aws.Client, providerARN, namePrefix strin
 	}
 
 	for _, tag := range provider.Tags {
-		if tag.Key == awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)) {
+		if *tag.Key == fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix) {
 			return true, nil
 		}
 	}
