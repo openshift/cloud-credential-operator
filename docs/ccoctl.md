@@ -46,3 +46,14 @@ $ ccoctl create iam-roles --name-prefix=<name-prefix> --region=<aws-region> --cr
 ```
 
 This will create one IAM Role for each CredentialsRequest with a trust policy tied to the provided Identity Provider, and a permissions policy as defined in each CredentialsRequest object from the OpenShift release image.
+
+## Deleting resources
+
+To delete resources created by ccoctl, run
+
+```bash
+$ ccoctl delete --name-prefix=<name-prefix> --region=<aws-region>
+
+```
+
+where `name-prefix` is the name used to tag and account cloud resources that were created. `region` is the aws region in which cloud resources were created.
