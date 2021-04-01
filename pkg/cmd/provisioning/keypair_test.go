@@ -26,10 +26,9 @@ func TestKeyPair(t *testing.T) {
 		{
 			name: "private key file exists",
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), keypairTestDirPrefix)
-				require.NoError(t, err, "Failed to create temp directory")
+				tempDirName := prepTempDir(t)
 
-				err = ioutil.WriteFile(filepath.Join(tempDirName, privateKeyFile), []byte("some data"), 0600)
+				err := ioutil.WriteFile(filepath.Join(tempDirName, privateKeyFile), []byte("some data"), 0600)
 				require.NoError(t, err, "errored while setting up environment for test")
 
 				return tempDirName
@@ -42,13 +41,17 @@ func TestKeyPair(t *testing.T) {
 				require.NoError(t, err, "unexpected error reading in test private key data")
 
 				assert.Equal(t, []byte("some data"), fileData, "unexpected change in test private key data")
+
+				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, tlsDirName, boundSAKeyFilename))
+				require.NoError(t, err, "unexpected error reading in copied file %s/%s", tlsDirName, boundSAKeyFilename)
+
+				assert.Equal(t, []byte("some data"), tlsFileData, "unexpected file contents for %s/%s", tlsDirName, boundSAKeyFilename)
 			},
 		},
 		{
 			name: "generate keys",
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), keypairTestDirPrefix)
-				require.NoError(t, err, "Failed to create temp directory")
+				tempDirName := prepTempDir(t)
 
 				return tempDirName
 			},
@@ -79,6 +82,11 @@ func TestKeyPair(t *testing.T) {
 
 				assert.Equal(t, pubFileBytes, calculatedPubKeyBytes, "Missmatch between written public key file and caluclated public key (from private key)")
 
+				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, tlsDirName, boundSAKeyFilename))
+				require.NoError(t, err, "unexpected error reading in copied file %s/%s", tlsDirName, boundSAKeyFilename)
+
+				assert.Equal(t, privFile, tlsFileData, "unexpected file contents for %s/%s", tlsDirName, boundSAKeyFilename)
+
 			},
 		},
 	}
@@ -98,4 +106,16 @@ func TestKeyPair(t *testing.T) {
 			}
 		})
 	}
+}
+
+func prepTempDir(t *testing.T) string {
+	tempDirName, err := ioutil.TempDir(os.TempDir(), keypairTestDirPrefix)
+
+	require.NoError(t, err, "unexpected error setting up temp directory")
+
+	tlsDir := filepath.Join(tempDirName, tlsDirName)
+	err = os.Mkdir(tlsDir, 0770)
+	require.NoError(t, err, "errored trying to create temp tls dir")
+
+	return tempDirName
 }

@@ -162,7 +162,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
 
-			err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName, test.generateOnly)
+			_, err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName, test.generateOnly)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")

@@ -47,6 +47,8 @@ $ ccoctl create iam-roles --name-prefix=<name-prefix> --region=<aws-region> --cr
 
 This will create one IAM Role for each CredentialsRequest with a trust policy tied to the provided Identity Provider, and a permissions policy as defined in each CredentialsRequest object from the OpenShift release image.
 
+It will also populate the `<output-dir>/manifests` directory with Secret files for each CredentialsRequest that was processed. These can be provided to the installer so that the appropriate Secrets are available for each in-cluster component needing to make cloud API calls.
+
 ## Deleting resources
 
 To delete resources created by ccoctl, run
