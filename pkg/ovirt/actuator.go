@@ -40,7 +40,6 @@ const (
 	urlKey      = "ovirt_url"
 	usernameKey = "ovirt_username"
 	passwordKey = "ovirt_password"
-	cafileKey   = "ovirt_cafile"
 	insecureKey = "ovirt_insecure"
 	cabundleKey = "ovirt_ca_bundle"
 )
@@ -53,8 +52,7 @@ type OvirtActuator struct {
 type OvirtCreds struct {
 	URL      string `json:"ovirt_url"`
 	Username string `json:"ovirt_username"`
-	Passord  string `json:"ovirt_password"`
-	CAFile   string `json:"ovirt_cafile"`
+	Password string `json:"ovirt_password"`
 	CABundle string `json:"ovirt_ca_bundle"`
 	Insecure bool   `json:"ovirt_insecure"`
 }
@@ -233,9 +231,6 @@ func (a *OvirtActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*co
 	if _, ok := loadedSecret.Data[passwordKey]; !ok {
 		logger.Warningf("secret did not have expected key: %s", passwordKey)
 	}
-	if _, ok := loadedSecret.Data[cafileKey]; !ok {
-		logger.Warningf("secret did not have expected key: %s", cafileKey)
-	}
 	if _, ok := loadedSecret.Data[cabundleKey]; !ok {
 		logger.Warningf("secret did not have expected key: %s", cabundleKey)
 	}
@@ -291,10 +286,6 @@ func secretToCreds(secret *corev1.Secret) (OvirtCreds, error) {
 	if !ok {
 		return c, fmt.Errorf("missing field %s", passwordKey)
 	}
-	cafile, ok := secret.Data[cafileKey]
-	if !ok {
-		return c, fmt.Errorf("missing field %s", cafileKey)
-	}
 	insecure, ok := secret.Data[insecureKey]
 	if !ok {
 		return c, fmt.Errorf("missing field %s", insecureKey)
@@ -306,8 +297,7 @@ func secretToCreds(secret *corev1.Secret) (OvirtCreds, error) {
 
 	c.URL = string(url)
 	c.Username = string(username)
-	c.Passord = string(password)
-	c.CAFile = string(cafile)
+	c.Password = string(password)
 	parse, err := strconv.ParseBool(string(insecure))
 	if err != nil {
 		return c, fmt.Errorf("failed to parse filed: insecure to boolean from value: %v error: %s", insecure, err)
@@ -351,8 +341,7 @@ func secretDataFrom(ovirtCreds *OvirtCreds) map[string][]byte {
 	return map[string][]byte{
 		urlKey:      []byte(ovirtCreds.URL),
 		usernameKey: []byte(ovirtCreds.Username),
-		passwordKey: []byte(ovirtCreds.Passord),
-		cafileKey:   []byte(ovirtCreds.CAFile),
+		passwordKey: []byte(ovirtCreds.Password),
 		insecureKey: []byte(strconv.FormatBool(ovirtCreds.Insecure)),
 		cabundleKey: []byte(ovirtCreds.CABundle),
 	}
