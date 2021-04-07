@@ -8,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -193,9 +194,14 @@ func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.Cred
 				PolicyDocument: awssdk.String(rolePolicyDocument),
 			})
 			if err != nil {
-				return "", errors.Wrap(err, "Faled to update Role Policy")
+				return "", errors.Wrap(err, "failed to update Role Policy document")
 			}
 			log.Printf("Updated Role policy document for role %s", *role.RoleName)
+
+			rolePolicy, err = updateRolePolicy(awsClient, *role.RoleName, awsProviderSpec.StatementEntries)
+			if err != nil {
+				return "", errors.Wrap(err, "failed to update Role Policy")
+			}
 		}
 
 		_, err = awsClient.PutRolePolicy(&iam.PutRolePolicyInput{
@@ -204,7 +210,7 @@ func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.Cred
 			PolicyDocument: awssdk.String(rolePolicy),
 		})
 		if err != nil {
-			return "", errors.Wrap(err, "Failed to put role policy")
+			return "", errors.Wrap(err, "failed to put role policy")
 		}
 		log.Printf("Updated Role policy for Role %s", *role.RoleName)
 
@@ -335,6 +341,48 @@ func createRolePolicy(statements []credreqv1.StatementEntry) string {
 	}
 
 	return string(b)
+}
+
+func updateRolePolicy(awsClient aws.Client, roleName string, newPolicyStatements []credreqv1.StatementEntry) (string, error) {
+	existingPolicy, err := awsClient.GetRolePolicy(&iam.GetRolePolicyInput{
+		RoleName:   awssdk.String(roleName),
+		PolicyName: awssdk.String(roleName),
+	})
+	if err != nil {
+		log.Print(err)
+		return "", errors.Wrapf(err, "failed to get policy for the role %s", roleName)
+	}
+
+	existingPolicyDocument := PolicyDocument{
+		Version:   "2012-10-17",
+		Statement: []StatementEntry{},
+	}
+	err = json.Unmarshal([]byte(*existingPolicy.PolicyDocument), &existingPolicyDocument)
+	if err != nil {
+		log.Print(err)
+		return "", errors.Wrapf(err, "failed to unmarshal the existing policy for the role %s", roleName)
+	}
+
+	// if existing and new policies are not equal, add statements in the new policy to the existing policy
+	if !reflect.DeepEqual(newPolicyStatements, existingPolicyDocument.Statement) {
+		for _, entry := range newPolicyStatements {
+			existingPolicyDocument.Statement = append(existingPolicyDocument.Statement,
+				StatementEntry{
+					Effect:    entry.Effect,
+					Action:    entry.Action,
+					Resource:  entry.Resource,
+					Condition: entry.PolicyCondition,
+				})
+		}
+	}
+
+	b, err := json.Marshal(&existingPolicyDocument)
+	if err != nil {
+		log.Print(err)
+		return "", errors.Wrapf(err, "failed to marshal the updated policy to JSON")
+	}
+
+	return string(b), nil
 }
 
 // writeCredReqSecret will take a credentialsRequest and a Role ARN and store

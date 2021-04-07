@@ -21,6 +21,9 @@ const (
 	testIdentityProviderARN = "arn:aws:iam::123456789012:oidc-provider/testing123-oidc.s3.amazonaws.com"
 	testIdentityProviderURL = "testing123-oidc.s3.amazonaws.com"
 	testNamePrefix          = "test-cluster1"
+	testRoleName            = "test-role-name"
+	testPolicyName          = "test-policy-name"
+	testRolePolicy          = "{\"Version\": \"2012-10-17\",\"Statement\": [{\"Action\": [\"s3:*\"],\"Effect\": \"Allow\",\"Resource\": \"*\"}]}"
 )
 
 func TestIAMRoles(t *testing.T) {
@@ -141,6 +144,7 @@ func TestIAMRoles(t *testing.T) {
 				roleName := fmt.Sprintf("%s-namespace1-secretName1", testNamePrefix)
 				mockGetRoleExists(mockAWSClient, roleName)
 				mockUpdateAssumeRolePolicy(mockAWSClient)
+				mockGetRolePolicy(mockAWSClient)
 				mockPutRolePolicy(mockAWSClient)
 				return mockAWSClient
 			},
@@ -262,6 +266,16 @@ func mockCreateRole(mockAWSClient *mockaws.MockClient, roleName string) {
 func mockFailedCreateRole(mockAWSClient *mockaws.MockClient, roleName string) {
 	mockAWSClient.EXPECT().CreateRole(gomock.Any()).Return(
 		&iam.CreateRoleOutput{}, fmt.Errorf("test error on role create"),
+	).Times(1)
+}
+
+func mockGetRolePolicy(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetRolePolicy(gomock.Any()).Return(
+		&iam.GetRolePolicyOutput{
+			RoleName:       awssdk.String(testRoleName),
+			PolicyName:     awssdk.String(testPolicyName),
+			PolicyDocument: awssdk.String(testRolePolicy),
+		}, nil,
 	).Times(1)
 }
 

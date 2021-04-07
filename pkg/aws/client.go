@@ -55,6 +55,7 @@ type Client interface {
 	ListOpenIDConnectProviders(*iam.ListOpenIDConnectProvidersInput) (*iam.ListOpenIDConnectProvidersOutput, error)
 	DeleteOpenIDConnectProvider(input *iam.DeleteOpenIDConnectProviderInput) (*iam.DeleteOpenIDConnectProviderOutput, error)
 	ListUserPolicies(*iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error)
+	GetRolePolicy(input *iam.GetRolePolicyInput) (*iam.GetRolePolicyOutput, error)
 	PutRolePolicy(*iam.PutRolePolicyInput) (*iam.PutRolePolicyOutput, error)
 	PutUserPolicy(*iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error)
 	SimulatePrincipalPolicy(*iam.SimulatePrincipalPolicyInput) (*iam.SimulatePolicyResponse, error)
@@ -121,6 +122,10 @@ func (c *awsClient) ListAccessKeys(input *iam.ListAccessKeysInput) (*iam.ListAcc
 
 func (c *awsClient) ListUserPolicies(input *iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error) {
 	return c.iamClient.ListUserPolicies(input)
+}
+
+func (c *awsClient) GetRolePolicy(input *iam.GetRolePolicyInput) (*iam.GetRolePolicyOutput, error) {
+	return c.iamClient.GetRolePolicy(input)
 }
 
 func (c *awsClient) PutRolePolicy(input *iam.PutRolePolicyInput) (*iam.PutRolePolicyOutput, error) {
