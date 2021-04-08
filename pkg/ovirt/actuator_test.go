@@ -62,7 +62,6 @@ func TestConvertRootCredentials(t *testing.T) {
 					"ovirt_url":       []byte("https://enginefqdn/ovirt-engine/api"),
 					"ovirt_username":  []byte("admin@internal"),
 					"ovirt_password":  []byte("secret"),
-					"ovirt_cafile":    []byte("/etc/pki/ovirt-engine/ca.pem"),
 					"ovirt_ca_bundle": []byte(ca_bundle),
 					"ovirt_insecure":  []byte("true"),
 				},
@@ -72,8 +71,7 @@ func TestConvertRootCredentials(t *testing.T) {
 			expectedCreds: OvirtCreds{
 				URL:      "https://enginefqdn/ovirt-engine/api",
 				Username: "admin@internal",
-				Passord:  "secret",
-				CAFile:   "/etc/pki/ovirt-engine/ca.pem",
+				Password: "secret",
 				CABundle: ca_bundle,
 				Insecure: true,
 			},
@@ -90,8 +88,7 @@ func TestConvertRootCredentials(t *testing.T) {
 			expectedCreds: OvirtCreds{
 				URL:      "",
 				Username: "",
-				Passord:  "",
-				CAFile:   "",
+				Password: "",
 				Insecure: false,
 			},
 			expectedToFail: true,
