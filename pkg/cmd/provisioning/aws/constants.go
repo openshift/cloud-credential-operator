@@ -1,4 +1,4 @@
-package provisioning
+package aws
 
 const (
 	// privateKeyFile is the name of the private key file created by "ccoctl create key-pair" command
@@ -13,6 +13,8 @@ const (
 	ccoctlAWSResourceTagKeyPrefix = "openshift.io/cloud-credential-operator"
 	// ownedCcoctlAWSResourceTagValue is the value of the tag applied to the AWS resources created by ccoctl
 	ownedCcoctlAWSResourceTagValue = "owned"
+	// nameTagKey is the key of the "Name" tag applied to the AWS resources created by ccoctl
+	nameTagKey = "Name"
 
 	// Generated files
 

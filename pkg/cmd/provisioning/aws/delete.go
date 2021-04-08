@@ -1,4 +1,4 @@
-package provisioning
+package aws
 
 import (
 	"fmt"
@@ -179,21 +179,21 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 	}
 
 	awsClient := aws.NewClientFromSession(s)
-	bucketName := fmt.Sprintf("%s-oidc", DeleteOpts.NamePrefix)
+	bucketName := fmt.Sprintf("%s-oidc", DeleteOpts.Name)
 
-	if err := deleteOIDCObjectsFromBucket(awsClient, bucketName, DeleteOpts.NamePrefix); err != nil {
+	if err := deleteOIDCObjectsFromBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
 		log.Print(err)
 	}
 
-	if err := deleteOIDCBucket(awsClient, bucketName, DeleteOpts.NamePrefix); err != nil {
+	if err := deleteOIDCBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
 		log.Print(err)
 	}
 
-	if err := deleteIAMRoles(awsClient, DeleteOpts.NamePrefix); err != nil {
+	if err := deleteIAMRoles(awsClient, DeleteOpts.Name); err != nil {
 		log.Print(err)
 	}
 
-	if err := deleteIAMIdentityProvider(awsClient, DeleteOpts.NamePrefix); err != nil {
+	if err := deleteIAMIdentityProvider(awsClient, DeleteOpts.Name); err != nil {
 		log.Print(err)
 	}
 }
@@ -201,15 +201,14 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 // NewDeleteCmd implements the "delete" command for the credentials provisioning
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
-		Use:              "delete",
-		Short:            "Delete credentials objects",
-		Long:             "Deleting objects related to cloud credentials",
-		PersistentPreRun: initEnv,
-		Run:              deleteCmd,
+		Use:   "delete",
+		Short: "Delete credentials objects",
+		Long:  "Deleting objects related to cloud credentials",
+		Run:   deleteCmd,
 	}
 
-	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.NamePrefix, "name-prefix", "", "User-defined name prefix for all created AWS resources (can be separate from the cluster's infra-id)")
-	deleteCmd.MarkPersistentFlagRequired("name-prefix")
+	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Name, "name", "", "User-defined name for all created AWS resources (can be separate from the cluster's infra-id)")
+	deleteCmd.MarkPersistentFlagRequired("name")
 	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Region, "region", "", "AWS region where the resources were created")
 	deleteCmd.MarkPersistentFlagRequired("region")
 

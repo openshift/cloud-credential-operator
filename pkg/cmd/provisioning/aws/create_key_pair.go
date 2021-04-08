@@ -1,4 +1,4 @@
-package provisioning
+package aws
 
 import (
 	"crypto/rand"
@@ -12,9 +12,19 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 const boundSAKeyFilename = "bound-service-account-signing-key.key"
+
+var (
+	// CreateKeyPairOpts captures the options that affect creation
+	// of the key pair.
+	CreateKeyPairOpts = options{
+		TargetDir: "",
+	}
+)
 
 func createKeys(prefixDir string) error {
 
@@ -98,19 +108,54 @@ func copyPrivateKeyForInstaller(sourceFile, prefixDir string) {
 	}
 }
 
-func keyCmd(cmd *cobra.Command, args []string) {
-	err := createKeys(CreateOpts.TargetDir)
+func CreateKeyPairCmd(cmd *cobra.Command, args []string) {
+	err := createKeys(CreateKeyPairOpts.TargetDir)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-// NewKeyProvision provides the "create key-pair" subcommand
-func NewKeyProvision() *cobra.Command {
-	keyProvisionCmd := &cobra.Command{
-		Use: "key-pair",
-		Run: keyCmd,
+// initEnvForCreateKeyPairCmd will ensure the destination directory is ready to receive the generated
+// files, and will create the directory if necessary.
+func initEnvForCreateKeyPairCmd(cmd *cobra.Command, args []string) {
+	if CreateKeyPairOpts.TargetDir == "" {
+		pwd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("Failed to get current directory: %s", err)
+		}
+
+		CreateKeyPairOpts.TargetDir = pwd
 	}
 
-	return keyProvisionCmd
+	fPath, err := filepath.Abs(CreateKeyPairOpts.TargetDir)
+	if err != nil {
+		log.Fatalf("Failed to resolve full path: %s", err)
+	}
+
+	// create target dir if necessary
+	err = provisioning.EnsureDir(fPath)
+	if err != nil {
+		log.Fatalf("failed to create target directory at %s", fPath)
+	}
+
+	// create tls dir if necessary
+	tlsDir := filepath.Join(fPath, tlsDirName)
+	err = provisioning.EnsureDir(tlsDir)
+	if err != nil {
+		log.Fatalf("failed to create tls directory at %s", tlsDir)
+	}
+}
+
+// NewCreateKeyPairCmd provides the "create-key-pair" subcommand
+func NewCreateKeyPairCmd() *cobra.Command {
+	CreateKeyPairCmd := &cobra.Command{
+		Use:              "create-key-pair",
+		Short:            "Create a key pair",
+		Run:              CreateKeyPairCmd,
+		PersistentPreRun: initEnvForCreateKeyPairCmd,
+	}
+
+	CreateKeyPairCmd.PersistentFlags().StringVar(&CreateKeyPairOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+
+	return CreateKeyPairCmd
 }
