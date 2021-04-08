@@ -19,9 +19,11 @@ package cmd
 import (
 	"context"
 	"flag"
+	"io/ioutil"
 	golog "log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 	"time"
 
@@ -34,6 +36,8 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
 	"github.com/openshift/cloud-credential-operator/pkg/util"
+
+	"github.com/openshift/library-go/pkg/controller/fileobserver"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
@@ -49,6 +53,9 @@ import (
 const (
 	defaultLogLevel         = "info"
 	leaderElectionConfigMap = "cloud-credential-operator-leader"
+
+	caConfigMapMountPath = "/var/run/configmaps/trusted-ca-bundle"
+	caConfigMapName      = "tls-ca-bundle.pem"
 )
 
 type ControllerManagerOptions struct {
@@ -112,6 +119,12 @@ func NewOperator() *cobra.Command {
 			// use a Go context so we can tell the leaderelection code when we want to step down
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
+
+			// If optional cco-trusted-ca configmap exists, run a file observer to watch for changes
+			caConfigMapPath := filepath.Join(caConfigMapMountPath, caConfigMapName)
+			if _, err := os.Stat(caConfigMapPath); err == nil {
+				terminateWhenProxyChanges(caConfigMapPath, cancel, ctx.Done())
+			}
 
 			// listen for interrupts or the Linux SIGTERM signal and cancel
 			// our context, which the leader election code will observe and
@@ -195,4 +208,40 @@ type glogWriter struct{}
 func (writer glogWriter) Write(data []byte) (n int, err error) {
 	glog.Info(string(data))
 	return len(data), nil
+}
+
+func terminateWhenProxyChanges(path string, cancel context.CancelFunc, done <-chan struct{}) {
+	// read the contents of the configmap
+	fileContents := map[string][]byte{}
+	var filenames []string
+	fileBytes, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.WithError(err).Fatal("Unable to read proxy CA config map")
+	}
+	fileContents[path] = fileBytes
+	filenames = append(filenames, path)
+
+	// create the file observer
+	obs, err := fileobserver.NewObserver(10 * time.Second)
+	if err != nil {
+		log.WithError(err).Fatal("could not set up file observer for proxy CA change")
+	}
+
+	// add reactor for proxy files
+	obs.AddReactor(
+		func(file string, action fileobserver.ActionType) error {
+			log.Info("Proxy CA configmap change detected, restarting pod")
+			cancel()
+			return nil
+		},
+		fileContents,
+		filenames...,
+	)
+
+	// run the file observer
+	go func() {
+		log.WithField("file", path).Info("running file observer")
+		obs.Run(done)
+		log.Fatal("file observer stopped")
+	}()
 }
