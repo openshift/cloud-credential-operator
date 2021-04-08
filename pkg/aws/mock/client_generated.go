@@ -319,6 +319,21 @@ func (mr *MockClientMockRecorder) ListUserPolicies(arg0 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserPolicies", reflect.TypeOf((*MockClient)(nil).ListUserPolicies), arg0)
 }
 
+// GetRolePolicy mocks base method
+func (m *MockClient) GetRolePolicy(input *iam.GetRolePolicyInput) (*iam.GetRolePolicyOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRolePolicy", input)
+	ret0, _ := ret[0].(*iam.GetRolePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRolePolicy indicates an expected call of GetRolePolicy
+func (mr *MockClientMockRecorder) GetRolePolicy(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRolePolicy", reflect.TypeOf((*MockClient)(nil).GetRolePolicy), input)
+}
+
 // PutRolePolicy mocks base method
 func (m *MockClient) PutRolePolicy(arg0 *iam.PutRolePolicyInput) (*iam.PutRolePolicyOutput, error) {
 	m.ctrl.T.Helper()
