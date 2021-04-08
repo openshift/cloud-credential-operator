@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/aws"
 )
 
 func main() {
@@ -14,10 +14,7 @@ func main() {
 		Short: "OpenShift credentials provisioning tool",
 	}
 
-	rootCmd.PersistentFlags().StringVar(&provisioning.CreateOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
-
-	rootCmd.AddCommand(provisioning.NewCreateCmd())
-	rootCmd.AddCommand(provisioning.NewDeleteCmd())
+	rootCmd.AddCommand(aws.NewAWSCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)

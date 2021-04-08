@@ -1,4 +1,4 @@
-package provisioning
+package aws
 
 import (
 	"crypto/x509"
