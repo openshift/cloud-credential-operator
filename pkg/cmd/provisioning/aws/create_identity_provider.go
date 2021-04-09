@@ -457,7 +457,7 @@ spec:
 	return nil
 }
 
-func CreateIdentityProviderCmd(cmd *cobra.Command, args []string) {
+func createIdentityProviderCmd(cmd *cobra.Command, args []string) {
 	cfg := &awssdk.Config{
 		Region: awssdk.String(CreateIdentityProviderOpts.Region),
 	}
@@ -513,20 +513,20 @@ func initEnvForCreateIdentityProviderCmd(cmd *cobra.Command, args []string) {
 
 // NewCreateIdentityProviderCmd provides the "create-identity-provider" subcommand
 func NewCreateIdentityProviderCmd() *cobra.Command {
-	CreateIdentityProviderCmd := &cobra.Command{
+	createIdentityProviderCmd := &cobra.Command{
 		Use:              "create-identity-provider",
 		Short:            "Create IAM identity provider",
-		Run:              CreateIdentityProviderCmd,
+		Run:              createIdentityProviderCmd,
 		PersistentPreRun: initEnvForCreateIdentityProviderCmd,
 	}
 
-	CreateIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.Name, "name", "", "User-defined name for all created AWS resources (can be separate from the cluster's infra-id)")
-	CreateIdentityProviderCmd.MarkPersistentFlagRequired("name")
-	CreateIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
-	CreateIdentityProviderCmd.MarkPersistentFlagRequired("region")
-	CreateIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
-	CreateIdentityProviderCmd.PersistentFlags().BoolVar(&CreateIdentityProviderOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
-	CreateIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.Name, "name", "", "User-defined name for all created AWS resources (can be separate from the cluster's infra-id)")
+	createIdentityProviderCmd.MarkPersistentFlagRequired("name")
+	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
+	createIdentityProviderCmd.MarkPersistentFlagRequired("region")
+	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
+	createIdentityProviderCmd.PersistentFlags().BoolVar(&CreateIdentityProviderOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
+	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 
-	return CreateIdentityProviderCmd
+	return createIdentityProviderCmd
 }

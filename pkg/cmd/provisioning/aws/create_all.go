@@ -1,7 +1,6 @@
 package aws
 
 import (
-	"fmt"
 	"log"
 	"os"
 	"path"
@@ -46,7 +45,6 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 	}
 
 	identityProviderARN, err := createIdentityProvider(awsClient, CreateAllOpts.Name, CreateAllOpts.Region, publicKeyPath, CreateAllOpts.TargetDir, false)
-	fmt.Printf("ARN: %+v\n", identityProviderARN)
 	if err != nil {
 		log.Fatalf("Failed to create Identity provider: %s", err)
 	}

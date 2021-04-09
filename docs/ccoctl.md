@@ -59,7 +59,7 @@ To create all the above mentioned resources in one go, run
 $ oc adm release extract --credentials-requests --cloud=aws --to=./credrequests quay.io/path/to/openshift-release:version
 ```
 
-Then you can use `ccoctl` to process each CredentialsRequest object in the `./credrequests` directory (from the example above)
+Then you can use `ccoctl` to process all CredentialsRequest objects in the `./credrequests` directory (from the example above)
 
 ```bash
 $ ccoctl aws create-all --name=<name> --region=<aws-region> --credentials-requests-dir=<path-to-directory-with-list-of-credentials-requests>
