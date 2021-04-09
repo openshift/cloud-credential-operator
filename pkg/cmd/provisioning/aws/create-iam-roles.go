@@ -3,7 +3,6 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"io"
 	"io/ioutil"
 	"log"
@@ -23,6 +22,7 @@ import (
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 const (
