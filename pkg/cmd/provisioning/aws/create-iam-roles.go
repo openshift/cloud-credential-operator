@@ -286,7 +286,9 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 }
 
 func createIAMRolesCmd(cmd *cobra.Command, args []string) {
-	cfg := &awssdk.Config{}
+	cfg := &awssdk.Config{
+		Region: awssdk.String(CreateIAMRolesOpts.Region),
+	}
 
 	s, err := session.NewSession(cfg)
 	if err != nil {
@@ -413,6 +415,7 @@ func NewCreateIAMRolesCmd() *cobra.Command {
 	createIAMRolesCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.IdentityProviderARN, "identity-provider-arn", "", "ARN of IAM Identity provider for IAM Role trust relationship (can be created with the 'create identity-provider' sub-command)")
 	createIAMRolesCmd.MarkPersistentFlagRequired("identity-provider-arn")
+	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.Region, "region", "", "AWS region endpoint only required for GovCloud")
 	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 
