@@ -1,4 +1,4 @@
-package provisioning
+package aws
 
 import (
 	"encoding/json"
@@ -22,6 +22,7 @@ import (
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 const (
@@ -52,7 +53,15 @@ metadata:
 type: Opaque`
 )
 
-func createIAMRoles(client aws.Client, identityProviderARN, namePrefix, credReqDir, targetDir string, generateOnly bool) error {
+var (
+	// CreateIAMRolesOpts captures the options that affect creation/updating
+	// of the IAM Roles.
+	CreateIAMRolesOpts = options{
+		TargetDir: "",
+	}
+)
+
+func createIAMRoles(client aws.Client, identityProviderARN, name, credReqDir, targetDir string, generateOnly bool) error {
 	// Process directory
 	credRequests, err := getListOfCredentialsRequests(credReqDir)
 	if err != nil {
@@ -60,14 +69,14 @@ func createIAMRoles(client aws.Client, identityProviderARN, namePrefix, credReqD
 	}
 
 	// Create IAM Roles (with policies)
-	if err := processCredentialsRequests(client, credRequests, identityProviderARN, namePrefix, targetDir, generateOnly); err != nil {
+	if err := processCredentialsRequests(client, credRequests, identityProviderARN, name, targetDir, generateOnly); err != nil {
 		return errors.Wrap(err, "Failed while processing each CredentialsRequest")
 	}
 
 	return nil
 }
 
-func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.CredentialsRequest, identityProviderARN, namePrefix, targetDir string, generateOnly bool) error {
+func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.CredentialsRequest, identityProviderARN, name, targetDir string, generateOnly bool) error {
 
 	issuerURL, err := getIssuerURLFromIdentityProvider(awsClient, identityProviderARN)
 	if err != nil {
@@ -76,7 +85,7 @@ func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.Cred
 
 	for i, cr := range credReqs {
 		// infraName-targetNamespace-targetSecretName
-		_, err = createRole(awsClient, namePrefix, cr, i, identityProviderARN, issuerURL, targetDir, generateOnly)
+		_, err = createRole(awsClient, name, cr, i, identityProviderARN, issuerURL, targetDir, generateOnly)
 		if err != nil {
 			return err
 		}
@@ -85,8 +94,8 @@ func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.Cred
 	return nil
 }
 
-func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.CredentialsRequest, roleNum int, oidcProviderARN, issuerURL, targetDir string, generateOnly bool) (string, error) {
-	roleName := fmt.Sprintf("%s-%s-%s", namePrefix, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name)
+func createRole(awsClient aws.Client, name string, credReq *credreqv1.CredentialsRequest, roleNum int, oidcProviderARN, issuerURL, targetDir string, generateOnly bool) (string, error) {
+	roleName := fmt.Sprintf("%s-%s-%s", name, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name)
 
 	// Decode AWSProviderSpec
 	codec, err := credreqv1.NewCodec()
@@ -166,8 +175,12 @@ func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.Cred
 						AssumeRolePolicyDocument: awssdk.String(rolePolicyDocument),
 						Tags: []*iam.Tag{
 							{
-								Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix)),
+								Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name)),
 								Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
+							},
+							{
+								Key:   awssdk.String(nameTagKey),
+								Value: awssdk.String(name),
 							},
 						},
 					})
@@ -186,16 +199,7 @@ func createRole(awsClient aws.Client, namePrefix string, credReq *credreqv1.Cred
 		} else {
 			role = outRole.Role
 			log.Printf("Existing role %s found", *role.Arn)
-
-			// TODO: implement idemponent apply/update for role
-			_, err = awsClient.UpdateAssumeRolePolicy(&iam.UpdateAssumeRolePolicyInput{
-				RoleName:       role.RoleName,
-				PolicyDocument: awssdk.String(rolePolicyDocument),
-			})
-			if err != nil {
-				return "", errors.Wrap(err, "Faled to update Role Policy")
-			}
-			log.Printf("Updated Role policy document for role %s", *role.RoleName)
+			return *role.Arn, nil
 		}
 
 		_, err = awsClient.PutRolePolicy(&iam.PutRolePolicyInput{
@@ -281,8 +285,10 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 	return *idProvider.Url, nil
 }
 
-func iamRolesCmd(cmd *cobra.Command, args []string) {
-	cfg := &awssdk.Config{}
+func createIAMRolesCmd(cmd *cobra.Command, args []string) {
+	cfg := &awssdk.Config{
+		Region: awssdk.String(CreateIAMRolesOpts.Region),
+	}
 
 	s, err := session.NewSession(cfg)
 	if err != nil {
@@ -291,7 +297,7 @@ func iamRolesCmd(cmd *cobra.Command, args []string) {
 
 	awsClient := aws.NewClientFromSession(s)
 
-	err = createIAMRoles(awsClient, CreateOpts.IdentityProviderARN, CreateOpts.NamePrefix, CreateOpts.CredRequestDir, CreateOpts.TargetDir, CreateOpts.DryRun)
+	err = createIAMRoles(awsClient, CreateIAMRolesOpts.IdentityProviderARN, CreateIAMRolesOpts.Name, CreateIAMRolesOpts.CredRequestDir, CreateIAMRolesOpts.TargetDir, CreateIAMRolesOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -363,20 +369,55 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, roleARN str
 	return nil
 }
 
-// NewIAMRolesSetup provides the "create iam-roles" subcommand
-func NewIAMRolesSetup() *cobra.Command {
-	iamRolesSetupCmd := &cobra.Command{
-		Use: "iam-roles",
-		Run: iamRolesCmd,
+// initEnvForCreateIAMRolesCmd will ensure the destination directory is ready to receive the generated
+// files, and will create the directory if necessary.
+func initEnvForCreateIAMRolesCmd(cmd *cobra.Command, args []string) {
+	if CreateAllOpts.TargetDir == "" {
+		pwd, err := os.Getwd()
+		if err != nil {
+			log.Fatalf("Failed to get current directory: %s", err)
+		}
+
+		CreateAllOpts.TargetDir = pwd
 	}
 
-	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.NamePrefix, "name-prefix", "", "User-define name prefix for all created AWS resources (can be separate from the cluster's infra-id)")
-	iamRolesSetupCmd.MarkPersistentFlagRequired("name-prefix")
-	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=aws' against an OpenShift release image)")
-	iamRolesSetupCmd.MarkPersistentFlagRequired("credentials-requests-dir")
-	iamRolesSetupCmd.PersistentFlags().StringVar(&CreateOpts.IdentityProviderARN, "identity-provider-arn", "", "ARN of IAM Identity provider for IAM Role trust relationship (can be created with the 'create identity-provider' sub-command)")
-	iamRolesSetupCmd.MarkPersistentFlagRequired("identity-provider-arn")
-	iamRolesSetupCmd.PersistentFlags().BoolVar(&CreateOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
+	fPath, err := filepath.Abs(CreateAllOpts.TargetDir)
+	if err != nil {
+		log.Fatalf("Failed to resolve full path: %s", err)
+	}
 
-	return iamRolesSetupCmd
+	// create target dir if necessary
+	err = provisioning.EnsureDir(fPath)
+	if err != nil {
+		log.Fatalf("failed to create target directory at %s", fPath)
+	}
+
+	// create manifests dir if necessary
+	manifestsDir := filepath.Join(fPath, manifestsDirName)
+	err = provisioning.EnsureDir(manifestsDir)
+	if err != nil {
+		log.Fatalf("failed to create manifests directory at %s", manifestsDir)
+	}
+}
+
+// NewCreateIAMRolesCmd provides the "create-iam-roles" subcommand
+func NewCreateIAMRolesCmd() *cobra.Command {
+	createIAMRolesCmd := &cobra.Command{
+		Use:              "create-iam-roles",
+		Short:            "Create IAM roles",
+		Run:              createIAMRolesCmd,
+		PersistentPreRun: initEnvForCreateIAMRolesCmd,
+	}
+
+	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.Name, "name", "", "User-define name for all created AWS resources (can be separate from the cluster's infra-id)")
+	createIAMRolesCmd.MarkPersistentFlagRequired("name")
+	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=aws' against an OpenShift release image)")
+	createIAMRolesCmd.MarkPersistentFlagRequired("credentials-requests-dir")
+	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.IdentityProviderARN, "identity-provider-arn", "", "ARN of IAM Identity provider for IAM Role trust relationship (can be created with the 'create identity-provider' sub-command)")
+	createIAMRolesCmd.MarkPersistentFlagRequired("identity-provider-arn")
+	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.Region, "region", "", "AWS region endpoint only required for GovCloud")
+	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
+	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+
+	return createIAMRolesCmd
 }
