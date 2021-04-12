@@ -1,4 +1,4 @@
-package provisioning
+package aws
 
 import (
 	"fmt"
@@ -140,8 +140,6 @@ func TestIAMRoles(t *testing.T) {
 				mockGetOpenIDConnectProvider(mockAWSClient)
 				roleName := fmt.Sprintf("%s-namespace1-secretName1", testNamePrefix)
 				mockGetRoleExists(mockAWSClient, roleName)
-				mockUpdateAssumeRolePolicy(mockAWSClient)
-				mockPutRolePolicy(mockAWSClient)
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
