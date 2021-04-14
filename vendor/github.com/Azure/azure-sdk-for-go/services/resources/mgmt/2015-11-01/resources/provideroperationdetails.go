@@ -35,7 +35,9 @@ func NewProviderOperationDetailsClient(subscriptionID string) ProviderOperationD
 	return NewProviderOperationDetailsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewProviderOperationDetailsClientWithBaseURI creates an instance of the ProviderOperationDetailsClient client.
+// NewProviderOperationDetailsClientWithBaseURI creates an instance of the ProviderOperationDetailsClient client using
+// a custom endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign
+// clouds, Azure stack).
 func NewProviderOperationDetailsClientWithBaseURI(baseURI string, subscriptionID string) ProviderOperationDetailsClient {
 	return ProviderOperationDetailsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -43,7 +45,7 @@ func NewProviderOperationDetailsClientWithBaseURI(baseURI string, subscriptionID
 // List gets a list of resource providers.
 // Parameters:
 // resourceProviderNamespace - resource identity.
-func (client ProviderOperationDetailsClient) List(ctx context.Context, resourceProviderNamespace string) (result ProviderOperationDetailListResultPage, err error) {
+func (client ProviderOperationDetailsClient) List(ctx context.Context, resourceProviderNamespace string, APIVersion string) (result ProviderOperationDetailListResultPage, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/ProviderOperationDetailsClient.List")
 		defer func() {
@@ -55,7 +57,7 @@ func (client ProviderOperationDetailsClient) List(ctx context.Context, resourceP
 		}()
 	}
 	result.fn = client.listNextResults
-	req, err := client.ListPreparer(ctx, resourceProviderNamespace)
+	req, err := client.ListPreparer(ctx, resourceProviderNamespace, APIVersion)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.ProviderOperationDetailsClient", "List", nil, "Failure preparing request")
 		return
@@ -71,18 +73,22 @@ func (client ProviderOperationDetailsClient) List(ctx context.Context, resourceP
 	result.podlr, err = client.ListResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.ProviderOperationDetailsClient", "List", resp, "Failure responding to request")
+		return
+	}
+	if result.podlr.hasNextLink() && result.podlr.IsEmpty() {
+		err = result.NextWithContext(ctx)
+		return
 	}
 
 	return
 }
 
 // ListPreparer prepares the List request.
-func (client ProviderOperationDetailsClient) ListPreparer(ctx context.Context, resourceProviderNamespace string) (*http.Request, error) {
+func (client ProviderOperationDetailsClient) ListPreparer(ctx context.Context, resourceProviderNamespace string, APIVersion string) (*http.Request, error) {
 	pathParameters := map[string]interface{}{
 		"resourceProviderNamespace": autorest.Encode("path", resourceProviderNamespace),
 	}
 
-	const APIVersion = "2015-11-01"
 	queryParameters := map[string]interface{}{
 		"api-version": APIVersion,
 	}
@@ -98,8 +104,7 @@ func (client ProviderOperationDetailsClient) ListPreparer(ctx context.Context, r
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client ProviderOperationDetailsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -107,7 +112,6 @@ func (client ProviderOperationDetailsClient) ListSender(req *http.Request) (*htt
 func (client ProviderOperationDetailsClient) ListResponder(resp *http.Response) (result ProviderOperationDetailListResult, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusNoContent),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -137,7 +141,7 @@ func (client ProviderOperationDetailsClient) listNextResults(ctx context.Context
 }
 
 // ListComplete enumerates all values, automatically crossing page boundaries as required.
-func (client ProviderOperationDetailsClient) ListComplete(ctx context.Context, resourceProviderNamespace string) (result ProviderOperationDetailListResultIterator, err error) {
+func (client ProviderOperationDetailsClient) ListComplete(ctx context.Context, resourceProviderNamespace string, APIVersion string) (result ProviderOperationDetailListResultIterator, err error) {
 	if tracing.IsEnabled() {
 		ctx = tracing.StartSpan(ctx, fqdn+"/ProviderOperationDetailsClient.List")
 		defer func() {
@@ -148,6 +152,6 @@ func (client ProviderOperationDetailsClient) ListComplete(ctx context.Context, r
 			tracing.EndSpan(ctx, sc, err)
 		}()
 	}
-	result.page, err = client.List(ctx, resourceProviderNamespace)
+	result.page, err = client.List(ctx, resourceProviderNamespace, APIVersion)
 	return
 }

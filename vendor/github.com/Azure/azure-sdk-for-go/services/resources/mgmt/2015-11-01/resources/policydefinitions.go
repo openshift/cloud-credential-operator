@@ -35,7 +35,9 @@ func NewPolicyDefinitionsClient(subscriptionID string) PolicyDefinitionsClient {
 	return NewPolicyDefinitionsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewPolicyDefinitionsClientWithBaseURI creates an instance of the PolicyDefinitionsClient client.
+// NewPolicyDefinitionsClientWithBaseURI creates an instance of the PolicyDefinitionsClient client using a custom
+// endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure
+// stack).
 func NewPolicyDefinitionsClientWithBaseURI(baseURI string, subscriptionID string) PolicyDefinitionsClient {
 	return PolicyDefinitionsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -71,6 +73,7 @@ func (client PolicyDefinitionsClient) CreateOrUpdate(ctx context.Context, policy
 	result, err = client.CreateOrUpdateResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyDefinitionsClient", "CreateOrUpdate", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -101,8 +104,7 @@ func (client PolicyDefinitionsClient) CreateOrUpdatePreparer(ctx context.Context
 // CreateOrUpdateSender sends the CreateOrUpdate request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyDefinitionsClient) CreateOrUpdateSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // CreateOrUpdateResponder handles the response to the CreateOrUpdate request. The method always
@@ -110,7 +112,6 @@ func (client PolicyDefinitionsClient) CreateOrUpdateSender(req *http.Request) (*
 func (client PolicyDefinitionsClient) CreateOrUpdateResponder(resp *http.Response) (result PolicyDefinition, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -148,6 +149,7 @@ func (client PolicyDefinitionsClient) Delete(ctx context.Context, policyDefiniti
 	result, err = client.DeleteResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyDefinitionsClient", "Delete", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -176,8 +178,7 @@ func (client PolicyDefinitionsClient) DeletePreparer(ctx context.Context, policy
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyDefinitionsClient) DeleteSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // DeleteResponder handles the response to the Delete request. The method always
@@ -185,7 +186,6 @@ func (client PolicyDefinitionsClient) DeleteSender(req *http.Request) (*http.Res
 func (client PolicyDefinitionsClient) DeleteResponder(resp *http.Response) (result autorest.Response, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByClosing())
 	result.Response = resp
@@ -222,6 +222,7 @@ func (client PolicyDefinitionsClient) Get(ctx context.Context, policyDefinitionN
 	result, err = client.GetResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyDefinitionsClient", "Get", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -250,8 +251,7 @@ func (client PolicyDefinitionsClient) GetPreparer(ctx context.Context, policyDef
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyDefinitionsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -259,7 +259,6 @@ func (client PolicyDefinitionsClient) GetSender(req *http.Request) (*http.Respon
 func (client PolicyDefinitionsClient) GetResponder(resp *http.Response) (result PolicyDefinition, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())

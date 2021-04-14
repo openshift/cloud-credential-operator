@@ -3,12 +3,17 @@ package azure
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
+	"os"
 	"path"
 	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
+	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
@@ -22,6 +27,13 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 )
 
+const (
+	azureStackCloudConfigMapName = "cloud-provider-config"
+	azureStackCloudNamespace     = "openshift-config"
+	// FIXME: what key in the configmap will the endpoints info be found???
+	azureStackEndpointsKey = "endpoints"
+)
+
 func getAuthorizer(clientID, clientSecret, tenantID string, env azure.Environment, resourceEndpoint string) (autorest.Authorizer, error) {
 	config := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
 	config.Resource = resourceEndpoint
@@ -29,7 +41,7 @@ func getAuthorizer(clientID, clientSecret, tenantID string, env azure.Environmen
 	return config.Authorizer()
 }
 
-type credentialMinterBuilder func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error)
+type credentialMinterBuilder func(kubeClient kclient.Client, logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error)
 
 type AzureCredentialsMinter struct {
 	appClient             AppClient
@@ -53,7 +65,42 @@ func NewFakeAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecre
 	}, nil
 }
 
-func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret string, cloudName configv1.AzureCloudEnvironment, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
+func NewAzureCredentialsMinter(kubeClient kclient.Client, logger log.FieldLogger, clientID, clientSecret string, cloudName configv1.AzureCloudEnvironment, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
+
+	// If on AzureStackCloud, make sure there is an endpoints file available to the Azure SDK
+	// before calling azure.EnvironmentFromName()
+	if cloudName == configv1.AzureStackCloud {
+		configMapKey := types.NamespacedName{Name: azureStackCloudConfigMapName, Namespace: azureStackCloudNamespace}
+		cm := &corev1.ConfigMap{}
+		if err := kubeClient.Get(context.TODO(), configMapKey, cm); err != nil {
+			logger.WithError(err).Error("failed to read in cloud configmap")
+			return nil, err
+		}
+
+		endpoints, ok := cm.Data[azureStackEndpointsKey]
+		if !ok {
+			msg := fmt.Sprintf("did not find %s key in %s/%s configmap", azureStackEndpointsKey, azureStackCloudNamespace, azureStackCloudConfigMapName)
+			logger.Error(msg)
+			return nil, fmt.Errorf(msg)
+		}
+
+		tFile, err := ioutil.TempFile(os.TempDir(), "azurestack")
+		if err != nil {
+			logger.WithError(err).Error("failed to create temp azurestack JSON file")
+		}
+		defer os.Remove(tFile.Name())
+
+		if err := ioutil.WriteFile(tFile.Name(), []byte(endpoints), 0660); err != nil {
+			logger.WithError(err).Error("failed to save azurestack JSON file contents")
+			return nil, err
+		}
+
+		if err := os.Setenv(azure.EnvironmentFilepathName, tFile.Name()); err != nil {
+			logger.WithError(err).Errorf("failed to set %s env var", azure.EnvironmentFilepathName)
+			return nil, err
+		}
+	}
+
 	env, err := azure.EnvironmentFromName(string(cloudName))
 	if err != nil {
 		return nil, fmt.Errorf("Unable to determine Azure environment: %w", err)

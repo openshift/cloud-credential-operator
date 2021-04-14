@@ -36,7 +36,9 @@ func NewPolicyAssignmentsClient(subscriptionID string) PolicyAssignmentsClient {
 	return NewPolicyAssignmentsClientWithBaseURI(DefaultBaseURI, subscriptionID)
 }
 
-// NewPolicyAssignmentsClientWithBaseURI creates an instance of the PolicyAssignmentsClient client.
+// NewPolicyAssignmentsClientWithBaseURI creates an instance of the PolicyAssignmentsClient client using a custom
+// endpoint.  Use this when interacting with an Azure cloud that uses a non-standard base URI (sovereign clouds, Azure
+// stack).
 func NewPolicyAssignmentsClientWithBaseURI(baseURI string, subscriptionID string) PolicyAssignmentsClient {
 	return PolicyAssignmentsClient{NewWithBaseURI(baseURI, subscriptionID)}
 }
@@ -73,6 +75,7 @@ func (client PolicyAssignmentsClient) Create(ctx context.Context, scope string, 
 	result, err = client.CreateResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "Create", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -104,8 +107,7 @@ func (client PolicyAssignmentsClient) CreatePreparer(ctx context.Context, scope 
 // CreateSender sends the Create request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) CreateSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // CreateResponder handles the response to the Create request. The method always
@@ -113,7 +115,6 @@ func (client PolicyAssignmentsClient) CreateSender(req *http.Request) (*http.Res
 func (client PolicyAssignmentsClient) CreateResponder(resp *http.Response) (result PolicyAssignment, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -152,6 +153,7 @@ func (client PolicyAssignmentsClient) CreateByID(ctx context.Context, policyAssi
 	result, err = client.CreateByIDResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "CreateByID", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -182,8 +184,7 @@ func (client PolicyAssignmentsClient) CreateByIDPreparer(ctx context.Context, po
 // CreateByIDSender sends the CreateByID request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) CreateByIDSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // CreateByIDResponder handles the response to the CreateByID request. The method always
@@ -191,7 +192,6 @@ func (client PolicyAssignmentsClient) CreateByIDSender(req *http.Request) (*http
 func (client PolicyAssignmentsClient) CreateByIDResponder(resp *http.Response) (result PolicyAssignment, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK, http.StatusCreated),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -230,6 +230,7 @@ func (client PolicyAssignmentsClient) Delete(ctx context.Context, scope string, 
 	result, err = client.DeleteResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "Delete", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -252,8 +253,7 @@ func (client PolicyAssignmentsClient) DeletePreparer(ctx context.Context, scope 
 // DeleteSender sends the Delete request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) DeleteSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // DeleteResponder handles the response to the Delete request. The method always
@@ -261,7 +261,6 @@ func (client PolicyAssignmentsClient) DeleteSender(req *http.Request) (*http.Res
 func (client PolicyAssignmentsClient) DeleteResponder(resp *http.Response) (result PolicyAssignment, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -299,6 +298,7 @@ func (client PolicyAssignmentsClient) DeleteByID(ctx context.Context, policyAssi
 	result, err = client.DeleteByIDResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "DeleteByID", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -326,8 +326,7 @@ func (client PolicyAssignmentsClient) DeleteByIDPreparer(ctx context.Context, po
 // DeleteByIDSender sends the DeleteByID request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) DeleteByIDSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // DeleteByIDResponder handles the response to the DeleteByID request. The method always
@@ -335,7 +334,6 @@ func (client PolicyAssignmentsClient) DeleteByIDSender(req *http.Request) (*http
 func (client PolicyAssignmentsClient) DeleteByIDResponder(resp *http.Response) (result PolicyAssignment, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -374,6 +372,7 @@ func (client PolicyAssignmentsClient) Get(ctx context.Context, scope string, pol
 	result, err = client.GetResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "Get", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -402,8 +401,7 @@ func (client PolicyAssignmentsClient) GetPreparer(ctx context.Context, scope str
 // GetSender sends the Get request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) GetSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // GetResponder handles the response to the Get request. The method always
@@ -411,7 +409,6 @@ func (client PolicyAssignmentsClient) GetSender(req *http.Request) (*http.Respon
 func (client PolicyAssignmentsClient) GetResponder(resp *http.Response) (result PolicyAssignment, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -449,6 +446,7 @@ func (client PolicyAssignmentsClient) GetByID(ctx context.Context, policyAssignm
 	result, err = client.GetByIDResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "GetByID", resp, "Failure responding to request")
+		return
 	}
 
 	return
@@ -476,8 +474,7 @@ func (client PolicyAssignmentsClient) GetByIDPreparer(ctx context.Context, polic
 // GetByIDSender sends the GetByID request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) GetByIDSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // GetByIDResponder handles the response to the GetByID request. The method always
@@ -485,7 +482,6 @@ func (client PolicyAssignmentsClient) GetByIDSender(req *http.Request) (*http.Re
 func (client PolicyAssignmentsClient) GetByIDResponder(resp *http.Response) (result PolicyAssignment, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -524,6 +520,11 @@ func (client PolicyAssignmentsClient) List(ctx context.Context, filter string) (
 	result.palr, err = client.ListResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "List", resp, "Failure responding to request")
+		return
+	}
+	if result.palr.hasNextLink() && result.palr.IsEmpty() {
+		err = result.NextWithContext(ctx)
+		return
 	}
 
 	return
@@ -554,8 +555,7 @@ func (client PolicyAssignmentsClient) ListPreparer(ctx context.Context, filter s
 // ListSender sends the List request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) ListSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListResponder handles the response to the List request. The method always
@@ -563,7 +563,6 @@ func (client PolicyAssignmentsClient) ListSender(req *http.Request) (*http.Respo
 func (client PolicyAssignmentsClient) ListResponder(resp *http.Response) (result PolicyAssignmentListResult, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -652,6 +651,11 @@ func (client PolicyAssignmentsClient) ListForResource(ctx context.Context, resou
 	result.palr, err = client.ListForResourceResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "ListForResource", resp, "Failure responding to request")
+		return
+	}
+	if result.palr.hasNextLink() && result.palr.IsEmpty() {
+		err = result.NextWithContext(ctx)
+		return
 	}
 
 	return
@@ -687,8 +691,7 @@ func (client PolicyAssignmentsClient) ListForResourcePreparer(ctx context.Contex
 // ListForResourceSender sends the ListForResource request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) ListForResourceSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListForResourceResponder handles the response to the ListForResource request. The method always
@@ -696,7 +699,6 @@ func (client PolicyAssignmentsClient) ListForResourceSender(req *http.Request) (
 func (client PolicyAssignmentsClient) ListForResourceResponder(resp *http.Response) (result PolicyAssignmentListResult, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -781,6 +783,11 @@ func (client PolicyAssignmentsClient) ListForResourceGroup(ctx context.Context, 
 	result.palr, err = client.ListForResourceGroupResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "ListForResourceGroup", resp, "Failure responding to request")
+		return
+	}
+	if result.palr.hasNextLink() && result.palr.IsEmpty() {
+		err = result.NextWithContext(ctx)
+		return
 	}
 
 	return
@@ -812,8 +819,7 @@ func (client PolicyAssignmentsClient) ListForResourceGroupPreparer(ctx context.C
 // ListForResourceGroupSender sends the ListForResourceGroup request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) ListForResourceGroupSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		azure.DoRetryWithRegistration(client.Client))
+	return client.Send(req, azure.DoRetryWithRegistration(client.Client))
 }
 
 // ListForResourceGroupResponder handles the response to the ListForResourceGroup request. The method always
@@ -821,7 +827,6 @@ func (client PolicyAssignmentsClient) ListForResourceGroupSender(req *http.Reque
 func (client PolicyAssignmentsClient) ListForResourceGroupResponder(resp *http.Response) (result PolicyAssignmentListResult, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())
@@ -898,6 +903,11 @@ func (client PolicyAssignmentsClient) ListForScope(ctx context.Context, scope st
 	result.palr, err = client.ListForScopeResponder(resp)
 	if err != nil {
 		err = autorest.NewErrorWithError(err, "resources.PolicyAssignmentsClient", "ListForScope", resp, "Failure responding to request")
+		return
+	}
+	if result.palr.hasNextLink() && result.palr.IsEmpty() {
+		err = result.NextWithContext(ctx)
+		return
 	}
 
 	return
@@ -928,8 +938,7 @@ func (client PolicyAssignmentsClient) ListForScopePreparer(ctx context.Context, 
 // ListForScopeSender sends the ListForScope request. The method will close the
 // http.Response Body if it receives an error.
 func (client PolicyAssignmentsClient) ListForScopeSender(req *http.Request) (*http.Response, error) {
-	return autorest.SendWithSender(client, req,
-		autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
+	return client.Send(req, autorest.DoRetryForStatusCodes(client.RetryAttempts, client.RetryDuration, autorest.StatusCodesForRetry...))
 }
 
 // ListForScopeResponder handles the response to the ListForScope request. The method always
@@ -937,7 +946,6 @@ func (client PolicyAssignmentsClient) ListForScopeSender(req *http.Request) (*ht
 func (client PolicyAssignmentsClient) ListForScopeResponder(resp *http.Response) (result PolicyAssignmentListResult, err error) {
 	err = autorest.Respond(
 		resp,
-		client.ByInspecting(),
 		azure.WithErrorUnlessStatusCode(http.StatusOK),
 		autorest.ByUnmarshallingJSON(&result),
 		autorest.ByClosing())

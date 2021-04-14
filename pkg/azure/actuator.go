@@ -25,6 +25,7 @@ import (
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	kclient "sigs.k8s.io/controller-runtime/pkg/client"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -38,7 +39,6 @@ import (
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	log "github.com/sirupsen/logrus"
-	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
 )
@@ -57,7 +57,7 @@ type Actuator struct {
 	generateServicePrincipalName servicePrincipalNameBuilder
 }
 
-func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
+func NewActuator(c kclient.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating Azure codec")
@@ -68,14 +68,14 @@ func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Ac
 	return &Actuator{
 		client: client,
 		codec:  codec,
-		credentialMinterBuilder: func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
-			return NewAzureCredentialsMinter(logger, clientID, clientSecret, cloudName, tenantID, subscriptionID)
+		credentialMinterBuilder: func(kubeClient kclient.Client, logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
+			return NewAzureCredentialsMinter(kubeClient, logger, clientID, clientSecret, cloudName, tenantID, subscriptionID)
 		},
 		generateServicePrincipalName: generateServicePrincipalName,
 	}, nil
 }
 
-func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec,
+func NewFakeActuator(c kclient.Client, codec *minterv1.ProviderCodec,
 	credentialMinterBuilder credentialMinterBuilder,
 	servicePrincipalNameBuilder servicePrincipalNameBuilder) *Actuator {
 	return &Actuator{
@@ -190,7 +190,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 	// Also, there is no harm in deleting the secret in general. Every component consuming
 	// the secret will be forbidden to talk to Azure API once the service principal is destroyed.
 	existingSecret := &corev1.Secret{}
-	err = a.client.Get(ctx, client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
+	err = a.client.Get(ctx, kclient.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err == nil {
 		logger.Infof("Deleting secret %v/%v", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
 		if err := a.client.Delete(ctx, existingSecret); err != nil {
@@ -223,6 +223,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 	}
 
 	azureCredentialsMinter, err := a.credentialMinterBuilder(
+		a.client.Client,
 		logger,
 		string(credentialsRootSecret.Data[AzureClientID]),
 		string(credentialsRootSecret.Data[AzureClientSecret]),
@@ -320,7 +321,7 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 
 // loadAzureInfrastructureResourceGroups loads the cluster Infrastructure config and returns
 // resource group reported in its status
-func loadAzureInfrastructureResourceGroups(c client.Client, logger log.FieldLogger) ([]string, error) {
+func loadAzureInfrastructureResourceGroups(c kclient.Client, logger log.FieldLogger) ([]string, error) {
 	infra := &configv1.Infrastructure{}
 	err := c.Get(context.Background(), types.NamespacedName{Name: "cluster"}, infra)
 	if err != nil {
@@ -451,6 +452,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	}
 
 	azureCredentialsMinter, err := a.credentialMinterBuilder(
+		a.client,
 		logger,
 		string(cloudCredsSecret.Data[AzureClientID]),
 		string(cloudCredsSecret.Data[AzureClientSecret]),
@@ -465,7 +467,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	// Thus, either use already existing (if it can be found) or generate new one.
 	clientSecret := ""
 	existingSecret := &corev1.Secret{}
-	if err := a.client.Get(ctx, client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret); err == nil {
+	if err := a.client.Get(ctx, kclient.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret); err == nil {
 		if existingSecret.ResourceVersion == azureStatus.SecretLastResourceVersion {
 			clientSecret = string(existingSecret.Data[AzureClientSecret])
 		}
@@ -547,7 +549,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	// When the credential secret is created, it is not available right away.
 	// Waiting for the secret to manifests so we can get the secret resource version.
 	if err := wait.PollImmediate(2*time.Second, 10*time.Second, func() (bool, error) {
-		if err := a.client.Get(ctx, client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, updatedSecret); err != nil {
+		if err := a.client.Get(ctx, kclient.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, updatedSecret); err != nil {
 			if kerrors.IsNotFound(err) {
 				return false, nil
 			}
@@ -601,7 +603,7 @@ func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.Credentials
 
 func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
 	existing := &corev1.Secret{}
-	key := client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
+	key := kclient.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
 	err := a.client.Get(ctx, key, existing)
 	if err != nil && kerrors.IsNotFound(err) {
 		s := &corev1.Secret{}
