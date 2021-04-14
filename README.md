@@ -304,6 +304,10 @@ spec:
 
 List of Azure built in roles: https://docs.microsoft.com/en-us/azure/role-based-access-control/built-in-roles
 
+# Instructions to add new cloud provider
+
+Please refer [this](./docs/mode-manual-creds.md) documentation for adding a new provider.
+
 # For OpenShift Second Level Operators
 
  1. Add CredentialsRequests objects to your CVO manifests and deployed via the release payload. Please do not create them in operator code as we want to use the release manifest for auditing and dynamically checking permissions.
