@@ -120,7 +120,7 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		shortenedRoleName = roleName
 	}
 
-	rolePolicyDocument, err := createRolePolicyDocument(oidcProviderARN, issuerURL, credReq.Spec.ServiceAccountNames)
+	rolePolicyDocument, err := createRolePolicyDocument(oidcProviderARN, issuerURL, credReq.Spec.SecretRef.Namespace, credReq.Spec.ServiceAccountNames)
 	if err != nil {
 		return "", errors.Wrap(err, "Error while create Role policy document")
 	}
@@ -220,15 +220,15 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 	}
 }
 
-func createRolePolicyDocument(oidcProviderARN, issuerURL string, serviceAccountNames []string) (string, error) {
+func createRolePolicyDocument(oidcProviderARN, issuerURL, namespace string, serviceAccountNames []string) (string, error) {
 	var conditionString string
 	if len(serviceAccountNames) > 0 {
 		var serviceAccountListString string
 		for i, sa := range serviceAccountNames {
 			if i == 0 {
-				serviceAccountListString = fmt.Sprintf(`[ "system:serviceaccount:%s:%s" `, sa, sa)
+				serviceAccountListString = fmt.Sprintf(`[ "system:serviceaccount:%s:%s" `, namespace, sa)
 			} else {
-				serviceAccountListString = fmt.Sprintf(`%s , "system:serviceaccount:%s:%s"`, serviceAccountListString, sa, sa)
+				serviceAccountListString = fmt.Sprintf(`%s , "system:serviceaccount:%s:%s"`, serviceAccountListString, namespace, sa)
 			}
 		}
 		serviceAccountListString += " ]"
