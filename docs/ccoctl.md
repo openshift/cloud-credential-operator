@@ -25,11 +25,11 @@ This will write out public/private key files named `serviceaccount-signer.privat
 To set up an OpenID Connect provider in the cloud, run
 
 ```bash
-$ ccoctl aws create-identity-provider --name=<name> --region=<aws-region> --public-key=/path/to/public/key/file
+$ ccoctl aws create-identity-provider --name=<name> --region=<aws-region> --public-key-file=/path/to/public/key/file
 
 ```
 
-where `name` is the name used to tag and account any cloud resources that are created. `region` is the aws region in which cloud resources will be created and `public-key` is the path to a public key file generated using `ccoctl create-key-pair` command.
+where `name` is the name used to tag and account any cloud resources that are created. `region` is the aws region in which cloud resources will be created and `public-key-file` is the path to a public key file generated using `ccoctl create-key-pair` command.
 
 The above command will write out discovery document file named `02-openid-configuration` and JSON web key set file named `03-keys.json` when `--dry-run` flag is set.
 
