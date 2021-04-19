@@ -18,8 +18,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
-
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -30,6 +28,7 @@ import (
 	jose "gopkg.in/square/go-jose.v2"
 
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 var (
