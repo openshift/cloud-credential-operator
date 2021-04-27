@@ -138,6 +138,21 @@ func (mr *MockClientMockRecorder) ListServiceAccountKeys(arg0, arg1 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServiceAccountKeys", reflect.TypeOf((*MockClient)(nil).ListServiceAccountKeys), arg0, arg1)
 }
 
+// QueryTestablePermissions mocks base method
+func (m *MockClient) QueryTestablePermissions(arg0 context.Context, arg1 *admin.QueryTestablePermissionsRequest) (*admin.QueryTestablePermissionsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QueryTestablePermissions", arg0, arg1)
+	ret0, _ := ret[0].(*admin.QueryTestablePermissionsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// QueryTestablePermissions indicates an expected call of QueryTestablePermissions
+func (mr *MockClientMockRecorder) QueryTestablePermissions(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryTestablePermissions", reflect.TypeOf((*MockClient)(nil).QueryTestablePermissions), arg0, arg1)
+}
+
 // GetProjectIamPolicy mocks base method
 func (m *MockClient) GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
 	m.ctrl.T.Helper()
