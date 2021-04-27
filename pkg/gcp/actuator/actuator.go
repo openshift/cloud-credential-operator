@@ -259,7 +259,10 @@ func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.Credentials
 
 	enoughPerms, err := gcputils.CheckPermissionsAgainstPermissionList(rootClient, permList, logger)
 	if err != nil {
-		return fmt.Errorf("error checking whether GCP client has sufficient permissions: %v", err)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("error while validating permissions: %s", err.Error()),
+		}
 	}
 
 	if !enoughPerms {
