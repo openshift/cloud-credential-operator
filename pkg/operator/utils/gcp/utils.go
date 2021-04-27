@@ -17,20 +17,27 @@ limitations under the License.
 package gcp
 
 import (
+	"context"
 	"fmt"
 	"regexp"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
-
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/apimachinery/pkg/util/sets"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
+
+type testablePermissions struct {
+	permSet     sets.String
+	lastUpdated time.Time
+}
 
 var (
 	// CredMintingPermissions is a list of GCP permissions needed to run in the mode where the
@@ -64,19 +71,8 @@ var (
 	}
 
 	credentailRequestScheme = runtime.NewScheme()
-	credentialRequestCodec  = serializer.NewCodecFactory(credentailRequestScheme)
 
-	invalidPermsForProjectScopedPermissionsTesting = []string{
-		// checking whether we have permissions resourcemanager.projects.list returns an error
-		// (as it is invalid when checking against a project resource),
-		// but listing projects is always allowed (it simply returns a list of projects you
-		// have projects.get permissions for)
-		"resourcemanager.projects.list",
-	}
-)
-
-const (
-	infrastructureConfigName = "cluster"
+	testablePerms = testablePermissions{}
 )
 
 var (
@@ -84,6 +80,10 @@ var (
 	// <service>.<category>.<action> so that we can easily create
 	// the API name <service>.googleapis.com.
 	permToAPIRegexp = regexp.MustCompile(`^([A-Za-z0-9-]*)\..*`)
+
+	// Regexp to find which API permission is being reported as invalid
+	// for testing against the Project level.
+	invalidProjectPermissionsCheck = regexp.MustCompile(`^Permission (.*) is not valid for this resource.$`)
 )
 
 func init() {
@@ -123,24 +123,65 @@ func checkServicesAndPermissions(gcpClient ccgcp.Client, permissionsList []strin
 	return servicesEnabled, nil
 }
 
-// filterOutPermissions will take a list of GCP permissions and return a list of permissions with any matching the filterOutList removed
-func filterOutPermissions(permList, filterOutList []string) []string {
-	filteredPerms := []string{}
-	for _, perm := range permList {
-		filterOut := false
-		for _, filterPerm := range filterOutList {
-			if perm == filterPerm {
-				filterOut = true
-				break
-			}
+func refreshTestablePermissions(gcpClient ccgcp.Client, projectName string, logger log.FieldLogger) error {
+	// skip refresh if last update was less than 1 hour ago
+	if testablePerms.lastUpdated.Add(time.Hour).After(time.Now()) {
+		return nil
+	}
+
+	ctx := context.TODO()
+	nextPageToken := ""
+	projectNamePath := fmt.Sprintf(`//cloudresourcemanager.googleapis.com/projects/%s`, projectName)
+	newPermSet := sets.NewString()
+
+	request := &iamadminpb.QueryTestablePermissionsRequest{
+		FullResourceName: projectNamePath,
+	}
+
+	for {
+		request.PageToken = nextPageToken
+
+		resp, err := gcpClient.QueryTestablePermissions(ctx, request)
+		if err != nil {
+			logger.WithError(err).Error("failed to gather list of testable permissions")
+			return err
 		}
 
-		if filterOut {
-			continue
+		for _, perm := range resp.Permissions {
+			newPermSet.Insert(perm.Name)
 		}
-		filteredPerms = append(filteredPerms, perm)
+
+		nextPageToken = resp.NextPageToken
+
+		if nextPageToken == "" {
+			break
+		}
 	}
-	return filteredPerms
+
+	testablePerms.permSet = newPermSet
+	testablePerms.lastUpdated = time.Now()
+
+	return nil
+}
+
+// filterOutPermissions will take a list of GCP permissions to test against and return a list of permissions that
+// are valid to test against at the project level
+func filterOutPermissions(gcpClient ccgcp.Client, projectName string, permList []string, logger log.FieldLogger) ([]string, error) {
+
+	filteredPerms := []string{}
+
+	if err := refreshTestablePermissions(gcpClient, projectName, logger); err != nil {
+		return filteredPerms, err
+	}
+
+	for _, perm := range permList {
+		if testablePerms.permSet.Has(perm) {
+			filteredPerms = append(filteredPerms, perm)
+		} else {
+			logger.Warnf("Ignoring permission checking of %s at project level", perm)
+		}
+	}
+	return filteredPerms, nil
 }
 
 // CheckPermissionsAgainstPermissionList will take the passsed-in list of permissions to check whether the provided
@@ -150,7 +191,10 @@ func CheckPermissionsAgainstPermissionList(gcpClient ccgcp.Client, permList []st
 
 	projectName := gcpClient.GetProjectName()
 
-	filteredPermList := filterOutPermissions(permList, invalidPermsForProjectScopedPermissionsTesting)
+	filteredPermList, err := filterOutPermissions(gcpClient, projectName, permList, logger)
+	if err != nil {
+		return false, err
+	}
 
 	if len(filteredPermList) == 0 {
 		return true, nil
