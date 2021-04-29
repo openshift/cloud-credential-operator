@@ -372,16 +372,16 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, roleARN str
 // initEnvForCreateIAMRolesCmd will ensure the destination directory is ready to receive the generated
 // files, and will create the directory if necessary.
 func initEnvForCreateIAMRolesCmd(cmd *cobra.Command, args []string) {
-	if CreateAllOpts.TargetDir == "" {
+	if CreateIAMRolesOpts.TargetDir == "" {
 		pwd, err := os.Getwd()
 		if err != nil {
 			log.Fatalf("Failed to get current directory: %s", err)
 		}
 
-		CreateAllOpts.TargetDir = pwd
+		CreateIAMRolesOpts.TargetDir = pwd
 	}
 
-	fPath, err := filepath.Abs(CreateAllOpts.TargetDir)
+	fPath, err := filepath.Abs(CreateIAMRolesOpts.TargetDir)
 	if err != nil {
 		log.Fatalf("Failed to resolve full path: %s", err)
 	}

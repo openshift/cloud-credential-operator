@@ -11,13 +11,14 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"io/ioutil"
 	"log"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -483,16 +484,16 @@ func createIdentityProviderCmd(cmd *cobra.Command, args []string) {
 // initEnvForCreateIdentityProviderCmd will ensure the destination directory is ready to receive the generated
 // files, and will create the directory if necessary.
 func initEnvForCreateIdentityProviderCmd(cmd *cobra.Command, args []string) {
-	if CreateAllOpts.TargetDir == "" {
+	if CreateIdentityProviderOpts.TargetDir == "" {
 		pwd, err := os.Getwd()
 		if err != nil {
 			log.Fatalf("Failed to get current directory: %s", err)
 		}
 
-		CreateAllOpts.TargetDir = pwd
+		CreateIdentityProviderOpts.TargetDir = pwd
 	}
 
-	fPath, err := filepath.Abs(CreateAllOpts.TargetDir)
+	fPath, err := filepath.Abs(CreateIdentityProviderOpts.TargetDir)
 	if err != nil {
 		log.Fatalf("Failed to resolve full path: %s", err)
 	}
