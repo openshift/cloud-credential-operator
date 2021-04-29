@@ -251,6 +251,12 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 				wantErr:        false,
 			},
 			{
+				name:           "Empty CA Cert",
+				cacert:         "\"\"",
+				expectedCACert: "",
+				wantErr:        false,
+			},
+			{
 				name:           "Incorrect CA Cert",
 				cacert:         incorrectCACertFile,
 				expectedCACert: correctCACertFile,

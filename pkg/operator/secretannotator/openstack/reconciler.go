@@ -215,6 +215,10 @@ func fixInvalidCACertFile(content string) (string, bool, error) {
 		}
 
 		if len(path) == 1 {
+			if y[path[0]] == "" {
+				// We need to update the path only if it is non-empty.
+				return false
+			}
 			y[path[0]] = openstack.CACertFile
 			return true
 		}
