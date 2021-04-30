@@ -161,7 +161,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 		return reconcile.Result{}, err
 	}
 
-	clouds, cloudsUpdated, err := fixInvalidCACertFile(clouds)
+	clouds, cloudsUpdated, err := r.fixInvalidCACertFile(clouds)
 	if err != nil {
 		r.Logger.WithError(err).Error("errored checking clouds.yaml")
 		return reconcile.Result{}, err
@@ -198,7 +198,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 // The installer no longer generates an invalid cacert as of 4.7, and this
 // method will fix any invalid secret present during 4.8. We can therefore
 // remove this code in 4.9.
-func fixInvalidCACertFile(content string) (string, bool, error) {
+func (r *ReconcileCloudCredSecret) fixInvalidCACertFile(content string) (string, bool, error) {
 	clouds := make(map[string]interface{})
 
 	err := yaml.Unmarshal([]byte(content), &clouds)
@@ -208,15 +208,33 @@ func fixInvalidCACertFile(content string) (string, bool, error) {
 
 	var updatePath func(y map[string]interface{}, path ...string) bool
 	updatePath = func(y map[string]interface{}, path ...string) bool {
-		field, ok := y[path[0]]
+		head := path[0]
+
+		field, ok := y[head]
 		if !ok {
 			// clouds.yaml doesn't contain this path. Nothing to update
 			return false
 		}
 
+		// This is the cacert path
 		if len(path) == 1 {
-			y[path[0]] = openstack.CACertFile
-			return true
+			// clouds.yaml which was written by gophercloud prior to
+			// https://github.com/gophercloud/utils/pull/100 may contain an
+			// empty cacert value. This includes OCP 4.2. We remove this value.
+			if field == nil || field == "" {
+				r.Logger.Warnf("Removed empty cacert from clouds.yaml")
+				delete(y, head)
+				return true
+			}
+
+			if field != openstack.CACertFile {
+				r.Logger.Warnf("Fixed incorrect cacert path in clouds.yaml: %s", field)
+				y[head] = openstack.CACertFile
+				return true
+			}
+
+			// cacert is correct
+			return false
 		}
 
 		fieldMap, ok := field.(map[string]interface{})
