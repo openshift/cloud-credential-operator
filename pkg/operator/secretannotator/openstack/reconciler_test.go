@@ -178,7 +178,7 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 			},
 		} {
 			t.Run(tc.name, func(t *testing.T) {
-				secret := testSecret("")
+				secret := testSecret(fmt.Sprintf(cloudsWithCACert, correctCACertFile))
 				existing := append(tc.existing, infra, secret, testOperatorConfig(tc.mode))
 				fakeClient := fake.NewFakeClient(existing...)
 
