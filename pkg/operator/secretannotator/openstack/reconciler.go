@@ -161,7 +161,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 		return reconcile.Result{}, err
 	}
 
-	clouds, cloudsUpdated, err := fixInvalidCACertFile(clouds)
+	clouds, cloudsUpdated, err := r.fixInvalidCACertFile(clouds)
 	if err != nil {
 		r.Logger.WithError(err).Error("errored checking clouds.yaml")
 		return reconcile.Result{}, err
@@ -198,7 +198,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnR
 // The installer no longer generates an invalid cacert as of 4.7, and this
 // method will fix any invalid secret present during 4.8. We can therefore
 // remove this code in 4.9.
-func fixInvalidCACertFile(content string) (string, bool, error) {
+func (r *ReconcileCloudCredSecret) fixInvalidCACertFile(content string) (string, bool, error) {
 	clouds := make(map[string]interface{})
 
 	err := yaml.Unmarshal([]byte(content), &clouds)
@@ -215,6 +215,7 @@ func fixInvalidCACertFile(content string) (string, bool, error) {
 		}
 
 		if len(path) == 1 {
+			r.Logger.Warnf("Fixed incorrect cacert path in clouds.yaml: %s", field)
 			y[path[0]] = openstack.CACertFile
 			return true
 		}
