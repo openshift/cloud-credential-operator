@@ -208,16 +208,24 @@ func (r *ReconcileCloudCredSecret) fixInvalidCACertFile(content string) (string,
 
 	var updatePath func(y map[string]interface{}, path ...string) bool
 	updatePath = func(y map[string]interface{}, path ...string) bool {
-		field, ok := y[path[0]]
+		head := path[0]
+
+		field, ok := y[head]
 		if !ok {
 			// clouds.yaml doesn't contain this path. Nothing to update
 			return false
 		}
 
+		// This is the cacert path
 		if len(path) == 1 {
-			r.Logger.Warnf("Fixed incorrect cacert path in clouds.yaml: %s", field)
-			y[path[0]] = openstack.CACertFile
-			return true
+			if field != openstack.CACertFile {
+				r.Logger.Warnf("Fixed incorrect cacert path in clouds.yaml: %s", field)
+				y[head] = openstack.CACertFile
+				return true
+			}
+
+			// cacert is correct
+			return false
 		}
 
 		fieldMap, ok := field.(map[string]interface{})
