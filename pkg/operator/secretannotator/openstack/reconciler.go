@@ -218,6 +218,15 @@ func (r *ReconcileCloudCredSecret) fixInvalidCACertFile(content string) (string,
 
 		// This is the cacert path
 		if len(path) == 1 {
+			// clouds.yaml which was written by gophercloud prior to
+			// https://github.com/gophercloud/utils/pull/100 may contain an
+			// empty cacert value. This includes OCP 4.2. We remove this value.
+			if field == nil || field == "" {
+				r.Logger.Warnf("Removed empty cacert from clouds.yaml")
+				delete(y, head)
+				return true
+			}
+
 			if field != openstack.CACertFile {
 				r.Logger.Warnf("Fixed incorrect cacert path in clouds.yaml: %s", field)
 				y[head] = openstack.CACertFile

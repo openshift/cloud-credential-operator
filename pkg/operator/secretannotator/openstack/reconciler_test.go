@@ -217,6 +217,8 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 		  error
 		* If the root secret clouds.yaml does not contain a CA Cert we should not
 		  modify it
+		* If the root secret clouds.yaml contains a blank or empty CA Cert we
+		  should remove it.
 		* If the root secret clouds.yaml contains the incorrect CA Cert path we
 		  should update it
 		* If the root secret clouds.yaml contains the correct CA Cert path we
@@ -240,6 +242,16 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 			{
 				name:               "No CA Cert",
 				cloudsYAML:         cloudsNoCACert,
+				expectedCloudsYAML: cloudsNoCACert,
+			},
+			{
+				name:               "Blank CA Cert",
+				cloudsYAML:         fmt.Sprintf(cloudsWithCACert, ""),
+				expectedCloudsYAML: cloudsNoCACert,
+			},
+			{
+				name:               "Empty string CA Cert",
+				cloudsYAML:         fmt.Sprintf(cloudsWithCACert, "\"\""),
 				expectedCloudsYAML: cloudsNoCACert,
 			},
 			{
