@@ -159,6 +159,7 @@ spec:
           readOnly: false
       nodeSelector:
         node-role.kubernetes.io/master: ""
+      priorityClassName: system-cluster-critical
       serviceAccountName: pod-identity-webhook
       tolerations:
       - effect: NoSchedule
