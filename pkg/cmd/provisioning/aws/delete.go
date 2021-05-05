@@ -93,7 +93,7 @@ func deleteIAMRoles(client aws.Client, namePrefix string) error {
 			RoleName: roleMetadata.RoleName,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "failed to fetch IAM role %s", *roleOutput.Role.RoleName)
+			return errors.Wrapf(err, "failed to fetch IAM role %s", *roleMetadata.RoleName)
 		}
 
 		for _, tag := range roleOutput.Role.Tags {
