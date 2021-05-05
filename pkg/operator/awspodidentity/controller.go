@@ -279,11 +279,11 @@ func (r *staticResourceReconciler) ReconcileResources() error {
 	requestedDeployment := resourceread.ReadDeploymentV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/deployment.yaml"))
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
 	resultDeployment, modified, err := resourceapply.ApplyDeployment(r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration)
-	r.deploymentGeneration = resultDeployment.Generation
 	if err != nil {
 		r.logger.WithError(err).Error("error applying Deployment")
 		return err
 	}
+	r.deploymentGeneration = resultDeployment.Generation
 	if modified {
 		r.logger.Infof("Deployment reconciled successfully")
 	}
