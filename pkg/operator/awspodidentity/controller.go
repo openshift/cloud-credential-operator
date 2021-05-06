@@ -9,7 +9,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	admissionregistrationv1beta1 "k8s.io/api/admissionregistration/v1beta1"
+	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,7 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	admissionregistrationclientv1beta1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1beta1"
+	admissionregistrationclientv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -289,8 +289,8 @@ func (r *staticResourceReconciler) ReconcileResources() error {
 	}
 
 	// "v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"
-	requestedMutatingWebhookConfiguration := ReadMutatingWebhookConfigurationV1Beta1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"))
-	_, modified, err = ApplyMutatingWebhookConfiguration(r.clientset.AdmissionregistrationV1beta1(), r.eventRecorder, requestedMutatingWebhookConfiguration)
+	requestedMutatingWebhookConfiguration := ReadMutatingWebhookConfigurationV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"))
+	_, modified, err = ApplyMutatingWebhookConfiguration(r.clientset.AdmissionregistrationV1(), r.eventRecorder, requestedMutatingWebhookConfiguration)
 	if err != nil {
 		r.logger.WithError(err).Error("error applying MutatingWebhookConfiguration")
 		return err
@@ -303,16 +303,16 @@ func (r *staticResourceReconciler) ReconcileResources() error {
 
 // TODO: add MutatingWebhookConfiguration helpers to library-go/operator/resource
 
-func ReadMutatingWebhookConfigurationV1Beta1OrDie(objBytes []byte) *admissionregistrationv1beta1.MutatingWebhookConfiguration {
-	requiredObj, err := runtime.Decode(defaultCodecs.UniversalDecoder(admissionregistrationv1beta1.SchemeGroupVersion), objBytes)
+func ReadMutatingWebhookConfigurationV1OrDie(objBytes []byte) *admissionregistrationv1.MutatingWebhookConfiguration {
+	requiredObj, err := runtime.Decode(defaultCodecs.UniversalDecoder(admissionregistrationv1.SchemeGroupVersion), objBytes)
 	if err != nil {
 		panic(err)
 	}
-	return requiredObj.(*admissionregistrationv1beta1.MutatingWebhookConfiguration)
+	return requiredObj.(*admissionregistrationv1.MutatingWebhookConfiguration)
 }
 
 // ApplyMutatingWebhookConfiguration merges objectmeta, does not worry about anything else
-func ApplyMutatingWebhookConfiguration(client admissionregistrationclientv1beta1.MutatingWebhookConfigurationsGetter, recorder events.Recorder, required *admissionregistrationv1beta1.MutatingWebhookConfiguration) (*admissionregistrationv1beta1.MutatingWebhookConfiguration, bool, error) {
+func ApplyMutatingWebhookConfiguration(client admissionregistrationclientv1.MutatingWebhookConfigurationsGetter, recorder events.Recorder, required *admissionregistrationv1.MutatingWebhookConfiguration) (*admissionregistrationv1.MutatingWebhookConfiguration, bool, error) {
 	existing, err := client.MutatingWebhookConfigurations().Get(context.TODO(), required.Name, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		actual, err := client.MutatingWebhookConfigurations().Create(context.TODO(), required, metav1.CreateOptions{})

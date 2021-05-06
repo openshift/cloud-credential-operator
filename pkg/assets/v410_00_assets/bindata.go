@@ -74,6 +74,15 @@ rules:
   - get
   - watch
   - list
+- apiGroups:
+  - certificates.k8s.io
+  resources:
+  - certificatesigningrequests
+  verbs:
+  - create
+  - get
+  - list
+  - watch
 `)
 
 func v410AwsPodIdentityWebhookClusterroleYamlBytes() ([]byte, error) {
@@ -193,7 +202,7 @@ func v410AwsPodIdentityWebhookDeploymentYaml() (*asset, error) {
 	return a, nil
 }
 
-var _v410AwsPodIdentityWebhookMutatingwebhookYaml = []byte(`apiVersion: admissionregistration.k8s.io/v1beta1
+var _v410AwsPodIdentityWebhookMutatingwebhookYaml = []byte(`apiVersion: admissionregistration.k8s.io/v1
 kind: MutatingWebhookConfiguration
 metadata:
   name: pod-identity-webhook
@@ -201,6 +210,8 @@ metadata:
     service.beta.openshift.io/inject-cabundle: "true"
 webhooks:
 - name: pod-identity-webhook.amazonaws.com
+  admissionReviewVersions:
+  - v1beta1
   failurePolicy: Ignore
   sideEffects: None
   clientConfig:
