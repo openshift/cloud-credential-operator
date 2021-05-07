@@ -42,12 +42,12 @@ import (
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	anngcp "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
-	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
-
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -93,6 +93,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 				mockGetProjectName(mockGCPClient)
+				mockTestMintQueryTestablePermissionsSuccess(mockGCPClient)
 				mockTestMintIamPermissionsSuccess(mockGCPClient)
 				mockListMintServicesEnabledSuccess(mockGCPClient)
 
@@ -304,6 +305,19 @@ func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudC
 
 func mockGetProjectName(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().GetProjectName().AnyTimes().Return("test-GCP-project")
+}
+
+func mockTestMintQueryTestablePermissionsSuccess(mockGCPClient *mockgcp.MockClient) {
+
+	permResponse := []*iamadminpb.Permission{}
+
+	for _, perm := range gcputils.CredMintingPermissions {
+		permResponse = append(permResponse, &iamadminpb.Permission{Name: perm})
+	}
+
+	mockGCPClient.EXPECT().QueryTestablePermissions(gomock.Any(), gomock.Any()).Return(&iamadminpb.QueryTestablePermissionsResponse{
+		Permissions: permResponse,
+	}, nil)
 }
 
 func mockTestMintIamPermissionsSuccess(mockGCPClient *mockgcp.MockClient) {
