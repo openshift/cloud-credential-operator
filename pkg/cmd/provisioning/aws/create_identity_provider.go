@@ -95,22 +95,33 @@ type JSONWebKeySet struct {
 	Keys []jose.JSONWebKey `json:"keys"`
 }
 
-func createIdentityProvider(client aws.Client, name, region, publicKeyPath, targetDir string, generateOnly bool) (string, error) {
+func createIdentityProvider(client aws.Client, name, region, publicKeyPath, targetDir string, generateOnly, configureS3Bucket bool) (string, error) {
 	// Create the S3 bucket
 	bucketName := fmt.Sprintf("%s-oidc", name)
-	if err := createOIDCBucket(client, bucketName, name, region, targetDir, generateOnly); err != nil {
-		return "", err
+	log.Printf("Configure S3 bucket: %v\n", configureS3Bucket)
+	if !configureS3Bucket {
+		log.Printf("Not configuring s3 bucket, expecting OIDC configuration and bucket to be created separately\n")
+	}
+
+	if configureS3Bucket {
+		if err := createOIDCBucket(client, bucketName, name, region, targetDir, generateOnly); err != nil {
+			return "", err
+		}
 	}
 	issuerURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
 
 	// Create the OIDC config file
-	if err := createOIDCConfiguration(client, bucketName, issuerURL, name, targetDir, generateOnly); err != nil {
-		return "", err
+	if configureS3Bucket {
+		if err := createOIDCConfiguration(client, bucketName, issuerURL, name, targetDir, generateOnly); err != nil {
+			return "", err
+		}
 	}
 
 	// Create the OIDC key list
-	if err := createJSONWebKeySet(client, publicKeyPath, bucketName, name, targetDir, generateOnly); err != nil {
-		return "", err
+	if configureS3Bucket {
+		if err := createJSONWebKeySet(client, publicKeyPath, bucketName, name, targetDir, generateOnly); err != nil {
+			return "", err
+		}
 	}
 
 	// Create the IAM Identity Provider
@@ -474,7 +485,7 @@ func createIdentityProviderCmd(cmd *cobra.Command, args []string) {
 		publicKeyPath = filepath.Join(CreateIdentityProviderOpts.TargetDir, publicKeyFile)
 	}
 
-	_, err = createIdentityProvider(awsClient, CreateIdentityProviderOpts.Name, CreateIdentityProviderOpts.Region, publicKeyPath, CreateIdentityProviderOpts.TargetDir, CreateIdentityProviderOpts.DryRun)
+	_, err = createIdentityProvider(awsClient, CreateIdentityProviderOpts.Name, CreateIdentityProviderOpts.Region, publicKeyPath, CreateIdentityProviderOpts.TargetDir, CreateIdentityProviderOpts.DryRun, CreateIdentityProviderOpts.ConfigureS3Bucket)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -527,6 +538,7 @@ func NewCreateIdentityProviderCmd() *cobra.Command {
 	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 	createIdentityProviderCmd.PersistentFlags().BoolVar(&CreateIdentityProviderOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createIdentityProviderCmd.PersistentFlags().BoolVar(&CreateIdentityProviderOpts.ConfigureS3Bucket, "configure-s3-bucket", true, "Create and configure S3 bucket with OIDC configuration")
 
 	return createIdentityProviderCmd
 }

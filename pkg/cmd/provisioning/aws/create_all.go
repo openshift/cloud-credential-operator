@@ -44,7 +44,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create public/private key pair: %s", err)
 	}
 
-	identityProviderARN, err := createIdentityProvider(awsClient, CreateAllOpts.Name, CreateAllOpts.Region, publicKeyPath, CreateAllOpts.TargetDir, false)
+	identityProviderARN, err := createIdentityProvider(awsClient, CreateAllOpts.Name, CreateAllOpts.Region, publicKeyPath, CreateAllOpts.TargetDir, false, true)
 	if err != nil {
 		log.Fatalf("Failed to create Identity provider: %s", err)
 	}

@@ -12,6 +12,7 @@ type options struct {
 	CredRequestDir      string
 	IdentityProviderARN string
 	DryRun              bool
+	ConfigureS3Bucket   bool
 }
 
 // NewAWSCmd implements the "aws" subcommand for the credentials provisioning

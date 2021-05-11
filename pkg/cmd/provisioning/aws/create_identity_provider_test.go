@@ -44,13 +44,14 @@ const (
 func TestCreateIdentityProvider(t *testing.T) {
 
 	tests := []struct {
-		name          string
-		mockAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
-		setup         func(*testing.T) string
-		verify        func(t *testing.T, tempDirName string)
-		cleanup       func(*testing.T)
-		generateOnly  bool
-		expectError   bool
+		name              string
+		mockAWSClient     func(mockCtrl *gomock.Controller) *mockaws.MockClient
+		setup             func(*testing.T) string
+		verify            func(t *testing.T, tempDirName string)
+		cleanup           func(*testing.T)
+		generateOnly      bool
+		configureS3Bucket bool
+		expectError       bool
 	}{
 		{
 			name: "Public key not found",
@@ -145,8 +146,9 @@ func TestCreateIdentityProvider(t *testing.T) {
 				require.NoError(t, err, "error calculating expected key id")
 				assert.Equalf(t, expectedKeyID, kid, "unexpected key id")
 			},
-			generateOnly: true,
-			expectError:  false,
+			generateOnly:      true,
+			configureS3Bucket: true,
+			expectError:       false,
 		},
 	}
 
@@ -162,7 +164,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
 
-			_, err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName, test.generateOnly)
+			_, err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName, test.generateOnly, test.configureS3Bucket)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
