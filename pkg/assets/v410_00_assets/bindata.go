@@ -74,15 +74,6 @@ rules:
   - get
   - watch
   - list
-- apiGroups:
-  - certificates.k8s.io
-  resources:
-  - certificatesigningrequests
-  verbs:
-  - create
-  - get
-  - list
-  - watch
 `)
 
 func v410AwsPodIdentityWebhookClusterroleYamlBytes() ([]byte, error) {
