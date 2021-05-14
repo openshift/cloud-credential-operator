@@ -108,7 +108,6 @@ data:
   ovirt_url: Base64encodeURL
   ovirt_username: Base64encodeUsername
   ovirt_password: Base64encodePassword
-  ovirt_cafile: Base64encodeCAFile
   ovirt_insecure: Base64encodeInsecure
   ovirt_ca_bundle: Base64encodeCABundle
 ```
