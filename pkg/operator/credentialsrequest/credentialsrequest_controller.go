@@ -786,7 +786,8 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 	case configv1.KubevirtPlatformType:
 		return cloudType == reflect.TypeOf(minterv1.KubevirtProviderSpec{}).Name(), nil
 	default:
-		return false, fmt.Errorf("unsupported platorm type: %v", clusterCloudPlatform)
+		// Unsupported platform, not considered an error. (i.e. bare metal)
+		return false, nil
 	}
 }
 
