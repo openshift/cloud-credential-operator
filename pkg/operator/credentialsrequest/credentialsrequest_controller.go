@@ -677,7 +677,7 @@ func setFailedToProvisionCredentialsRequest(cr *minterv1.CredentialsRequest, fai
 		updateCheck utils.UpdateConditionCheck
 	)
 	if failed {
-		msg = fmt.Sprintf("failed to grant creds: %v", err)
+		msg = fmt.Sprintf("failed to grant creds: %v", utils.ErrorScrub(err))
 		status = corev1.ConditionTrue
 		reason = credentialsProvisionFailure
 		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
@@ -698,7 +698,7 @@ func setCredentialsDeprovisionFailureCondition(cr *minterv1.CredentialsRequest, 
 		updateCheck utils.UpdateConditionCheck
 	)
 	if failed {
-		msg = fmt.Sprintf("failed to deprovision resource: %v", err)
+		msg = fmt.Sprintf("failed to deprovision resource: %v", utils.ErrorScrub(err))
 		status = corev1.ConditionTrue
 		reason = cloudCredDeprovisionFailure
 		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
