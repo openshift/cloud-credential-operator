@@ -20,6 +20,7 @@ import (
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
 	"github.com/openshift/cloud-credential-operator/pkg/kubevirt"
 	"github.com/openshift/cloud-credential-operator/pkg/openstack"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/awspodidentity"
@@ -105,6 +106,15 @@ func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 				log.Fatalf("missing GCP configuration in platform status")
 			}
 			a, err = gcpactuator.NewActuator(m.GetClient(), infraStatus.PlatformStatus.GCP.ProjectID)
+			if err != nil {
+				return err
+			}
+		case configv1.IBMCloudPlatformType:
+			log.Info("initializing IBMCloud actuator")
+			if infraStatus.PlatformStatus == nil || infraStatus.PlatformStatus.IBMCloud == nil {
+				log.Fatalf("missing IBMCloud configuration in platform status")
+			}
+			a, err = ibmcloud.NewActuator(m.GetClient())
 			if err != nil {
 				return err
 			}

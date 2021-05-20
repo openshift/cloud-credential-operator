@@ -169,6 +169,8 @@ func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
 		secretKey.Name = constants.AzureCloudCredSecretName
 	case configv1.GCPPlatformType:
 		secretKey.Name = constants.GCPCloudCredSecretName
+	case configv1.IBMCloudPlatformType:
+		secretKey.Name = constants.IBMCloudCredSecretName
 	case configv1.OpenStackPlatformType:
 		secretKey.Name = constants.OpenStackCloudCredsSecretName
 	case configv1.OvirtPlatformType:
@@ -193,6 +195,8 @@ func cloudProviderSpecToMetricsKey(cloud string) string {
 		return "azure"
 	case "GCPProviderSpec":
 		return "gcp"
+	case "IBMCloudProviderSpec":
+		return "ibmcloud"
 	case "OpenStackProviderSpec":
 		return "openstack"
 	case "OvirtProviderSpec":

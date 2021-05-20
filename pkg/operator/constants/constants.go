@@ -113,6 +113,9 @@ const (
 	// GCPCloudCredSecretName is the name of the secret created by the installer containing cloud creds.
 	GCPCloudCredSecretName = "gcp-credentials"
 
+	// IBMCloudCredSecretName is the name of the secret created by the installer containing cloud creds.
+	IBMCloudCredSecretName = "ibmcloud-credentials"
+
 	// OpenStackCloudCredsSecretName is the name of the secret created by the installer containing cloud creds.
 	OpenStackCloudCredsSecretName = "openstack-credentials"
 

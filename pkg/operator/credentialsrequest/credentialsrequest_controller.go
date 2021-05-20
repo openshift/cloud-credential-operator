@@ -342,6 +342,7 @@ func isAdminCredSecret(namespace, secretName string) bool {
 		if secretName == constants.AWSCloudCredSecretName ||
 			secretName == constants.AzureCloudCredSecretName ||
 			secretName == constants.GCPCloudCredSecretName ||
+			secretName == constants.IBMCloudCredSecretName ||
 			secretName == constants.OpenStackCloudCredsSecretName ||
 			secretName == constants.OvirtCloudCredsSecretName ||
 			secretName == constants.KubevirtCloudCredSecretName ||
@@ -777,6 +778,8 @@ func crInfraMatches(cr *minterv1.CredentialsRequest, clusterCloudPlatform config
 		return cloudType == reflect.TypeOf(minterv1.AzureProviderSpec{}).Name(), nil
 	case configv1.GCPPlatformType:
 		return cloudType == reflect.TypeOf(minterv1.GCPProviderSpec{}).Name(), nil
+	case configv1.IBMCloudPlatformType:
+		return cloudType == reflect.TypeOf(minterv1.IBMCloudProviderSpec{}).Name(), nil
 	case configv1.OpenStackPlatformType:
 		return cloudType == reflect.TypeOf(minterv1.OpenStackProviderSpec{}).Name(), nil
 	case configv1.OvirtPlatformType:

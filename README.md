@@ -17,7 +17,7 @@ instance roles)
 
 # Cloud Providers
 
-Currently the operator supports AWS, Azure, GCP, KubeVirt, OpenStack. oVirt and VMWare.
+Currently the operator supports AWS, Azure, GCP, IBMCloud, KubeVirt, OpenStack. oVirt and VMWare.
 
 ## Credentials Root Secret Formats
 
@@ -69,6 +69,18 @@ metadata:
   name: gcp-credentials
 data:
   service_account.json: Base64encodeServiceAccount
+```
+
+### IBMCloud
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  namespace: kube-system
+  name: ibmcloud-credentials
+data:
+  ibmcloud_api_key: Base64encodeAPIKey
 ```
 
 ### Kubevirt
@@ -174,7 +186,7 @@ Cons:
   * Credential permissions may need to be manually updated prior to any upgrade.
   * Each component has permissions used by all other components.
 
-Supported clouds: AWS, GCP, Azure, VMWare, OpenStack, oVirt, KubeVirt
+Supported clouds: AWS, GCP, IBMCloud, Azure, VMWare, OpenStack, oVirt, KubeVirt
 
 ## 3. Manual Credentials Management
 

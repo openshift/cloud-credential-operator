@@ -394,6 +394,8 @@ func getWatchedSecrets(platformType configv1.PlatformType) []types.NamespacedNam
 		rootSecret.Name = constants.AzureCloudCredSecretName
 	case configv1.GCPPlatformType:
 		rootSecret.Name = constants.GCPCloudCredSecretName
+	case configv1.IBMCloudPlatformType:
+		rootSecret.Name = constants.IBMCloudCredSecretName
 	case configv1.OpenStackPlatformType:
 		rootSecret.Name = constants.OpenStackCloudCredsSecretName
 	case configv1.OvirtPlatformType:
