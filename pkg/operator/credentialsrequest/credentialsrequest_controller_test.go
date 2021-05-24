@@ -175,12 +175,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
@@ -217,12 +216,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
@@ -255,12 +253,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -329,12 +326,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -370,12 +366,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -405,12 +400,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -442,13 +436,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID2,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey2,
-						string(targetSecret.Data["aws_secret_access_key"]))
-					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID2,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey2,
+					string(targetSecret.Data["aws_secret_access_key"]))
+				assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -481,13 +474,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID2,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey2,
-						string(targetSecret.Data["aws_secret_access_key"]))
-					assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID2,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey2,
+					string(targetSecret.Data["aws_secret_access_key"]))
+				assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -574,12 +566,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testRootAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testRootAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testRootAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testRootAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -614,12 +605,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -652,12 +642,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -820,12 +809,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID2,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey2,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID2,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey2,
+					string(targetSecret.Data["aws_secret_access_key"]))
 			},
 		},
 		{
@@ -946,12 +934,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
@@ -1273,12 +1260,11 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testRootAWSAccessKeyID,
-						string(targetSecret.Data["aws_access_key_id"]))
-					assert.Equal(t, testRootAWSSecretAccessKey,
-						string(targetSecret.Data["aws_secret_access_key"]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testRootAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testRootAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
 				assert.Equal(t, testCredRootSecretResourceVersion, cr.Status.LastSyncCloudCredsSecretResourceVersion)
