@@ -29,6 +29,8 @@ import (
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -238,6 +240,8 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// needs update
 				mockGetRole(mockGCPClient)
 				mockListServicesEnabled(mockGCPClient)
+				mockGetProjectName(mockGCPClient)
+				mockGetServiceAccount(mockGCPClient)
 
 				return mockGCPClient
 			},
@@ -322,6 +326,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// needs update
 				mockGetRole(mockGCPClient)
 				mockListServicesEnabled(mockGCPClient)
+				mockGetServiceAccount(mockGCPClient)
 
 				// create service account key
 				mockGetRole(mockGCPClient)
@@ -340,6 +345,60 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 					annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
 					assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				}
+				cr := getCredRequest(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "cred exists but service account is deleted",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testProvisionedGCPCredentialsRequest(t),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetProjectName(mockGCPClient)
+
+				// needs update
+				mockGetRole(mockGCPClient)
+				mockListServicesEnabled(mockGCPClient)
+				mockGetDeletedServiceAccount(mockGCPClient)
+
+				// create service account key
+				mockGetRole(mockGCPClient)
+				mockListServicesEnabled(mockGCPClient)
+				mockGetDeletedServiceAccount(mockGCPClient)
+				mockGetProjectIamPolicy(mockGCPClient, testValidPolicyBindings)
+				mockListServiceAccountKeys(mockGCPClient, testServiceAccountKeyName)
+				mockCreateServiceAccount(mockGCPClient)
+				mockSetProjectIamPolicy(mockGCPClient)
+				mockDeleteServiceAccountKey(mockGCPClient, testServiceAccountKeyName)
+				mockCreateServiceAccountKey(mockGCPClient, "NEW AUTH KEY DATA")
+
+				return mockGCPClient
+			},
+			mockReadGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+
+				// needs update
+				mockGetProjectName(mockGCPClient)
+				mockGetServiceAccountFailed(mockGCPClient)
+
+				return mockGCPClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, "NEW AUTH KEY DATA", string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
+				assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				cr := getCredRequest(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -788,6 +847,12 @@ func testGCPCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	return cr
 }
 
+func testProvisionedGCPCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
+	cr := testGCPCredentialsRequest(t)
+	cr.Status.Provisioned = true
+	return cr
+}
+
 func testGCPCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testGCPCredentialsRequest(t)
 	now := metav1.Now()
@@ -862,7 +927,7 @@ func mockGetProjectName(mockGCPClient *mockgcp.MockClient) {
 }
 
 func mockGetServiceAccount(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).Return(&iamadminpb.ServiceAccount{
+	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).AnyTimes().Return(&iamadminpb.ServiceAccount{
 		Name:  testGCPServiceAccountID,
 		Email: fmt.Sprintf("%s@%s.iam.gserviceaccount.com", testGCPServiceAccountID, testGCPProjectName),
 	}, nil)
@@ -870,6 +935,11 @@ func mockGetServiceAccount(mockGCPClient *mockgcp.MockClient) {
 
 func mockGetServiceAccountFailed(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("TEST ERROR"))
+}
+
+func mockGetDeletedServiceAccount(mockGCPClient *mockgcp.MockClient) {
+	serviceAccountNotFoundError := status.Error(codes.NotFound, "service account not found")
+	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).Return(nil, serviceAccountNotFoundError)
 }
 
 func mockGetProjectIamPolicy(mockGCPClient *mockgcp.MockClient, bindings []*cloudresourcemanager.Binding) {
@@ -952,6 +1022,12 @@ func mockListServiceAccountKeys(mockGCPClient *mockgcp.MockClient, customName st
 
 func mockDeleteServiceAccount(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().DeleteServiceAccount(gomock.Any(), gomock.Any()).Return(nil)
+}
+
+func mockCreateServiceAccount(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any()).Return(&iamadminpb.ServiceAccount{
+		DisplayName: testServiceAccountKeyName,
+	}, nil)
 }
 
 func mockCreateServiceAccountKey(mockGCPClient *mockgcp.MockClient, privateKeyData string) {
