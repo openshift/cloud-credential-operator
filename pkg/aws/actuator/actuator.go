@@ -190,7 +190,18 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			UserName: aws.String(awsStatus.User),
 		})
 		if err != nil {
-			logger.WithError(err).Errorf("error getting user: %s", user)
+			if aerr, ok := err.(awserr.Error); ok {
+				switch aerr.Code() {
+				case iam.ErrCodeNoSuchEntityException:
+					// Current user does not exist, we unset the user in the status and create a new one
+					logger.Errorf("user %s does not exist, creating a new user", awsStatus.User)
+					awsStatus.User = ""
+					return true, nil
+				default:
+					return true, formatAWSErr(aerr)
+				}
+			}
+			logger.WithError(err).Errorf("unknown error getting user: %s", user)
 			return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
 		}
 
