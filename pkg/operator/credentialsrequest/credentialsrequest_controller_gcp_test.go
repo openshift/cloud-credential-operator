@@ -139,9 +139,8 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret, "expected non-empty target secret to exist") {
-					assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
-				}
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -181,9 +180,8 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -294,11 +292,10 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, "NEW PRIVATE DATA", string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
-					annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
-					assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, "NEW PRIVATE DATA", string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
+				assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				cr := getCredRequest(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -335,11 +332,10 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret) {
-					assert.Equal(t, "NEW AUTH KEY DATA", string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
-					annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
-					assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
-				}
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, "NEW AUTH KEY DATA", string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
+				assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				cr := getCredRequest(c)
 				assert.True(t, cr.Status.Provisioned)
 			},
@@ -562,9 +558,8 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret, "expected non-empty target secret to exist") {
-					assert.Equal(t, testRootGCPAuth, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
-				}
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, testRootGCPAuth, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -632,9 +627,8 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret, "expected non-empty target secret to exist") {
-					assert.Equal(t, testRootGCPAuth, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
-				}
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, testRootGCPAuth, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -670,10 +664,9 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret, "expected non-empty target secret to exist") {
-					// existing secret has old/unchanged content
-					assert.Equal(t, testRootGCPAuth, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
-				}
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				// existing secret has old/unchanged content
+				assert.Equal(t, testRootGCPAuth, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)

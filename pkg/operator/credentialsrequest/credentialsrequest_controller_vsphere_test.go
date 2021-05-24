@@ -86,10 +86,8 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				assert.NotNil(t, targetSecret)
-				if assert.NotNil(t, targetSecret, "expected non-empty target secret to exist") {
-					assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
-				}
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -145,9 +143,8 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret, "expected non-empty target secret to exist") {
-					assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
-				}
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -166,10 +163,9 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
-				if assert.NotNil(t, targetSecret, "expected non-empty target secret to exist") {
-					// existing secret has updated content
-					assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
-				}
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				// existing secret has updated content
+				assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
