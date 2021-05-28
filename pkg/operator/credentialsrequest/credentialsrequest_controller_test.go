@@ -493,6 +493,47 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "cred exists but user is deleted",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testProvisionedCredentialsRequest(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				mockGetUser(mockAWSClient)
+				mockCreateUser(mockAWSClient)
+				mockTagUser(mockAWSClient)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockGetUserPolicy(mockAWSClient, testPolicy1)
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
+				assert.Equal(t, fmt.Sprintf("%s/%s", testNamespace, testCRName), targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
+
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
 			name: "cred exists credentials key missing",
 			existing: []runtime.Object{
 				testOperatorConfig(""),
@@ -1492,6 +1533,12 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	}
 
 	cr.Status.ProviderStatus = awsStatus
+	return cr
+}
+
+func testProvisionedCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
+	cr := testCredentialsRequest(t)
+	cr.Status.Provisioned = true
 	return cr
 }
 
