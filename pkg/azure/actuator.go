@@ -138,6 +138,23 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
 
+	cloudCredsSecret, err := a.GetCredentialsRootSecret(ctx, cr)
+	if err != nil {
+		logger.WithError(err).Error("issue with cloud credentials secret")
+		return true, err
+	}
+
+	azureCredentialsMinter, err := a.credentialMinterBuilder(
+		logger,
+		string(cloudCredsSecret.Data[AzureClientID]),
+		string(cloudCredsSecret.Data[AzureClientSecret]),
+		string(cloudCredsSecret.Data[AzureTenantID]),
+		string(cloudCredsSecret.Data[AzureSubscriptionID]),
+	)
+	if err != nil {
+		return true, fmt.Errorf("unable to create azure cred minter: %v", err)
+	}
+
 	if azureStatus.ServicePrincipalName == "" {
 		// passthrough-specifc checks here
 
@@ -149,6 +166,17 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		// If the cloud credentials secret has been updated in passthrough mode, we need an update
 		if credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion {
 			logger.Debug("root cloud creds have changed, update is needed")
+			return true, nil
+		}
+	} else {
+		// mint-specific checks here
+
+		spItems, err := azureCredentialsMinter.spClient.List(ctx, fmt.Sprintf("appId eq '%v'", azureStatus.AppID))
+		if err != nil {
+			return true, err
+		}
+		if len(spItems) == 0 {
+			log.Warnf("ServicePrincipal %s does not exist, creating a new ServicePrincipal", azureStatus.ServicePrincipalName)
 			return true, nil
 		}
 	}

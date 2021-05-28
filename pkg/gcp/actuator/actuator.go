@@ -455,6 +455,15 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 	if gcpStatus.ServiceAccountID != "" {
 		// serviceAccountID non-"" means we're in mint-mode
 
+		_, err := getServiceAccount(readClient, gcpStatus.ServiceAccountID)
+		if err != nil {
+			if status.Code(err) == codes.NotFound {
+				logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Debug("service account does not exist, creating a new one")
+				return serviceAPIsEnabled, true, nil
+			} else {
+				return serviceAPIsEnabled, true, fmt.Errorf("error checking for existing service account: %v", err)
+			}
+		}
 		// check if service account key in secret is still available
 		keyID, err := a.loadExistingSecretKeyAuthID(cr)
 		if err != nil {
@@ -542,7 +551,20 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating read GCP client")
-	return a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
+
+	// Test if the read-only client is working, if any error here we will fall back to using
+	// the root client.
+	gcpStatus, err := decodeProviderStatus(a.Codec, cr)
+	if err != nil {
+		return nil, err
+	}
+	_, err = getServiceAccount(client, gcpStatus.ServiceAccountID)
+	if err != nil {
+		logger.Warn("could not find read-only service account, falling back to root AWS client")
+		return a.buildRootGCPClient(cr)
+	}
+	return client, nil
 }
 
 func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Client, error) {
