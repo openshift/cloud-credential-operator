@@ -504,8 +504,12 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		return err
 	}
 
-	if clientSecret == "" {
+	if newClientSecret != "" {
 		clientSecret = newClientSecret
+	}
+
+	if clientSecret == "" {
+		return fmt.Errorf("client secret is empty")
 	}
 
 	if aadApp.AppID == nil {
