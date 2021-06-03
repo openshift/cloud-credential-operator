@@ -17,7 +17,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure/auth"
 	"github.com/Azure/go-autorest/autorest/date"
 	"github.com/Azure/go-autorest/autorest/to"
-	uuid "github.com/satori/go.uuid"
+	uuid "github.com/gofrs/uuid"
 
 	configv1 "github.com/openshift/api/config/v1"
 )
@@ -90,7 +90,11 @@ func (credMinter *AzureCredentialsMinter) CreateOrUpdateAADApplication(ctx conte
 	switch len(appItems) {
 	case 0:
 		credMinter.logger.Infof("Creating AAD application %q", aadAppName)
-		secret := uuid.NewV4().String()
+		uuid, err := uuid.NewV4()
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to generate UUID: %v", err)
+		}
+		secret := uuid.String()
 		app, err := credMinter.appClient.Create(ctx, graphrbac.ApplicationCreateParameters{
 			DisplayName:             to.StringPtr(aadAppName),
 			AvailableToOtherTenants: to.BoolPtr(false),
@@ -111,8 +115,12 @@ func (credMinter *AzureCredentialsMinter) CreateOrUpdateAADApplication(ctx conte
 		credMinter.logger.Infof("Found AAD application %q", aadAppName)
 		clientSecret := ""
 		if regenClientSecret {
-			secret := uuid.NewV4().String()
-			err := credMinter.appClient.UpdatePasswordCredentials(ctx, *appItems[0].ObjectID, graphrbac.PasswordCredentialsUpdateParameters{
+			uuid, err := uuid.NewV4()
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to generate UUID: %v", err)
+			}
+			secret := uuid.String()
+			err = credMinter.appClient.UpdatePasswordCredentials(ctx, *appItems[0].ObjectID, graphrbac.PasswordCredentialsUpdateParameters{
 				Value: &[]graphrbac.PasswordCredential{
 					{
 						Value:   &secret,
@@ -267,7 +275,11 @@ func (credMinter *AzureCredentialsMinter) AssignResourceScopedRole(ctx context.C
 			continue
 		}
 
-		raName := uuid.NewV4().String()
+		uuid, err := uuid.NewV4()
+		if err != nil {
+			return fmt.Errorf("failed to generate UUID: %v", err)
+		}
+		raName := uuid.String()
 
 		err = wait.PollImmediate(5*time.Second, 60*time.Second, func() (bool, error) {
 			credMinter.logger.Debugf("assigning role %s for resource group %s", *roleDefinition.Name, resourceGroup)
