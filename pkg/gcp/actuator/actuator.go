@@ -561,7 +561,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 	_, err = getServiceAccount(client, gcpStatus.ServiceAccountID)
 	if err != nil {
-		logger.Warn("could not find read-only service account, falling back to root AWS client")
+		logger.Warn("could not find read-only service account, falling back to root GCP client")
 		return a.buildRootGCPClient(cr)
 	}
 	return client, nil
