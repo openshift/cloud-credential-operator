@@ -2,6 +2,9 @@ package aws
 
 import (
 	"github.com/spf13/cobra"
+
+	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 )
 
 type options struct {
@@ -29,4 +32,15 @@ func NewAWSCmd() *cobra.Command {
 	createCmd.AddCommand(NewDeleteCmd())
 
 	return createCmd
+}
+
+func awsSession(region string) (*session.Session, error) {
+	cfg := awssdk.Config{
+		Region: awssdk.String(region),
+	}
+
+	return session.NewSessionWithOptions(session.Options{
+		Config:            cfg,
+		SharedConfigState: session.SharedConfigEnable,
+	})
 }
