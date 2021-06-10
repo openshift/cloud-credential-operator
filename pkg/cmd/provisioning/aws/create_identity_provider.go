@@ -20,7 +20,6 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
@@ -458,11 +457,7 @@ spec:
 }
 
 func createIdentityProviderCmd(cmd *cobra.Command, args []string) {
-	cfg := &awssdk.Config{
-		Region: awssdk.String(CreateIdentityProviderOpts.Region),
-	}
-
-	s, err := session.NewSession(cfg)
+	s, err := awsSession(CreateIdentityProviderOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
