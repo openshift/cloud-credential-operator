@@ -5,7 +5,6 @@ import (
 	"log"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
@@ -169,11 +168,7 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 }
 
 func deleteCmd(cmd *cobra.Command, args []string) {
-	cfg := &awssdk.Config{
-		Region: awssdk.String(DeleteOpts.Region),
-	}
-
-	s, err := session.NewSession(cfg)
+	s, err := awsSession(DeleteOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
