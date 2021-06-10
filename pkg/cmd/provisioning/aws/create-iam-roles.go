@@ -15,7 +15,6 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/iam"
 
 	"k8s.io/apimachinery/pkg/util/yaml"
@@ -286,11 +285,7 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 }
 
 func createIAMRolesCmd(cmd *cobra.Command, args []string) {
-	cfg := &awssdk.Config{
-		Region: awssdk.String(CreateIAMRolesOpts.Region),
-	}
-
-	s, err := session.NewSession(cfg)
+	s, err := awsSession(CreateIAMRolesOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
