@@ -81,10 +81,14 @@ func deleteOIDCBucket(client aws.Client, bucketName, namePrefix string) error {
 }
 
 // deleteIAMRoles deletes the IAM Roles created by ccoctl
-func deleteIAMRoles(client aws.Client, namePrefix string) error {
-	roleList, err := client.ListRoles(&iam.ListRolesInput{})
+func deleteIAMRoles(client aws.Client, namePrefix string, paginationMarker *string) error {
+	// iam.ListRolesInput results are paginated to 100 items by default, if result is truncated we need to
+	// fetch next set of items and perform delete operation
+	roleList, err := client.ListRoles(&iam.ListRolesInput{
+		Marker: paginationMarker,
+	})
 	if err != nil {
-		return errors.Wrapf(err, "failed to fetch a list of IAM roles")
+		return errors.Wrapf(err, "failed to fetch a list of IAM roles, pagination marker: %v", paginationMarker)
 	}
 
 	for _, roleMetadata := range roleList.Roles {
@@ -111,6 +115,10 @@ func deleteIAMRoles(client aws.Client, namePrefix string) error {
 				break
 			}
 		}
+	}
+
+	if *roleList.IsTruncated {
+		return deleteIAMRoles(client, namePrefix, roleList.Marker)
 	}
 
 	return nil
@@ -184,7 +192,7 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Print(err)
 	}
 
-	if err := deleteIAMRoles(awsClient, DeleteOpts.Name); err != nil {
+	if err := deleteIAMRoles(awsClient, DeleteOpts.Name, nil); err != nil {
 		log.Print(err)
 	}
 
