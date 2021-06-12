@@ -8,9 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
@@ -24,11 +21,7 @@ var (
 )
 
 func createAllCmd(cmd *cobra.Command, args []string) {
-	cfg := &awssdk.Config{
-		Region: awssdk.String(CreateAllOpts.Region),
-	}
-
-	s, err := session.NewSession(cfg)
+	s, err := awsSession(CreateAllOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
