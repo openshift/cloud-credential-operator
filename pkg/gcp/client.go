@@ -46,6 +46,7 @@ type Client interface {
 	GetRole(context.Context, *iamadminpb.GetRoleRequest) (*iamadminpb.Role, error)
 	GetServiceAccount(context.Context, *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error)
 	ListServiceAccountKeys(context.Context, *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error)
+	QueryTestablePermissions(context.Context, *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error)
 
 	//CloudResourceManager
 	GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
@@ -140,6 +141,12 @@ func (c *gcpClient) TestIamPermissions(projectName string, permRequest *cloudres
 		return nil, err
 	}
 	return response, nil
+}
+
+func (c *gcpClient) QueryTestablePermissions(ctx context.Context, request *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamClient.QueryTestablePermissions(ctx, request)
 }
 
 func (c *gcpClient) ListServicesEnabled() (map[string]bool, error) {

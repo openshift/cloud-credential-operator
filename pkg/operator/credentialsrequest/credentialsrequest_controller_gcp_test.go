@@ -555,6 +555,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				mockListServicesEnabled(mockGCPClient)
 
 				mockGetRole(mockGCPClient)
+				mockQueryableTestablePermissions(mockGCPClient)
 				mockTestIamPermissions(mockGCPClient)
 
 				return mockGCPClient
@@ -891,6 +892,17 @@ func mockGetRole(mockGCPClient *mockgcp.MockClient) {
 func mockListServicesEnabled(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().ListServicesEnabled().Return(map[string]bool{
 		testServiceAPIName: true,
+	}, nil)
+}
+
+func mockQueryableTestablePermissions(mockGCPClient *mockgcp.MockClient) {
+	permResponse := []*iamadminpb.Permission{}
+
+	for _, perm := range testRolePermissions {
+		permResponse = append(permResponse, &iamadminpb.Permission{Name: perm})
+	}
+	mockGCPClient.EXPECT().QueryTestablePermissions(gomock.Any(), gomock.Any()).Return(&iamadminpb.QueryTestablePermissionsResponse{
+		Permissions: permResponse,
 	}, nil)
 }
 
