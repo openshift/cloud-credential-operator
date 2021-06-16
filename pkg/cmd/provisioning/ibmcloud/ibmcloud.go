@@ -7,7 +7,6 @@ import (
 type options struct {
 	TargetDir      string
 	CredRequestDir string
-	DryRun         bool
 }
 
 // NewIBMCloudCmd implements the "ibmcloud" subcommand for the credentials provisioning

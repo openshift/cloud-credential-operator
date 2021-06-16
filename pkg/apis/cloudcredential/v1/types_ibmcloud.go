@@ -27,3 +27,9 @@ import (
 type IBMCloudProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 }
+
+// IBMCloudProviderStatus contains the status of the IBM Cloud credentials request.
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+type IBMCloudProviderStatus struct {
+	metav1.TypeMeta `json:",inline"`
+}
