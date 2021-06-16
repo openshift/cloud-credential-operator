@@ -212,6 +212,7 @@ Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 AWS | Y | 4.4+ | Y | 4.3+ | 4.6+ (expected)
 Azure | Y | N | Y | Y | N
 GCP | Y | 4.7+ | Y | Y | N
+IBMCloud | N | N | N | Y | N
 KubeVirt | N | N | Y | N | N
 OpenStack | N | N | Y | N | N
 oVirt | N | N | Y | N | N
