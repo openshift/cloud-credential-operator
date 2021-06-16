@@ -17,7 +17,7 @@ func NewIBMCloudCmd() *cobra.Command {
 		Long:  "Creating/deleting cloud credentials objects for IBM Cloud",
 	}
 
-	createCmd.AddCommand(NewCreateCmd())
+	createCmd.AddCommand(NewCreateSecretsCmd())
 
 	return createCmd
 }
