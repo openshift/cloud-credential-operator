@@ -22,7 +22,7 @@ import (
 
 // TODO: these types should eventually be broken out, along with the actuator, to a separate repo.
 
-// IBMCloudProviderSpec the specification of the credentials request in IBM Cloud.
+// IBMCloudProviderSpec is the specification of the credentials request in IBM Cloud.
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type IBMCloudProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
