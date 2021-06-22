@@ -2,3 +2,4 @@
 .vscode/
 /_output/
 .idea/
+coverage.out

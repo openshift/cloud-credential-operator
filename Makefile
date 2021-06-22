@@ -126,3 +126,7 @@ vet: verify-govet
 
 build-no-gen: build
 .PHONY: build-no-gen
+
+coverage:
+	hack/codecov.sh
+.PHONY: coverage
