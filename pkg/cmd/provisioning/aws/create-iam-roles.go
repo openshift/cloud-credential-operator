@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -27,19 +26,6 @@ import (
 
 const (
 	rolePolicyDocmentTemplate = `{ "Version": "2012-10-17", "Statement": [ { "Effect": "Allow", "Principal": { "Federated": "%s" }, "Action": "sts:AssumeRoleWithWebIdentity", "Condition": %s } ] }`
-
-	roleTemplate = `{
-	"RoleName": "%s",
-	"AssumeRolePolicyDocument": "%s",
-	"PermissionsBoundary": "%s",
-	"Description": "%s"
-}`
-
-	rolePolicyTemplate = `{
-	"RoleName": "%s",
-	"PolicyName": "%s",
-	"PolicyDocument": "%s"
-}`
 
 	secretManifestsTemplate = `apiVersion: v1
 stringData:
@@ -133,22 +119,49 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 	switch generateOnly {
 	case true:
 		// Generate Role
-		// Need to escape all the double quotes in the generated JSON rolePolicyDocument
-		// so that the JSON text file is valid
-		escapedRolePolicyDoc := strings.Replace(rolePolicyDocument, "\"", "\\\"", -1)
-		roleJSON := fmt.Sprintf(roleTemplate, shortenedRoleName, escapedRolePolicyDoc, PermissionsBoundaryARN, roleDescription)
+		// Generated JSON must be valid input for AWS IAM CreateRole API
+		roleTemplate := map[string]interface{}{
+			"RoleName":                 shortenedRoleName,
+			"Description":              roleDescription,
+			"AssumeRolePolicyDocument": rolePolicyDocument,
+			"Tags": []map[string]string{
+				{
+					"Key":   fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name),
+					"Value": ownedCcoctlAWSResourceTagValue,
+				},
+				{
+					"Key":   nameTagKey,
+					"Value": name,
+				},
+			},
+		}
+		if PermissionsBoundaryARN != "" {
+			roleTemplate["PermissionsBoundary"] = PermissionsBoundaryARN
+		}
+		roleJSON, err := json.Marshal(&roleTemplate)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to convert Role to JSON")
+		}
 		roleFilename := fmt.Sprintf(roleFilenameFormat, roleNum, roleName)
 		roleFullPath := filepath.Join(targetDir, roleFilename)
-		if err := saveToFile(roleDescription, roleFullPath, []byte(roleJSON)); err != nil {
+		if err := saveToFile(roleDescription, roleFullPath, roleJSON); err != nil {
 			return "", errors.Wrap(err, "failed to save Role content JSON")
 		}
 
 		// Generate Role Policy
-		escapedRolePolicy := strings.Replace(rolePolicy, "\"", "\\\"", -1)
-		rolePolicyJSON := fmt.Sprintf(rolePolicyTemplate, shortenedRoleName, shortenedRoleName, escapedRolePolicy)
+		// Generated JSON must be valid input for AWS IAM PutRolePolicy API
+		rolePolicyTemplate := map[string]string{
+			"PolicyDocument": rolePolicy,
+			"PolicyName":     shortenedRoleName,
+			"RoleName":       shortenedRoleName,
+		}
+		rolePolicyJSON, err := json.Marshal(&rolePolicyTemplate)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to convert Role Policy to JSON")
+		}
 		rolePolicyFilename := fmt.Sprintf(rolePolicyFilenameFormat, roleNum, roleName)
 		rolePolicyFullPath := filepath.Join(targetDir, rolePolicyFilename)
-		if err := saveToFile(roleDescription, rolePolicyFullPath, []byte(rolePolicyJSON)); err != nil {
+		if err := saveToFile(roleDescription, rolePolicyFullPath, rolePolicyJSON); err != nil {
 			return "", errors.Wrap(err, "failed to save Role Policy content JSON")
 		}
 
