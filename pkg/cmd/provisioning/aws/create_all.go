@@ -42,7 +42,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create Identity provider: %s", err)
 	}
 
-	err = createIAMRoles(awsClient, identityProviderARN, CreateAllOpts.Name, CreateAllOpts.CredRequestDir, CreateAllOpts.TargetDir, false)
+	err = createIAMRoles(awsClient, identityProviderARN, CreateAllOpts.PermissionsBoundaryARN, CreateAllOpts.Name, CreateAllOpts.CredRequestDir, CreateAllOpts.TargetDir, false)
 	if err != nil {
 		log.Fatalf("Failed to process IAM Roles: %s", err)
 	}
@@ -99,6 +99,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("name")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.Region, "region", "", "AWS region where the S3 OpenID Connect endpoint will be created")
 	createAllCmd.MarkPersistentFlagRequired("region")
+	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.PermissionsBoundaryARN, "permissions-boundary-arn", "", "ARN of IAM policy to use as the permissions boundary for created roles")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=aws' against an OpenShift release image)")
 	createAllCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
