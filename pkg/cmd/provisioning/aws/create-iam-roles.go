@@ -8,7 +8,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -26,18 +25,6 @@ import (
 
 const (
 	rolePolicyDocmentTemplate = `{ "Version": "2012-10-17", "Statement": [ { "Effect": "Allow", "Principal": { "Federated": "%s" }, "Action": "sts:AssumeRoleWithWebIdentity", "Condition": %s } ] }`
-
-	roleTemplate = `{
-	"RoleName": "%s",
-	"AssumeRolePolicyDocument": "%s",
-	"Description": "%s"
-}`
-
-	rolePolicyTemplate = `{
-	"RoleName": "%s",
-	"PolicyName": "%s",
-	"PolicyDocument": "%s"
-}`
 
 	secretManifestsTemplate = `apiVersion: v1
 stringData:
@@ -60,7 +47,7 @@ var (
 	}
 )
 
-func createIAMRoles(client aws.Client, identityProviderARN, name, credReqDir, targetDir string, generateOnly bool) error {
+func createIAMRoles(client aws.Client, identityProviderARN, PermissionsBoundaryARN, name, credReqDir, targetDir string, generateOnly bool) error {
 	// Process directory
 	credRequests, err := getListOfCredentialsRequests(credReqDir)
 	if err != nil {
@@ -68,14 +55,14 @@ func createIAMRoles(client aws.Client, identityProviderARN, name, credReqDir, ta
 	}
 
 	// Create IAM Roles (with policies)
-	if err := processCredentialsRequests(client, credRequests, identityProviderARN, name, targetDir, generateOnly); err != nil {
+	if err := processCredentialsRequests(client, credRequests, identityProviderARN, PermissionsBoundaryARN, name, targetDir, generateOnly); err != nil {
 		return errors.Wrap(err, "Failed while processing each CredentialsRequest")
 	}
 
 	return nil
 }
 
-func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.CredentialsRequest, identityProviderARN, name, targetDir string, generateOnly bool) error {
+func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.CredentialsRequest, identityProviderARN, PermissionsBoundaryARN, name, targetDir string, generateOnly bool) error {
 
 	issuerURL, err := getIssuerURLFromIdentityProvider(awsClient, identityProviderARN)
 	if err != nil {
@@ -84,7 +71,7 @@ func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.Cred
 
 	for i, cr := range credReqs {
 		// infraName-targetNamespace-targetSecretName
-		_, err = createRole(awsClient, name, cr, i, identityProviderARN, issuerURL, targetDir, generateOnly)
+		_, err = createRole(awsClient, name, cr, i, identityProviderARN, issuerURL, PermissionsBoundaryARN, targetDir, generateOnly)
 		if err != nil {
 			return err
 		}
@@ -93,7 +80,7 @@ func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.Cred
 	return nil
 }
 
-func createRole(awsClient aws.Client, name string, credReq *credreqv1.CredentialsRequest, roleNum int, oidcProviderARN, issuerURL, targetDir string, generateOnly bool) (string, error) {
+func createRole(awsClient aws.Client, name string, credReq *credreqv1.CredentialsRequest, roleNum int, oidcProviderARN, issuerURL, PermissionsBoundaryARN, targetDir string, generateOnly bool) (string, error) {
 	roleName := fmt.Sprintf("%s-%s-%s", name, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name)
 
 	// Decode AWSProviderSpec
@@ -131,22 +118,49 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 	switch generateOnly {
 	case true:
 		// Generate Role
-		// Need to escape all the double quotes in the generated JSON rolePolicyDocument
-		// so that the JSON text file is valid
-		escapedRolePolicyDoc := strings.Replace(rolePolicyDocument, "\"", "\\\"", -1)
-		roleJSON := fmt.Sprintf(roleTemplate, shortenedRoleName, escapedRolePolicyDoc, roleDescription)
+		// Generated JSON must be valid input for AWS IAM CreateRole API
+		roleTemplate := map[string]interface{}{
+			"RoleName":                 shortenedRoleName,
+			"Description":              roleDescription,
+			"AssumeRolePolicyDocument": rolePolicyDocument,
+			"Tags": []map[string]string{
+				{
+					"Key":   fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name),
+					"Value": ownedCcoctlAWSResourceTagValue,
+				},
+				{
+					"Key":   nameTagKey,
+					"Value": name,
+				},
+			},
+		}
+		if PermissionsBoundaryARN != "" {
+			roleTemplate["PermissionsBoundary"] = PermissionsBoundaryARN
+		}
+		roleJSON, err := json.Marshal(&roleTemplate)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to convert Role to JSON")
+		}
 		roleFilename := fmt.Sprintf(roleFilenameFormat, roleNum, roleName)
 		roleFullPath := filepath.Join(targetDir, roleFilename)
-		if err := saveToFile(roleDescription, roleFullPath, []byte(roleJSON)); err != nil {
+		if err := saveToFile(roleDescription, roleFullPath, roleJSON); err != nil {
 			return "", errors.Wrap(err, "failed to save Role content JSON")
 		}
 
 		// Generate Role Policy
-		escapedRolePolicy := strings.Replace(rolePolicy, "\"", "\\\"", -1)
-		rolePolicyJSON := fmt.Sprintf(rolePolicyTemplate, shortenedRoleName, shortenedRoleName, escapedRolePolicy)
+		// Generated JSON must be valid input for AWS IAM PutRolePolicy API
+		rolePolicyTemplate := map[string]string{
+			"PolicyDocument": rolePolicy,
+			"PolicyName":     shortenedRoleName,
+			"RoleName":       shortenedRoleName,
+		}
+		rolePolicyJSON, err := json.Marshal(&rolePolicyTemplate)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to convert Role Policy to JSON")
+		}
 		rolePolicyFilename := fmt.Sprintf(rolePolicyFilenameFormat, roleNum, roleName)
 		rolePolicyFullPath := filepath.Join(targetDir, rolePolicyFilename)
-		if err := saveToFile(roleDescription, rolePolicyFullPath, []byte(rolePolicyJSON)); err != nil {
+		if err := saveToFile(roleDescription, rolePolicyFullPath, rolePolicyJSON); err != nil {
 			return "", errors.Wrap(err, "failed to save Role Policy content JSON")
 		}
 
@@ -168,7 +182,7 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 				switch aerr.Code() {
 				case iam.ErrCodeNoSuchEntityException:
 
-					roleOutput, err := awsClient.CreateRole(&iam.CreateRoleInput{
+					roleInput := &iam.CreateRoleInput{
 						RoleName:                 awssdk.String(shortenedRoleName),
 						Description:              awssdk.String(roleDescription),
 						AssumeRolePolicyDocument: awssdk.String(rolePolicyDocument),
@@ -182,7 +196,11 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 								Value: awssdk.String(name),
 							},
 						},
-					})
+					}
+					if PermissionsBoundaryARN != "" {
+						roleInput.PermissionsBoundary = awssdk.String(PermissionsBoundaryARN)
+					}
+					roleOutput, err := awsClient.CreateRole(roleInput)
 					if err != nil {
 						return "", errors.Wrap(err, "Failed to create role")
 					}
@@ -292,7 +310,7 @@ func createIAMRolesCmd(cmd *cobra.Command, args []string) {
 
 	awsClient := aws.NewClientFromSession(s)
 
-	err = createIAMRoles(awsClient, CreateIAMRolesOpts.IdentityProviderARN, CreateIAMRolesOpts.Name, CreateIAMRolesOpts.CredRequestDir, CreateIAMRolesOpts.TargetDir, CreateIAMRolesOpts.DryRun)
+	err = createIAMRoles(awsClient, CreateIAMRolesOpts.IdentityProviderARN, CreateIAMRolesOpts.PermissionsBoundaryARN, CreateIAMRolesOpts.Name, CreateIAMRolesOpts.CredRequestDir, CreateIAMRolesOpts.TargetDir, CreateIAMRolesOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -410,6 +428,7 @@ func NewCreateIAMRolesCmd() *cobra.Command {
 	createIAMRolesCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.IdentityProviderARN, "identity-provider-arn", "", "ARN of IAM Identity provider for IAM Role trust relationship (can be created with the 'create identity-provider' sub-command)")
 	createIAMRolesCmd.MarkPersistentFlagRequired("identity-provider-arn")
+	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.PermissionsBoundaryARN, "permissions-boundary-arn", "", "ARN of IAM policy to use as the permissions boundary for created roles")
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.Region, "region", "", "AWS region endpoint only required for GovCloud")
 	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")

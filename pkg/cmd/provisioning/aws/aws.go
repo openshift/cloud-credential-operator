@@ -8,13 +8,14 @@ import (
 )
 
 type options struct {
-	TargetDir           string
-	PublicKeyPath       string
-	Region              string
-	Name                string
-	CredRequestDir      string
-	IdentityProviderARN string
-	DryRun              bool
+	TargetDir              string
+	PublicKeyPath          string
+	Region                 string
+	Name                   string
+	CredRequestDir         string
+	IdentityProviderARN    string
+	PermissionsBoundaryARN string
+	DryRun                 bool
 }
 
 // NewAWSCmd implements the "aws" subcommand for the credentials provisioning

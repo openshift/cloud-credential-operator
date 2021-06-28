@@ -18,9 +18,10 @@ import (
 )
 
 const (
-	testIdentityProviderARN = "arn:aws:iam::123456789012:oidc-provider/testing123-oidc.s3.amazonaws.com"
-	testIdentityProviderURL = "testing123-oidc.s3.amazonaws.com"
-	testNamePrefix          = "test-cluster1"
+	testIdentityProviderARN    = "arn:aws:iam::123456789012:oidc-provider/testing123-oidc.s3.amazonaws.com"
+	testPermissionsBoundaryARN = "arn:aws:iam::123456789012:policy/testing123-permissions-boundary"
+	testIdentityProviderURL    = "testing123-oidc.s3.amazonaws.com"
+	testNamePrefix             = "test-cluster1"
 )
 
 func TestIAMRoles(t *testing.T) {
@@ -168,7 +169,7 @@ func TestIAMRoles(t *testing.T) {
 			targetDir, err := ioutil.TempDir(os.TempDir(), "iamroletest")
 			require.NoError(t, err, "unexpected error creating temp dir for test")
 
-			err = createIAMRoles(mockAWSClient, testIdentityProviderARN, testNamePrefix, credReqDir, targetDir, test.generateOnly)
+			err = createIAMRoles(mockAWSClient, testIdentityProviderARN, testPermissionsBoundaryARN, testNamePrefix, credReqDir, targetDir, test.generateOnly)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
