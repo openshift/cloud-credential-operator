@@ -65,7 +65,7 @@ func TestCreateSecretsCmd(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "CreateSecretsCmd with unset API key environment variable should fail",
+			name: "CreateSharedSecretsCmd with unset API key environment variable should fail",
 			setup: func(t *testing.T) string {
 				os.Setenv(APIKeyEnvVar, "")
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
@@ -104,7 +104,7 @@ func TestCreateSecretsCmd(t *testing.T) {
 			}
 			CreateOpts.CredRequestDir = credReqDir
 			CreateOpts.TargetDir = targetDir
-			err = createSecretsCmd(&cobra.Command{}, args)
+			err = createSharedSecretsCmd(&cobra.Command{}, args)
 
 			if test.expectError {
 				require.Error(t, err, "Expected error returned")

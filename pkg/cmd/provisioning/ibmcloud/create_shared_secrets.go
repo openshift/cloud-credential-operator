@@ -40,13 +40,13 @@ var (
 	}
 )
 
-// NewCreateSecretsCmd implements the "create-secrets" command for the credentials provisioning
-func NewCreateSecretsCmd() *cobra.Command {
+// NewCreateSharedSecretsCmd implements the "create-shared-secrets" command for the credentials provisioning
+func NewCreateSharedSecretsCmd() *cobra.Command {
 	createSecretsCmd := &cobra.Command{
-		Use:              "create-secrets",
+		Use:              "create-shared-secrets",
 		Short:            "Create credentials objects",
-		Long:             "Creating objects related to cloud credentials",
-		RunE:             createSecretsCmd,
+		Long:             "Creating secrets from credentials requests using the API key in the IC_API_KEY environment variable",
+		RunE:             createSharedSecretsCmd,
 		PersistentPreRun: initEnvForCreateCmd,
 	}
 
@@ -57,20 +57,20 @@ func NewCreateSecretsCmd() *cobra.Command {
 	return createSecretsCmd
 }
 
-func createSecretsCmd(cmd *cobra.Command, args []string) error {
+func createSharedSecretsCmd(cmd *cobra.Command, args []string) error {
 	apiKey := os.Getenv(APIKeyEnvVar)
 	if apiKey == "" {
 		return fmt.Errorf("%s environment variable not set", APIKeyEnvVar)
 	}
 
-	err := createSecrets(CreateOpts.CredRequestDir, CreateOpts.TargetDir, apiKey)
+	err := createSharedSecrets(CreateOpts.CredRequestDir, CreateOpts.TargetDir, apiKey)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func createSecrets(credReqDir string, targetDir string, apiKey string) error {
+func createSharedSecrets(credReqDir string, targetDir string, apiKey string) error {
 	credRequests, err := getListOfCredentialsRequests(credReqDir)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
