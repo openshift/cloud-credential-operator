@@ -23,6 +23,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/azure"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/equinixmetal"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/openstack"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/vsphere"
@@ -52,6 +53,8 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		return vsphere.Add(mgr, vsphere.NewReconciler(mgr))
 	case configv1.OpenStackPlatformType:
 		return openstack.Add(mgr, openstack.NewReconciler(mgr))
+	case configv1.EquinixMetalPlatformType:
+		return equinixmetal.Add(mgr, equinixmetal.NewReconciler(mgr))
 	default: // returning the AWS implementation for default to avoid changing any behavior
 		return aws.Add(mgr, aws.NewReconciler(mgr))
 	}
