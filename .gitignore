@@ -1,4 +1,5 @@
 /cloud-credential-operator
+/ccoctl
 .vscode/
 /_output/
 .idea/
