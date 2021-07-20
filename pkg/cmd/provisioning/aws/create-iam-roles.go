@@ -208,6 +208,10 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 					role = roleOutput.Role
 					log.Printf("Role %s created", *role.Arn)
 
+					if err := writeCredReqSecret(credReq, targetDir, *role.Arn); err != nil {
+						return "", errors.Wrap(err, "failed to save Secret for install manifests")
+					}
+
 				default:
 					return "", err
 				}
@@ -216,7 +220,6 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		} else {
 			role = outRole.Role
 			log.Printf("Existing role %s found", *role.Arn)
-			return *role.Arn, nil
 		}
 
 		_, err = awsClient.PutRolePolicy(&iam.PutRolePolicyInput{
@@ -228,10 +231,6 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 			return "", errors.Wrap(err, "Failed to put role policy")
 		}
 		log.Printf("Updated Role policy for Role %s", *role.RoleName)
-
-		if err := writeCredReqSecret(credReq, targetDir, *role.Arn); err != nil {
-			return "", errors.Wrap(err, "failed to save Secret for install manifests")
-		}
 
 		return *role.Arn, nil
 	}
