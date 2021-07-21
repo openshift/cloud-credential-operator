@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/iam"
 
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 const (
@@ -30,7 +32,7 @@ func TestIAMRoles(t *testing.T) {
 		name          string
 		mockAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		setup         func(*testing.T) string
-		verify        func(t *testing.T, tempDirName string)
+		verify        func(t *testing.T, targetDir, manifestsDir string)
 		cleanup       func(*testing.T)
 		generateOnly  bool
 		expectError   bool
@@ -48,12 +50,14 @@ func TestIAMRoles(t *testing.T) {
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
-			verify: func(t *testing.T, targetDir string) {
+			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				files, err := ioutil.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
+				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
 
-				assert.Zero(t, len(files), "Should be no files in targetDir when no CredReqs to process")
-
+				files, err = ioutil.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
 		},
 		{
@@ -73,12 +77,14 @@ func TestIAMRoles(t *testing.T) {
 
 				return tempDirName
 			},
-			verify: func(t *testing.T, targetDir string) {
+			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				files, err := ioutil.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
+				assert.Equal(t, 2, countNonDirectoryFiles(files), "Should be exactly 1 IAM Role JSON and 1 IAM Role Policy file for each CredReq")
 
-				assert.Equal(t, 2, len(files), "Should be exactly 1 IAM Role JSON and 1 IAM Role Policy file for each CredReq")
-
+				files, err = ioutil.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
 		},
 		{
@@ -102,12 +108,14 @@ func TestIAMRoles(t *testing.T) {
 
 				return tempDirName
 			},
-			verify: func(t *testing.T, targetDir string) {
+			verify: func(t *testing.T, targetDir, manifestsDir string) {
 				files, err := ioutil.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
+				assert.Zero(t, countNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 
-				assert.Zero(t, len(files), "Should be no generated files when not in generate mode")
-
+				files, err = ioutil.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
 		},
 		{
@@ -131,7 +139,7 @@ func TestIAMRoles(t *testing.T) {
 
 				return tempDirName
 			},
-			verify: func(t *testing.T, targetDir string) {},
+			verify: func(t *testing.T, targetDir, manifestsDir string) {},
 		},
 		{
 			name:         "Role already exists",
@@ -141,6 +149,7 @@ func TestIAMRoles(t *testing.T) {
 				mockGetOpenIDConnectProvider(mockAWSClient)
 				roleName := fmt.Sprintf("%s-namespace1-secretName1", testNamePrefix)
 				mockGetRoleExists(mockAWSClient, roleName)
+				mockPutRolePolicy(mockAWSClient)
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
@@ -152,7 +161,7 @@ func TestIAMRoles(t *testing.T) {
 
 				return tempDirName
 			},
-			verify: func(t *testing.T, targetDir string) {},
+			verify: func(t *testing.T, targetDir, manifestsDir string) {},
 		},
 	}
 
@@ -167,14 +176,20 @@ func TestIAMRoles(t *testing.T) {
 			defer os.RemoveAll(credReqDir)
 
 			targetDir, err := ioutil.TempDir(os.TempDir(), "iamroletest")
-			require.NoError(t, err, "unexpected error creating temp dir for test")
+			require.NoError(t, err, "unexpected error creating target dir for test")
+			defer os.RemoveAll(targetDir)
+
+			manifestsDir := filepath.Join(targetDir, manifestsDirName)
+			err = provisioning.EnsureDir(manifestsDir)
+			require.NoError(t, err, "unexpected error creating manifests dir for test")
+			defer os.RemoveAll(manifestsDir)
 
 			err = createIAMRoles(mockAWSClient, testIdentityProviderARN, testPermissionsBoundaryARN, testNamePrefix, credReqDir, targetDir, test.generateOnly)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
 			} else {
-				test.verify(t, targetDir)
+				test.verify(t, targetDir, manifestsDir)
 			}
 		})
 	}
@@ -221,6 +236,17 @@ spec:
 	require.NoError(t, err, "error while writing out contents of CredentialsRequest file")
 
 	return nil
+}
+
+// countNonDirectoryFiles counts files which are not a directory
+func countNonDirectoryFiles(files []os.FileInfo) int {
+	NonDirectoryFiles := 0
+	for _, f := range files {
+		if !f.IsDir() {
+			NonDirectoryFiles++
+		}
+	}
+	return NonDirectoryFiles
 }
 
 func mockGetOpenIDConnectProvider(mockAWSClient *mockaws.MockClient) {
