@@ -29,8 +29,8 @@ type: Opaque`
 	manifestsDirName = "manifests"
 )
 
-// APIKeyEnvVar is the environment variable name containing an IBM Cloud API key
-const APIKeyEnvVar = "IC_API_KEY"
+// APIKeyEnvVars is a list of environment variable names containing an IBM Cloud API key
+var APIKeyEnvVars = []string{"IC_API_KEY", "IBMCLOUD_API_KEY", "BM_API_KEY", "BLUEMIX_API_KEY"}
 
 var (
 	// CreateOpts captures the options that affect creation of the generated
@@ -57,10 +57,20 @@ func NewCreateSharedSecretsCmd() *cobra.Command {
 	return createSecretsCmd
 }
 
+// getEnv reads the content from first found environment variable from the envs list, returns empty string if none found.
+func getEnv(envs []string) string {
+	for _, k := range envs {
+		if v := os.Getenv(k); v != "" {
+			return v
+		}
+	}
+	return ""
+}
+
 func createSharedSecretsCmd(cmd *cobra.Command, args []string) error {
-	apiKey := os.Getenv(APIKeyEnvVar)
+	apiKey := getEnv(APIKeyEnvVars)
 	if apiKey == "" {
-		return fmt.Errorf("%s environment variable not set", APIKeyEnvVar)
+		return fmt.Errorf("%s environment variable not set", APIKeyEnvVars)
 	}
 
 	err := createSharedSecrets(CreateOpts.CredRequestDir, CreateOpts.TargetDir, apiKey)
