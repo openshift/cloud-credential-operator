@@ -33,7 +33,7 @@ func TestCreateSecretsCmd(t *testing.T) {
 		{
 			name: "CreateSecretsCmd should populate secret with API key environment variable",
 			setup: func(t *testing.T) string {
-				os.Setenv(APIKeyEnvVar, apiKey)
+				os.Setenv(APIKeyEnvVars[0], apiKey)
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
@@ -67,7 +67,7 @@ func TestCreateSecretsCmd(t *testing.T) {
 		{
 			name: "CreateSharedSecretsCmd with unset API key environment variable should fail",
 			setup: func(t *testing.T) string {
-				os.Setenv(APIKeyEnvVar, "")
+				os.Setenv(APIKeyEnvVars[0], "")
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
@@ -143,4 +143,51 @@ spec:
 	require.NoError(t, err, "error while writing out contents of CredentialsRequest file")
 
 	return nil
+}
+
+func Test_getEnv(t *testing.T) {
+	type env struct {
+		variable, value string
+	}
+	tests := []struct {
+		name string
+		envs []env
+		want string
+	}{
+		{
+			name: "Return IC_API_KEY value",
+			envs: []env{
+				{"IBMCLOUD_API_KEY", "IBMCLOUD_API_KEY_apikey"},
+				{"BM_API_KEY", "BM_API_KEY_apikey"},
+				{"IC_API_KEY", "IC_API_KEY_apikey"},
+				{"BLUEMIX_API_KEY", "BLUEMIX_API_KEY_apikey"},
+			},
+			want: "IC_API_KEY_apikey",
+		},
+		{
+			name: "Return IBMCLOUD_API_KEY value",
+			envs: []env{
+				{"BM_API_KEY", "BM_API_KEY_apikey"},
+				{"BLUEMIX_API_KEY", "BLUEMIX_API_KEY_apikey"},
+				{"IBMCLOUD_API_KEY", "IBMCLOUD_API_KEY_apikey"},
+			},
+			want: "IBMCLOUD_API_KEY_apikey",
+		},
+		{
+			name: "Returns empty value",
+			envs: []env{},
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, env := range tt.envs {
+				os.Setenv(env.variable, env.value)
+				defer os.Unsetenv(env.variable)
+			}
+			if got := getEnv(APIKeyEnvVars); got != tt.want {
+				t.Errorf("getEnv() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }
