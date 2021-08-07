@@ -57,7 +57,7 @@ func TestCreateSecretsCmd(t *testing.T) {
 				if err := decoder.Decode(secret); err != nil && err != io.EOF {
 					require.NoError(t, err, "Unexpected error decoding secret file")
 				}
-				assert.Equal(t, apiKey, secret.StringData["ibmcloud_api_key"])
+				assert.Equal(t, apiKey, string(secret.Data["ibmcloud_api_key"]))
 			},
 			cleanup: func(t *testing.T) {
 				return

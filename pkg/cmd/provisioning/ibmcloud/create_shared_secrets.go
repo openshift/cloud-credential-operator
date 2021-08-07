@@ -1,6 +1,7 @@
 package ibmcloud
 
 import (
+	b64 "encoding/base64"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -18,7 +19,7 @@ import (
 
 const (
 	secretManifestsTemplate = `apiVersion: v1
-stringData:
+data:
   ibmcloud_api_key: %s
 kind: Secret
 metadata:
@@ -139,7 +140,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, apiKey stri
 	fileName := fmt.Sprintf("%s-%s-credentials.yaml", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
 	filePath := filepath.Join(manifestsDir, fileName)
 
-	fileData := fmt.Sprintf(secretManifestsTemplate, apiKey, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
+	fileData := fmt.Sprintf(secretManifestsTemplate, b64.StdEncoding.EncodeToString([]byte(apiKey)), cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
 
 	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
 		return errors.Wrap(err, "Failed to save Secret file")
