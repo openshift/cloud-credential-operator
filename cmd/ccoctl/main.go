@@ -6,6 +6,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/aws"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/ibmcloud"
 )
 
@@ -16,6 +17,7 @@ func main() {
 	}
 
 	rootCmd.AddCommand(aws.NewAWSCmd())
+	rootCmd.AddCommand(gcp.NewGCPCmd())
 	rootCmd.AddCommand(ibmcloud.NewIBMCloudCmd())
 
 	if err := rootCmd.Execute(); err != nil {
