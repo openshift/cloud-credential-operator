@@ -1,6 +1,6 @@
 # Manual Mode
 
-Cloud Credential Operator can be put into manual mode prior to install in environments where the cloud IAM APIs are not reachable, or the administrator simply prefers not to store an admin level credential Secret in the cluster kube-system Namespace.
+Cloud Credential Operator can be put into manual mode prior to install in environments where the cloud IAM APIs are not reachable, or the administrator simply prefers not to store an admin level credential Secret in the cluster kube-system Namespace. Depending on the cluster's cloud credentials configuration (eg AWS STS, GCP workload identity, etc), the `ccoctl` [tool](https://github.com/openshift/cloud-credential-operator/blob/master/docs/ccoctl.md) may help automate many of these steps.
 
 Run the OpenShift installer to generate manifests:
 
@@ -8,7 +8,7 @@ Run the OpenShift installer to generate manifests:
 $ openshift-install create install-config --dir=mycluster
 ```
 
-Indicated that the cluster should be set up for Manual mode:
+Indicate that the cluster should be set up for Manual mode:
 
 ```bash
 $ echo "credentialsMode: Manual" >> ./mycluster/install-config.yaml
@@ -87,7 +87,9 @@ $ openshift-install create cluster --dir=mycluster
 
 ## Upgrades
 
-It is important to note that before performing an upgrade from one minor version to the next (ie 4.7.x to 4.8.y), you may need to adjust your credentials if permissions have changed in the next release. The Cloud Credential Operator will mark itself Upgradeable=False when configured for Manual mode. The Upgradeable=False status should not affect z-stream upgrades (ie 4.7.4 to 4.7.5).
+It is important to note that before performing an upgrade from one minor version to the next (ie 4.7.x to 4.8.y), you may need to adjust your credentials if permissions have changed in the next release. The Cloud Credential Operator will mark itself Upgradeable=False when configured for Manual mode until you have completed the following steps. The Upgradeable=False status *does not* affect z-stream upgrades (ie 4.7.4 to 4.7.5).
+
+> Note: As noted above, the `ccoctl` [tool](https://github.com/openshift/cloud-credential-operator/blob/master/docs/ccoctl.md) can help automate many of these steps if your cloud credentials configuration is supported by the tool.
 
 Before upgrade from one minor version to the next, the cluster admin(s) should review the bundle of CredentialsRequest objects from the version being upgraded to. First extract the CredentialsRequest objects for the cluster's cloud:
 
