@@ -30,10 +30,10 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 
 	publicKeyPath := CreateAllOpts.PublicKeyPath
 	if publicKeyPath == "" {
-		publicKeyPath = path.Join(CreateAllOpts.TargetDir, publicKeyFile)
+		publicKeyPath = path.Join(CreateAllOpts.TargetDir, provisioning.PublicKeyFile)
 	}
 
-	if err := createKeys(CreateAllOpts.TargetDir); err != nil {
+	if err := provisioning.CreateKeys(CreateAllOpts.TargetDir); err != nil {
 		log.Fatalf("Failed to create public/private key pair: %s", err)
 	}
 
@@ -72,14 +72,14 @@ func initEnvForCreateAllCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// create manifests dir if necessary
-	manifestsDir := filepath.Join(fPath, manifestsDirName)
+	manifestsDir := filepath.Join(fPath, provisioning.ManifestsDirName)
 	err = provisioning.EnsureDir(manifestsDir)
 	if err != nil {
 		log.Fatalf("failed to create manifests directory at %s", manifestsDir)
 	}
 
 	// create tls dir if necessary
-	tlsDir := filepath.Join(fPath, tlsDirName)
+	tlsDir := filepath.Join(fPath, provisioning.TLSDirName)
 	err = provisioning.EnsureDir(tlsDir)
 	if err != nil {
 		log.Fatalf("failed to create tls directory at %s", tlsDir)

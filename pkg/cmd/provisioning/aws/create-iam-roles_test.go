@@ -179,7 +179,7 @@ func TestIAMRoles(t *testing.T) {
 			require.NoError(t, err, "unexpected error creating target dir for test")
 			defer os.RemoveAll(targetDir)
 
-			manifestsDir := filepath.Join(targetDir, manifestsDirName)
+			manifestsDir := filepath.Join(targetDir, provisioning.ManifestsDirName)
 			err = provisioning.EnsureDir(manifestsDir)
 			require.NoError(t, err, "unexpected error creating manifests dir for test")
 			defer os.RemoveAll(manifestsDir)

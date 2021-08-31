@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 const (
@@ -123,7 +124,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 				jwksURI, ok := discoveryDocumentJSON["jwks_uri"]
 				require.True(t, ok, "jwks_uri field absent in discovery document")
-				assert.Equal(t, fmt.Sprintf("%s/%s", issuerURL, keysURI), jwksURI, "unexpected jwks uri")
+				assert.Equal(t, fmt.Sprintf("%s/%s", issuerURL, provisioning.KeysURI), jwksURI, "unexpected jwks uri")
 
 				// Comparing key ID from the JSON web key with the one generated from the public key
 				jwks, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcKeysFilename))
