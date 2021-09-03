@@ -5,8 +5,10 @@ import (
 )
 
 type options struct {
-	TargetDir      string
-	CredRequestDir string
+	TargetDir         string
+	Name              string
+	CredRequestDir    string
+	ResourceGroupName string
 }
 
 // NewIBMCloudCmd implements the "ibmcloud" subcommand for the credentials provisioning
@@ -17,7 +19,7 @@ func NewIBMCloudCmd() *cobra.Command {
 		Long:  "Creating/deleting cloud credentials objects for IBM Cloud",
 	}
 
-	createCmd.AddCommand(NewCreateSharedSecretsCmd())
+	createCmd.AddCommand(NewCreateServiceIDCmd())
 
 	return createCmd
 }
