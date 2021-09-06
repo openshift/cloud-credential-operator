@@ -54,7 +54,7 @@ func NewCreateServiceIDCmd() *cobra.Command {
 
 	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.Name, "name", "", "User-defined name for all created IBM Cloud resources (can be separate from the cluster's infra-id)")
 	createServiceIDCmd.MarkPersistentFlagRequired("name")
-	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=aws' against an OpenShift release image)")
+	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=ibmcloud' against an OpenShift release image)")
 	createServiceIDCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
 	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
