@@ -26,6 +26,30 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type IBMCloudProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
+
+	// Policies are a list of access policies to create for the generated credentials
+	Policies []AccessPolicy `json:"policies"`
+}
+
+// AccessPolicy is a definition of an IAM access policy
+type AccessPolicy struct {
+	// Attributes identify the resources to which this policy applies
+	Attributes []ResourceAttribute `json:"attributes"`
+
+	// Roles are the IAM roles assigned to this policy
+	Roles []string `json:"roles"`
+}
+
+// ResourceAttribute is an attribute associated with a resource.
+type ResourceAttribute struct {
+	// Name is the name of an attribute.
+	Name string `json:"name"`
+
+	// Value is the value of an attribute.
+	Value string `json:"value"`
+
+	// Operator is the operator of an attribute.
+	Operator string `json:"operator,omitempty"`
 }
 
 // IBMCloudProviderStatus contains the status of the IBM Cloud credentials request.
