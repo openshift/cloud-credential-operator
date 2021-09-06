@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/url"
 	"os"
 	"path/filepath"
 
@@ -45,6 +46,8 @@ type Provision interface {
 	UnDo(string) error
 
 	Dump(string) error
+
+	Delete(bool) error
 }
 
 type ServiceID struct {
@@ -245,6 +248,67 @@ func (s *ServiceID) UnDo(targetDir string) error {
 	}
 
 	return nil
+}
+
+func (s *ServiceID) Delete(force bool) error {
+	log.Printf("Deleting the service account with name: %s", s.name)
+	start := ""
+	var allrecs []iamidentityv1.ServiceID
+	var pg int64 = 1
+	for {
+		listServiceIDOptions := iamidentityv1.ListServiceIdsOptions{
+			AccountID: &s.accountID,
+			Name:      &s.name,
+			Pagesize:  &pg,
+		}
+		if start != "" {
+			listServiceIDOptions.Pagetoken = &start
+		}
+
+		serviceIDs, _, err := s.Client.ListServiceID(&listServiceIDOptions)
+		if err != nil {
+			return errors.Wrap(err, "Error listing Service Ids")
+		}
+		start = getPageToken(serviceIDs.Next)
+		allrecs = append(allrecs, serviceIDs.Serviceids...)
+		if start == "" {
+			break
+		}
+	}
+
+	if len(allrecs) > 1 && !force {
+		return fmt.Errorf("more than one ServiceIDs present with %s name, please run with --force flag to delete all the entries forcefully", s.name)
+	} else if len(allrecs) == 0 {
+		log.Printf("no ServiceID found with name: %s", s.name)
+		return nil
+	} else {
+		if force {
+			log.Printf("--force flag present, will delete all the entries with %s name forcefully", s.name)
+		}
+		for _, serviceID := range allrecs {
+			log.Printf("deleting the ServiceID with name: %s, ID: %s", *serviceID.Name, *serviceID.ID)
+			options := &iamidentityv1.DeleteServiceIDOptions{
+				ID: serviceID.ID}
+			if _, err := s.Client.DeleteServiceID(options); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
+// getPageToken reads the pagetoken query from the URL
+func getPageToken(next *string) string {
+	if next == nil {
+		return ""
+	}
+	u, err := url.Parse(*next)
+	if err != nil {
+		return ""
+	}
+	q := u.Query()
+	return q.Get("pagetoken")
 }
 
 func NewServiceID(client ibmcloud.Client, prefix, accountID, resourceGroupID string, cr *credreqv1.CredentialsRequest) *ServiceID {
