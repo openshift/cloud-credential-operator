@@ -5,6 +5,8 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 type options struct {
@@ -26,7 +28,7 @@ func NewAWSCmd() *cobra.Command {
 		Long:  "Creating/updating/deleting cloud credentials objects for AWS cloud",
 	}
 
-	createCmd.AddCommand(NewCreateKeyPairCmd())
+	createCmd.AddCommand(provisioning.NewCreateKeyPairCmd())
 	createCmd.AddCommand(NewCreateIdentityProviderCmd())
 	createCmd.AddCommand(NewCreateIAMRolesCmd())
 	createCmd.AddCommand(NewCreateAllCmd())

@@ -1,4 +1,4 @@
-package aws
+package provisioning
 
 import (
 	"crypto/rand"
@@ -12,11 +12,13 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 const boundSAKeyFilename = "bound-service-account-signing-key.key"
+
+type options struct {
+	TargetDir string
+}
 
 var (
 	// CreateKeyPairOpts captures the options that affect creation
@@ -26,10 +28,10 @@ var (
 	}
 )
 
-func createKeys(prefixDir string) error {
+func CreateKeys(prefixDir string) error {
 
-	privateKeyFilePath := filepath.Join(prefixDir, privateKeyFile)
-	publicKeyFilePath := filepath.Join(prefixDir, publicKeyFile)
+	privateKeyFilePath := filepath.Join(prefixDir, PrivateKeyFile)
+	publicKeyFilePath := filepath.Join(prefixDir, PublicKeyFile)
 	bitSize := 4096
 
 	defer copyPrivateKeyForInstaller(privateKeyFilePath, prefixDir)
@@ -87,7 +89,7 @@ func createKeys(prefixDir string) error {
 }
 
 func copyPrivateKeyForInstaller(sourceFile, prefixDir string) {
-	privateKeyForInstaller := filepath.Join(prefixDir, tlsDirName, boundSAKeyFilename)
+	privateKeyForInstaller := filepath.Join(prefixDir, TLSDirName, boundSAKeyFilename)
 
 	log.Print("Copying signing key for use by installer")
 	from, err := os.Open(sourceFile)
@@ -109,7 +111,7 @@ func copyPrivateKeyForInstaller(sourceFile, prefixDir string) {
 }
 
 func CreateKeyPairCmd(cmd *cobra.Command, args []string) {
-	err := createKeys(CreateKeyPairOpts.TargetDir)
+	err := CreateKeys(CreateKeyPairOpts.TargetDir)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -133,14 +135,14 @@ func initEnvForCreateKeyPairCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// create target dir if necessary
-	err = provisioning.EnsureDir(fPath)
+	err = EnsureDir(fPath)
 	if err != nil {
 		log.Fatalf("failed to create target directory at %s", fPath)
 	}
 
 	// create tls dir if necessary
-	tlsDir := filepath.Join(fPath, tlsDirName)
-	err = provisioning.EnsureDir(tlsDir)
+	tlsDir := filepath.Join(fPath, TLSDirName)
+	err = EnsureDir(tlsDir)
 	if err != nil {
 		log.Fatalf("failed to create tls directory at %s", tlsDir)
 	}
