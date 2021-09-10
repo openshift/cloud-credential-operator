@@ -37,6 +37,10 @@ metadata:
   name: %s
   namespace: %s
 type: Opaque`
+
+	// Generated role files
+	roleFilenameFormat       = "05-%d-%s-role.json"
+	rolePolicyFilenameFormat = "06-%d-%s-policy.json"
 )
 
 var (
@@ -358,7 +362,7 @@ func createRolePolicy(statements []credreqv1.StatementEntry) string {
 // writeCredReqSecret will take a credentialsRequest and a Role ARN and store
 // a Secret with an AWS config in the 'credentials' field of the Secret.
 func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, roleARN string) error {
-	manifestsDir := filepath.Join(targetDir, manifestsDirName)
+	manifestsDir := filepath.Join(targetDir, provisioning.ManifestsDirName)
 
 	fileName := fmt.Sprintf("%s-%s-credentials.yaml", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
 	filePath := filepath.Join(manifestsDir, fileName)
@@ -405,7 +409,7 @@ func initEnvForCreateIAMRolesCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// create manifests dir if necessary
-	manifestsDir := filepath.Join(fPath, manifestsDirName)
+	manifestsDir := filepath.Join(fPath, provisioning.ManifestsDirName)
 	err = provisioning.EnsureDir(manifestsDir)
 	if err != nil {
 		log.Fatalf("failed to create manifests directory at %s", manifestsDir)

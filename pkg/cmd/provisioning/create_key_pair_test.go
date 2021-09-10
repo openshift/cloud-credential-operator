@@ -1,4 +1,4 @@
-package aws
+package provisioning
 
 import (
 	"crypto/x509"
@@ -28,24 +28,24 @@ func TestKeyPair(t *testing.T) {
 			setup: func(t *testing.T) string {
 				tempDirName := prepTempDir(t)
 
-				err := ioutil.WriteFile(filepath.Join(tempDirName, privateKeyFile), []byte("some data"), 0600)
+				err := ioutil.WriteFile(filepath.Join(tempDirName, PrivateKeyFile), []byte("some data"), 0600)
 				require.NoError(t, err, "errored while setting up environment for test")
 
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
-				_, err := os.Stat(filepath.Join(tempDirName, publicKeyFile))
+				_, err := os.Stat(filepath.Join(tempDirName, PublicKeyFile))
 				require.Error(t, err, "expected public key file to not exist")
 
-				fileData, err := ioutil.ReadFile(filepath.Join(tempDirName, privateKeyFile))
+				fileData, err := ioutil.ReadFile(filepath.Join(tempDirName, PrivateKeyFile))
 				require.NoError(t, err, "unexpected error reading in test private key data")
 
 				assert.Equal(t, []byte("some data"), fileData, "unexpected change in test private key data")
 
-				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, tlsDirName, boundSAKeyFilename))
-				require.NoError(t, err, "unexpected error reading in copied file %s/%s", tlsDirName, boundSAKeyFilename)
+				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, TLSDirName, boundSAKeyFilename))
+				require.NoError(t, err, "unexpected error reading in copied file %s/%s", TLSDirName, boundSAKeyFilename)
 
-				assert.Equal(t, []byte("some data"), tlsFileData, "unexpected file contents for %s/%s", tlsDirName, boundSAKeyFilename)
+				assert.Equal(t, []byte("some data"), tlsFileData, "unexpected file contents for %s/%s", TLSDirName, boundSAKeyFilename)
 			},
 		},
 		{
@@ -56,10 +56,10 @@ func TestKeyPair(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
-				pubFileBytes, err := ioutil.ReadFile(filepath.Join(tempDirName, publicKeyFile))
+				pubFileBytes, err := ioutil.ReadFile(filepath.Join(tempDirName, PublicKeyFile))
 				require.NoError(t, err, "error reading in generated public key file")
 
-				privFile, err := ioutil.ReadFile(filepath.Join(tempDirName, privateKeyFile))
+				privFile, err := ioutil.ReadFile(filepath.Join(tempDirName, PrivateKeyFile))
 				require.NoError(t, err, "error reading in test private key file")
 
 				block, _ := pem.Decode(privFile)
@@ -82,10 +82,10 @@ func TestKeyPair(t *testing.T) {
 
 				assert.Equal(t, pubFileBytes, calculatedPubKeyBytes, "Missmatch between written public key file and caluclated public key (from private key)")
 
-				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, tlsDirName, boundSAKeyFilename))
-				require.NoError(t, err, "unexpected error reading in copied file %s/%s", tlsDirName, boundSAKeyFilename)
+				tlsFileData, err := ioutil.ReadFile(filepath.Join(tempDirName, TLSDirName, boundSAKeyFilename))
+				require.NoError(t, err, "unexpected error reading in copied file %s/%s", TLSDirName, boundSAKeyFilename)
 
-				assert.Equal(t, privFile, tlsFileData, "unexpected file contents for %s/%s", tlsDirName, boundSAKeyFilename)
+				assert.Equal(t, privFile, tlsFileData, "unexpected file contents for %s/%s", TLSDirName, boundSAKeyFilename)
 
 			},
 		},
@@ -97,7 +97,7 @@ func TestKeyPair(t *testing.T) {
 			tempDirName := test.setup(t)
 			defer os.RemoveAll(tempDirName)
 
-			err := createKeys(tempDirName)
+			err := CreateKeys(tempDirName)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
@@ -113,7 +113,7 @@ func prepTempDir(t *testing.T) string {
 
 	require.NoError(t, err, "unexpected error setting up temp directory")
 
-	tlsDir := filepath.Join(tempDirName, tlsDirName)
+	tlsDir := filepath.Join(tempDirName, TLSDirName)
 	err = os.Mkdir(tlsDir, 0770)
 	require.NoError(t, err, "errored trying to create temp tls dir")
 

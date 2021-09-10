@@ -88,6 +88,17 @@ var (
 	]
 }
 `
+	// ccoctlAWSResourceTagKeyPrefix is the prefix of the tag key applied to the AWS resources created/shared by ccoctl
+	ccoctlAWSResourceTagKeyPrefix = "openshift.io/cloud-credential-operator"
+	// ownedCcoctlAWSResourceTagValue is the value of the tag applied to the AWS resources created by ccoctl
+	ownedCcoctlAWSResourceTagValue = "owned"
+	// nameTagKey is the key of the "Name" tag applied to the AWS resources created by ccoctl
+	nameTagKey = "Name"
+	// Generated identity provider files
+	oidcBucketFilename          = "01-oidc-bucket.json"
+	oidcConfigurationFilename   = "02-openid-configuration"
+	oidcKeysFilename            = "03-keys.json"
+	iamIdentityProviderFilename = "04-iam-identity-provider.json"
 )
 
 type JSONWebKeySet struct {
@@ -241,20 +252,20 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 			ACL:     awssdk.String("public-read"),
 			Body:    awssdk.ReadSeekCloser(bytes.NewReader(jwks)),
 			Bucket:  awssdk.String(bucketName),
-			Key:     awssdk.String(keysURI),
+			Key:     awssdk.String(provisioning.KeysURI),
 			Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s&%s=%s", ccoctlAWSResourceTagKeyPrefix, name, ownedCcoctlAWSResourceTagValue, nameTagKey, name)),
 		})
 
 		if err != nil {
 			return errors.Wrapf(err, "failed to upload JSON web key set (JWKS) in the S3 bucket %s", bucketName)
 		}
-		log.Printf("JSON web key set (JWKS) in the S3 bucket %s at %s updated", bucketName, keysURI)
+		log.Printf("JSON web key set (JWKS) in the S3 bucket %s at %s updated", bucketName, provisioning.KeysURI)
 	}
 	return nil
 }
 
 func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, targetDir string, generateOnly bool) error {
-	discoveryDocumentJSON := fmt.Sprintf(discoveryDocumentTemplate, issuerURL, issuerURL, keysURI)
+	discoveryDocumentJSON := fmt.Sprintf(discoveryDocumentTemplate, issuerURL, issuerURL, provisioning.KeysURI)
 	if generateOnly {
 		err := saveToFile("discovery document", filepath.Join(targetDir, oidcConfigurationFilename), []byte(discoveryDocumentJSON))
 		if err != nil {
@@ -265,13 +276,13 @@ func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, tar
 			ACL:     awssdk.String("public-read"),
 			Body:    awssdk.ReadSeekCloser(strings.NewReader(discoveryDocumentJSON)),
 			Bucket:  awssdk.String(bucketName),
-			Key:     awssdk.String(discoveryDocumentURI),
+			Key:     awssdk.String(provisioning.DiscoveryDocumentURI),
 			Tagging: awssdk.String(fmt.Sprintf("%s/%s=%s&%s=%s", ccoctlAWSResourceTagKeyPrefix, name, ownedCcoctlAWSResourceTagValue, nameTagKey, name)),
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to upload discovery document in the S3 bucket %s", bucketName)
 		}
-		log.Printf("OpenID Connect discovery document in the S3 bucket %s at %s updated", bucketName, discoveryDocumentURI)
+		log.Printf("OpenID Connect discovery document in the S3 bucket %s at %s updated", bucketName, provisioning.DiscoveryDocumentURI)
 	}
 	return nil
 }
@@ -447,7 +458,7 @@ metadata:
 spec:
   serviceAccountIssuer: %s`
 
-	clusterAuthFile := filepath.Join(targetDir, manifestsDirName, "cluster-authentication-02-config.yaml")
+	clusterAuthFile := filepath.Join(targetDir, provisioning.ManifestsDirName, "cluster-authentication-02-config.yaml")
 
 	fileData := fmt.Sprintf(clusterAuthenticationTemplate, issuerURL)
 	if err := ioutil.WriteFile(clusterAuthFile, []byte(fileData), 0600); err != nil {
@@ -466,7 +477,7 @@ func createIdentityProviderCmd(cmd *cobra.Command, args []string) {
 
 	publicKeyPath := CreateIdentityProviderOpts.PublicKeyPath
 	if publicKeyPath == "" {
-		publicKeyPath = filepath.Join(CreateIdentityProviderOpts.TargetDir, publicKeyFile)
+		publicKeyPath = filepath.Join(CreateIdentityProviderOpts.TargetDir, provisioning.PublicKeyFile)
 	}
 
 	_, err = createIdentityProvider(awsClient, CreateIdentityProviderOpts.Name, CreateIdentityProviderOpts.Region, publicKeyPath, CreateIdentityProviderOpts.TargetDir, CreateIdentityProviderOpts.DryRun)
@@ -499,7 +510,7 @@ func initEnvForCreateIdentityProviderCmd(cmd *cobra.Command, args []string) {
 	}
 
 	// create manifests dir if necessary
-	manifestsDir := filepath.Join(fPath, manifestsDirName)
+	manifestsDir := filepath.Join(fPath, provisioning.ManifestsDirName)
 	err = provisioning.EnsureDir(manifestsDir)
 	if err != nil {
 		log.Fatalf("failed to create manifests directory at %s", manifestsDir)
