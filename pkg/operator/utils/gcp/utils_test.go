@@ -25,10 +25,10 @@ import (
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/apimachinery/pkg/util/sets"
 
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	"google.golang.org/api/googleapi"
+	"google.golang.org/api/cloudresourcemanager/v1"
+
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 )
@@ -127,8 +127,11 @@ func TestCheckPermissionsAgainstPermissionListChunking(t *testing.T) {
 			mockClient := mock.NewMockClient(gomock.NewController(t))
 			logger := log.New()
 
-			mockClient.EXPECT().GetProjectName().AnyTimes().Return("fake")
+			mockClient.EXPECT().GetProjectName().Times(1).Return("fake")
+
 			permissionsList := perms(0, test.count)
+			testablePerms.lastUpdated = time.Now()
+			testablePerms.permSet = sets.NewString(permissionsList...)
 
 			mockCallList := []*gomock.Call{}
 
@@ -139,7 +142,7 @@ func TestCheckPermissionsAgainstPermissionListChunking(t *testing.T) {
 
 				chunkCopy := chunk
 
-				mockCall := mockClient.EXPECT().TestIamPermissions("fake", gomock.Any()).DoAndReturn(
+				mockCall := mockClient.EXPECT().TestIamPermissions("fake", gomock.Any()).Times(1).DoAndReturn(
 					func(projectName string, actualRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
 						origSet := sets.NewString(permRequest.Permissions...)
 						actualSet := sets.NewString(actualRequest.Permissions...)
@@ -171,39 +174,20 @@ func TestIgnoreInvalidProjectPermissions(t *testing.T) {
 	tests := []struct {
 		name             string
 		origPermList     []string
+		allowed          bool
 		setupGCPResponse func(*mock.MockClient)
 	}{
 		{
-			name: "receive invalid permission and try again",
+			name: "one invalid permission",
 			origPermList: []string{
 				"allowedPerm",
 				"invalidPerm",
 			},
 			setupGCPResponse: func(mockClient *mock.MockClient) {
-				// first reject the "invalidPerm"
-				firstMock := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).DoAndReturn(
+				// allow the perm list w/o invalidPerm
+				mockCall := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).Times(1).DoAndReturn(
 					func(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
-
-						if len(permRequest.Permissions) != 2 {
-							return nil, fmt.Errorf("expected length 2 list of permissions to test")
-						}
-
-						return nil, &googleapi.Error{
-							Code:    400,
-							Message: "Permission invalidPerm is not valid for this resource.",
-						}
-					})
-
-				// now allow the perm list w/o invalidPerm
-				secondMock := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).DoAndReturn(
-					func(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
-						if len(permRequest.Permissions) != 1 {
-							return nil, fmt.Errorf("expected only 'allowedPerm' in permissions list")
-						}
-
-						if permRequest.Permissions[0] != "allowedPerm" {
-							return nil, fmt.Errorf("expected only 'allowedPerm' in permissions list")
-						}
+						assert.Equal(t, 2, len(permRequest.Permissions), "expected 2 permissions in permissions list")
 
 						return &cloudresourcemanager.TestIamPermissionsResponse{
 							Permissions: []string{
@@ -212,8 +196,9 @@ func TestIgnoreInvalidProjectPermissions(t *testing.T) {
 						}, nil
 					})
 
-				gomock.InOrder(firstMock, secondMock)
+				gomock.InOrder(mockCall)
 			},
+			allowed: false,
 		},
 		{
 			name: "multiple invalid permissions",
@@ -223,44 +208,10 @@ func TestIgnoreInvalidProjectPermissions(t *testing.T) {
 				"invalidPerm2",
 			},
 			setupGCPResponse: func(mockClient *mock.MockClient) {
-				// first reject the "invalidPerm1"
-				firstMock := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).DoAndReturn(
+				// allow the perm list w/o invalidPerm1 and invalidPerm2
+				mockCall := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).Times(1).DoAndReturn(
 					func(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
-
-						if len(permRequest.Permissions) != 3 {
-							return nil, fmt.Errorf("expected length 3 list of permissions to test")
-						}
-
-						return nil, &googleapi.Error{
-							Code:    400,
-							Message: "Permission invalidPerm1 is not valid for this resource.",
-						}
-					})
-
-				// next reject the "invalidPerm2"
-				secondMock := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).DoAndReturn(
-					func(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
-
-						if len(permRequest.Permissions) != 2 {
-							return nil, fmt.Errorf("expected length 2 list of permissions to test")
-						}
-
-						return nil, &googleapi.Error{
-							Code:    400,
-							Message: "Permission invalidPerm2 is not valid for this resource.",
-						}
-					})
-
-				// now allow the perm list w/o invalidPerm
-				thirdMock := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).DoAndReturn(
-					func(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
-						if len(permRequest.Permissions) != 1 {
-							return nil, fmt.Errorf("expected only 'allowedPerm' in permissions list")
-						}
-
-						if permRequest.Permissions[0] != "allowedPerm" {
-							return nil, fmt.Errorf("expected only 'allowedPerm' in permissions list")
-						}
+						assert.Equal(t, 3, len(permRequest.Permissions), "expected 3 permissions in permissions list")
 
 						return &cloudresourcemanager.TestIamPermissionsResponse{
 							Permissions: []string{
@@ -269,8 +220,33 @@ func TestIgnoreInvalidProjectPermissions(t *testing.T) {
 						}, nil
 					})
 
-				gomock.InOrder(firstMock, secondMock, thirdMock)
+				gomock.InOrder(mockCall)
 			},
+			allowed: false,
+		},
+		{
+			name: "only valid permissions",
+			origPermList: []string{
+				"allowedPerm1",
+				"allowedPerm2",
+			},
+			setupGCPResponse: func(mockClient *mock.MockClient) {
+				// allow the perm list w/o invalidPerm1 and invalidPerm2
+				mockCall := mockClient.EXPECT().TestIamPermissions(projectName, gomock.Any()).Times(1).DoAndReturn(
+					func(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
+						assert.Equal(t, 2, len(permRequest.Permissions), "expected 2 permissions in permissions list")
+
+						return &cloudresourcemanager.TestIamPermissionsResponse{
+							Permissions: []string{
+								"allowedPerm1",
+								"allowedPerm2",
+							},
+						}, nil
+					})
+
+				gomock.InOrder(mockCall)
+			},
+			allowed: true,
 		},
 	}
 
@@ -279,7 +255,10 @@ func TestIgnoreInvalidProjectPermissions(t *testing.T) {
 			mockClient := mock.NewMockClient(gomock.NewController(t))
 			logger := log.New()
 
-			mockClient.EXPECT().GetProjectName().AnyTimes().Return(projectName)
+			mockClient.EXPECT().GetProjectName().Times(1).Return(projectName)
+
+			testablePerms.lastUpdated = time.Now()
+			testablePerms.permSet = sets.NewString(test.origPermList...)
 
 			test.setupGCPResponse(mockClient)
 
@@ -287,7 +266,7 @@ func TestIgnoreInvalidProjectPermissions(t *testing.T) {
 
 			assert.NoError(t, err, "unexpected error")
 
-			assert.True(t, allowed, "expected invalid permissions to be ignored")
+			assert.Equal(t, test.allowed, allowed, "expected invalid permissions to be ignored")
 
 		})
 	}
