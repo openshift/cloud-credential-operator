@@ -83,8 +83,8 @@ func TestCreateSecretsCmd(t *testing.T) {
 				fmt.Sprintf("--output-dir=%s", targetDir),
 				fmt.Sprintf("--name=%s", "ibmcloud-cluster"),
 			}
-			CreateOpts.CredRequestDir = credReqDir
-			CreateOpts.TargetDir = targetDir
+			Options.CredRequestDir = credReqDir
+			Options.TargetDir = targetDir
 			err = createServiceIDCmd(&cobra.Command{}, args)
 
 			if test.expectError {

@@ -2,27 +2,26 @@ package ibmcloud
 
 import (
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
-	"github.com/pkg/errors"
 
-	//"github.com/pkg/errors"
+	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
 )
 
 // NewDeleteServiceIDCmd provides the "delete-service-id" subcommand
 func NewDeleteServiceIDCmd() *cobra.Command {
 	deleteServiceIDCmd := &cobra.Command{
-		Use:              "delete-service-id",
-		Short:            "Delete Service ID",
-		RunE:             deleteServiceIDCmd,
-		PersistentPreRun: initEnvForCreateServiceIDCmd,
+		Use:   "delete-service-id",
+		Short: "Delete Service ID",
+		RunE:  deleteServiceIDCmd,
 	}
 
-	deleteServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.Name, "name", "", "User-defined name for all created IBM Cloud resources (can be separate from the cluster's infra-id)")
+	deleteServiceIDCmd.PersistentFlags().StringVar(&Options.Name, "name", "", "User-defined name for all created IBM Cloud resources (can be separate from the cluster's infra-id)")
 	deleteServiceIDCmd.MarkPersistentFlagRequired("name")
-	deleteServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to delete IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=ibmcloud' against an OpenShift release image)")
+	deleteServiceIDCmd.PersistentFlags().StringVar(&Options.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to delete IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=ibmcloud' against an OpenShift release image)")
 	deleteServiceIDCmd.MarkPersistentFlagRequired("credentials-requests-dir")
-	deleteServiceIDCmd.PersistentFlags().BoolVar(&CreateOpts.Force, "force", false, "delete all the service account forcefully(will delete all the entries with the name)")
+	deleteServiceIDCmd.PersistentFlags().BoolVar(&Options.Force, "force", false, "delete all the service account forcefully(will delete all the entries with the name)")
 
 	return deleteServiceIDCmd
 }
@@ -34,7 +33,7 @@ func deleteServiceIDCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	params := &ibmcloud.ClientParams{
-		InfraName: CreateOpts.Name,
+		InfraName: Options.Name,
 	}
 
 	ibmclient, err := ibmcloud.NewClient(apiKey, params)
@@ -49,7 +48,7 @@ func deleteServiceIDCmd(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "Failed to get Details for the given APIKey")
 	}
 
-	err = deleteServiceIDs(ibmclient, *apiKeyDetails.AccountID, CreateOpts.Name, CreateOpts.CredRequestDir, CreateOpts.Force)
+	err = deleteServiceIDs(ibmclient, *apiKeyDetails.AccountID, Options.Name, Options.CredRequestDir, Options.Force)
 	if err != nil {
 		return err
 	}
