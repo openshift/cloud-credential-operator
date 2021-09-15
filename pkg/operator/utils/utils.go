@@ -206,6 +206,24 @@ func GetOperatorConfiguration(kubeClient client.Client, logger log.FieldLogger) 
 	return
 }
 
+func GetLogLevel(kubeClient client.Client, logger log.FieldLogger) (operatorv1.LogLevel, error) {
+	conf, err := getOperatorConfiguration(kubeClient, logger)
+	if err != nil {
+		return "", err
+	}
+
+	return conf.Spec.LogLevel, nil
+}
+func GetOperatorLogLevel(kubeClient client.Client, logger log.FieldLogger) (operatorv1.LogLevel, error) {
+
+	conf, err := getOperatorConfiguration(kubeClient, logger)
+	if err != nil {
+		return "", err
+	}
+
+	return conf.Spec.OperatorLogLevel, nil
+}
+
 // GetEffectiveOperatorMode will take the legacy configmap and the value in the operator config, and return
 // the effective CCO mode and whether there is a conflict between the legacy and operator config values.
 func GetEffectiveOperatorMode(configMapDisabledValue bool, operatorConfigMode operatorv1.CloudCredentialsMode) (operatorv1.CloudCredentialsMode, bool) {
@@ -229,7 +247,7 @@ func GetEffectiveOperatorMode(configMapDisabledValue bool, operatorConfigMode op
 
 }
 
-func getOperatorMode(kubeClient client.Client, logger log.FieldLogger) (operatorv1.CloudCredentialsMode, error) {
+func getOperatorConfiguration(kubeClient client.Client, logger log.FieldLogger) (*operatorv1.CloudCredential, error) {
 	conf := &operatorv1.CloudCredential{}
 
 	err := kubeClient.Get(context.TODO(),
@@ -241,12 +259,20 @@ func getOperatorMode(kubeClient client.Client, logger log.FieldLogger) (operator
 		// at the bottom of this block???
 		if metaerrors.IsNoMatchError(err) {
 			logger.WithError(err).Debug("no config CRD found")
-			return "", err
+			return nil, err
 		}
 		if errors.IsNotFound(err) {
 			logger.Debugf("%s CCO operator config does not exist", constants.CloudCredOperatorConfig)
-			return "", err
+			return nil, err
 		}
+		return nil, err
+	}
+	return conf, nil
+}
+
+func getOperatorMode(kubeClient client.Client, logger log.FieldLogger) (operatorv1.CloudCredentialsMode, error) {
+	conf, err := getOperatorConfiguration(kubeClient, logger)
+	if err != nil {
 		return "", err
 	}
 

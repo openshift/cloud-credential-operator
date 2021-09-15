@@ -26,6 +26,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/cleanup"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/loglevel"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator"
@@ -51,6 +52,7 @@ func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs, secretannotator.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, awspodidentity.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, status.Add)
+	AddToManagerFuncs = append(AddToManagerFuncs, loglevel.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, cleanup.Add)
 	AddToManagerWithActuatorFuncs = append(AddToManagerWithActuatorFuncs, credentialsrequest.AddWithActuator)
 }
