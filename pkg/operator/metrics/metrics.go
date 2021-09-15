@@ -231,6 +231,7 @@ func newAccumulator(client client.Client, logger log.FieldLogger) *credRequestAc
 	for _, c := range credreqv1.FailureConditionTypes {
 		acc.crConditions[c] = 0
 	}
+	acc.crConditions[credreqv1.StaleCredentials] = 0
 
 	return acc
 }
@@ -252,10 +253,19 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest, cco
 		a.podIdentityCredentials++
 	}
 
-	// Skip reporting conditions if CCO is disabled, as we shouldn't be alerting in that case.
+	// Skip reporting conditions if CCO is disabled, as we shouldn't be alerting in that case, except for stale credentials.
+	// condition. The stale credentials are removed by cleanup controller. But when CCO is disabled the only way to inform
+	// users to remove these credentials is through alerts.
 	if !ccoDisabled {
 		for _, cond := range cr.Status.Conditions {
-			if cond.Status == corev1.ConditionTrue {
+			// do not report stale credentials when CCO is enabled as it will be removed by cleanup controller.
+			if cond.Status == corev1.ConditionTrue && cond.Type != credreqv1.StaleCredentials {
+				a.crConditions[cond.Type]++
+			}
+		}
+	} else {
+		for _, cond := range cr.Status.Conditions {
+			if cond.Status == corev1.ConditionTrue && cond.Type == credreqv1.StaleCredentials {
 				a.crConditions[cond.Type]++
 			}
 		}
