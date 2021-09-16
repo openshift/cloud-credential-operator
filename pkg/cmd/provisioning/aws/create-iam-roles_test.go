@@ -53,11 +53,11 @@ func TestIAMRoles(t *testing.T) {
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				files, err := ioutil.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
 
 				files, err = ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
 		},
 		{
@@ -80,11 +80,11 @@ func TestIAMRoles(t *testing.T) {
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				files, err := ioutil.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Equal(t, 2, countNonDirectoryFiles(files), "Should be exactly 1 IAM Role JSON and 1 IAM Role Policy file for each CredReq")
+				assert.Equal(t, 2, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 IAM Role JSON and 1 IAM Role Policy file for each CredReq")
 
 				files, err = ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
-				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
+				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
 		},
 		{
@@ -111,11 +111,11 @@ func TestIAMRoles(t *testing.T) {
 			verify: func(t *testing.T, targetDir, manifestsDir string) {
 				files, err := ioutil.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 
 				files, err = ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
-				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
+				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
 		},
 		{
@@ -236,17 +236,6 @@ spec:
 	require.NoError(t, err, "error while writing out contents of CredentialsRequest file")
 
 	return nil
-}
-
-// countNonDirectoryFiles counts files which are not a directory
-func countNonDirectoryFiles(files []os.FileInfo) int {
-	NonDirectoryFiles := 0
-	for _, f := range files {
-		if !f.IsDir() {
-			NonDirectoryFiles++
-		}
-	}
-	return NonDirectoryFiles
 }
 
 func mockGetOpenIDConnectProvider(mockAWSClient *mockaws.MockClient) {

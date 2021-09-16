@@ -3,6 +3,7 @@ package provisioning
 import (
 	"fmt"
 	"os"
+	"strings"
 )
 
 // EnsureDir ensures that directory exists at a given path
@@ -22,4 +23,20 @@ func EnsureDir(path string) error {
 	}
 
 	return nil
+}
+
+// CreateShellScript creates a shell script given commands to execute
+func CreateShellScript(commands []string) string {
+	return fmt.Sprintf("#!/bin/sh\n%s", strings.Join(commands, "\n"))
+}
+
+// CountNonDirectoryFiles counts files which are not a directory
+func CountNonDirectoryFiles(files []os.FileInfo) int {
+	NonDirectoryFiles := 0
+	for _, f := range files {
+		if !f.IsDir() {
+			NonDirectoryFiles++
+		}
+	}
+	return NonDirectoryFiles
 }
