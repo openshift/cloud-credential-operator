@@ -41,6 +41,8 @@ type: Opaque`
 	// Generated role files
 	roleFilenameFormat       = "05-%d-%s-role.json"
 	rolePolicyFilenameFormat = "06-%d-%s-policy.json"
+	// fileModeCcoctlDryRun represents a mode and permission bits of the files created by ccoctl in dry run
+	fileModeCcoctlDryRun = 0644
 )
 
 var (
@@ -147,8 +149,9 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		}
 		roleFilename := fmt.Sprintf(roleFilenameFormat, roleNum, roleName)
 		roleFullPath := filepath.Join(targetDir, roleFilename)
-		if err := saveToFile(roleDescription, roleFullPath, roleJSON); err != nil {
-			return "", errors.Wrap(err, "failed to save Role content JSON")
+		log.Printf("Saving %s locally at %s", roleDescription, roleFullPath)
+		if err := ioutil.WriteFile(roleFullPath, roleJSON, fileModeCcoctlDryRun); err != nil {
+			return "", errors.Wrap(err, fmt.Sprintf("Failed to save %s locally at %s", roleDescription, roleFullPath))
 		}
 
 		// Generate Role Policy
@@ -164,8 +167,9 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		}
 		rolePolicyFilename := fmt.Sprintf(rolePolicyFilenameFormat, roleNum, roleName)
 		rolePolicyFullPath := filepath.Join(targetDir, rolePolicyFilename)
-		if err := saveToFile(roleDescription, rolePolicyFullPath, rolePolicyJSON); err != nil {
-			return "", errors.Wrap(err, "failed to save Role Policy content JSON")
+		log.Printf("Saving policy for %s locally at %s", roleDescription, rolePolicyFullPath)
+		if err := ioutil.WriteFile(rolePolicyFullPath, rolePolicyJSON, fileModeCcoctlDryRun); err != nil {
+			return "", errors.Wrap(err, fmt.Sprintf("Failed to save policy for %s locally at %s", roleDescription, rolePolicyFullPath))
 		}
 
 		if err := writeCredReqSecret(credReq, targetDir, ""); err != nil {

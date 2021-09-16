@@ -172,9 +172,10 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, name, targetDir str
 	if generateOnly {
 		oidcIdentityProviderJSON := fmt.Sprintf(iamIdentityProviderTemplate, issuerURL, fingerprint)
 
-		err := saveToFile("AWS IAM Identity Provider", filepath.Join(targetDir, iamIdentityProviderFilename), []byte(oidcIdentityProviderJSON))
-		if err != nil {
-			return "", errors.Wrap(err, "failed to save IAM Identity Provider file")
+		iamIdentityProviderFullPath := filepath.Join(targetDir, iamIdentityProviderFilename)
+		log.Printf("Saving AWS IAM Identity Provider locally at %s", iamIdentityProviderFullPath)
+		if err := ioutil.WriteFile(iamIdentityProviderFullPath, []byte(oidcIdentityProviderJSON), fileModeCcoctlDryRun); err != nil {
+			return "", errors.Wrap(err, fmt.Sprintf("Failed to save AWS IAM Identity Provider locally at %s", iamIdentityProviderFullPath))
 		}
 
 	} else {
@@ -243,9 +244,10 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 	}
 
 	if generateOnly {
-		err = saveToFile("JSON web key set (JWKS)", filepath.Join(targetDir, oidcKeysFilename), jwks)
-		if err != nil {
-			return errors.Wrap(err, "failed to save keys.json file")
+		oidcKeysFullPath := filepath.Join(targetDir, oidcKeysFilename)
+		log.Printf("Saving JSON web key set (JWKS) locally at %s", oidcKeysFullPath)
+		if err := ioutil.WriteFile(oidcKeysFullPath, jwks, fileModeCcoctlDryRun); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Failed to save JSON web key set (JWKS) locally at %s", oidcKeysFullPath))
 		}
 	} else {
 		_, err = client.PutObject(&s3.PutObjectInput{
@@ -267,9 +269,10 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, targetDir string, generateOnly bool) error {
 	discoveryDocumentJSON := fmt.Sprintf(discoveryDocumentTemplate, issuerURL, issuerURL, provisioning.KeysURI)
 	if generateOnly {
-		err := saveToFile("discovery document", filepath.Join(targetDir, oidcConfigurationFilename), []byte(discoveryDocumentJSON))
-		if err != nil {
-			return errors.Wrap(err, "failed to save oidc configuration file")
+		oidcConfigurationFullPath := filepath.Join(targetDir, oidcConfigurationFilename)
+		log.Printf("Saving discovery document locally at %s", oidcConfigurationFullPath)
+		if err := ioutil.WriteFile(oidcConfigurationFullPath, []byte(discoveryDocumentJSON), fileModeCcoctlDryRun); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Failed to save discovery document locally at %s", oidcConfigurationFullPath))
 		}
 	} else {
 		_, err := client.PutObject(&s3.PutObjectInput{
@@ -299,9 +302,9 @@ func createOIDCBucket(client aws.Client, bucketName, name, region, targetDir str
 			oidcBucketJSON = fmt.Sprintf(oidcBucketTemplateWithLocation, bucketName, region)
 		}
 
-		err := saveToFile("OIDC S3 bucket", oidcBucketFilepath, []byte(oidcBucketJSON))
-		if err != nil {
-			return errors.Wrap(err, "failed to save oidc bucket JSON file")
+		log.Printf("Saving OIDC S3 bucket locally at %s", oidcBucketFilepath)
+		if err := ioutil.WriteFile(oidcBucketFilepath, []byte(oidcBucketJSON), fileModeCcoctlDryRun); err != nil {
+			return errors.Wrap(err, fmt.Sprintf("Failed to save OIDC S3 bucket locally at %s", oidcBucketFilepath))
 		}
 	} else {
 		s3BucketInput := &s3.CreateBucketInput{
@@ -416,21 +419,6 @@ func keyIDFromPublicKey(publicKey interface{}) (string, error) {
 	keyID := base64.RawURLEncoding.EncodeToString(publicKeyDERHash)
 
 	return keyID, nil
-}
-
-// saveToFile saves the given data to a given file
-func saveToFile(filePurpose, filePath string, data []byte) error {
-	log.Printf("Saving %s locally at %s", filePurpose, filePath)
-	f, err := os.Create(filePath)
-	if err != nil {
-		return errors.Wrapf(err, "failed to create file %s to store %s", filePath, filePurpose)
-	}
-	_, err = f.Write(data)
-	f.Close()
-	if err != nil {
-		return errors.Wrapf(err, "failed to write %s to file %s", filePurpose, filePath)
-	}
-	return nil
 }
 
 // isExistingIdentifyProvider checks if given identity provider is owned by given name prefix
