@@ -252,7 +252,9 @@ func TestIgnoreInvalidProjectPermissions(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			mockClient := mock.NewMockClient(gomock.NewController(t))
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockClient := mock.NewMockClient(mockCtrl)
 			logger := log.New()
 
 			mockClient.EXPECT().GetProjectName().Times(1).Return(projectName)
