@@ -172,8 +172,15 @@ func (s *ServiceID) createPolicy(policy *credreqv1.AccessPolicy) error {
 
 	// Append the resource group attribute if specified as a command line argument.
 	if s.resourceGroupID != "" {
+		resourceGroupAttrName := "resourceGroupId"
+		for _, attr := range resourceAttributes {
+			if *attr.Name == "resourceType" && *attr.Value == "resource-group" {
+				resourceGroupAttrName = "resource"
+				break
+			}
+		}
 		resourceAttributes = append(resourceAttributes, iampolicymanagementv1.ResourceAttribute{
-			Name:  core.StringPtr("resourceGroupId"),
+			Name:  &resourceGroupAttrName,
 			Value: &s.resourceGroupID,
 		})
 	}
