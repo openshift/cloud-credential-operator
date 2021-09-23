@@ -112,7 +112,7 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 
 	rolePolicyDocument, err := createRolePolicyDocument(oidcProviderARN, issuerURL, credReq.Spec.SecretRef.Namespace, credReq.Spec.ServiceAccountNames)
 	if err != nil {
-		return "", errors.Wrap(err, "Error while create Role policy document")
+		return "", errors.Wrapf(err, "error while creating Role policy document for %s", credReq.Name)
 	}
 
 	roleDescription := fmt.Sprintf("OpenShift role for %s/%s", credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name)
@@ -256,7 +256,11 @@ func createRolePolicyDocument(oidcProviderARN, issuerURL, namespace string, serv
 		conditionString = fmt.Sprintf(` { "StringEquals": { "%s:sub": %s } }`, issuerURL, serviceAccountListString)
 	} else {
 		// TODO: maybe return an error once all CredentialsRequest start including ServiceAccountNames
-		conditionString = fmt.Sprintf(`{ "StringEquals": { "%s:aud": "openshift" } }`, issuerURL)
+		// We used to support leaving the list of ServiceAccounts blank in the CredentialsRequest while
+		// we transitioned all the existing CredReqs. That work is complete, and we should not
+		// create Role policies that limit the Role by audience any more.
+		// Return an error indicating that ccoctl requires the ServiceAccount list to be populated.
+		return "", fmt.Errorf("CredentialsRequest must provide ServieAccounts to bind the Role policy to")
 	}
 	policy := fmt.Sprintf(rolePolicyDocmentTemplate, oidcProviderARN, conditionString)
 
