@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
+
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -32,6 +33,7 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 type KubevirtActuator struct {
@@ -269,13 +271,5 @@ func (a *KubevirtActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldL
 }
 
 func (a *KubevirtActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
-		Status: configv1.ConditionTrue,
-		Type:   configv1.OperatorUpgradeable,
-	}
-	return upgradeableCondition
-}
-
-func (a *KubevirtActuator) GetUpcomingCredSecrets() []types.NamespacedName {
-	return []types.NamespacedName{}
+	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
 }
