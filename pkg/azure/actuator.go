@@ -23,8 +23,7 @@ import (
 	"reflect"
 	"time"
 
-	operatorv1 "github.com/openshift/api/operator/v1"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	log "github.com/sirupsen/logrus"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -32,18 +31,18 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
-
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
-var _ actuator.Actuator = (*Actuator)(nil)
+var _ actuatoriface.Actuator = (*Actuator)(nil)
 
 type servicePrincipalNameBuilder func(string, string) (string, error)
 
@@ -678,7 +677,7 @@ func (a *Actuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.Cr
 		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.AzureCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
+			Message:   "cannot proceed without cloud cred secret annotation",
 		}
 	}
 
@@ -743,5 +742,5 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return nil
+	return utils.UpgradeableCheck(a.client.Client, mode, a.GetCredentialsRootSecretLocation())
 }
