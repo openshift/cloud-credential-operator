@@ -7,8 +7,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/pkg/errors"
+
+	"k8s.io/apimachinery/pkg/runtime"
 
 	"github.com/IBM/go-sdk-core/v5/core"
 	"github.com/IBM/platform-services-go-sdk/iamidentityv1"
@@ -59,9 +62,20 @@ type ServiceID struct {
 }
 
 func (s *ServiceID) Validate() error {
-	_, err := s.decode()
+	codec, err := credreqv1.NewCodec()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "Failed to create credReq codec")
+	}
+
+	var unknown runtime.Unknown
+	err = codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, &unknown)
+	if err != nil {
+		return errors.Wrapf(err, "failed to DecodeProviderSpec")
+	}
+
+	if unknown.Kind != reflect.TypeOf(credreqv1.IBMCloudProviderSpec{}).Name() &&
+		unknown.Kind != reflect.TypeOf(credreqv1.IBMCloudPowerVSProviderSpec{}).Name() {
+		return fmt.Errorf("not supported of kind: %s", unknown.Kind)
 	}
 
 	options := &iamidentityv1.ListServiceIdsOptions{
@@ -88,12 +102,12 @@ func (s *ServiceID) Do() error {
 		return err
 	}
 	s.ServiceID = id
-	ibmcloudProviderSpec, err := s.decode()
+	policies, err := s.extractPolicies()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "Failed to extract the policies: %+v", err)
 	}
 	// Create a new Access Policy for each policy in the CredReq.
-	for _, policy := range ibmcloudProviderSpec.Policies {
+	for _, policy := range policies {
 		err = s.createPolicy(&policy)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to create access policy with: %+v", policy)
@@ -213,18 +227,34 @@ func (s *ServiceID) createPolicy(policy *credreqv1.AccessPolicy) error {
 	return nil
 }
 
-func (s *ServiceID) decode() (*credreqv1.IBMCloudProviderSpec, error) {
-	// Decode IBMCloudProviderSpec
+func (s *ServiceID) extractPolicies() (policies []credreqv1.AccessPolicy, err error) {
 	codec, err := credreqv1.NewCodec()
 	if err != nil {
 		return nil, errors.Wrap(err, "Failed to create credReq codec")
 	}
-
-	ibmcloudProviderSpec := &credreqv1.IBMCloudProviderSpec{}
-	if err := codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, ibmcloudProviderSpec); err != nil {
-		return nil, errors.Wrap(err, "Failed to decode the provider spec")
+	var unknown runtime.Unknown
+	err = codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, &unknown)
+	if err != nil {
+		return nil, err
 	}
-	return ibmcloudProviderSpec, nil
+
+	switch unknown.Kind {
+	case reflect.TypeOf(credreqv1.IBMCloudProviderSpec{}).Name():
+		ibmcloudProviderSpec := &credreqv1.IBMCloudProviderSpec{}
+		if err := codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, ibmcloudProviderSpec); err != nil {
+			return nil, errors.Wrap(err, "Failed to decode the provider spec")
+		}
+		policies = ibmcloudProviderSpec.Policies
+	case reflect.TypeOf(credreqv1.IBMCloudPowerVSProviderSpec{}).Name():
+		ibmCloudPowerVSProviderSpec := &credreqv1.IBMCloudPowerVSProviderSpec{}
+		if err := codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, ibmCloudPowerVSProviderSpec); err != nil {
+			return nil, errors.Wrap(err, "Failed to decode the provider spec")
+		}
+		policies = ibmCloudPowerVSProviderSpec.Policies
+	default:
+		return nil, fmt.Errorf("not supported of kind: %s", unknown.Kind)
+	}
+	return
 }
 
 func (s *ServiceID) UnDo(targetDir string) error {
