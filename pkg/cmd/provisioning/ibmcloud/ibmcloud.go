@@ -9,17 +9,19 @@ type options struct {
 	Name              string
 	CredRequestDir    string
 	ResourceGroupName string
+	Force             bool
 }
 
 // NewIBMCloudCmd implements the "ibmcloud" subcommand for the credentials provisioning
 func NewIBMCloudCmd() *cobra.Command {
-	createCmd := &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "ibmcloud",
 		Short: "Manage credentials objects for IBM Cloud",
 		Long:  "Creating/deleting cloud credentials objects for IBM Cloud",
 	}
 
-	createCmd.AddCommand(NewCreateServiceIDCmd())
+	cmd.AddCommand(NewCreateServiceIDCmd())
+	cmd.AddCommand(NewDeleteServiceIDCmd())
 
-	return createCmd
+	return cmd
 }
