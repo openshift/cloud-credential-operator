@@ -23,9 +23,9 @@ import (
 var APIKeyEnvVars = []string{"IC_API_KEY", "IBMCLOUD_API_KEY", "BM_API_KEY", "BLUEMIX_API_KEY"}
 
 var (
-	// CreateOpts captures the options that affect creation of the generated
+	// Options captures the options that affect creation/deletion of the generated
 	// objects.
-	CreateOpts = options{
+	Options = options{
 		TargetDir: "",
 	}
 
@@ -52,12 +52,12 @@ func NewCreateServiceIDCmd() *cobra.Command {
 		PersistentPreRun: initEnvForCreateServiceIDCmd,
 	}
 
-	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.Name, "name", "", "User-defined name for all created IBM Cloud resources (can be separate from the cluster's infra-id)")
+	createServiceIDCmd.PersistentFlags().StringVar(&Options.Name, "name", "", "User-defined name for all created IBM Cloud resources (can be separate from the cluster's infra-id)")
 	createServiceIDCmd.MarkPersistentFlagRequired("name")
-	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=aws' against an OpenShift release image)")
+	createServiceIDCmd.PersistentFlags().StringVar(&Options.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=ibmcloud' against an OpenShift release image)")
 	createServiceIDCmd.MarkPersistentFlagRequired("credentials-requests-dir")
-	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
-	createServiceIDCmd.PersistentFlags().StringVar(&CreateOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createServiceIDCmd.PersistentFlags().StringVar(&Options.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
+	createServiceIDCmd.PersistentFlags().StringVar(&Options.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 
 	return createServiceIDCmd
 }
@@ -69,7 +69,7 @@ func createServiceIDCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	params := &ibmcloud.ClientParams{
-		InfraName: CreateOpts.Name,
+		InfraName: Options.Name,
 	}
 
 	ibmclient, err := ibmcloud.NewClient(apiKey, params)
@@ -84,8 +84,8 @@ func createServiceIDCmd(cmd *cobra.Command, args []string) error {
 		return errors.Wrap(err, "Failed to get Details for the given APIKey")
 	}
 
-	err = createServiceIDs(ibmclient, apiKeyDetails.AccountID, CreateOpts.Name, CreateOpts.ResourceGroupName,
-		CreateOpts.CredRequestDir, CreateOpts.TargetDir)
+	err = createServiceIDs(ibmclient, apiKeyDetails.AccountID, Options.Name, Options.ResourceGroupName,
+		Options.CredRequestDir, Options.TargetDir)
 	if err != nil {
 		return err
 	}
@@ -194,16 +194,16 @@ func getListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, 
 // initEnvForCreateServiceIDCmd will ensure the destination directory is ready to receive the generated
 // files, and will create the directory if necessary.
 func initEnvForCreateServiceIDCmd(cmd *cobra.Command, args []string) {
-	if CreateOpts.TargetDir == "" {
+	if Options.TargetDir == "" {
 		pwd, err := os.Getwd()
 		if err != nil {
 			log.Fatalf("Failed to get current directory: %s", err)
 		}
 
-		CreateOpts.TargetDir = pwd
+		Options.TargetDir = pwd
 	}
 
-	fPath, err := filepath.Abs(CreateOpts.TargetDir)
+	fPath, err := filepath.Abs(Options.TargetDir)
 	if err != nil {
 		log.Fatalf("Failed to resolve full path: %s", err)
 	}
