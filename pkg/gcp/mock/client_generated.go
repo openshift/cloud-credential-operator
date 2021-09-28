@@ -10,6 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iam "google.golang.org/api/iam/v1"
 	admin "google.golang.org/genproto/googleapis/iam/admin/v1"
 )
 
@@ -64,6 +65,21 @@ func (m *MockClient) CreateServiceAccountKey(arg0 context.Context, arg1 *admin.C
 func (mr *MockClientMockRecorder) CreateServiceAccountKey(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateServiceAccountKey", reflect.TypeOf((*MockClient)(nil).CreateServiceAccountKey), arg0, arg1)
+}
+
+// CreateWorkloadIdentityPool mocks base method.
+func (m *MockClient) CreateWorkloadIdentityPool(arg0 context.Context, arg1, arg2 string, arg3 *iam.WorkloadIdentityPool) (*iam.Operation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateWorkloadIdentityPool", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*iam.Operation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateWorkloadIdentityPool indicates an expected call of CreateWorkloadIdentityPool.
+func (mr *MockClientMockRecorder) CreateWorkloadIdentityPool(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).CreateWorkloadIdentityPool), arg0, arg1, arg2, arg3)
 }
 
 // DeleteServiceAccount mocks base method.

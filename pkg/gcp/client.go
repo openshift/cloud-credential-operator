@@ -21,16 +21,12 @@ import (
 	"fmt"
 	"time"
 
-	// GCP auth
-	"golang.org/x/oauth2/google"
-	"google.golang.org/api/option"
-
-	// API Client Libraries (classic libs)
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	serviceusage "google.golang.org/api/serviceusage/v1"
-
-	// Cloud Client Libraries
 	iamadmin "cloud.google.com/go/iam/admin/apiv1"
+	"golang.org/x/oauth2/google"
+	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	iam "google.golang.org/api/iam/v1"
+	"google.golang.org/api/option"
+	serviceusage "google.golang.org/api/serviceusage/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 )
 
@@ -47,6 +43,7 @@ type Client interface {
 	GetServiceAccount(context.Context, *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error)
 	ListServiceAccountKeys(context.Context, *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error)
 	QueryTestablePermissions(context.Context, *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error)
+	CreateWorkloadIdentityPool(context.Context, string, string, *iam.WorkloadIdentityPool) (*iam.Operation, error)
 
 	//CloudResourceManager
 	GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
@@ -63,6 +60,7 @@ type gcpClient struct {
 	creds                      *google.Credentials
 	cloudResourceManagerClient *cloudresourcemanager.Service
 	iamClient                  *iamadmin.IamClient
+	iamService                 *iam.Service
 	serviceUsageClient         *serviceusage.Service
 }
 
@@ -149,6 +147,12 @@ func (c *gcpClient) QueryTestablePermissions(ctx context.Context, request *iamad
 	return c.iamClient.QueryTestablePermissions(ctx, request)
 }
 
+func (c *gcpClient) CreateWorkloadIdentityPool(ctx context.Context, parent, poolID string, pool *iam.WorkloadIdentityPool) (*iam.Operation, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamService.Projects.Locations.WorkloadIdentityPools.Create(parent, pool).WorkloadIdentityPoolId(poolID).Context(ctx).Do()
+}
+
 func (c *gcpClient) ListServicesEnabled() (map[string]bool, error) {
 	serviceMap := map[string]bool{}
 
@@ -198,9 +202,16 @@ func fixupServiceMap(serviceMap map[string]bool) {
 // NewClient creates our client wrapper object for interacting with GCP.
 func NewClient(projectName string, authJSON []byte) (Client, error) {
 	ctx := context.TODO()
-
+	var creds *google.Credentials
+	var err error
 	// since we're using a single creds var, we should specify all the required scopes when initializing
-	creds, err := google.CredentialsFromJSON(context.TODO(), authJSON, "https://www.googleapis.com/auth/cloud-platform")
+	scope := "https://www.googleapis.com/auth/cloud-platform"
+
+	if len(authJSON) != 0 {
+		creds, err = google.CredentialsFromJSON(context.TODO(), authJSON, scope)
+	} else {
+		creds, err = google.FindDefaultCredentials(context.TODO(), scope)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -215,6 +226,11 @@ func NewClient(projectName string, authJSON []byte) (Client, error) {
 		return nil, err
 	}
 
+	iamService, err := iam.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
 	serviceUsageClient, err := serviceusage.NewService(ctx, option.WithCredentials(creds))
 	if err != nil {
 		return nil, err
@@ -225,6 +241,7 @@ func NewClient(projectName string, authJSON []byte) (Client, error) {
 		creds:                      creds,
 		cloudResourceManagerClient: cloudResourceManagerClient,
 		iamClient:                  iamClient,
+		iamService:                 iamService,
 		serviceUsageClient:         serviceUsageClient,
 	}, nil
 }
