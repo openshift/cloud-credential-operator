@@ -2,13 +2,14 @@ package ibmcloud
 
 import (
 	"fmt"
-	"github.com/IBM/platform-services-go-sdk/resourcemanagerv2"
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"strconv"
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,6 +17,7 @@ import (
 	"github.com/IBM/go-sdk-core/v5/core"
 	"github.com/IBM/platform-services-go-sdk/iamidentityv1"
 	pmv1 "github.com/IBM/platform-services-go-sdk/iampolicymanagementv1"
+	"github.com/IBM/platform-services-go-sdk/resourcemanagerv2"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	mockibmcloud "github.com/openshift/cloud-credential-operator/pkg/ibmcloud/mock"
@@ -132,7 +134,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			name: "Create for one CredReq",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, false, false)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
 				mockCreateServiceID(mockIBMCloudClient, 1, false)
 				mockDeleteServiceID(mockIBMCloudClient, 0, false)
 				mockCreateAPIKey(mockIBMCloudClient, 1, false)
@@ -163,7 +165,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
 				mockListResourceGroups(mockIBMCloudClient, true, false)
-				mockListServiceID(mockIBMCloudClient, false, false)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
 				mockCreateServiceID(mockIBMCloudClient, 1, false)
 				mockDeleteServiceID(mockIBMCloudClient, 0, false)
 				mockCreateAPIKey(mockIBMCloudClient, 1, false)
@@ -285,7 +287,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			name: "failed to CreateServiceID",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, false, false)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
 				mockCreateServiceID(mockIBMCloudClient, 1, true)
 				return mockIBMCloudClient
 			},
@@ -304,7 +306,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			name: "failed to createPolicy",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, false, false)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
 				mockCreateServiceID(mockIBMCloudClient, 1, false)
 				mockCreatePolicy(mockIBMCloudClient, 1, true)
 				mockDeleteServiceID(mockIBMCloudClient, 1, false)
@@ -325,7 +327,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			name: "failed to CreateAPIKey",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, false, false)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
 				mockCreateServiceID(mockIBMCloudClient, 1, false)
 				mockCreatePolicy(mockIBMCloudClient, 1, false)
 				mockCreateAPIKey(mockIBMCloudClient, 1, true)
@@ -347,7 +349,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			name: "failed to DeleteServiceID",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, false, false)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
 				mockCreateServiceID(mockIBMCloudClient, 1, false)
 				mockCreatePolicy(mockIBMCloudClient, 1, false)
 				mockCreateAPIKey(mockIBMCloudClient, 1, true)
@@ -369,7 +371,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			name: "Create with Existing ServiceID",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, true, false)
+				mockListServiceID(mockIBMCloudClient, "", 1, false)
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
@@ -387,7 +389,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			name: "failed to ListServiceID",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, false, true)
+				mockListServiceID(mockIBMCloudClient, "", 0, true)
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
@@ -442,7 +444,7 @@ func TestCreateSharedSecretsInvalidTargetDir(t *testing.T) {
 			name: "with invalid target dir",
 			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
 				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
-				mockListServiceID(mockIBMCloudClient, false, false)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
 				mockCreateServiceID(mockIBMCloudClient, 1, false)
 				mockDeleteServiceID(mockIBMCloudClient, 0, false)
 				mockCreateAPIKey(mockIBMCloudClient, 1, false)
@@ -659,7 +661,7 @@ func mockListResourceGroups(client *mockibmcloud.MockClient, resourceGroupExist,
 	client.EXPECT().ListResourceGroups(gomock.Any()).Return(list, nil, err).Times(1)
 }
 
-func mockListServiceID(client *mockibmcloud.MockClient, serviceIDExist, fail bool) {
+func mockListServiceID(client *mockibmcloud.MockClient, namePrefix string, count int, fail bool) {
 	var err error
 	if fail {
 		err = fmt.Errorf("failed to get ListServiceID")
@@ -667,10 +669,14 @@ func mockListServiceID(client *mockibmcloud.MockClient, serviceIDExist, fail boo
 	list := &iamidentityv1.ServiceIDList{
 		Serviceids: []iamidentityv1.ServiceID{},
 	}
-	if serviceIDExist {
+	if namePrefix == "" {
+		namePrefix = "service-id"
+	}
+	for i := 0; i < count; i++ {
 		list.Serviceids = append(list.Serviceids,
 			iamidentityv1.ServiceID{
-				ID: core.StringPtr("1234aa936dd1434b9317f8ed4c7a2345"),
+				Name: core.StringPtr(namePrefix + "-" + strconv.Itoa(i)),
+				ID:   core.StringPtr("ServiceId-" + uuid.New().String()),
 			})
 	}
 	client.EXPECT().ListServiceID(gomock.Any()).Return(list, nil, err).Times(1)
