@@ -227,15 +227,15 @@ func (s *ServiceID) createPolicy(policy *credreqv1.AccessPolicy) error {
 	return nil
 }
 
-func (s *ServiceID) extractPolicies() (policies []credreqv1.AccessPolicy, err error) {
-	codec, err := credreqv1.NewCodec()
-	if err != nil {
-		return nil, errors.Wrap(err, "Failed to create credReq codec")
+func (s *ServiceID) extractPolicies() (policies []credreqv1.AccessPolicy, returnErr error) {
+	codec, returnErr := credreqv1.NewCodec()
+	if returnErr != nil {
+		return nil, errors.Wrap(returnErr, "Failed to create credReq codec")
 	}
 	var unknown runtime.Unknown
-	err = codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, &unknown)
-	if err != nil {
-		return nil, err
+	returnErr = codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, &unknown)
+	if returnErr != nil {
+		return nil, returnErr
 	}
 
 	switch unknown.Kind {
