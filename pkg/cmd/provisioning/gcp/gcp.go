@@ -7,13 +7,14 @@ import (
 )
 
 type options struct {
-	TargetDir      string
-	PublicKeyPath  string
-	Region         string
-	Name           string
-	CredRequestDir string
-	DryRun         bool
-	Project        string
+	TargetDir            string
+	PublicKeyPath        string
+	Region               string
+	Name                 string
+	Project              string
+	WorkloadIdentityPool string
+	CredRequestDir       string
+	DryRun               bool
 }
 
 // NewGCPCmd implements the "gcp" subcommand for the credentials provisioning
@@ -26,6 +27,7 @@ func NewGCPCmd() *cobra.Command {
 
 	gcpCmd.AddCommand(provisioning.NewCreateKeyPairCmd())
 	gcpCmd.AddCommand(NewCreateWorkloadIdentityPool())
+	gcpCmd.AddCommand(NewCreateWorkloadIdentityProviderCmd())
 
 	return gcpCmd
 }
