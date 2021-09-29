@@ -9,6 +9,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/spf13/cobra"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/IBM/go-sdk-core/v5/core"
@@ -23,19 +24,22 @@ func Test_deleteServiceIDCmd(t *testing.T) {
 		args []string
 	}
 	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
+		name        string
+		args        args
+		expectError string
 	}{
 		{
-			name:    "CreateSharedSecretsCmd with unset API key environment variable should fail",
-			wantErr: true,
+			name:        "CreateSharedSecretsCmd with unset API key environment variable should fail",
+			expectError: "environment variable not set",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := deleteServiceIDCmd(tt.args.cmd, tt.args.args); (err != nil) != tt.wantErr {
-				t.Errorf("deleteServiceIDCmd() error = %v, wantErr %v", err, tt.wantErr)
+			err := deleteServiceIDCmd(tt.args.cmd, tt.args.args)
+			if tt.expectError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Containsf(t, err.Error(), tt.expectError, "expected error containing %q, got %s", tt.expectError, err)
 			}
 		})
 	}
@@ -47,7 +51,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 		mockIBMCloudClient func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient
 		setup              func(*testing.T) string
 		force              bool
-		wantErr            bool
+		expectError        string
 	}{
 		{
 			// Tests the delete-service-id command without any CredReqs present in the credentials-requests-dir directory.
@@ -99,7 +103,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 
 				return tempDirName
 			},
-			wantErr: true,
+			expectError: "more than one ServiceIDs present",
 		},
 		{
 			// Tests the delete-service-id command with more than one service ID with the same name, this will throw
@@ -137,7 +141,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 
 				return tempDirName
 			},
-			wantErr: true,
+			expectError: "Error listing Service Ids",
 		},
 		{
 			// Tests the delete-service-id command when failed to DeleteServiceID
@@ -156,7 +160,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 
 				return tempDirName
 			},
-			wantErr: true,
+			expectError: "Failed to delete the serviceIDs",
 		},
 		{
 			// Tests the delete-service-id command when no matching service ID found, in this case command will just run
@@ -187,8 +191,11 @@ func Test_deleteServiceIDs(t *testing.T) {
 			credReqDir := tt.setup(t)
 			defer os.RemoveAll(credReqDir)
 
-			if err := deleteServiceIDs(mockIBMCloudClient, "1234", "name", credReqDir, tt.force); (err != nil) != tt.wantErr {
-				t.Errorf("deleteServiceIDs() error = %v, wantErr %v", err, tt.wantErr)
+			err := deleteServiceIDs(mockIBMCloudClient, "1234", "name", credReqDir, tt.force)
+			if tt.expectError == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.Containsf(t, err.Error(), tt.expectError, "expected error containing %q, got %s", tt.expectError, err)
 			}
 		})
 	}
@@ -197,7 +204,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 func mockListServiceIDWithSameName(client *mockibmcloud.MockClient, name string, count int, fail bool) {
 	var err error
 	if fail {
-		err = fmt.Errorf("failed to get ListServiceID")
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
 	}
 	list := &iamidentityv1.ServiceIDList{
 		Serviceids: []iamidentityv1.ServiceID{},

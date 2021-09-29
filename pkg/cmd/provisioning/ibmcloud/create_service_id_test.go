@@ -607,7 +607,7 @@ func getMockedAPIKey() *iamidentityv1.APIKey {
 func mockDeleteServiceID(client *mockibmcloud.MockClient, times int, fail bool) {
 	var err error
 	if fail {
-		err = fmt.Errorf("failed to get APIKeyDetails")
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
 	}
 	client.EXPECT().DeleteServiceID(gomock.Any()).Return(nil, err).Times(times)
 }
@@ -615,7 +615,7 @@ func mockDeleteServiceID(client *mockibmcloud.MockClient, times int, fail bool) 
 func mockCreatePolicy(client *mockibmcloud.MockClient, times int, fail bool) {
 	var err error
 	if fail {
-		err = fmt.Errorf("failed to get APIKeyDetails")
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
 	}
 	client.EXPECT().CreatePolicy(gomock.Any()).Return(
 		&pmv1.Policy{
@@ -627,7 +627,7 @@ func mockCreatePolicy(client *mockibmcloud.MockClient, times int, fail bool) {
 func mockCreateAPIKey(client *mockibmcloud.MockClient, times int, fail bool) {
 	var err error
 	if fail {
-		err = fmt.Errorf("failed to get APIKeyDetails")
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
 	}
 	apiKey := getMockedAPIKey()
 	client.EXPECT().CreateAPIKey(gomock.Any()).Return(apiKey, nil, err).Times(times)
@@ -636,7 +636,7 @@ func mockCreateAPIKey(client *mockibmcloud.MockClient, times int, fail bool) {
 func mockCreateServiceID(client *mockibmcloud.MockClient, times int, fail bool) {
 	var err error
 	if fail {
-		err = fmt.Errorf("failed to get APIKeyDetails")
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
 	}
 	client.EXPECT().CreateServiceID(gomock.Any()).Return(
 		&iamidentityv1.ServiceID{
@@ -649,7 +649,7 @@ func mockCreateServiceID(client *mockibmcloud.MockClient, times int, fail bool) 
 func mockListResourceGroups(client *mockibmcloud.MockClient, resourceGroupExist, fail bool) {
 	var err error
 	if fail {
-		err = fmt.Errorf("failed to get ListResourceGroups")
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
 	}
 	list := &resourcemanagerv2.ResourceGroupList{}
 	if resourceGroupExist {
@@ -664,7 +664,7 @@ func mockListResourceGroups(client *mockibmcloud.MockClient, resourceGroupExist,
 func mockListServiceID(client *mockibmcloud.MockClient, namePrefix string, count int, fail bool) {
 	var err error
 	if fail {
-		err = fmt.Errorf("failed to get ListServiceID")
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
 	}
 	list := &iamidentityv1.ServiceIDList{
 		Serviceids: []iamidentityv1.ServiceID{},
