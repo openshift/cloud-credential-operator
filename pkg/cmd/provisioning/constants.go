@@ -13,4 +13,26 @@ const (
 	ManifestsDirName = "manifests"
 	// TLSDirName is the name of the directory to save bound service account signing key created by ccoctl
 	TLSDirName = "tls"
+	// DiscoveryDocumentTemplate is a template of the discovery document that needs to be populated with appropriate values
+	DiscoveryDocumentTemplate = `{
+	"issuer": "%s",
+	"jwks_uri": "%s/%s",
+    "response_types_supported": [
+        "id_token"
+    ],
+    "subject_types_supported": [
+        "public"
+    ],
+    "id_token_signing_alg_values_supported": [
+        "RS256"
+    ],
+    "claims_supported": [
+        "aud",
+        "exp",
+        "sub",
+        "iat",
+        "iss",
+        "sub"
+    ]
+}`
 )
