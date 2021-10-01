@@ -227,6 +227,8 @@ func (c *awsClient) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectO
 func NewClient(accessKeyID, secretAccessKey []byte, params *ClientParams) (Client, error) {
 	var awsOpts session.Options
 
+	agentText := "defaultAgent"
+
 	if params != nil {
 		if params.Region != "" {
 			awsOpts.Config.Region = aws.String(params.Region)
@@ -235,24 +237,24 @@ func NewClient(accessKeyID, secretAccessKey []byte, params *ClientParams) (Clien
 		if params.Endpoint != "" {
 			awsOpts.Config.Endpoint = aws.String(params.Endpoint)
 		}
+
+		if params.CABundle != "" {
+			awsOpts.CustomCABundle = strings.NewReader(params.CABundle)
+		}
+
+		if params.InfraName != "" {
+			agentText = params.InfraName
+		}
 	}
 
 	awsOpts.Config.Credentials = credentials.NewStaticCredentials(
 		string(accessKeyID), string(secretAccessKey), "")
-
-	if params.CABundle != "" {
-		awsOpts.CustomCABundle = strings.NewReader(params.CABundle)
-	}
 
 	s, err := session.NewSessionWithOptions(awsOpts)
 	if err != nil {
 		return nil, err
 	}
 
-	agentText := "defaultAgent"
-	if params != nil && params.InfraName != "" {
-		agentText = params.InfraName
-	}
 	s.Handlers.Build.PushBackNamed(request.NamedHandler{
 		Name: "openshift.io/cloud-credential-operator",
 		Fn:   request.MakeAddToUserAgentHandler("openshift.io cloud-credential-operator", version.Get().String(), agentText),
