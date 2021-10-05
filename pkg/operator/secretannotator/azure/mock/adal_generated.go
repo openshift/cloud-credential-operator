@@ -5,36 +5,35 @@
 package mock
 
 import (
-	reflect "reflect"
-
 	adal "github.com/Azure/go-autorest/autorest/adal"
 	gomock "github.com/golang/mock/gomock"
+	reflect "reflect"
 )
 
-// MockAdalService is a mock of AdalService interface.
+// MockAdalService is a mock of AdalService interface
 type MockAdalService struct {
 	ctrl     *gomock.Controller
 	recorder *MockAdalServiceMockRecorder
 }
 
-// MockAdalServiceMockRecorder is the mock recorder for MockAdalService.
+// MockAdalServiceMockRecorder is the mock recorder for MockAdalService
 type MockAdalServiceMockRecorder struct {
 	mock *MockAdalService
 }
 
-// NewMockAdalService creates a new mock instance.
+// NewMockAdalService creates a new mock instance
 func NewMockAdalService(ctrl *gomock.Controller) *MockAdalService {
 	mock := &MockAdalService{ctrl: ctrl}
 	mock.recorder = &MockAdalServiceMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
+// EXPECT returns an object that allows the caller to indicate expected use
 func (m *MockAdalService) EXPECT() *MockAdalServiceMockRecorder {
 	return m.recorder
 }
 
-// NewOAuthConfig mocks base method.
+// NewOAuthConfig mocks base method
 func (m *MockAdalService) NewOAuthConfig(activeDirectoryEndpoint, tenantID string) (*adal.OAuthConfig, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewOAuthConfig", activeDirectoryEndpoint, tenantID)
@@ -43,13 +42,13 @@ func (m *MockAdalService) NewOAuthConfig(activeDirectoryEndpoint, tenantID strin
 	return ret0, ret1
 }
 
-// NewOAuthConfig indicates an expected call of NewOAuthConfig.
+// NewOAuthConfig indicates an expected call of NewOAuthConfig
 func (mr *MockAdalServiceMockRecorder) NewOAuthConfig(activeDirectoryEndpoint, tenantID interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewOAuthConfig", reflect.TypeOf((*MockAdalService)(nil).NewOAuthConfig), activeDirectoryEndpoint, tenantID)
 }
 
-// NewServicePrincipalToken mocks base method.
+// NewServicePrincipalToken mocks base method
 func (m *MockAdalService) NewServicePrincipalToken(oauthConfig adal.OAuthConfig, clientID, secret, resource string, callbacks ...adal.TokenRefreshCallback) (*adal.ServicePrincipalToken, error) {
 	m.ctrl.T.Helper()
 	varargs := []interface{}{oauthConfig, clientID, secret, resource}
@@ -62,7 +61,7 @@ func (m *MockAdalService) NewServicePrincipalToken(oauthConfig adal.OAuthConfig,
 	return ret0, ret1
 }
 
-// NewServicePrincipalToken indicates an expected call of NewServicePrincipalToken.
+// NewServicePrincipalToken indicates an expected call of NewServicePrincipalToken
 func (mr *MockAdalServiceMockRecorder) NewServicePrincipalToken(oauthConfig, clientID, secret, resource interface{}, callbacks ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	varargs := append([]interface{}{oauthConfig, clientID, secret, resource}, callbacks...)
