@@ -104,8 +104,11 @@ func computeStatusConditions(
 		conditions = append(conditions, *upgradeableCondition)
 	}
 
+	if operatorIsDisabled {
+		return conditions
+	}
+
 	failingCredRequests := 0
-	staleCredRequests := 0
 
 	validCredRequests := []minterv1.CredentialsRequest{}
 	// Filter out credRequests that are for different clouds
@@ -136,26 +139,6 @@ func computeStatusConditions(
 		if foundFailure {
 			failingCredRequests = failingCredRequests + 1
 		}
-
-		// Check for stale credential request condition
-		staleCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, minterv1.StaleCredentials)
-		if staleCond != nil && staleCond.Status == corev1.ConditionTrue {
-			staleCredRequests = staleCredRequests + 1
-		}
-	}
-
-	if operatorIsDisabled {
-		if staleCredRequests > 0 {
-			var degradedCondition configv1.ClusterOperatorStatusCondition
-			degradedCondition.Type = configv1.OperatorDegraded
-			degradedCondition.Status = configv1.ConditionTrue
-			degradedCondition.Reason = reasonStaleCredentials
-			degradedCondition.Message = fmt.Sprintf(
-				"%d of %d credentials requests are stale and should be deleted.",
-				staleCredRequests, len(validCredRequests))
-			conditions = append(conditions, degradedCondition)
-		}
-		return conditions
 	}
 
 	if failingCredRequests > 0 {

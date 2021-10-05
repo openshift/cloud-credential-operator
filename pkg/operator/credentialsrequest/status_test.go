@@ -157,21 +157,6 @@ func TestClusterOperatorStatus(t *testing.T) {
 			},
 		},
 		{
-			name: "stale credentials request that is no longer required",
-			credRequests: []minterv1.CredentialsRequest{
-				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
-				testCredentialsRequestWithStatus("cred2", true, []minterv1.CredentialsRequestCondition{
-					testCRCondition(minterv1.StaleCredentials, corev1.ConditionTrue),
-				}, nil),
-				testCredentialsRequestWithStatus("cred3", true, []minterv1.CredentialsRequestCondition{}, nil),
-			},
-			cloudPlatform:    configv1.AWSPlatformType,
-			operatorDisabled: true,
-			expectedConditions: []configv1.ClusterOperatorStatusCondition{
-				testCondition(configv1.OperatorDegraded, configv1.ConditionTrue, reasonStaleCredentials),
-			},
-		},
-		{
 			name: "ignore nonAWS credreqs",
 			credRequests: []minterv1.CredentialsRequest{
 				testCredentialsRequestWithStatus("cred1", true, []minterv1.CredentialsRequestCondition{}, nil),
