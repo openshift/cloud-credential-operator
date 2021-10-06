@@ -12,7 +12,10 @@ import (
 
 	"github.com/pkg/errors"
 
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
+	"sigs.k8s.io/yaml"
 
 	"github.com/IBM/go-sdk-core/v5/core"
 	"github.com/IBM/platform-services-go-sdk/iamidentityv1"
@@ -23,19 +26,6 @@ import (
 )
 
 const (
-	//TODO(mkumatag): Remove the entry for ibmcloud_api_key once all the in-cluster components migrate to use the GetAuthenticatorFromEnvironment method
-	secretManifestsTemplate = `apiVersion: v1
-stringData:
-  ibmcloud_api_key: %s
-  ibm-credentials.env: |
-    IBMCLOUD_APIKEY=%s
-    IBMCLOUD_AUTHTYPE=iam
-kind: Secret
-metadata:
-  name: %s
-  namespace: %s
-type: Opaque`
-
 	manifestsDirName      = "manifests"
 	secretFileNamePattern = "%s-%s-credentials.yaml"
 )
@@ -47,6 +37,11 @@ type Provision interface {
 
 	Do() error
 	UnDo(string) error
+
+	List() ([]iamidentityv1.ServiceID, error)
+
+	Refresh() error
+	RemoveStaleKeys() error
 
 	Dump(string) error
 
@@ -62,6 +57,26 @@ type ServiceID struct {
 	resourceGroupID string
 	cr              *credreqv1.CredentialsRequest
 	apiKey          *string
+}
+
+func (s *ServiceID) List() ([]iamidentityv1.ServiceID, error) {
+	_, err := s.extractPolicies()
+	if err != nil {
+		return nil, err
+	}
+
+	options := &iamidentityv1.ListServiceIdsOptions{
+		AccountID: &s.accountID,
+		Name:      &s.name,
+	}
+	list, _, err := s.Client.ListServiceID(options)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to list the serviceIDs")
+	}
+	if len(list.Serviceids) >= 1 {
+		return list.Serviceids, nil
+	}
+	return nil, nil
 }
 
 func (s *ServiceID) Validate() error {
@@ -81,15 +96,11 @@ func (s *ServiceID) Validate() error {
 		return fmt.Errorf("not supported of kind: %s", unknown.Kind)
 	}
 
-	options := &iamidentityv1.ListServiceIdsOptions{
-		AccountID: &s.accountID,
-		Name:      &s.name,
-	}
-	list, _, err := s.Client.ListServiceID(options)
+	list, err := s.List()
 	if err != nil {
-		return errors.Wrapf(err, "failed to list the serviceIDs")
+		return err
 	}
-	if len(list.Serviceids) != 0 {
+	if len(list) != 0 {
 		return errors.Errorf("exists with the same name: %s, please delete the entries or create with a different name", s.name)
 	}
 	return nil
@@ -123,6 +134,28 @@ func (s *ServiceID) Do() error {
 	return nil
 }
 
+func (s *ServiceID) BuildSecret() (*corev1.Secret, error) {
+	if s.apiKey == nil || s.cr == nil {
+		return nil, errors.New("apiKey or credentialRequest can't be nil")
+	}
+	return &corev1.Secret{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: corev1.SchemeGroupVersion.String(),
+			Kind:       "Secret",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      s.cr.Spec.SecretRef.Name,
+			Namespace: s.cr.Spec.SecretRef.Namespace,
+		},
+		StringData: map[string]string{
+			//TODO(mkumatag): Remove the entry for ibmcloud_api_key once all the in-cluster components migrate to use the GetAuthenticatorFromEnvironment method
+			"ibmcloud_api_key":    *s.apiKey,
+			"ibm-credentials.env": fmt.Sprintf("IBMCLOUD_AUTHTYPE=iam\nIBMCLOUD_APIKEY=%s", *s.apiKey),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}, nil
+}
+
 func (s *ServiceID) Dump(targetDir string) error {
 	if s.apiKey == nil || s.cr == nil {
 		return errors.New("apiKey or credentialRequest can't be nil")
@@ -132,9 +165,16 @@ func (s *ServiceID) Dump(targetDir string) error {
 	fileName := fmt.Sprintf(secretFileNamePattern, s.cr.Spec.SecretRef.Namespace, s.cr.Spec.SecretRef.Name)
 	filePath := filepath.Join(manifestsDir, fileName)
 
-	fileData := fmt.Sprintf(secretManifestsTemplate, *s.apiKey, *s.apiKey, s.cr.Spec.SecretRef.Name, s.cr.Spec.SecretRef.Namespace)
+	secret, err := s.BuildSecret()
+	if err != nil {
+		return errors.Wrapf(err, "Failed to Dump the secret for the serviceID: %s", s.name)
+	}
+	data, err := yaml.Marshal(secret)
+	if err != nil {
+		return errors.Wrapf(err, "Failed to marshal the secret for the serviceID: %s", s.name)
+	}
 
-	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
+	if err := ioutil.WriteFile(filePath, data, 0600); err != nil {
 		return errors.Wrap(err, "Failed to save Secret file")
 	}
 
@@ -284,6 +324,32 @@ func (s *ServiceID) UnDo(targetDir string) error {
 		}
 	}
 
+	return nil
+}
+
+func (s *ServiceID) Refresh() error {
+	return s.createAPIKey()
+}
+
+func (s *ServiceID) RemoveStaleKeys() error {
+	options := &iamidentityv1.ListAPIKeysOptions{
+		IamID:     s.IamID,
+		AccountID: s.AccountID,
+		Sort:      core.StringPtr("created_at"),
+	}
+	keys, _, err := s.Client.ListAPIKeys(options)
+	if err != nil {
+		return errors.Wrap(err, "Failed to ListAPIKeys")
+	}
+	// remove all the stale keys except the latest one
+	for i := 0; i < len(keys.Apikeys)-1; i++ {
+		deleteOptions := &iamidentityv1.DeleteAPIKeyOptions{
+			ID: keys.Apikeys[i].ID,
+		}
+		if _, err := s.Client.DeleteAPIKey(deleteOptions); err != nil {
+			return errors.Wrap(err, "Failed to DeleteAPIKey")
+		}
+	}
 	return nil
 }
 

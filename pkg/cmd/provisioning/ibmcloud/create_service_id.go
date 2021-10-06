@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 	"k8s.io/apimachinery/pkg/util/yaml"
 
-	"github.com/IBM/platform-services-go-sdk/resourcemanagerv2"
-
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
@@ -96,22 +94,9 @@ func createServiceIDCmd(cmd *cobra.Command, args []string) error {
 func createServiceIDs(client ibmcloud.Client, accountID *string,
 	name, resourceGroupName, credReqDir, targetDir string) error {
 
-	var resourceGroupID string
-	if resourceGroupName != "" {
-		// Get the ID for the given resourceGroupName
-		listResourceGroupsOptions := &resourcemanagerv2.ListResourceGroupsOptions{
-			Name: &resourceGroupName,
-		}
-		resourceGroups, _, err := client.ListResourceGroups(listResourceGroupsOptions)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to list resource groups for the name: %s", resourceGroupName)
-		}
-
-		if len(resourceGroups.Resources) == 0 {
-			return errors.Errorf("Resource group %s not found", resourceGroupName)
-		}
-
-		resourceGroupID = *resourceGroups.Resources[0].ID
+	resourceGroupID, err := getResourceGroupID(client, resourceGroupName)
+	if err != nil {
+		return errors.Wrap(err, "Failed to getResourceGroupID")
 	}
 
 	// Process directory
