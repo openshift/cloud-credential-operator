@@ -58,4 +58,5 @@ require (
 	k8s.io/code-generator v0.19.2
 	k8s.io/utils v0.0.0-20200729134348-d5654de09c73
 	sigs.k8s.io/controller-runtime v0.6.2
+	sigs.k8s.io/yaml v1.2.0
 )
