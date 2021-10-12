@@ -121,11 +121,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
-				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
-
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err := ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -150,11 +146,32 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
-				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
+				files, err := ioutil.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
+			},
+		},
+		{
+			name: "CredReq with IBMCloudPowerVSProvider",
+			mockIBMCloudClient: func(mockCtrl *gomock.Controller) *mockibmcloud.MockClient {
+				mockIBMCloudClient := mockibmcloud.NewMockClient(mockCtrl)
+				mockListServiceID(mockIBMCloudClient, "", 0, false)
+				mockCreateServiceID(mockIBMCloudClient, 1, false)
+				mockDeleteServiceID(mockIBMCloudClient, 0, false)
+				mockCreateAPIKey(mockIBMCloudClient, 1, false)
+				mockCreatePolicy(mockIBMCloudClient, 1, false)
+				return mockIBMCloudClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				testCredentialsRequestPowerVS(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+
+				return tempDirName
+			},
+			verify: func(t *testing.T, targetDir string, manifestsDir string) {
+				files, err := ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -182,11 +199,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				//TODO(mkumatag): add validation to check for the rules created for the resource group if mentioned
-				files, err := ioutil.ReadDir(targetDir)
-				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
-
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err := ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -209,11 +222,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				//TODO(mkumatag): add validation to check for the rules created for the resource group if mentioned
-				files, err := ioutil.ReadDir(targetDir)
-				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
-
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err := ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 0, countNonDirectoryFiles(files), "Should not any secret in manifestsDir")
 			},
@@ -253,11 +262,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
-				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
-
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err := ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 0, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -273,11 +278,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return "non-existingdir"
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
-				require.NoError(t, err, "unexpected error listing files in targetDir")
-				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
-
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err := ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 0, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -493,34 +494,18 @@ func writeToTempFile(t *testing.T, targetDir, content string) {
 }
 
 func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string) {
-	credReqTemplate := `---
-apiVersion: cloudcredential.openshift.io/v1
-kind: CredentialsRequest
-metadata:
-  name: %s
-  namespace: openshift-cloud-credential-operator
-spec:
-  providerSpec:
-    apiVersion: cloudcredential.openshift.io/v1
-    kind: IBMCloudProviderSpec
-    policies:
-      - roles:
-          - "crn:v1:bluemix:public:iam::::serviceRole:Manager"
-          - "crn:v1:bluemix:public:iam::::role:Editor"
-          - "crn:v1:bluemix:public:iam::::role:Viewer"
-        attributes:
-          - name: "serviceName"
-            value: "is"
-  secretRef:
-    namespace: %s
-    name: %s`
-
-	credReq := fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
-
-	writeToTempFile(t, targetDir, credReq)
+	writeToTempFile(t, targetDir, getCredentialsRequest(crName, "IBMCloudProviderSpec", targetSecretNamespace, targetSecretName))
 }
 
 func testCredentialsRequestNonIBM(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string) {
+	writeToTempFile(t, targetDir, getCredentialsRequest(crName, "AWSProviderSpec", targetSecretNamespace, targetSecretName))
+}
+
+func testCredentialsRequestPowerVS(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string) {
+	writeToTempFile(t, targetDir, getCredentialsRequest(crName, "IBMCloudPowerVSProviderSpec", targetSecretNamespace, targetSecretName))
+}
+
+func getCredentialsRequest(crName, kind, targetSecretNamespace, targetSecretName string) string {
 	credReqTemplate := `---
 apiVersion: cloudcredential.openshift.io/v1
 kind: CredentialsRequest
@@ -530,7 +515,7 @@ metadata:
 spec:
   providerSpec:
     apiVersion: cloudcredential.openshift.io/v1
-    kind: AWSProviderSpec
+    kind: %s
     policies:
       - roles:
           - "crn:v1:bluemix:public:iam::::serviceRole:Manager"
@@ -543,9 +528,7 @@ spec:
     namespace: %s
     name: %s`
 
-	credReq := fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
-
-	writeToTempFile(t, targetDir, credReq)
+	return fmt.Sprintf(credReqTemplate, crName, kind, targetSecretNamespace, targetSecretName)
 }
 
 func Test_getEnv(t *testing.T) {
