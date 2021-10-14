@@ -18,6 +18,8 @@ type Client interface {
 	ListServiceID(*identityv1.ListServiceIdsOptions) (*identityv1.ServiceIDList, *core.DetailedResponse, error)
 	DeleteServiceID(*identityv1.DeleteServiceIDOptions) (*core.DetailedResponse, error)
 	CreateAPIKey(*identityv1.CreateAPIKeyOptions) (*identityv1.APIKey, *core.DetailedResponse, error)
+	ListAPIKeys(*identityv1.ListAPIKeysOptions) (*identityv1.APIKeyList, *core.DetailedResponse, error)
+	DeleteAPIKey(*identityv1.DeleteAPIKeyOptions) (*core.DetailedResponse, error)
 	GetAPIKeysDetails(*identityv1.GetAPIKeysDetailsOptions) (*identityv1.APIKey, *core.DetailedResponse, error)
 	NewGetAPIKeysDetailsOptions() *identityv1.GetAPIKeysDetailsOptions
 	ListResourceGroups(*resourcemanagerv2.ListResourceGroupsOptions) (*resourcemanagerv2.ResourceGroupList, *core.DetailedResponse, error)
@@ -37,6 +39,14 @@ type ibmcloudClient struct {
 
 func (i *ibmcloudClient) CreateAPIKey(options *identityv1.CreateAPIKeyOptions) (*identityv1.APIKey, *core.DetailedResponse, error) {
 	return i.identityClient.CreateAPIKey(options)
+}
+
+func (i *ibmcloudClient) ListAPIKeys(options *identityv1.ListAPIKeysOptions) (*identityv1.APIKeyList, *core.DetailedResponse, error) {
+	return i.identityClient.ListAPIKeys(options)
+}
+
+func (i *ibmcloudClient) DeleteAPIKey(options *identityv1.DeleteAPIKeyOptions) (*core.DetailedResponse, error) {
+	return i.identityClient.DeleteAPIKey(options)
 }
 
 func (i *ibmcloudClient) NewGetAPIKeysDetailsOptions() *identityv1.GetAPIKeysDetailsOptions {

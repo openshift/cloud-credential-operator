@@ -10,6 +10,8 @@ type options struct {
 	CredRequestDir    string
 	ResourceGroupName string
 	Force             bool
+	KubeConfigFile    string
+	Create            bool
 }
 
 // NewIBMCloudCmd implements the "ibmcloud" subcommand for the credentials provisioning
@@ -22,6 +24,7 @@ func NewIBMCloudCmd() *cobra.Command {
 
 	cmd.AddCommand(NewCreateServiceIDCmd())
 	cmd.AddCommand(NewDeleteServiceIDCmd())
+	cmd.AddCommand(NewRefreshKeysCmd())
 
 	return cmd
 }
