@@ -21,7 +21,9 @@ import (
 	"fmt"
 	"time"
 
+	iamcloud "cloud.google.com/go/iam"
 	iamadmin "cloud.google.com/go/iam/admin/apiv1"
+	storage "cloud.google.com/go/storage"
 	"golang.org/x/oauth2/google"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iam "google.golang.org/api/iam/v1"
@@ -44,6 +46,7 @@ type Client interface {
 	ListServiceAccountKeys(context.Context, *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error)
 	QueryTestablePermissions(context.Context, *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error)
 	CreateWorkloadIdentityPool(context.Context, string, string, *iam.WorkloadIdentityPool) (*iam.Operation, error)
+	CreateWorkloadIdentityProvider(context.Context, string, string, *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error)
 
 	//CloudResourceManager
 	GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
@@ -53,6 +56,12 @@ type Client interface {
 
 	//ServiceUsage
 	ListServicesEnabled() (map[string]bool, error)
+
+	//Storage
+	CreateBucket(context.Context, string, string, *storage.BucketAttrs) error
+	GetBucketPolicy(context.Context, string) (*iamcloud.Policy3, error)
+	SetBucketPolicy(context.Context, string, *iamcloud.Policy3) error
+	PutObject(context.Context, string, string, []byte) error
 }
 
 type gcpClient struct {
@@ -62,6 +71,7 @@ type gcpClient struct {
 	iamClient                  *iamadmin.IamClient
 	iamService                 *iam.Service
 	serviceUsageClient         *serviceusage.Service
+	storageClient              *storage.Client
 }
 
 const (
@@ -153,6 +163,12 @@ func (c *gcpClient) CreateWorkloadIdentityPool(ctx context.Context, parent, pool
 	return c.iamService.Projects.Locations.WorkloadIdentityPools.Create(parent, pool).WorkloadIdentityPoolId(poolID).Context(ctx).Do()
 }
 
+func (c *gcpClient) CreateWorkloadIdentityProvider(ctx context.Context, parent, providerID string, provider *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamService.Projects.Locations.WorkloadIdentityPools.Providers.Create(parent, provider).WorkloadIdentityPoolProviderId(providerID).Context(ctx).Do()
+}
+
 func (c *gcpClient) ListServicesEnabled() (map[string]bool, error) {
 	serviceMap := map[string]bool{}
 
@@ -199,6 +215,38 @@ func fixupServiceMap(serviceMap map[string]bool) {
 	}
 }
 
+func (c *gcpClient) CreateBucket(ctx context.Context, bucketName, project string, attributes *storage.BucketAttrs) error {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.storageClient.Bucket(bucketName).Create(ctx, project, attributes)
+}
+
+func (c *gcpClient) GetBucketPolicy(ctx context.Context, bucketName string) (*iamcloud.Policy3, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.storageClient.Bucket(bucketName).IAM().V3().Policy(ctx)
+}
+
+func (c *gcpClient) SetBucketPolicy(ctx context.Context, bucketName string, policy *iamcloud.Policy3) error {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.storageClient.Bucket(bucketName).IAM().V3().SetPolicy(ctx, policy)
+}
+
+func (c *gcpClient) PutObject(ctx context.Context, bucketName, objectName string, data []byte) error {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	obj := c.storageClient.Bucket(bucketName).Object(objectName)
+	w := obj.NewWriter(ctx)
+	if _, err := w.Write(data); err != nil {
+		return err
+	}
+	if err := w.Close(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // NewClient creates our client wrapper object for interacting with GCP.
 func NewClient(projectName string, authJSON []byte) (Client, error) {
 	ctx := context.TODO()
@@ -236,6 +284,11 @@ func NewClient(projectName string, authJSON []byte) (Client, error) {
 		return nil, err
 	}
 
+	storageClient, err := storage.NewClient(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
 	return &gcpClient{
 		projectName:                projectName,
 		creds:                      creds,
@@ -243,5 +296,6 @@ func NewClient(projectName string, authJSON []byte) (Client, error) {
 		iamClient:                  iamClient,
 		iamService:                 iamService,
 		serviceUsageClient:         serviceUsageClient,
+		storageClient:              storageClient,
 	}, nil
 }

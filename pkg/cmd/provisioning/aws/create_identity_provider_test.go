@@ -142,7 +142,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 				block, _ := pem.Decode([]byte(testPublicKeyData))
 				publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-				expectedKeyID, err := keyIDFromPublicKey(publicKey)
+				expectedKeyID, err := provisioning.KeyIDFromPublicKey(publicKey)
 				require.NoError(t, err, "error calculating expected key id")
 				assert.Equalf(t, expectedKeyID, kid, "unexpected key id")
 			},
