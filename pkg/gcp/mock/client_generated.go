@@ -5,10 +5,12 @@
 package mock
 
 import (
+	iam "cloud.google.com/go/iam"
+	storage "cloud.google.com/go/storage"
 	context "context"
 	gomock "github.com/golang/mock/gomock"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	iam "google.golang.org/api/iam/v1"
+	iam0 "google.golang.org/api/iam/v1"
 	admin "google.golang.org/genproto/googleapis/iam/admin/v1"
 	reflect "reflect"
 )
@@ -155,10 +157,10 @@ func (mr *MockClientMockRecorder) QueryTestablePermissions(arg0, arg1 interface{
 }
 
 // CreateWorkloadIdentityPool mocks base method
-func (m *MockClient) CreateWorkloadIdentityPool(arg0 context.Context, arg1, arg2 string, arg3 *iam.WorkloadIdentityPool) (*iam.Operation, error) {
+func (m *MockClient) CreateWorkloadIdentityPool(arg0 context.Context, arg1, arg2 string, arg3 *iam0.WorkloadIdentityPool) (*iam0.Operation, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateWorkloadIdentityPool", arg0, arg1, arg2, arg3)
-	ret0, _ := ret[0].(*iam.Operation)
+	ret0, _ := ret[0].(*iam0.Operation)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
@@ -167,6 +169,21 @@ func (m *MockClient) CreateWorkloadIdentityPool(arg0 context.Context, arg1, arg2
 func (mr *MockClientMockRecorder) CreateWorkloadIdentityPool(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).CreateWorkloadIdentityPool), arg0, arg1, arg2, arg3)
+}
+
+// CreateWorkloadIdentityProvider mocks base method
+func (m *MockClient) CreateWorkloadIdentityProvider(arg0 context.Context, arg1, arg2 string, arg3 *iam0.WorkloadIdentityPoolProvider) (*iam0.Operation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateWorkloadIdentityProvider", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*iam0.Operation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateWorkloadIdentityProvider indicates an expected call of CreateWorkloadIdentityProvider
+func (mr *MockClientMockRecorder) CreateWorkloadIdentityProvider(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWorkloadIdentityProvider", reflect.TypeOf((*MockClient)(nil).CreateWorkloadIdentityProvider), arg0, arg1, arg2, arg3)
 }
 
 // GetProjectIamPolicy mocks base method
@@ -241,4 +258,61 @@ func (m *MockClient) ListServicesEnabled() (map[string]bool, error) {
 func (mr *MockClientMockRecorder) ListServicesEnabled() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServicesEnabled", reflect.TypeOf((*MockClient)(nil).ListServicesEnabled))
+}
+
+// CreateBucket mocks base method
+func (m *MockClient) CreateBucket(arg0 context.Context, arg1, arg2 string, arg3 *storage.BucketAttrs) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateBucket", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateBucket indicates an expected call of CreateBucket
+func (mr *MockClientMockRecorder) CreateBucket(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), arg0, arg1, arg2, arg3)
+}
+
+// GetBucketPolicy mocks base method
+func (m *MockClient) GetBucketPolicy(arg0 context.Context, arg1 string) (*iam.Policy3, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBucketPolicy", arg0, arg1)
+	ret0, _ := ret[0].(*iam.Policy3)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBucketPolicy indicates an expected call of GetBucketPolicy
+func (mr *MockClientMockRecorder) GetBucketPolicy(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBucketPolicy", reflect.TypeOf((*MockClient)(nil).GetBucketPolicy), arg0, arg1)
+}
+
+// SetBucketPolicy mocks base method
+func (m *MockClient) SetBucketPolicy(arg0 context.Context, arg1 string, arg2 *iam.Policy3) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetBucketPolicy", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetBucketPolicy indicates an expected call of SetBucketPolicy
+func (mr *MockClientMockRecorder) SetBucketPolicy(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBucketPolicy", reflect.TypeOf((*MockClient)(nil).SetBucketPolicy), arg0, arg1, arg2)
+}
+
+// PutObject mocks base method
+func (m *MockClient) PutObject(arg0 context.Context, arg1, arg2 string, arg3 []byte) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutObject", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// PutObject indicates an expected call of PutObject
+func (mr *MockClientMockRecorder) PutObject(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), arg0, arg1, arg2, arg3)
 }

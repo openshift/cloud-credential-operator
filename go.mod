@@ -4,6 +4,7 @@ go 1.16
 
 require (
 	cloud.google.com/go v0.88.0
+	cloud.google.com/go/storage v1.16.0
 	github.com/Azure/azure-sdk-for-go v31.1.0+incompatible
 	github.com/Azure/go-autorest/autorest v0.10.0
 	github.com/Azure/go-autorest/autorest/adal v0.8.3

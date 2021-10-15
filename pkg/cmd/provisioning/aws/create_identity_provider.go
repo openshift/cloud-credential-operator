@@ -2,14 +2,8 @@ package aws
 
 import (
 	"bytes"
-	"crypto"
-	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/tls"
-	"crypto/x509"
-	"encoding/base64"
-	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -38,29 +32,6 @@ var (
 		PublicKeyPath: "",
 		TargetDir:     "",
 	}
-
-	// discoveryDocumentTemplate is a template of the discovery document that needs to be populated with appropriate values
-	discoveryDocumentTemplate = `{
-	"issuer": "%s",
-	"jwks_uri": "%s/%s",
-    "response_types_supported": [
-        "id_token"
-    ],
-    "subject_types_supported": [
-        "public"
-    ],
-    "id_token_signing_alg_values_supported": [
-        "RS256"
-    ],
-    "claims_supported": [
-        "aud",
-        "exp",
-        "sub",
-        "iat",
-        "iss",
-        "sub"
-    ]
-}`
 
 	// S3 bucket template (usable with aws CLI --cli-input-json param)
 	oidcBucketTemplateWithLocation = `{
@@ -130,7 +101,7 @@ func createIdentityProvider(client aws.Client, name, region, publicKeyPath, targ
 	}
 
 	// Create the installer manifest file
-	if err := createClusterAuthentication(issuerURL, targetDir); err != nil {
+	if err := provisioning.CreateClusterAuthentication(issuerURL, targetDir); err != nil {
 		return "", err
 	}
 
@@ -238,7 +209,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, name, targetDir str
 }
 
 func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name, targetDir string, generateOnly bool) error {
-	jwks, err := buildJsonWebKeySet(publicKeyFilepath)
+	jwks, err := provisioning.BuildJsonWebKeySet(publicKeyFilepath)
 	if err != nil {
 		return errors.Wrap(err, "failed to build JSON web key set from the public key")
 	}
@@ -267,7 +238,7 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 }
 
 func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, targetDir string, generateOnly bool) error {
-	discoveryDocumentJSON := fmt.Sprintf(discoveryDocumentTemplate, issuerURL, issuerURL, provisioning.KeysURI)
+	discoveryDocumentJSON := fmt.Sprintf(provisioning.DiscoveryDocumentTemplate, issuerURL, issuerURL, provisioning.KeysURI)
 	if generateOnly {
 		oidcConfigurationFullPath := filepath.Join(targetDir, oidcConfigurationFilename)
 		log.Printf("Saving discovery document locally at %s", oidcConfigurationFullPath)
@@ -356,71 +327,6 @@ func createOIDCBucket(client aws.Client, bucketName, name, region, targetDir str
 	return nil
 }
 
-// buildJsonWebKeySet builds JSON web key set from the public key
-func buildJsonWebKeySet(publicKeyPath string) ([]byte, error) {
-	log.Print("Reading public key")
-	publicKeyContent, err := ioutil.ReadFile(publicKeyPath)
-
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read public key")
-	}
-
-	block, _ := pem.Decode(publicKeyContent)
-	if block == nil {
-		return nil, errors.Wrap(err, "frror decoding PEM file")
-	}
-
-	publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
-	if err != nil {
-		return nil, errors.Wrap(err, "error parsing key content")
-	}
-
-	var alg jose.SignatureAlgorithm
-	switch publicKey.(type) {
-	case *rsa.PublicKey:
-		alg = jose.RS256
-	default:
-		return nil, errors.New("public key is not of type RSA")
-	}
-
-	kid, err := keyIDFromPublicKey(publicKey)
-	if err != nil {
-		return nil, errors.New("Failed to fetch key ID from public key")
-	}
-
-	var keys []jose.JSONWebKey
-	keys = append(keys, jose.JSONWebKey{
-		Key:       publicKey,
-		KeyID:     kid,
-		Algorithm: string(alg),
-		Use:       "sig",
-	})
-
-	keySet, err := json.MarshalIndent(JSONWebKeySet{Keys: keys}, "", "    ")
-	if err != nil {
-		return nil, errors.New("JSON encoding of web key set failed")
-	}
-
-	return keySet, nil
-}
-
-// keyIDFromPublicKey derives a key ID non-reversibly from a public key
-// reference: https://github.com/kubernetes/kubernetes/blob/0f140bf1eeaf63c155f5eba1db8db9b5d52d5467/pkg/serviceaccount/jwt.go#L89-L111
-func keyIDFromPublicKey(publicKey interface{}) (string, error) {
-	publicKeyDERBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to serialize public key to DER format: %v", err)
-	}
-
-	hasher := crypto.SHA256.New()
-	hasher.Write(publicKeyDERBytes)
-	publicKeyDERHash := hasher.Sum(nil)
-
-	keyID := base64.RawURLEncoding.EncodeToString(publicKeyDERHash)
-
-	return keyID, nil
-}
-
 // isExistingIdentifyProvider checks if given identity provider is owned by given name prefix
 func isExistingIdentifyProvider(client aws.Client, providerARN, namePrefix string) (bool, error) {
 	provider, err := client.GetOpenIDConnectProvider(&iam.GetOpenIDConnectProviderInput{
@@ -436,23 +342,6 @@ func isExistingIdentifyProvider(client aws.Client, providerARN, namePrefix strin
 		}
 	}
 	return false, nil
-}
-
-func createClusterAuthentication(issuerURL, targetDir string) error {
-	clusterAuthenticationTemplate := `apiVersion: config.openshift.io/v1
-kind: Authentication
-metadata:
-  name: cluster
-spec:
-  serviceAccountIssuer: %s`
-
-	clusterAuthFile := filepath.Join(targetDir, provisioning.ManifestsDirName, "cluster-authentication-02-config.yaml")
-
-	fileData := fmt.Sprintf(clusterAuthenticationTemplate, issuerURL)
-	if err := ioutil.WriteFile(clusterAuthFile, []byte(fileData), 0600); err != nil {
-		return errors.Wrap(err, "failed to save cluster authentication file")
-	}
-	return nil
 }
 
 func createIdentityProviderCmd(cmd *cobra.Command, args []string) {

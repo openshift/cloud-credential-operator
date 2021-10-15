@@ -19,7 +19,7 @@ import (
 const (
 	testName      = "test-name"
 	testProject   = "test-project"
-	testDirPrefix = "identitypooltestdir"
+	testDirPrefix = "test-dir"
 )
 
 func TestCreateWorkloadIdentityPool(t *testing.T) {
