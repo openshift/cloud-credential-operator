@@ -318,6 +318,10 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		logger.WithError(err).Error("error building root GCP client")
 		return err
 	}
+	// This should be impossible if err == nil
+	if rootGCPClient == nil {
+		return fmt.Errorf("no root GCP client available")
+	}
 
 	permList, err := getPermissionsFromRoles(rootGCPClient, gcpSpec.PredefinedRoles)
 	if err != nil {
@@ -347,14 +351,11 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	projectName := rootGCPClient.GetProjectName()
 	getServiceAccount, err := getServiceAccount(rootGCPClient, gcpStatus.ServiceAccountID)
 	if err != nil {
-		if status.Code(err) == codes.NotFound {
-			logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Debug("service account does not exist, creating")
-			if rootGCPClient == nil {
-				return fmt.Errorf("no root GCP client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.GCPCloudCredSecretName)
-			}
-		} else {
+		if status.Code(err) != codes.NotFound {
 			return fmt.Errorf("error checking for existing service account: %v", err)
 		}
+
+		logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Debug("service account does not exist, creating")
 
 		// The service account name field has a 100 char max, so generate a name consisting of the
 		// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
