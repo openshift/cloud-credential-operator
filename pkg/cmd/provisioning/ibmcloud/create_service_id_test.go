@@ -644,7 +644,7 @@ func mockListResourceGroups(client *mockibmcloud.MockClient, resourceGroupExist,
 	client.EXPECT().ListResourceGroups(gomock.Any()).Return(list, nil, err).Times(1)
 }
 
-func mockListServiceID(client *mockibmcloud.MockClient, namePrefix string, count int, fail bool) {
+func mockListServiceIDTimes(client *mockibmcloud.MockClient, namePrefix string, numSvcIDs int, fail bool, times int) {
 	var err error
 	if fail {
 		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
@@ -655,14 +655,44 @@ func mockListServiceID(client *mockibmcloud.MockClient, namePrefix string, count
 	if namePrefix == "" {
 		namePrefix = "service-id"
 	}
-	for i := 0; i < count; i++ {
+	for i := 0; i < numSvcIDs; i++ {
 		list.Serviceids = append(list.Serviceids,
 			iamidentityv1.ServiceID{
 				Name: core.StringPtr(namePrefix + "-" + strconv.Itoa(i)),
 				ID:   core.StringPtr("ServiceId-" + uuid.New().String()),
 			})
 	}
-	client.EXPECT().ListServiceID(gomock.Any()).Return(list, nil, err).Times(1)
+	client.EXPECT().ListServiceID(gomock.Any()).Return(list, nil, err).Times(times)
+}
+
+func mockListServiceID(client *mockibmcloud.MockClient, namePrefix string, numSvcIDs int, fail bool) {
+	mockListServiceIDTimes(client, namePrefix, numSvcIDs, fail, 1)
+}
+
+func mockListAPIKeys(client *mockibmcloud.MockClient, count int, fail bool) {
+	var err error
+	if fail {
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
+	}
+	apiKeyList := &iamidentityv1.APIKeyList{}
+	for i := 0; i < count; i++ {
+		apiKeyList.Apikeys = append(apiKeyList.Apikeys,
+			iamidentityv1.APIKey{
+				Name: &APIKeyName,
+				ID:   core.StringPtr(uuid.New().String()),
+			})
+	}
+
+	client.EXPECT().ListAPIKeys(gomock.Any()).Return(apiKeyList, nil, err).Times(1)
+}
+
+func mockDeleteAPIKey(client *mockibmcloud.MockClient, fail bool, times int) {
+	var err error
+	if fail {
+		err = fmt.Errorf(core.ERRORMSG_NO_AUTHENTICATOR)
+	}
+
+	client.EXPECT().DeleteAPIKey(gomock.Any()).Return(nil, err).Times(times)
 }
 
 // countNonDirectoryFiles counts files which are not a directory
