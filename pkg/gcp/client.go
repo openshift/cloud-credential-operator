@@ -26,6 +26,7 @@ import (
 	storage "cloud.google.com/go/storage"
 	"golang.org/x/oauth2/google"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	compute "google.golang.org/api/compute/v1"
 	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/api/option"
 	serviceusage "google.golang.org/api/serviceusage/v1"
@@ -253,13 +254,7 @@ func NewClient(projectName string, authJSON []byte) (Client, error) {
 	var creds *google.Credentials
 	var err error
 	// since we're using a single creds var, we should specify all the required scopes when initializing
-	scope := "https://www.googleapis.com/auth/cloud-platform"
-
-	if len(authJSON) != 0 {
-		creds, err = google.CredentialsFromJSON(context.TODO(), authJSON, scope)
-	} else {
-		creds, err = google.FindDefaultCredentials(context.TODO(), scope)
-	}
+	creds, err = google.CredentialsFromJSON(context.TODO(), authJSON, compute.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
