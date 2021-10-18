@@ -71,7 +71,7 @@ func refreshKeysCmd(cmd *cobra.Command, args []string) error {
 }
 
 func refreshKeys(ibmcloudClient ibmcloud.Client, kubeClient *kubernetes.Clientset, accountID *string, name, resourceGroupName, credReqDir string, create bool) error {
-	resourceGroupID, err := getResourceGroupID(ibmcloudClient, resourceGroupName)
+	resourceGroupID, err := getResourceGroupID(ibmcloudClient, accountID, resourceGroupName)
 	if err != nil {
 		return errors.Wrap(err, "Failed to getResourceGroupID")
 	}
