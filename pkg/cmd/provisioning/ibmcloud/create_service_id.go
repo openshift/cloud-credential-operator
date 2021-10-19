@@ -94,7 +94,7 @@ func createServiceIDCmd(cmd *cobra.Command, args []string) error {
 func createServiceIDs(client ibmcloud.Client, accountID *string,
 	name, resourceGroupName, credReqDir, targetDir string) error {
 
-	resourceGroupID, err := getResourceGroupID(client, resourceGroupName)
+	resourceGroupID, err := getResourceGroupID(client, accountID, resourceGroupName)
 	if err != nil {
 		return errors.Wrap(err, "Failed to getResourceGroupID")
 	}

@@ -7,14 +7,15 @@ import (
 )
 
 // getResourceGroupID returns the resource group ID associated with the given name, returns nil if name is empty.
-func getResourceGroupID(client ibmcloud.Client, name string) (string, error) {
+func getResourceGroupID(client ibmcloud.Client, accountID *string, name string) (string, error) {
 	if name == "" {
 		return "", nil
 	}
 
 	// Get the ID for the given resourceGroupName
 	listResourceGroupsOptions := &resourcemanagerv2.ListResourceGroupsOptions{
-		Name: &name,
+		AccountID: accountID,
+		Name:      &name,
 	}
 	resourceGroups, _, err := client.ListResourceGroups(listResourceGroupsOptions)
 	if err != nil {
