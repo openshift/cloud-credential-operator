@@ -34,7 +34,7 @@ var (
 	keyIDFromKeyName = regexp.MustCompile(`.*/`)
 )
 
-func getServiceAccount(gcpClient ccgcp.Client, svcAcctID string) (*iamadminpb.ServiceAccount, error) {
+func GetServiceAccount(gcpClient ccgcp.Client, svcAcctID string) (*iamadminpb.ServiceAccount, error) {
 	projectName := gcpClient.GetProjectName()
 
 	restString := fmt.Sprintf("projects/%s/serviceAccounts/%s@%s.iam.gserviceaccount.com", projectName, svcAcctID, projectName)
@@ -48,12 +48,13 @@ func getServiceAccount(gcpClient ccgcp.Client, svcAcctID string) (*iamadminpb.Se
 	return svcAcct, nil
 }
 
-func createServiceAccount(gcpClient ccgcp.Client, svcAcctID, svcAcctName, projectName string) (*iamadminpb.ServiceAccount, error) {
+func CreateServiceAccount(gcpClient ccgcp.Client, svcAcctID, svcAcctName, svcAcctDescription, projectName string) (*iamadminpb.ServiceAccount, error) {
 	request := &iamadminpb.CreateServiceAccountRequest{
 		Name:      fmt.Sprintf("projects/%s", projectName),
 		AccountId: svcAcctID,
 		ServiceAccount: &iamadminpb.ServiceAccount{
 			DisplayName: svcAcctName,
+			Description: svcAcctDescription,
 		},
 	}
 	svcAcct, err := gcpClient.CreateServiceAccount(context.TODO(), request)
@@ -149,7 +150,7 @@ func deleteServiceAccount(gcpClient ccgcp.Client, svcAcct *iamadminpb.ServiceAcc
 	return nil
 }
 
-func serviceAccountBindingName(svcAccount *iamadminpb.ServiceAccount) string {
+func ServiceAccountBindingName(svcAccount *iamadminpb.ServiceAccount) string {
 	return fmt.Sprintf("serviceAccount:%s", svcAccount.Email)
 }
 

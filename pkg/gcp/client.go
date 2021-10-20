@@ -50,9 +50,12 @@ type Client interface {
 	CreateWorkloadIdentityProvider(context.Context, string, string, *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error)
 
 	//CloudResourceManager
-	GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
 	GetProjectName() string
-	SetProjectIamPolicy(projectName string, request *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
+	GetProject(ctx context.Context, projectName string) (*cloudresourcemanager.Project, error)
+	GetProjectIamPolicy(string, *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
+	SetProjectIamPolicy(string, *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
+	GetServiceAccountIamPolicy(string) (*iam.Policy, error)
+	SetServiceAccountIamPolicy(string, *iam.SetIamPolicyRequest) (*iam.Policy, error)
 	TestIamPermissions(string, *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error)
 
 	//ServiceUsage
@@ -132,14 +135,32 @@ func (c *gcpClient) GetProjectIamPolicy(projectName string, request *cloudresour
 	return c.cloudResourceManagerClient.Projects.GetIamPolicy(projectName, request).Context(ctx).Do()
 }
 
+func (c *gcpClient) GetServiceAccountIamPolicy(svcAcctResource string) (*iam.Policy, error) {
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+	return c.iamService.Projects.ServiceAccounts.GetIamPolicy(svcAcctResource).Context(ctx).Do()
+}
+
 func (c *gcpClient) GetProjectName() string {
 	return c.projectName
 }
 
-func (c *gcpClient) SetProjectIamPolicy(projectName string, request *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
+func (c *gcpClient) GetProject(ctx context.Context, projectName string) (*cloudresourcemanager.Project, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.cloudResourceManagerClient.Projects.Get(projectName).Context(ctx).Do()
+}
+
+func (c *gcpClient) SetProjectIamPolicy(svcAcctResource string, request *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
 	ctx, cancel := contextWithTimeout(context.TODO())
 	defer cancel()
-	return c.cloudResourceManagerClient.Projects.SetIamPolicy(projectName, request).Context(ctx).Do()
+	return c.cloudResourceManagerClient.Projects.SetIamPolicy(svcAcctResource, request).Context(ctx).Do()
+}
+
+func (c *gcpClient) SetServiceAccountIamPolicy(serviceAccountEmail string, request *iam.SetIamPolicyRequest) (*iam.Policy, error) {
+	ctx, cancel := contextWithTimeout(context.TODO())
+	defer cancel()
+	return c.iamService.Projects.ServiceAccounts.SetIamPolicy(serviceAccountEmail, request).Context(ctx).Do()
 }
 
 func (c *gcpClient) TestIamPermissions(projectName string, permRequest *cloudresourcemanager.TestIamPermissionsRequest) (*cloudresourcemanager.TestIamPermissionsResponse, error) {
