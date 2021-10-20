@@ -209,6 +209,7 @@ Future supported clouds: AWS
 ## Support Matrix
 Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 --- | --- | --- | --- | --- | ---
+AlibabaCloud | N | N | N | Y | N
 AWS | Y | 4.4+ | Y | 4.3+ | 4.6+ (expected)
 Azure | Y | N | Y | Y | N
 GCP | Y | 4.7+ | Y | Y | N
