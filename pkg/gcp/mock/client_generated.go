@@ -186,21 +186,6 @@ func (mr *MockClientMockRecorder) CreateWorkloadIdentityProvider(arg0, arg1, arg
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWorkloadIdentityProvider", reflect.TypeOf((*MockClient)(nil).CreateWorkloadIdentityProvider), arg0, arg1, arg2, arg3)
 }
 
-// GetProjectIamPolicy mocks base method
-func (m *MockClient) GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetProjectIamPolicy", projectName, request)
-	ret0, _ := ret[0].(*cloudresourcemanager.Policy)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetProjectIamPolicy indicates an expected call of GetProjectIamPolicy
-func (mr *MockClientMockRecorder) GetProjectIamPolicy(projectName, request interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectIamPolicy", reflect.TypeOf((*MockClient)(nil).GetProjectIamPolicy), projectName, request)
-}
-
 // GetProjectName mocks base method
 func (m *MockClient) GetProjectName() string {
 	m.ctrl.T.Helper()
@@ -215,19 +200,79 @@ func (mr *MockClientMockRecorder) GetProjectName() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectName", reflect.TypeOf((*MockClient)(nil).GetProjectName))
 }
 
-// SetProjectIamPolicy mocks base method
-func (m *MockClient) SetProjectIamPolicy(projectName string, request *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
+// GetProject mocks base method
+func (m *MockClient) GetProject(ctx context.Context, projectName string) (*cloudresourcemanager.Project, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetProjectIamPolicy", projectName, request)
+	ret := m.ctrl.Call(m, "GetProject", ctx, projectName)
+	ret0, _ := ret[0].(*cloudresourcemanager.Project)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProject indicates an expected call of GetProject
+func (mr *MockClientMockRecorder) GetProject(ctx, projectName interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProject", reflect.TypeOf((*MockClient)(nil).GetProject), ctx, projectName)
+}
+
+// GetProjectIamPolicy mocks base method
+func (m *MockClient) GetProjectIamPolicy(arg0 string, arg1 *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetProjectIamPolicy", arg0, arg1)
+	ret0, _ := ret[0].(*cloudresourcemanager.Policy)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetProjectIamPolicy indicates an expected call of GetProjectIamPolicy
+func (mr *MockClientMockRecorder) GetProjectIamPolicy(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectIamPolicy", reflect.TypeOf((*MockClient)(nil).GetProjectIamPolicy), arg0, arg1)
+}
+
+// SetProjectIamPolicy mocks base method
+func (m *MockClient) SetProjectIamPolicy(arg0 string, arg1 *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetProjectIamPolicy", arg0, arg1)
 	ret0, _ := ret[0].(*cloudresourcemanager.Policy)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SetProjectIamPolicy indicates an expected call of SetProjectIamPolicy
-func (mr *MockClientMockRecorder) SetProjectIamPolicy(projectName, request interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) SetProjectIamPolicy(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetProjectIamPolicy", reflect.TypeOf((*MockClient)(nil).SetProjectIamPolicy), projectName, request)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetProjectIamPolicy", reflect.TypeOf((*MockClient)(nil).SetProjectIamPolicy), arg0, arg1)
+}
+
+// GetServiceAccountIamPolicy mocks base method
+func (m *MockClient) GetServiceAccountIamPolicy(arg0 string) (*iam0.Policy, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetServiceAccountIamPolicy", arg0)
+	ret0, _ := ret[0].(*iam0.Policy)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetServiceAccountIamPolicy indicates an expected call of GetServiceAccountIamPolicy
+func (mr *MockClientMockRecorder) GetServiceAccountIamPolicy(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceAccountIamPolicy", reflect.TypeOf((*MockClient)(nil).GetServiceAccountIamPolicy), arg0)
+}
+
+// SetServiceAccountIamPolicy mocks base method
+func (m *MockClient) SetServiceAccountIamPolicy(arg0 string, arg1 *iam0.SetIamPolicyRequest) (*iam0.Policy, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetServiceAccountIamPolicy", arg0, arg1)
+	ret0, _ := ret[0].(*iam0.Policy)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// SetServiceAccountIamPolicy indicates an expected call of SetServiceAccountIamPolicy
+func (mr *MockClientMockRecorder) SetServiceAccountIamPolicy(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetServiceAccountIamPolicy", reflect.TypeOf((*MockClient)(nil).SetServiceAccountIamPolicy), arg0, arg1)
 }
 
 // TestIamPermissions mocks base method

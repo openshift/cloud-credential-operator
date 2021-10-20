@@ -19,15 +19,15 @@ package actuator
 import (
 	"fmt"
 
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	"google.golang.org/api/cloudresourcemanager/v1"
+	"google.golang.org/api/iam/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
 
-// ensurePolicyBindings will add and remove any policy bindings for the service account to match the
-// roles list provided.
-func ensurePolicyBindings(rootClient ccgcp.Client, roles []string, svcAcct *iamadminpb.ServiceAccount) error {
+// EnsurePolicyBindingsForProject ensures that given roles and member, appropriate binding is added to project
+func EnsurePolicyBindingsForProject(rootClient ccgcp.Client, roles []string, member string) error {
 	needPolicyUpdate := false
 
 	projectName := rootClient.GetProjectName()
@@ -42,7 +42,7 @@ func ensurePolicyBindings(rootClient ccgcp.Client, roles []string, svcAcct *iama
 		// Earlier we've verified that the requested roles already exist.
 
 		// Add policy binding
-		modified := addPolicyBinding(policy, definedRole, svcAcct)
+		modified := addPolicyBindingForProject(policy, definedRole, member)
 		if modified {
 			needPolicyUpdate = true
 		}
@@ -50,7 +50,7 @@ func ensurePolicyBindings(rootClient ccgcp.Client, roles []string, svcAcct *iama
 	}
 
 	// Remove extra role bindings as needed
-	modified := purgeExtraPolicyBindings(policy, roles, svcAcct)
+	modified := purgeExtraPolicyBindingsForProject(policy, roles, member)
 	if modified {
 		needPolicyUpdate = true
 	}
@@ -66,14 +66,86 @@ func ensurePolicyBindings(rootClient ccgcp.Client, roles []string, svcAcct *iama
 	return nil
 }
 
-func purgeExtraPolicyBindings(policy *cloudresourcemanager.Policy, roleList []string, svcAcct *iamadminpb.ServiceAccount) bool {
+// EnsurePolicyBindingsForServiceAccount ensures that given roles and member, appropriate binding is added to IAM service account
+func EnsurePolicyBindingsForServiceAccount(rootClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount, roles []string, member string) error {
+	needPolicyUpdate := false
+
+	projectName := rootClient.GetProjectName()
+	svcAcctResource := fmt.Sprintf("projects/%s/serviceAccounts/%s", projectName, svcAcct.Email)
+	policy, err := rootClient.GetServiceAccountIamPolicy(svcAcctResource)
+
+	if err != nil {
+		return fmt.Errorf("error fetching policy for service account: %v", err)
+	}
+
+	// Validate that each role exists, and add the policy binding as needed
+	for _, definedRole := range roles {
+		// Earlier we've verified that the requested roles already exist.
+
+		// Add policy binding
+		modified := addPolicyBindingForServiceAccount(policy, definedRole, member)
+		if modified {
+			needPolicyUpdate = true
+		}
+
+	}
+
+	// Remove extra role bindings as needed
+	modified := purgeExtraPolicyBindingsForServiceAccount(policy, roles, member)
+	if modified {
+		needPolicyUpdate = true
+	}
+
+	if needPolicyUpdate {
+		if rootClient == nil {
+			return fmt.Errorf("detected need for policy update, but no root creds available")
+		}
+		return setServiceAccountIamPolicy(rootClient, policy, svcAcctResource)
+	}
+
+	// If we made it this far there were no updates needed
+	return nil
+}
+
+func purgeExtraPolicyBindingsForProject(policy *cloudresourcemanager.Policy, roleList []string, memberName string) bool {
 	modifiedPolicy := false
-	svcAcctBindingName := serviceAccountBindingName(svcAcct)
 
 	for _, binding := range policy.Bindings {
-		// find if our service account has an entry in this binding
+		// find if given member has an entry in this binding
 		for j, member := range binding.Members {
-			if member == svcAcctBindingName {
+			if member == memberName {
+				removeMember := true
+
+				// check if this role is one that should be bound to this project's roleList
+				for _, role := range roleList {
+					if role == binding.Role {
+						removeMember = false
+						break
+					}
+				}
+
+				if removeMember {
+					// It is okay to submit a policy with a binding entry where the member list
+					// is empty. The policy will be cleaned up on the GCP-side and it will be
+					// as if we had removed the entire binding entry.
+
+					binding.Members = append(binding.Members[:j], binding.Members[j+1:]...)
+					modifiedPolicy = true
+				}
+			}
+		}
+	}
+
+	return modifiedPolicy
+}
+
+func purgeExtraPolicyBindingsForServiceAccount(policy *iam.Policy, roleList []string, memberName string) bool {
+	modifiedPolicy := false
+
+	for _, binding := range policy.Bindings {
+		// find if our member has an entry in this binding
+		for j, member := range binding.Members {
+			if member == memberName {
 				removeMember := true
 
 				// check if this role is one that should be bound to this service account's roleList
@@ -99,49 +171,80 @@ func purgeExtraPolicyBindings(policy *cloudresourcemanager.Policy, roleList []st
 	return modifiedPolicy
 }
 
-func addPolicyBinding(policy *cloudresourcemanager.Policy, roleName string, svcAcct *iamadminpb.ServiceAccount) bool {
+func addPolicyBindingForProject(policy *cloudresourcemanager.Policy, roleName, memberName string) bool {
 	for i, binding := range policy.Bindings {
 		if binding.Role == roleName {
-			return addServiceAccountToBinding(svcAcct, policy.Bindings[i])
+			return addMemberToBindingForProject(memberName, policy.Bindings[i])
 		}
 	}
 
 	// if we didn't find an existing binding entry, then make one
-	createServiceAccountRoleBinding(policy, roleName, svcAcct)
+	createMemberRoleBindingForProject(policy, roleName, memberName)
 
 	return true
 }
 
-func createServiceAccountRoleBinding(policy *cloudresourcemanager.Policy, roleName string, svcAcct *iamadminpb.ServiceAccount) {
-	svcAcctBindingName := serviceAccountBindingName(svcAcct)
+func addPolicyBindingForServiceAccount(policy *iam.Policy, roleName, memberName string) bool {
+	for i, binding := range policy.Bindings {
+		if binding.Role == roleName {
+			return addMemberToBindingForServiceAccount(memberName, policy.Bindings[i])
+		}
+	}
+
+	// if we didn't find an existing binding entry, then make one
+	createMemberRoleBindingForServiceAccount(policy, roleName, memberName)
+
+	return true
+}
+
+func createMemberRoleBindingForProject(policy *cloudresourcemanager.Policy, roleName, memberName string) {
 	policy.Bindings = append(policy.Bindings, &cloudresourcemanager.Binding{
-		Members: []string{svcAcctBindingName},
+		Members: []string{memberName},
 		Role:    roleName,
 	})
 }
 
-// adds svc account entry to existing binding. returns bool indicating if an entry was made
-func addServiceAccountToBinding(svcAccount *iamadminpb.ServiceAccount, binding *cloudresourcemanager.Binding) bool {
-	svcAcctBindingName := serviceAccountBindingName(svcAccount)
+func createMemberRoleBindingForServiceAccount(policy *iam.Policy, roleName, memberName string) {
+	policy.Bindings = append(policy.Bindings, &iam.Binding{
+		Members: []string{memberName},
+		Role:    roleName,
+	})
+}
+
+// adds member to existing binding. returns bool indicating if an entry was made
+func addMemberToBindingForProject(memberName string, binding *cloudresourcemanager.Binding) bool {
 	for _, member := range binding.Members {
-		if member == svcAcctBindingName {
+		if member == memberName {
 			// already present
 			return false
 		}
 	}
 
-	binding.Members = append(binding.Members, svcAcctBindingName)
+	binding.Members = append(binding.Members, memberName)
+	return true
+}
+
+// adds member to existing binding. returns bool indicating if an entry was made
+func addMemberToBindingForServiceAccount(memberName string, binding *iam.Binding) bool {
+	for _, member := range binding.Members {
+		if member == memberName {
+			// already present
+			return false
+		}
+	}
+
+	binding.Members = append(binding.Members, memberName)
 	return true
 }
 
 func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccountID string, roles []string) (bool, error) {
 
 	projectName := gcpClient.GetProjectName()
-	svcAcct, err := getServiceAccount(gcpClient, serviceAccountID)
+	svcAcct, err := GetServiceAccount(gcpClient, serviceAccountID)
 	if err != nil {
 		return true, fmt.Errorf("error fetching service account details: %v", err)
 	}
-	svcAcctBindingName := serviceAccountBindingName(svcAcct)
+	svcAcctBindingName := ServiceAccountBindingName(svcAcct)
 
 	policy, err := gcpClient.GetProjectIamPolicy(projectName, &cloudresourcemanager.GetIamPolicyRequest{})
 	if err != nil {
@@ -188,7 +291,7 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 func removeAllPolicyBindingsFromServiceAccount(gcpClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount) error {
 	projectName := gcpClient.GetProjectName()
 
-	svcAcctBindingName := serviceAccountBindingName(svcAcct)
+	svcAcctBindingName := ServiceAccountBindingName(svcAcct)
 
 	policy, err := gcpClient.GetProjectIamPolicy(projectName, &cloudresourcemanager.GetIamPolicyRequest{})
 	if err != nil {
@@ -221,6 +324,18 @@ func setProjectIamPolicy(gcpClient ccgcp.Client, policy *cloudresourcemanager.Po
 	_, err := gcpClient.SetProjectIamPolicy(projectName, policyRequest)
 	if err != nil {
 		return fmt.Errorf("error setting project policy: %v", err)
+	}
+	return nil
+}
+
+func setServiceAccountIamPolicy(gcpClient ccgcp.Client, policy *iam.Policy, svcAcctResource string) error {
+	policyRequest := &iam.SetIamPolicyRequest{
+		Policy: policy,
+	}
+
+	_, err := gcpClient.SetServiceAccountIamPolicy(svcAcctResource, policyRequest)
+	if err != nil {
+		return fmt.Errorf("error setting service account policy: %v", err)
 	}
 	return nil
 }
