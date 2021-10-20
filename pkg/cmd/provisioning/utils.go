@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -16,6 +17,10 @@ import (
 
 	"github.com/pkg/errors"
 	"gopkg.in/square/go-jose.v2"
+
+	"k8s.io/apimachinery/pkg/util/yaml"
+
+	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 )
 
 type JSONWebKeySet struct {
@@ -138,4 +143,35 @@ func KeyIDFromPublicKey(publicKey interface{}) (string, error) {
 	keyID := base64.RawURLEncoding.EncodeToString(publicKeyDERHash)
 
 	return keyID, nil
+}
+
+// GetListOfCredentialsRequests decodes manifests in a given directory and returns a list of CredentialsRequests
+func GetListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, error) {
+	credRequests := []*credreqv1.CredentialsRequest{}
+	files, err := ioutil.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, file := range files {
+		f, err := os.Open(filepath.Join(dir, file.Name()))
+		if err != nil {
+			return nil, errors.Wrap(err, "Failed to open file")
+		}
+		defer f.Close()
+		decoder := yaml.NewYAMLOrJSONDecoder(f, 4096)
+		for {
+			cr := &credreqv1.CredentialsRequest{}
+			if err := decoder.Decode(cr); err != nil {
+				if err == io.EOF {
+					break
+				}
+				return nil, errors.Wrap(err, "Failed to decode to CredentialsRequest")
+			}
+			credRequests = append(credRequests, cr)
+		}
+
+	}
+
+	return credRequests, nil
 }

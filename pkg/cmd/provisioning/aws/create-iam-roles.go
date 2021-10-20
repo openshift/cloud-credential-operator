@@ -3,7 +3,6 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
 	"os"
@@ -15,8 +14,6 @@ import (
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/iam"
-
-	"k8s.io/apimachinery/pkg/util/yaml"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
@@ -31,7 +28,7 @@ stringData:
   credentials: |-
     [default]
     role_arn = %s
-    web_identity_token_file = /var/run/secrets/openshift/serviceaccount/token
+    web_identity_token_file = %s
 kind: Secret
 metadata:
   name: %s
@@ -55,7 +52,7 @@ var (
 
 func createIAMRoles(client aws.Client, identityProviderARN, PermissionsBoundaryARN, name, credReqDir, targetDir string, generateOnly bool) error {
 	// Process directory
-	credRequests, err := getListOfCredentialsRequests(credReqDir)
+	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
@@ -271,36 +268,6 @@ func createRolePolicyDocument(oidcProviderARN, issuerURL, namespace string, serv
 	return policy, nil
 }
 
-func getListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, error) {
-	credRequests := []*credreqv1.CredentialsRequest{}
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, file := range files {
-		f, err := os.Open(filepath.Join(dir, file.Name()))
-		if err != nil {
-			return nil, errors.Wrap(err, "Failed to open file")
-		}
-		defer f.Close()
-		decoder := yaml.NewYAMLOrJSONDecoder(f, 4096)
-		for {
-			cr := &credreqv1.CredentialsRequest{}
-			if err := decoder.Decode(cr); err != nil {
-				if err == io.EOF {
-					break
-				}
-				return nil, errors.Wrap(err, "Failed to decode to CredentialsRequest")
-			}
-			credRequests = append(credRequests, cr)
-		}
-
-	}
-
-	return credRequests, nil
-}
-
 func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string) (string, error) {
 	idProvider, err := awsClient.GetOpenIDConnectProvider(&iam.GetOpenIDConnectProviderInput{
 		OpenIDConnectProviderArn: awssdk.String(idProviderARN),
@@ -375,7 +342,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, roleARN str
 	fileName := fmt.Sprintf("%s-%s-credentials.yaml", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
 	filePath := filepath.Join(manifestsDir, fileName)
 
-	fileData := fmt.Sprintf(secretManifestsTemplate, roleARN, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
+	fileData := fmt.Sprintf(secretManifestsTemplate, roleARN, provisioning.OidcTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
 
 	// roleARN would be an empty string if ccoctl was in --dry-run mode
 	// so lets make sure we have an invalide Secret until the user
