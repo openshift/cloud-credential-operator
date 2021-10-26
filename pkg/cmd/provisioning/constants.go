@@ -13,6 +13,8 @@ const (
 	ManifestsDirName = "manifests"
 	// TLSDirName is the name of the directory to save bound service account signing key created by ccoctl
 	TLSDirName = "tls"
+	// OidcTokenPath is the path where oidc token is stored in the pod
+	OidcTokenPath = "/var/run/secrets/openshift/serviceaccount/token"
 	// DiscoveryDocumentTemplate is a template of the discovery document that needs to be populated with appropriate values
 	DiscoveryDocumentTemplate = `{
 	"issuer": "%s",
