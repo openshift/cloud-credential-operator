@@ -141,6 +141,21 @@ func (mr *MockClientMockRecorder) ListServiceAccountKeys(arg0, arg1 interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServiceAccountKeys", reflect.TypeOf((*MockClient)(nil).ListServiceAccountKeys), arg0, arg1)
 }
 
+// ListServiceAccounts mocks base method
+func (m *MockClient) ListServiceAccounts(arg0 context.Context, arg1 *admin.ListServiceAccountsRequest) ([]*admin.ServiceAccount, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListServiceAccounts", arg0, arg1)
+	ret0, _ := ret[0].([]*admin.ServiceAccount)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListServiceAccounts indicates an expected call of ListServiceAccounts
+func (mr *MockClientMockRecorder) ListServiceAccounts(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServiceAccounts", reflect.TypeOf((*MockClient)(nil).ListServiceAccounts), arg0, arg1)
+}
+
 // QueryTestablePermissions mocks base method
 func (m *MockClient) QueryTestablePermissions(arg0 context.Context, arg1 *admin.QueryTestablePermissionsRequest) (*admin.QueryTestablePermissionsResponse, error) {
 	m.ctrl.T.Helper()
@@ -169,6 +184,21 @@ func (m *MockClient) CreateWorkloadIdentityPool(arg0 context.Context, arg1, arg2
 func (mr *MockClientMockRecorder) CreateWorkloadIdentityPool(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).CreateWorkloadIdentityPool), arg0, arg1, arg2, arg3)
+}
+
+// DeleteWorkloadIdentityPool mocks base method
+func (m *MockClient) DeleteWorkloadIdentityPool(arg0 context.Context, arg1 string) (*iam0.Operation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteWorkloadIdentityPool", arg0, arg1)
+	ret0, _ := ret[0].(*iam0.Operation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteWorkloadIdentityPool indicates an expected call of DeleteWorkloadIdentityPool
+func (mr *MockClientMockRecorder) DeleteWorkloadIdentityPool(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).DeleteWorkloadIdentityPool), arg0, arg1)
 }
 
 // CreateWorkloadIdentityProvider mocks base method
@@ -348,6 +378,35 @@ func (mr *MockClientMockRecorder) SetBucketPolicy(arg0, arg1, arg2 interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetBucketPolicy", reflect.TypeOf((*MockClient)(nil).SetBucketPolicy), arg0, arg1, arg2)
 }
 
+// DeleteBucket mocks base method
+func (m *MockClient) DeleteBucket(arg0 context.Context, arg1 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBucket", arg0, arg1)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteBucket indicates an expected call of DeleteBucket
+func (mr *MockClientMockRecorder) DeleteBucket(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBucket", reflect.TypeOf((*MockClient)(nil).DeleteBucket), arg0, arg1)
+}
+
+// ListObjects mocks base method
+func (m *MockClient) ListObjects(arg0 context.Context, arg1 string) ([]*storage.ObjectAttrs, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListObjects", arg0, arg1)
+	ret0, _ := ret[0].([]*storage.ObjectAttrs)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListObjects indicates an expected call of ListObjects
+func (mr *MockClientMockRecorder) ListObjects(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListObjects", reflect.TypeOf((*MockClient)(nil).ListObjects), arg0, arg1)
+}
+
 // PutObject mocks base method
 func (m *MockClient) PutObject(arg0 context.Context, arg1, arg2 string, arg3 []byte) error {
 	m.ctrl.T.Helper()
@@ -360,4 +419,18 @@ func (m *MockClient) PutObject(arg0 context.Context, arg1, arg2 string, arg3 []b
 func (mr *MockClientMockRecorder) PutObject(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), arg0, arg1, arg2, arg3)
+}
+
+// DeleteObject mocks base method
+func (m *MockClient) DeleteObject(arg0 context.Context, arg1, arg2 string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteObject", arg0, arg1, arg2)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteObject indicates an expected call of DeleteObject
+func (mr *MockClientMockRecorder) DeleteObject(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteObject", reflect.TypeOf((*MockClient)(nil).DeleteObject), arg0, arg1, arg2)
 }
