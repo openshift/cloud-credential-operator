@@ -18,7 +18,6 @@ package actuator
 
 import (
 	"fmt"
-
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iam/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -288,10 +287,10 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 	return false, nil
 }
 
-func removeAllPolicyBindingsFromServiceAccount(gcpClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount) error {
+// RemovePolicyBindingsForProject ensures that given member, all the associated bindings for that member are removed
+// from the project policy
+func RemovePolicyBindingsForProject(gcpClient ccgcp.Client, memberName string) error {
 	projectName := gcpClient.GetProjectName()
-
-	svcAcctBindingName := ServiceAccountBindingName(svcAcct)
 
 	policy, err := gcpClient.GetProjectIamPolicy(projectName, &cloudresourcemanager.GetIamPolicyRequest{})
 	if err != nil {
@@ -300,7 +299,7 @@ func removeAllPolicyBindingsFromServiceAccount(gcpClient ccgcp.Client, svcAcct *
 
 	for _, binding := range policy.Bindings {
 		for j, member := range binding.Members {
-			if member == svcAcctBindingName {
+			if member == memberName {
 				// It is okay to submit a policy with a binding entry where the member list
 				// is empty. The policy will be cleaned up on the GCP-side and it will be
 				// as if we had removed the entire binding entry.
