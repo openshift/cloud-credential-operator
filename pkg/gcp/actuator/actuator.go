@@ -111,7 +111,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return err
 	}
 
-	svcAcct, err := getServiceAccount(gcpClient, gcpStatus.ServiceAccountID)
+	svcAcct, err := GetServiceAccount(gcpClient, gcpStatus.ServiceAccountID)
 	if err != nil {
 		return fmt.Errorf("error getting service account details: %v", err)
 	}
@@ -349,7 +349,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	// Create service account if necessary
 	var serviceAccount *iamadminpb.ServiceAccount
 	projectName := rootGCPClient.GetProjectName()
-	getServiceAccount, err := getServiceAccount(rootGCPClient, gcpStatus.ServiceAccountID)
+	getServiceAccount, err := GetServiceAccount(rootGCPClient, gcpStatus.ServiceAccountID)
 	if err != nil {
 		if status.Code(err) != codes.NotFound {
 			return fmt.Errorf("error checking for existing service account: %v", err)
@@ -364,7 +364,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 			return fmt.Errorf("error generating service acocunt name: %v", err)
 		}
 		svcAcctName = svcAcctName[:len(svcAcctName)-6] // chop off the trailing random chars
-		svcAcct, err := createServiceAccount(rootGCPClient, gcpStatus.ServiceAccountID, svcAcctName, projectName)
+		svcAcct, err := CreateServiceAccount(rootGCPClient, gcpStatus.ServiceAccountID, svcAcctName, "", projectName)
 		if err != nil {
 			return fmt.Errorf("error creating service account: %v", err)
 		}
@@ -377,7 +377,8 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	// TODO: set service account labels once we come up with a scheme for GCP
 
 	// Set policy/role binding to the service account
-	err = ensurePolicyBindings(rootGCPClient, gcpSpec.PredefinedRoles, serviceAccount)
+	svcAcctBindingName := ServiceAccountBindingName(serviceAccount)
+	err = EnsurePolicyBindingsForProject(rootGCPClient, gcpSpec.PredefinedRoles, svcAcctBindingName)
 	if err != nil {
 		return err
 	}
@@ -456,7 +457,7 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 	if gcpStatus.ServiceAccountID != "" {
 		// serviceAccountID non-"" means we're in mint-mode
 
-		_, err := getServiceAccount(readClient, gcpStatus.ServiceAccountID)
+		_, err := GetServiceAccount(readClient, gcpStatus.ServiceAccountID)
 		if err != nil {
 			if status.Code(err) == codes.NotFound {
 				logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Debug("service account does not exist, creating a new one")
@@ -560,7 +561,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	if err != nil {
 		return nil, err
 	}
-	_, err = getServiceAccount(client, gcpStatus.ServiceAccountID)
+	_, err = GetServiceAccount(client, gcpStatus.ServiceAccountID)
 	if err != nil {
 		logger.Warn("could not find read-only service account, falling back to root GCP client")
 		return a.buildRootGCPClient(cr)
