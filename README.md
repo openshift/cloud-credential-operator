@@ -234,8 +234,19 @@ $ make run
 NOTE: To keep the in-cluster versions of the code from conflicting with your local copy, you should scale down the deployments for cloud-credential-operator and cluster-version-operator
 
 ```
-$ kubectl scale -n openshift-cloud-credential-operator deployment.v1.apps/cloud-credential-operator --replicas=0
 $ kubectl scale -n openshift-cluster-version deployment.v1.apps/cluster-version-operator --replicas=0
+$ kubectl scale -n openshift-cloud-credential-operator deployment.v1.apps/cloud-credential-operator --replicas=0
+```
+
+As an alternative to disabling the cluster verison operator entirely, you can add the CCO Deployment as an unmanaged object into the clusterversion resource:
+```yaml
+spec:
+  overrides:
+    - kind: Deployment
+      group: apps/v1
+      name: cloud-credential-operator
+      namespace: openshift-cloud-credential-operator
+      unmanaged: true
 ```
 
 ## Deploying in cluster
