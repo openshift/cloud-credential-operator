@@ -24,10 +24,12 @@ import (
 	iamcloud "cloud.google.com/go/iam"
 	iamadmin "cloud.google.com/go/iam/admin/apiv1"
 	storage "cloud.google.com/go/storage"
+	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	compute "google.golang.org/api/compute/v1"
 	iam "google.golang.org/api/iam/v1"
+	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	serviceusage "google.golang.org/api/serviceusage/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -45,8 +47,10 @@ type Client interface {
 	GetRole(context.Context, *iamadminpb.GetRoleRequest) (*iamadminpb.Role, error)
 	GetServiceAccount(context.Context, *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error)
 	ListServiceAccountKeys(context.Context, *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error)
+	ListServiceAccounts(context.Context, *iamadminpb.ListServiceAccountsRequest) ([]*iamadminpb.ServiceAccount, error)
 	QueryTestablePermissions(context.Context, *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error)
 	CreateWorkloadIdentityPool(context.Context, string, string, *iam.WorkloadIdentityPool) (*iam.Operation, error)
+	DeleteWorkloadIdentityPool(context.Context, string) (*iam.Operation, error)
 	CreateWorkloadIdentityProvider(context.Context, string, string, *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error)
 
 	//CloudResourceManager
@@ -65,7 +69,10 @@ type Client interface {
 	CreateBucket(context.Context, string, string, *storage.BucketAttrs) error
 	GetBucketPolicy(context.Context, string) (*iamcloud.Policy3, error)
 	SetBucketPolicy(context.Context, string, *iamcloud.Policy3) error
+	DeleteBucket(context.Context, string) error
+	ListObjects(context.Context, string) ([]*storage.ObjectAttrs, error)
 	PutObject(context.Context, string, string, []byte) error
+	DeleteObject(context.Context, string, string) error
 }
 
 type gcpClient struct {
@@ -129,6 +136,24 @@ func (c *gcpClient) ListServiceAccountKeys(ctx context.Context, request *iamadmi
 	return c.iamClient.ListServiceAccountKeys(ctx, request)
 }
 
+func (c *gcpClient) ListServiceAccounts(ctx context.Context, request *iamadminpb.ListServiceAccountsRequest) ([]*iamadminpb.ServiceAccount, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	it := c.iamClient.ListServiceAccounts(ctx, request)
+	var svcAcctList []*iamadminpb.ServiceAccount
+	for {
+		svcAcct, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return svcAcctList, errors.Wrapf(err, "Failed to fetch list of service accounts")
+		}
+		svcAcctList = append(svcAcctList, svcAcct)
+	}
+	return svcAcctList, nil
+}
+
 func (c *gcpClient) GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
 	ctx, cancel := contextWithTimeout(context.TODO())
 	defer cancel()
@@ -183,6 +208,12 @@ func (c *gcpClient) CreateWorkloadIdentityPool(ctx context.Context, parent, pool
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
 	return c.iamService.Projects.Locations.WorkloadIdentityPools.Create(parent, pool).WorkloadIdentityPoolId(poolID).Context(ctx).Do()
+}
+
+func (c *gcpClient) DeleteWorkloadIdentityPool(ctx context.Context, resource string) (*iam.Operation, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamService.Projects.Locations.WorkloadIdentityPools.Delete(resource).Context(ctx).Do()
 }
 
 func (c *gcpClient) CreateWorkloadIdentityProvider(ctx context.Context, parent, providerID string, provider *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error) {
@@ -267,6 +298,36 @@ func (c *gcpClient) PutObject(ctx context.Context, bucketName, objectName string
 		return err
 	}
 	return nil
+}
+
+func (c *gcpClient) DeleteBucket(ctx context.Context, bucketName string) error {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.storageClient.Bucket(bucketName).Delete(ctx)
+}
+
+func (c *gcpClient) ListObjects(ctx context.Context, bucketName string) ([]*storage.ObjectAttrs, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	var objectAttrs []*storage.ObjectAttrs
+	it := c.storageClient.Bucket(bucketName).Objects(ctx, nil)
+	for {
+		attrs, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch objects from bucket %s: %v", bucketName, err)
+		}
+		objectAttrs = append(objectAttrs, attrs)
+	}
+	return objectAttrs, nil
+}
+
+func (c *gcpClient) DeleteObject(ctx context.Context, bucketName, objectName string) error {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.storageClient.Bucket(bucketName).Object(objectName).Delete(ctx)
 }
 
 // NewClient creates our client wrapper object for interacting with GCP.

@@ -139,7 +139,7 @@ func serviceAccountKeyExists(gcpClient ccgcp.Client, svcAcctID, keyID string, lo
 	return false, nil
 }
 
-func deleteServiceAccount(gcpClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount) error {
+func DeleteServiceAccount(gcpClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount) error {
 	req := &iamadminpb.DeleteServiceAccountRequest{
 		Name: svcAcct.Name,
 	}
