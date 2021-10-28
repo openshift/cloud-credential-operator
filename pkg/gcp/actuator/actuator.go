@@ -116,11 +116,12 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return fmt.Errorf("error getting service account details: %v", err)
 	}
 
-	if err := removeAllPolicyBindingsFromServiceAccount(gcpClient, svcAcct); err != nil {
+	svcAcctBindingName := ServiceAccountBindingName(svcAcct)
+	if err := RemovePolicyBindingsForProject(gcpClient, svcAcctBindingName); err != nil {
 		return fmt.Errorf("error removing service account policy bindings: %v", err)
 	}
 
-	if err := deleteServiceAccount(gcpClient, svcAcct); err != nil {
+	if err := DeleteServiceAccount(gcpClient, svcAcct); err != nil {
 		return fmt.Errorf("error deleting service account: %v", err)
 	}
 
