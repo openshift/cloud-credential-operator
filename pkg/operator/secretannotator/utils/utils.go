@@ -4,6 +4,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -21,25 +22,27 @@ import (
 func WatchCCOConfig(c controller.Controller, cloudSecretKey types.NamespacedName) error {
 	configPredicate := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return cloudCredentialConfigObjectCheck(e.MetaNew)
+			return cloudCredentialConfigObjectCheck(e.ObjectNew)
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return cloudCredentialConfigObjectCheck(e.Meta)
+			return cloudCredentialConfigObjectCheck(e.Object)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return cloudCredentialConfigObjectCheck(e.Meta)
+			return cloudCredentialConfigObjectCheck(e.Object)
 		},
 	}
-	err := c.Watch(&source.Kind{Type: &operatorv1.CloudCredential{}}, &handler.EnqueueRequestsFromMapFunc{
-		// Just requeue the cloud-cred secret for any change to the CCO config object
-		ToRequests: handler.ToRequestsFunc(func(handler.MapObject) []reconcile.Request {
+
+	err := c.Watch(&source.Kind{Type: &operatorv1.CloudCredential{}},
+		handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+			// Just requeue the cloud-cred secret for any change to the CCO config object
 			return []reconcile.Request{
 				{
 					NamespacedName: cloudSecretKey,
 				},
 			}
 		}),
-	}, configPredicate)
+		configPredicate,
+	)
 
 	return err
 }

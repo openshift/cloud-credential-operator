@@ -1,6 +1,7 @@
 package loglevel
 
 import (
+	"context"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -77,7 +78,7 @@ func TestLogLevelCloudCredentialReconcile(t *testing.T) {
 				Client: fakeClient,
 			}
 
-			_, err := rccc.Reconcile(reconcile.Request{
+			_, err := rccc.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      constants.CloudCredOperatorConfig,
 					Namespace: testNamespace,

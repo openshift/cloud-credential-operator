@@ -123,7 +123,7 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 				Client: fakeClient,
 			}
 
-			_, err := rscr.Reconcile(reconcile.Request{
+			_, err := rscr.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testStaleCRName,
 					Namespace: testNamespace,
