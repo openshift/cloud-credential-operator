@@ -71,7 +71,7 @@ func TestClusterOperatorVersion(t *testing.T) {
 				Logger:   log.WithField("controller", "teststatus"),
 				platform: configv1.AWSPlatformType,
 			}
-			_, err := rs.Reconcile(reconcile.Request{})
+			_, err := rs.Reconcile(context.TODO(), reconcile.Request{})
 
 			require.NoError(t, err, "unexpected error")
 
@@ -310,7 +310,7 @@ func TestConditions(t *testing.T) {
 		}
 		defer clearHandlers()
 
-		_, err := r.Reconcile(reconcile.Request{})
+		_, err := r.Reconcile(context.TODO(), reconcile.Request{})
 
 		require.NoError(t, err, "unexpected error")
 

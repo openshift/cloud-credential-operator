@@ -99,7 +99,7 @@ func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 			}
 
 			// error will end-up in InsufficientAnnotation on the secret
-			rcc.Reconcile(reconcile.Request{
+			rcc.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      TestSecretName,
 					Namespace: TestNamespace,
