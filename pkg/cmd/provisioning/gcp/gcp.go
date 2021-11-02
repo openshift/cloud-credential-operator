@@ -30,6 +30,7 @@ func NewGCPCmd() *cobra.Command {
 	gcpCmd.AddCommand(NewCreateWorkloadIdentityPool())
 	gcpCmd.AddCommand(NewCreateWorkloadIdentityProviderCmd())
 	gcpCmd.AddCommand(NewCreateServiceAccountsCmd())
+	gcpCmd.AddCommand(NewCreateAllCmd())
 	gcpCmd.AddCommand(NewDeleteCmd())
 
 	return gcpCmd
