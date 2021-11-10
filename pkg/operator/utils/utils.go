@@ -376,7 +376,7 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 	upgradeableTo = semver.MajorMinor(upgradeableTo)
 
 	if semver.Compare(upgradeableTo, clusterSemVer) == 1 {
-		log.Info("Found annotation indicating upradeability, assuming upgradeable")
+		log.Info("Found annotation indicating upgradeability, assuming upgradeable")
 		return nil
 	}
 
