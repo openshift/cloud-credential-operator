@@ -54,6 +54,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 
 	scheme.AddKnownTypes(SchemeGroupVersion,
 		&CredentialsRequest{}, &CredentialsRequestList{},
+		&AlibabaCloudProviderStatus{}, &AlibabaCloudProviderSpec{},
 		&AWSProviderStatus{}, &AWSProviderSpec{},
 		&AzureProviderStatus{}, &AzureProviderSpec{},
 		&GCPProviderStatus{}, &GCPProviderSpec{},
