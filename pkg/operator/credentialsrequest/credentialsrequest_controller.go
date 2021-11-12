@@ -34,6 +34,7 @@ import (
 	"k8s.io/client-go/util/workqueue"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
@@ -47,7 +48,6 @@ import (
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/internalcontroller"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
@@ -112,27 +112,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 
-	// Create controller with dependencies set
-	c := &internalcontroller.Controller{
-		Do:                      r,
-		Cache:                   mgr.GetCache(),
-		Config:                  mgr.GetConfig(),
-		Scheme:                  mgr.GetScheme(),
-		Client:                  mgr.GetClient(),
-		Recorder:                mgr.GetEventRecorderFor(name),
-		Queue:                   workqueue.NewNamedRateLimitingQueue(rateLimiter, name),
-		MaxConcurrentReconciles: 1,
-		Name:                    name,
-	}
-
-	if err := mgr.Add(c); err != nil {
+	c, err := controller.New(name, mgr, controller.Options{
+		Reconciler:  r,
+		RateLimiter: rateLimiter,
+	})
+	if err != nil {
 		return err
 	}
 
 	// Watch for changes to CredentialsRequest
 	// TODO: we should limit the namespaces where we watch, we want all requests in one namespace so anyone with admin on a namespace cannot create
 	// a request for any credentials they want.
-	err := c.Watch(&source.Kind{Type: &minterv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(&source.Kind{Type: &minterv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -318,6 +309,9 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 			ToRequests: allCredRequestsMapFn,
 		},
 		configMapPredicate)
+	if err != nil {
+		return err
+	}
 
 	// Watch the CloudCredential config object and reconcile everything on changes.
 	err = c.Watch(
