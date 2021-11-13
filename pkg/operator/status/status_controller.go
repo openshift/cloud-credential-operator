@@ -323,6 +323,8 @@ func defaultUnsetConditions(existing []configv1.ClusterOperatorStatusCondition) 
 			case configv1.OperatorUpgradeable:
 				defaultCondition.Status = configv1.ConditionTrue
 			}
+			defaultCondition.Reason = "AsExpected"
+			defaultCondition.Message = "All is well"
 			conditions = append(conditions, defaultCondition)
 		}
 	}
