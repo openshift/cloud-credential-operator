@@ -162,7 +162,7 @@ func TestConditionsEqual(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		actual := ConditionEqual(tc.a, tc.b)
+		actual := conditionEqual(tc.a, tc.b)
 		if actual != tc.expected {
 			t.Fatalf("%q: expected %v, got %v", tc.description,
 				tc.expected, actual)
