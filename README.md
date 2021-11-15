@@ -191,36 +191,34 @@ Supported clouds: AWS
 
 [Documentation](./docs/mode-manual-creds.md)
 
-##  4. Automated Short Lived Tokens
+##  4. Short Lived Tokens
 
-WARNING: In development functionality for AWS only, final state is not 100% known.
-
-This future enhancement will allow the use of short lived Amazon STS tokens. In this mode the credentials operator will create ServiceAccounts (rather than the usual secrets), annotated such that the AWS pod identity webhook will manage tokens automatically. See this [enhancement](https://github.com/openshift/enhancements/pull/260)
+OpenShift can be configured to use short lived credentials for different in-cluster components. It enables an authentication flow allowing a component to assume a cloud role resulting in short-lived credentials. It also automates requesting and refreshing of credentials using an OpenID Connect (OIDC) Identity Provider. OpenShift can sign ServiceAccount tokens trusted by OIDC provider, which can be projected into a Pod and used for authentication.
 
 Pros:
+  * Admin credentials are never stored in the cluster.
   * Each cluster component has only the permissions it needs.
-  * Automatic on-going reconciliation for cloud credentials including upgrades.
+  * Credentials for each cluster component are rotated periodically.
 
 Cons:
-  * Requires admin credential storage in a cluster kube-system secret. (if this is readable however, your cluster is severely compromised regardless)
-
-Future supported clouds: AWS
+  * Requires an additional cloud infrastructure setup from the user. We have [ccoctl](./docs/ccoctl.md) tool that can assist the setup process
+  * Push-button upgrades will not work as the cluster no longer has the admin credentials to mint credentials
+  
+Read more about supported clouds by clicking on the links below: 
+  * [AWS](./docs/sts.md)
+  * [GCP](./docs/gcp_workload_identity.md)
 
 ## Support Matrix
 Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 --- | --- | --- | --- | --- | ---
 AWS | Y | 4.4+ | Y | 4.3+ | 4.6+ (expected)
 Azure | Y | N | Y | Y | N
-GCP | Y | 4.7+ | Y | Y | N
+GCP | Y | 4.7+ | Y | Y | 4.10+
 IBMCloud | N | N | N | Y | N
 KubeVirt | N | N | Y | N | N
 OpenStack | N | N | Y | N | N
 oVirt | N | N | Y | N | N
 VMWare | N | N | Y | N | N
-
-# Short lived Credentials with AWS Security Token Service
-
-OpenShift can be configured to use short lived credentials for different components with AWS Security Token Service. It also eliminates the need to have root credentials inside the cluster. This feature is still in development. For more information please refer [here](./docs/sts.md).
 
 # Developer Instructions
 
