@@ -344,7 +344,7 @@ func setLastTransitionTime(oldConditions []configv1.ClusterOperatorStatusConditi
 	for i := range newConditions {
 		newCondition := &newConditions[i]
 		oldCondition, _ := findClusterOperatorCondition(oldConditions, newCondition.Type)
-		if oldCondition == nil || !ConditionEqual(*oldCondition, *newCondition) {
+		if oldCondition == nil || !conditionEqual(*oldCondition, *newCondition) {
 			newCondition.LastTransitionTime = metav1.Now()
 		} else {
 			newCondition.LastTransitionTime = oldCondition.LastTransitionTime
@@ -352,8 +352,8 @@ func setLastTransitionTime(oldConditions []configv1.ClusterOperatorStatusConditi
 	}
 }
 
-// ConditionEqual compares every field except LastTransitionTime.
-func ConditionEqual(a, b configv1.ClusterOperatorStatusCondition) bool {
+// conditionEqual compares every field except LastTransitionTime.
+func conditionEqual(a, b configv1.ClusterOperatorStatusCondition) bool {
 	if a.Type == b.Type &&
 		a.Status == b.Status &&
 		a.Reason == b.Reason &&
