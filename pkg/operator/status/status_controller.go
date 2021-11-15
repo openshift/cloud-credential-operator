@@ -344,23 +344,12 @@ func setLastTransitionTime(oldConditions []configv1.ClusterOperatorStatusConditi
 	for i := range newConditions {
 		newCondition := &newConditions[i]
 		oldCondition, _ := findClusterOperatorCondition(oldConditions, newCondition.Type)
-		if oldCondition == nil || !conditionEqual(*oldCondition, *newCondition) {
+		if oldCondition == nil || oldCondition.Status != newCondition.Status {
 			newCondition.LastTransitionTime = metav1.Now()
 		} else {
 			newCondition.LastTransitionTime = oldCondition.LastTransitionTime
 		}
 	}
-}
-
-// conditionEqual compares every field except LastTransitionTime.
-func conditionEqual(a, b configv1.ClusterOperatorStatusCondition) bool {
-	if a.Type == b.Type &&
-		a.Status == b.Status &&
-		a.Reason == b.Reason &&
-		a.Message == b.Message {
-		return true
-	}
-	return false
 }
 
 // isWatchedSecret is used to identify if a given secret namespace + name is one we're expecting in the future

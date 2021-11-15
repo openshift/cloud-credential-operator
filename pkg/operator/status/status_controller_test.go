@@ -379,6 +379,17 @@ func testClusterOperator(version string, progressingLastTransition metav1.Time) 
 	}
 }
 
+// conditionEqual compares every field except LastTransitionTime.
+func conditionEqual(a, b configv1.ClusterOperatorStatusCondition) bool {
+	if a.Type == b.Type &&
+		a.Status == b.Status &&
+		a.Reason == b.Reason &&
+		a.Message == b.Message {
+		return true
+	}
+	return false
+}
+
 type miniHandler struct {
 	name           string
 	conditions     []configv1.ClusterOperatorStatusCondition
