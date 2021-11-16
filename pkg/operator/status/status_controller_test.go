@@ -162,7 +162,7 @@ func TestConditionsEqual(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		actual := ConditionEqual(tc.a, tc.b)
+		actual := conditionEqual(tc.a, tc.b)
 		if actual != tc.expected {
 			t.Fatalf("%q: expected %v, got %v", tc.description,
 				tc.expected, actual)
@@ -377,6 +377,17 @@ func testClusterOperator(version string, progressingLastTransition metav1.Time) 
 			},
 		},
 	}
+}
+
+// conditionEqual compares every field except LastTransitionTime.
+func conditionEqual(a, b configv1.ClusterOperatorStatusCondition) bool {
+	if a.Type == b.Type &&
+		a.Status == b.Status &&
+		a.Reason == b.Reason &&
+		a.Message == b.Message {
+		return true
+	}
+	return false
 }
 
 type miniHandler struct {
