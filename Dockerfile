@@ -5,9 +5,15 @@ ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
 RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/cloud-credential-operator
 RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/ccoctl
 
+RUN for platform in linux/amd64 linux/arm64 linux/ppc64le linux/s390x darwin/amd64; \
+    do IFS=/ read GOOS GOARCH<<< ${platform}; unset IFS; \
+      GOOS=${GOOS} GOARCH=${GOARCH} go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" -o ./bin/${GOOS}/${GOARCH}/ccoctl ./cmd/ccoctl; \
+    done
+
 FROM registry.ci.openshift.org/ocp/4.10:base
 COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/cloud-credential-operator /usr/bin/
 COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/
+COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/bin /out
 COPY manifests /manifests
 # Update perms so we can copy updated CA if needed
 RUN chmod -R g+w /etc/pki/ca-trust/extracted/pem/
