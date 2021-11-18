@@ -19,11 +19,12 @@ spec:
         imagePullPolicy: IfNotPresent
         command:
         - /usr/bin/aws-pod-identity-webhook
-        - --in-cluster
+        - --in-cluster=false
+        - --tls-cert=/var/run/app/certs/tls.crt
+        - --tls-key=/var/run/app/certs/tls.key
         - --namespace=openshift-cloud-credential-operator
         - --port=6443
         - --service-name=pod-identity-webhook
-        - --tls-secret=pod-identity-webhook
         - --annotation-prefix=eks.amazonaws.com # TODO: use openshift.io based prefix
         - --token-audience=sts.amazonaws.com
         - --logtostderr
@@ -53,4 +54,6 @@ spec:
         tolerationSeconds: 120
       volumes:
       - name: webhook-certs
-        emptyDir: {}
+        secret:
+          secretName: pod-identity-webhook
+
