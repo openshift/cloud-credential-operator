@@ -204,7 +204,9 @@ ccoctl ibmcloud create-service-id --credentials-requests-dir <path-to-directory-
 ccoctl ibmcloud refresh-keys --kubeconfig <openshift-kubeconfig-file> --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name> 
 ```
 
-The above command will replace the old API key with newly created api key, hence all the effecting pods need to be recreated after successful of the command. 
+> Note: Any new credential request in the credentials request directory will require the --create parameter.
+
+> **WARNING**: The above command will replace the old API key with newly created api key, hence all the effecting pods need to be recreated after successful of the command. 
 
 ### Deleting the Service IDs
 
