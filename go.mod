@@ -14,6 +14,8 @@ require (
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/IBM/go-sdk-core/v5 v5.6.3
 	github.com/IBM/platform-services-go-sdk v0.19.4
+	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1323
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/aws/aws-sdk-go v1.37.14
 	github.com/dgrijalva/jwt-go v3.2.0+incompatible
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
@@ -61,7 +63,6 @@ require (
 	github.com/Azure/go-autorest/tracing v0.5.0 // indirect
 	github.com/PuerkitoBio/purell v1.1.1 // indirect
 	github.com/PuerkitoBio/urlesc v0.0.0-20170810143723-de5bf2ad4578 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver v3.5.0+incompatible // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
@@ -120,6 +121,7 @@ require (
 	google.golang.org/protobuf v1.27.1 // indirect
 	gopkg.in/go-playground/validator.v9 v9.31.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
+	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.3.0 // indirect
 	k8s.io/apiextensions-apiserver v0.19.2 // indirect
 	k8s.io/component-base v0.19.2 // indirect
