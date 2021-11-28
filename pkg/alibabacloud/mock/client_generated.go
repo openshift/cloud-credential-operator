@@ -49,6 +49,21 @@ func (mr *MockClientMockRecorder) AttachPolicyToUser(arg0 interface{}) *gomock.C
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "AttachPolicyToUser", reflect.TypeOf((*MockClient)(nil).AttachPolicyToUser), arg0)
 }
 
+// CreateAccessKey mocks base method.
+func (m *MockClient) CreateAccessKey(arg0 *ram.CreateAccessKeyRequest) (*ram.CreateAccessKeyResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateAccessKey", arg0)
+	ret0, _ := ret[0].(*ram.CreateAccessKeyResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateAccessKey indicates an expected call of CreateAccessKey.
+func (mr *MockClientMockRecorder) CreateAccessKey(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccessKey", reflect.TypeOf((*MockClient)(nil).CreateAccessKey), arg0)
+}
+
 // CreatePolicy mocks base method.
 func (m *MockClient) CreatePolicy(arg0 *ram.CreatePolicyRequest) (*ram.CreatePolicyResponse, error) {
 	m.ctrl.T.Helper()
@@ -64,32 +79,152 @@ func (mr *MockClientMockRecorder) CreatePolicy(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePolicy", reflect.TypeOf((*MockClient)(nil).CreatePolicy), arg0)
 }
 
-// DeletePolicy mocks base method.
-func (m *MockClient) DeletePolicy(arg0 *ram.DeletePolicyRequest) (*ram.DeletePolicyResponse, error) {
+// CreatePolicyVersion mocks base method.
+func (m *MockClient) CreatePolicyVersion(arg0 *ram.CreatePolicyVersionRequest) (*ram.CreatePolicyVersionResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeletePolicy", arg0)
+	ret := m.ctrl.Call(m, "CreatePolicyVersion", arg0)
+	ret0, _ := ret[0].(*ram.CreatePolicyVersionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreatePolicyVersion indicates an expected call of CreatePolicyVersion.
+func (mr *MockClientMockRecorder) CreatePolicyVersion(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePolicyVersion", reflect.TypeOf((*MockClient)(nil).CreatePolicyVersion), arg0)
+}
+
+// CreateUser mocks base method.
+func (m *MockClient) CreateUser(arg0 *ram.CreateUserRequest) (*ram.CreateUserResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateUser", arg0)
+	ret0, _ := ret[0].(*ram.CreateUserResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateUser indicates an expected call of CreateUser.
+func (mr *MockClientMockRecorder) CreateUser(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockClient)(nil).CreateUser), arg0)
+}
+
+// DeleteAccessKey mocks base method.
+func (m *MockClient) DeleteAccessKey(arg0 *ram.DeleteAccessKeyRequest) (*ram.DeleteAccessKeyResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAccessKey", arg0)
+	ret0, _ := ret[0].(*ram.DeleteAccessKeyResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteAccessKey indicates an expected call of DeleteAccessKey.
+func (mr *MockClientMockRecorder) DeleteAccessKey(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAccessKey", reflect.TypeOf((*MockClient)(nil).DeleteAccessKey), arg0)
+}
+
+// DeletePolicy mocks base method.
+func (m *MockClient) DeletePolicy(request *ram.DeletePolicyRequest) (*ram.DeletePolicyResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePolicy", request)
 	ret0, _ := ret[0].(*ram.DeletePolicyResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeletePolicy indicates an expected call of DeletePolicy.
-func (mr *MockClientMockRecorder) DeletePolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeletePolicy(request interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePolicy", reflect.TypeOf((*MockClient)(nil).DeletePolicy), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePolicy", reflect.TypeOf((*MockClient)(nil).DeletePolicy), request)
+}
+
+// DeleteUser mocks base method.
+func (m *MockClient) DeleteUser(arg0 *ram.DeleteUserRequest) (*ram.DeleteUserResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteUser", arg0)
+	ret0, _ := ret[0].(*ram.DeleteUserResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteUser indicates an expected call of DeleteUser.
+func (mr *MockClientMockRecorder) DeleteUser(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUser", reflect.TypeOf((*MockClient)(nil).DeleteUser), arg0)
 }
 
 // DetachPolicyFromUser mocks base method.
-func (m *MockClient) DetachPolicyFromUser(arg0 *ram.DetachPolicyFromUserRequest) (*ram.DetachPolicyFromUserResponse, error) {
+func (m *MockClient) DetachPolicyFromUser(request *ram.DetachPolicyFromUserRequest) (*ram.DetachPolicyFromUserResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DetachPolicyFromUser", arg0)
+	ret := m.ctrl.Call(m, "DetachPolicyFromUser", request)
 	ret0, _ := ret[0].(*ram.DetachPolicyFromUserResponse)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DetachPolicyFromUser indicates an expected call of DetachPolicyFromUser.
-func (mr *MockClientMockRecorder) DetachPolicyFromUser(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DetachPolicyFromUser(request interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetachPolicyFromUser", reflect.TypeOf((*MockClient)(nil).DetachPolicyFromUser), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DetachPolicyFromUser", reflect.TypeOf((*MockClient)(nil).DetachPolicyFromUser), request)
+}
+
+// GetPolicy mocks base method.
+func (m *MockClient) GetPolicy(arg0 *ram.GetPolicyRequest) (*ram.GetPolicyResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPolicy", arg0)
+	ret0, _ := ret[0].(*ram.GetPolicyResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetPolicy indicates an expected call of GetPolicy.
+func (mr *MockClientMockRecorder) GetPolicy(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPolicy", reflect.TypeOf((*MockClient)(nil).GetPolicy), arg0)
+}
+
+// GetUser mocks base method.
+func (m *MockClient) GetUser(arg0 *ram.GetUserRequest) (*ram.GetUserResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUser", arg0)
+	ret0, _ := ret[0].(*ram.GetUserResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetUser indicates an expected call of GetUser.
+func (mr *MockClientMockRecorder) GetUser(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockClient)(nil).GetUser), arg0)
+}
+
+// ListAccessKeys mocks base method.
+func (m *MockClient) ListAccessKeys(arg0 *ram.ListAccessKeysRequest) (*ram.ListAccessKeysResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListAccessKeys", arg0)
+	ret0, _ := ret[0].(*ram.ListAccessKeysResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListAccessKeys indicates an expected call of ListAccessKeys.
+func (mr *MockClientMockRecorder) ListAccessKeys(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAccessKeys", reflect.TypeOf((*MockClient)(nil).ListAccessKeys), arg0)
+}
+
+// ListPoliciesForUser mocks base method.
+func (m *MockClient) ListPoliciesForUser(request *ram.ListPoliciesForUserRequest) (*ram.ListPoliciesForUserResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPoliciesForUser", request)
+	ret0, _ := ret[0].(*ram.ListPoliciesForUserResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPoliciesForUser indicates an expected call of ListPoliciesForUser.
+func (mr *MockClientMockRecorder) ListPoliciesForUser(request interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPoliciesForUser", reflect.TypeOf((*MockClient)(nil).ListPoliciesForUser), request)
 }

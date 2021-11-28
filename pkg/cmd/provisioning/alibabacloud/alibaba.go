@@ -5,15 +5,10 @@ import (
 )
 
 type options struct {
-	TargetDir                string
-	Name                     string
-	Region                   string
-	RootAccessKeyId          string
-	RootAccessKeySecret      string
-	ComponentAccessKeyId     string
-	ComponentAccessKeySecret string
-	CredRequestDir           string
-	UserName                 string
+	TargetDir      string
+	Name           string
+	Region         string
+	CredRequestDir string
 }
 
 // NewAliababaCloudCmd implements the "alibabacloud" subcommand for the credentials provisioning
@@ -24,7 +19,8 @@ func NewAliababaCloudCmd() *cobra.Command {
 		Long:  "Creating/deleting cloud credentials objects for alibaba cloud",
 	}
 
-	createCmd.AddCommand(NewAttachRAMPolicyCmd())
+	createCmd.AddCommand(NewCreateRAMUsersCmd())
+	createCmd.AddCommand(NewDeleteRAMUsersCmd())
 
 	return createCmd
 }

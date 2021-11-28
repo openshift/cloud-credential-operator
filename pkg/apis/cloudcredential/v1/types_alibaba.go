@@ -44,8 +44,4 @@ type AlibabaStatementEntry struct {
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 type AlibabaCloudProviderStatus struct {
 	metav1.TypeMeta `json:",inline"`
-	// User is the name of the User created in AlibabaCloud for these credentials.
-	User string `json:"user"`
-	// Policy is the name of the policy attached to the user in AlibabaCloud.
-	Policy string `json:"policy"`
 }

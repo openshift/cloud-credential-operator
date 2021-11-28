@@ -18,22 +18,41 @@ import (
 )
 
 const (
-	testNamePrefix               = "test-cluster1"
-	testUserName                 = "test-user"
-	testDirPrefix                = "ramtestdir"
-	testComponentAccessKeyId     = "testAK"
-	testComponentAccessKeySecret = "testSK"
+	testNamePrefix = "test-cluster1"
+	testDirPrefix  = "ramtestdir"
 )
 
 var mockPolicyInCreatePolicy = ram.PolicyInCreatePolicy{
-	PolicyName:     "alibaba-mock-test",
+	PolicyName:     "alibaba-mock-default-test",
 	PolicyType:     "Custom",
 	Description:    "alibaba-mock-test",
 	DefaultVersion: "v1",
 	CreateDate:     "2021-01-23T12:33:18Z",
 }
 
-func TestAttachRAMPolicy(t *testing.T) {
+var mockPolicyInGetPolicy = ram.PolicyInGetPolicy{
+	PolicyName:     "alibaba-mock-default-test",
+	PolicyType:     "Custom",
+	Description:    "alibaba-mock-test",
+	DefaultVersion: "v1",
+	CreateDate:     "2021-01-23T12:33:18Z",
+}
+
+var mockPolicyVersionInCreatePolicyVersion = ram.PolicyVersionInCreatePolicyVersion{
+	VersionId:        "v2",
+	IsDefaultVersion: true,
+}
+
+var mockUserInCreateUser = ram.UserInCreateUser{
+	UserName: "mock-ram-user-name",
+}
+
+var mockAccessKeyInCreateAccessKey = ram.AccessKeyInCreateAccessKey{
+	AccessKeyId:     "test-ak",
+	AccessKeySecret: "test-sk",
+}
+
+func TestCreateRAMUsers(t *testing.T) {
 	tests := []struct {
 		name              string
 		mockAlibabaClient func(mockCtrl *gomock.Controller) *mockalibaba.MockClient
@@ -68,8 +87,12 @@ func TestAttachRAMPolicy(t *testing.T) {
 			generateOnly: true,
 			mockAlibabaClient: func(mockCtrl *gomock.Controller) *mockalibaba.MockClient {
 				mockAlibabaClient := mockalibaba.NewMockClient(mockCtrl)
+				mockCreateUser(mockAlibabaClient)
 				mockCreatePolicy(mockAlibabaClient)
 				mockAttachPolicyToUser(mockAlibabaClient)
+				mockCreateAccessKey(mockAlibabaClient)
+				mockGetPolicy(mockAlibabaClient)
+				mockCreatePolicyVersion(mockAlibabaClient)
 				return mockAlibabaClient
 			},
 			setup: func(t *testing.T) string {
@@ -110,13 +133,7 @@ func TestAttachRAMPolicy(t *testing.T) {
 			require.NoError(t, err, "unexpected error creating manifests dir for test")
 			defer os.RemoveAll(manifestsDir)
 
-			var componentSecretInfo = ComponenntSecretInfo{
-				componentAccessKeyId:     testComponentAccessKeyId,
-				componentAccessKeySecret: testComponentAccessKeySecret,
-				targetDir:                targetDir,
-				userName:                 testUserName,
-			}
-			err = attachRAMPolicy(mockAlibabaClient, testNamePrefix, credReqDir, componentSecretInfo)
+			err = createRAMUsers(mockAlibabaClient, testNamePrefix, credReqDir, targetDir)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
@@ -171,15 +188,43 @@ spec:
 	return nil
 }
 
-func mockCreatePolicy(mockAlibabaClient *mockalibaba.MockClient) {
-	mockAlibabaClient.EXPECT().CreatePolicy(gomock.Any()).Return(
-		&ram.CreatePolicyResponse{
-			Policy: mockPolicyInCreatePolicy,
-		}, nil).Times(1)
+func mockCreateUser(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().CreateUser(gomock.Any()).Return(
+		&ram.CreateUserResponse{
+			User: mockUserInCreateUser,
+		}, nil).AnyTimes()
+}
+
+func mockCreateAccessKey(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().CreateAccessKey(gomock.Any()).Return(
+		&ram.CreateAccessKeyResponse{
+			AccessKey: mockAccessKeyInCreateAccessKey,
+		}, nil).AnyTimes()
 }
 
 func mockAttachPolicyToUser(mockAlibabaClient *mockalibaba.MockClient) {
 	mockAlibabaClient.EXPECT().AttachPolicyToUser(gomock.Any()).Return(
 		&ram.AttachPolicyToUserResponse{}, nil,
-	).Times(1)
+	).AnyTimes()
+}
+
+func mockCreatePolicy(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().CreatePolicy(gomock.Any()).Return(
+		&ram.CreatePolicyResponse{
+			Policy: mockPolicyInCreatePolicy,
+		}, nil).AnyTimes()
+}
+
+func mockGetPolicy(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().GetPolicy(gomock.Any()).Return(
+		&ram.GetPolicyResponse{
+			Policy: mockPolicyInGetPolicy,
+		}, nil).AnyTimes()
+}
+
+func mockCreatePolicyVersion(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().CreatePolicyVersion(gomock.Any()).Return(
+		&ram.CreatePolicyVersionResponse{
+			PolicyVersion: mockPolicyVersionInCreatePolicyVersion,
+		}, nil).AnyTimes()
 }
