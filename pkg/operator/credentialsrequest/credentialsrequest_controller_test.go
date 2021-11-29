@@ -1349,7 +1349,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				platformType: configv1.AWSPlatformType,
 			}
 
-			_, err = rcr.Reconcile(reconcile.Request{
+			_, err = rcr.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testCRName,
 					Namespace: testNamespace,

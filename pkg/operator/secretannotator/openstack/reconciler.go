@@ -75,13 +75,13 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to cluster cloud secret
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return cloudCredSecretObjectCheck(e.MetaNew)
+			return cloudCredSecretObjectCheck(e.ObjectNew)
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return cloudCredSecretObjectCheck(e.Meta)
+			return cloudCredSecretObjectCheck(e.Object)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return cloudCredSecretObjectCheck(e.Meta)
+			return cloudCredSecretObjectCheck(e.Object)
 		},
 	}
 	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}, p)
@@ -114,7 +114,7 @@ type ReconcileCloudCredSecret struct {
 // In the event that the operator config resource has specified a mode to operate under (mint/passthrough)
 // then skip trying to determine the capabilities, and just annotate the secret.
 // +kubebuilder:rbac:groups=core,resources=secrets,verbs=get;list;watch;update
-func (r *ReconcileCloudCredSecret) Reconcile(request reconcile.Request) (returnResult reconcile.Result, returnErr error) {
+func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconcile.Request) (returnResult reconcile.Result, returnErr error) {
 	start := time.Now()
 
 	defer func() {

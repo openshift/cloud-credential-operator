@@ -56,13 +56,13 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 	// trigger a sync only in case of an event for a stale credential request
 	stateCredentialRequestPredicate := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isStaleCredentialsRequest(e.MetaNew.GetNamespace(), e.MetaNew.GetName())
+			return isStaleCredentialsRequest(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return isStaleCredentialsRequest(e.Meta.GetNamespace(), e.Meta.GetName())
+			return isStaleCredentialsRequest(e.Object.GetNamespace(), e.Object.GetName())
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isStaleCredentialsRequest(e.Meta.GetNamespace(), e.Meta.GetName())
+			return isStaleCredentialsRequest(e.Object.GetNamespace(), e.Object.GetName())
 		},
 	}
 
@@ -107,7 +107,7 @@ type ReconcileStaleCredentialsRequest struct {
 }
 
 // Reconcile marks the stale CredentialsRequest object for deletion
-func (r *ReconcileStaleCredentialsRequest) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileStaleCredentialsRequest) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 
 	logger := log.WithFields(log.Fields{

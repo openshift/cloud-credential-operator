@@ -17,6 +17,7 @@ limitations under the License.
 package loglevel
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -82,7 +83,7 @@ type ReconcileCloudCredentialConfig struct {
 // makes changes based on the state read and what is in the CredentialConfig.LogLevel
 // Automatically generate RBAC rules to allow the Controller to read and write required types.
 // +kubebuilder:rbac:groups=operator.openshift.io,resources=cloudcredential/spec,verbs=get
-func (r *ReconcileCloudCredentialConfig) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileCloudCredentialConfig) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	logger := log.WithFields(log.Fields{
 		"controller": controllerName,
 		"cr":         fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
