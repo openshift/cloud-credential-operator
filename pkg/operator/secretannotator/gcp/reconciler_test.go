@@ -228,7 +228,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				},
 			}
 
-			_, err := rcc.Reconcile(reconcile.Request{
+			_, err := rcc.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testSecretName,
 					Namespace: testNamespace,

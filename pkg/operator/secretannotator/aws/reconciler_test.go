@@ -277,7 +277,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				},
 			}
 
-			_, err := rcc.Reconcile(reconcile.Request{
+			_, err := rcc.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      constants.AWSCloudCredSecretName,
 					Namespace: constants.CloudCredSecretNamespace,

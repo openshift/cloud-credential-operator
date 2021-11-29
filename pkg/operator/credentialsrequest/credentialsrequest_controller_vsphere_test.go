@@ -17,6 +17,7 @@ limitations under the License.
 package credentialsrequest
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -190,7 +191,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				platformType: configv1.VSpherePlatformType,
 			}
 
-			_, err := rcr.Reconcile(reconcile.Request{
+			_, err := rcr.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testCRName,
 					Namespace: testNamespace,

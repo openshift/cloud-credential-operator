@@ -186,7 +186,7 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 					Client: fakeClient,
 					Logger: log.WithField("controller", "testController"),
 				}
-				_, err := r.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{
+				_, err := r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{
 					Name:      "openstack-credentials",
 					Namespace: "kube-system",
 				}})
@@ -274,7 +274,8 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 					Client: fakeClient,
 					Logger: log.WithField("controller", "testController"),
 				}
-				_, reconcileErr := r.Reconcile(reconcile.Request{NamespacedName: types.NamespacedName{
+
+				_, reconcileErr := r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{
 					Name:      "openstack-credentials",
 					Namespace: "kube-system",
 				}})

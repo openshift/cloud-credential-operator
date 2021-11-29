@@ -116,7 +116,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				Logger: log.WithField("controller", "testController"),
 			}
 
-			_, err := rcc.Reconcile(reconcile.Request{
+			_, err := rcc.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testSecretName,
 					Namespace: testNamespace,

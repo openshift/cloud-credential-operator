@@ -76,7 +76,7 @@ func newReconciler(mgr manager.Manager, platformType configv1.PlatformType) reco
 	return r
 }
 
-func alwaysReconcileCCOConfigObject(handler.MapObject) []reconcile.Request {
+func alwaysReconcileCCOConfigObject(client.Object) []reconcile.Request {
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
@@ -108,9 +108,7 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 	}
 
 	// Whenever a CredentialsRequest is modified, recalculate status
-	err = c.Watch(&source.Kind{Type: &credreqv1.CredentialsRequest{}}, &handler.EnqueueRequestsFromMapFunc{
-		ToRequests: handler.ToRequestsFunc(alwaysReconcileCCOConfigObject),
-	})
+	err = c.Watch(&source.Kind{Type: &credreqv1.CredentialsRequest{}}, handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject))
 	if err != nil {
 		return err
 	}
@@ -122,23 +120,24 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 	//	The root cloud cred secret in the kube-system namespace.
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isWatchedSecret(platformType, e.MetaNew.GetNamespace(), e.MetaNew.GetName(), e.MetaNew.GetAnnotations())
+			return isWatchedSecret(platformType, e.ObjectNew.GetNamespace(), e.ObjectNew.GetName(), e.ObjectNew.GetAnnotations())
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return isWatchedSecret(platformType, e.Meta.GetNamespace(), e.Meta.GetName(), e.Meta.GetAnnotations())
+			return isWatchedSecret(platformType, e.Object.GetNamespace(), e.Object.GetName(), e.Object.GetAnnotations())
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isWatchedSecret(platformType, e.Meta.GetNamespace(), e.Meta.GetName(), e.Meta.GetAnnotations())
+			return isWatchedSecret(platformType, e.Object.GetNamespace(), e.Object.GetName(), e.Object.GetAnnotations())
 		},
 	}
 
 	// Whenever one of our watched Secrets is updated, recalculate status
 	err = c.Watch(&source.Kind{Type: &corev1.Secret{}},
-		&handler.EnqueueRequestsFromMapFunc{
-			ToRequests: handler.ToRequestsFunc(alwaysReconcileCCOConfigObject),
-		},
+		handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject),
 		p,
 	)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -155,7 +154,7 @@ type ReconcileStatus struct {
 // Reconcile will ensure the ClusterOperator status conditions are updating by calling to each
 // registered domain-specific status handler. This function will ensure default conditions are set
 // if none of the handlers set a condition.
-func (r *ReconcileStatus) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *ReconcileStatus) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
 
 	defer func() {

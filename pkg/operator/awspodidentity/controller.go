@@ -20,6 +20,7 @@ import (
 	admissionregistrationclientv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -116,7 +117,7 @@ type awsPodIdentityController struct {
 	logger     log.FieldLogger
 }
 
-func (c *awsPodIdentityController) Start(stopCh <-chan struct{}) error {
+func (c *awsPodIdentityController) Start(ctx context.Context) error {
 	retryTimer := time.NewTimer(retryInterval)
 	for {
 		err := c.reconciler.ReconcileResources()
@@ -127,8 +128,8 @@ func (c *awsPodIdentityController) Start(stopCh <-chan struct{}) error {
 			break
 		}
 	}
-	go c.cache.Start(stopCh)
-	<-stopCh
+	go c.cache.Start(ctx)
+
 	return nil
 }
 
@@ -178,13 +179,13 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 
 	p := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isManaged(e.MetaNew)
+			return isManaged(e.ObjectNew)
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return isManaged(e.Meta)
+			return isManaged(e.Object)
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isManaged(e.Meta)
+			return isManaged(e.Object)
 		},
 	}
 
@@ -202,7 +203,11 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 			return err
 		}
 
-		informer, err := cache.GetInformer(context.TODO(), obj)
+		co, ok := obj.(client.Object)
+		if !ok {
+			return fmt.Errorf("failed to convert runtime.Object to client.Object")
+		}
+		informer, err := cache.GetInformer(context.TODO(), co)
 		if err != nil {
 			return err
 		}
@@ -214,7 +219,9 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 	}
 
 	status.AddHandler(controllerName, r)
-	mgr.Add(&awsPodIdentityController{reconciler: r, cache: cache, logger: logger})
+	if err := mgr.Add(&awsPodIdentityController{reconciler: r, cache: cache, logger: logger}); err != nil {
+		return err
+	}
 
 	return nil
 }
@@ -238,7 +245,7 @@ type staticResourceReconciler struct {
 
 var _ reconcile.Reconciler = &staticResourceReconciler{}
 
-func (r *staticResourceReconciler) Reconcile(request reconcile.Request) (reconcile.Result, error) {
+func (r *staticResourceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	r.logger.Debugf("reconciling after watch event %#v", request)
 	err := r.ReconcileResources()
 	if err != nil {

@@ -101,11 +101,11 @@ type Calculator struct {
 }
 
 // Start begins the metrics calculation loop.
-func (mc *Calculator) Start(stopCh <-chan struct{}) error {
+func (mc *Calculator) Start(ctx context.Context) error {
 	mc.log.Info("started metrics calculator goroutine")
 
 	// Run forever, sleep at the end:
-	wait.Until(mc.metricsLoop, mc.Interval, stopCh)
+	wait.Until(mc.metricsLoop, mc.Interval, ctx.Done())
 
 	return nil
 }
