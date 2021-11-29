@@ -43,6 +43,11 @@ var (
 		Type:   credreqv1.InsufficientCloudCredentials,
 		Status: corev1.ConditionTrue,
 	}
+
+	staleCredsCond = credreqv1.CredentialsRequestCondition{
+		Type:   credreqv1.StaleCredentials,
+		Status: corev1.ConditionTrue,
+	}
 )
 
 func TestSecretGetter(t *testing.T) {
@@ -165,6 +170,8 @@ func TestCredentialsRequests(t *testing.T) {
 				}(),
 				// insufficient cloud creds condition
 				testCredReqWithConditions(testAWSCredRequest("ainsufficientcreds"), []credreqv1.CredentialsRequestCondition{insufficientCredsCond}),
+				// stale creds condition
+				testCredReqWithConditions(testAWSCredRequest("astalecreds"), []credreqv1.CredentialsRequestCondition{staleCredsCond}),
 
 				// regular GCP credreq
 				testGCPCredRequest("gregular"),
@@ -174,7 +181,7 @@ func TestCredentialsRequests(t *testing.T) {
 			},
 			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				// total cred requests
-				assert.Equal(t, 5, accumulator.crTotals["aws"])
+				assert.Equal(t, 6, accumulator.crTotals["aws"])
 				assert.Equal(t, 2, accumulator.crTotals["gcp"])
 
 				// conditions
@@ -182,6 +189,7 @@ func TestCredentialsRequests(t *testing.T) {
 				assert.Equal(t, 1, accumulator.crConditions[credreqv1.CredentialsProvisionFailure])
 				assert.Equal(t, 1, accumulator.crConditions[credreqv1.Ignored])
 				assert.Equal(t, 1, accumulator.crConditions[credreqv1.InsufficientCloudCredentials])
+				assert.Equal(t, 0, accumulator.crConditions[credreqv1.StaleCredentials])
 			},
 		},
 		{
@@ -194,19 +202,23 @@ func TestCredentialsRequests(t *testing.T) {
 				testCredReqWithConditions(testAWSCredRequest("aprovisionfailed"), []credreqv1.CredentialsRequestCondition{provisionFailedCond}),
 				// insufficient cloud creds condition
 				testCredReqWithConditions(testAWSCredRequest("ainsufficientcreds"), []credreqv1.CredentialsRequestCondition{insufficientCredsCond}),
+				// stale creds condition
+				testCredReqWithConditions(testAWSCredRequest("astalecreds"), []credreqv1.CredentialsRequestCondition{staleCredsCond}),
 
 				// GCP credreq with condition set
 				testCredReqWithConditions(testGCPCredRequest("gignored"), []credreqv1.CredentialsRequestCondition{ignoredCond}),
 			},
 			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				// total cred requests
-				assert.Equal(t, 3, accumulator.crTotals["aws"])
+				assert.Equal(t, 4, accumulator.crTotals["aws"])
 				assert.Equal(t, 1, accumulator.crTotals["gcp"])
 
 				// failure conditions should all be zero as CCO is disabled
 				for _, cond := range credreqv1.FailureConditionTypes {
 					assert.Equal(t, 0, accumulator.crConditions[cond])
 				}
+				// stale conditions should be reported when cco is disabled
+				assert.Equal(t, 1, accumulator.crConditions[credreqv1.StaleCredentials])
 			},
 		},
 		{
