@@ -53,7 +53,7 @@ func deleteRAMUsers(client alibabacloud.Client, name, credReqDir string) error {
 	}
 
 	for _, credReq := range credRequests {
-		userName, _ := generateRAMUserName(fmt.Sprintf("%s-%s-%s", name, credReq.Namespace, credReq.Name))
+		userName, _ := generateRAMUserName(fmt.Sprintf("%s-%s-%s", name, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name))
 		listPoliciesReq := ram.CreateListPoliciesForUserRequest()
 		listPoliciesReq.UserName = userName
 		listPoliciesRes, err := client.ListPoliciesForUser(listPoliciesReq)

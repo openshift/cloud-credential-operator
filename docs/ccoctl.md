@@ -218,15 +218,15 @@ ccoctl ibmcloud delete-service-id --credentials-requests-dir <path-to-directory-
 
 ## Alibaba Cloud
 
-This part is the guide for using  manual mode on alibaba cloud, for more use info about manual mode, please reference to [cco-mode-manual](https://github.com/openshift/cloud-credential-operator/blob/master/docs/mode-manual-creds.md).
+This is a guide for using manual mode on alibaba cloud, for more info about manual mode, please refer to [cco-mode-manual](https://github.com/openshift/cloud-credential-operator/blob/master/docs/mode-manual-creds.md).
 
-In alibaba cloud manual mode,  the CCO utility (`ccoctl`) binary will create Secret manifests for the OpenShift installer that will create multiple users and use a long-lived RAM AK credentials for each OpenShift Container Platform cluster components. and every ram user who owns the AK would be attached the mapping ram policies with the permission defined in each component's CredentialsRequest, and a root ram user with required ram permission is needed for creating ram users, ram polices and also attaching the policy to each target component ram user.
+For alibaba cloud,  the CCO utility (`ccoctl`) binary will create credentials Secret manifests for the OpenShift installer. It will also create a user along with a long-lived RAM AccessKey (AK) for each OpenShift in-cluster component. Every RAM user who owns the AK would be attached RAM policies with the permission defined in each component's CredentialsRequest. To do all this, ccoctl consumes AK of a root RAM user with permissions required for creating user/policy and also attaching the policy to the user.
 
 ### Prerequisite
 
 1. Extract and prepare the ccoctl binary from the release image.
 
-2. Choose an existing ram user who has the ram pemissions below as least, and get this ram user's accesskey id/accesskey secret for creating the ram users and policies for each component and attaching the specific component permission to the mapping ram user.
+2. Choose an existing RAM user who has the below permissions, and get this user's accesskey id/secret for creating the RAM users and policies for each in-cluster component.
 
    ```
 ram:CreatePolicy
@@ -244,7 +244,7 @@ ram:ListAccessKeys
 ram:DeleteAccessKey
    ```
 
-3. Use the selected ram user’s accesskey id/secret to configure the Alibaba Cloud SDK client's creadential provider chain with [Envionment Creadentials](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#1-environment-credentials) mode or through [Credentials File](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#2-credentials-file) mode
+3. Use the selected RAM user’s accesskey id/secret to configure the Alibaba Cloud SDK client's credential provider chain with [Envionment Creadentials](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#1-environment-credentials) mode or through [Credentials File](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#2-credentials-file) mode
 
 ### Procedure
 
@@ -255,7 +255,7 @@ ram:DeleteAccessKey
    
    ```
 
-**step 2&3 are only need when preparing for upgrading clusters with manually maintained credentials. When doing a fresh installation please skip step 2&3**
+**step 2&3 are only needed when preparing for upgrading clusters with manually maintained credentials. When doing a fresh installation please skip step 2&3**
 
 2. For each CredentialsRequest CR in the release image, ensure that a namespace that matches the text in the spec.secretRef.namespace field exists in the cluster. This field is where the generated secrets that hold the credentials configuration are stored.
 
