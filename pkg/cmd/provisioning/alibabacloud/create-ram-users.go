@@ -162,7 +162,7 @@ func processNewCredentialsRequests(client alibabacloud.Client, credReqs []*credr
 }
 
 func createUser(client alibabacloud.Client, name string, credReq *credreqv1.CredentialsRequest) (string, error) {
-	userName := fmt.Sprintf("%s-%s-%s", name, credReq.Namespace, credReq.Name)
+	userName := fmt.Sprintf("%s-%s-%s", name, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name)
 	shortName, displayName := generateRAMUserName(userName)
 
 	userReq := ram.CreateCreateUserRequest()
