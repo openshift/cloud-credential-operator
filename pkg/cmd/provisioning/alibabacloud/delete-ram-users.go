@@ -39,9 +39,26 @@ func deleteComponentPolicy(client alibabacloud.Client, policyName string) error 
 
 //deleteComponentUser delete the specific component ram user
 func deleteComponentUser(client alibabacloud.Client, userName string) error {
+	//remove all user AccessKeys firstly
+	listKeyReq := ram.CreateListAccessKeysRequest()
+	listKeyReq.UserName = userName
+	listKeyRes, err := client.ListAccessKeys(listKeyReq)
+	if err != nil {
+		return errors.Wrap(err, "Failed to list accesskeys")
+	}
+	for _, oneKey := range listKeyRes.AccessKeys.AccessKey {
+		log.Printf("Ready to delete user %s accesskey %s", userName, oneKey.AccessKeyId)
+		deleteKeyReq := ram.CreateDeleteAccessKeyRequest()
+		deleteKeyReq.UserName = userName
+		deleteKeyReq.UserAccessKeyId = oneKey.AccessKeyId
+		_, err := client.DeleteAccessKey(deleteKeyReq)
+		if err != nil {
+			return err
+		}
+	}
 	req := ram.CreateDeleteUserRequest()
 	req.UserName = userName
-	_, err := client.DeleteUser(req)
+	_, err = client.DeleteUser(req)
 	return err
 }
 
@@ -90,7 +107,7 @@ func deleteRAMUsersCmd(cmd *cobra.Command, args []string) {
 
 	err = deleteRAMUsers(client, DeleteRAMUsersOpts.Name, DeleteRAMUsersOpts.CredRequestDir)
 	if err != nil {
-		log.Fatalf("Failed to detach and delete the ram policy: %v", err)
+		log.Fatalf(err.Error())
 	}
 }
 

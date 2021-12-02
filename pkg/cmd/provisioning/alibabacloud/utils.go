@@ -28,10 +28,10 @@ const (
 	newEmptyRegion  = "Parameter region is empty, please set a valid region id."
 
 	//ram error code
-	errorUserAlreadyExists = "EntityAlreadyExists.User"
-	errorUserNotExist      = "EntityNotExist.User"
-	errorPolicyNotExists   = "EntityNotExist.Policy"
-	errorAKLimitExceeded   = "LimitExceeded.User.AccessKey"
+	errorUserAlreadyExists        = "EntityAlreadyExists.User"
+	errorUserAleadyAttachedPolicy = "EntityAlreadyExists.User.Policy"
+	errorPolicyNotExists          = "EntityNotExist.Policy"
+	errorAKLimitExceeded          = "LimitExceeded.User.AccessKey"
 
 	//ram accesskey status
 	ramActiveStatus = "Active"
