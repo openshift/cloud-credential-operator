@@ -161,3 +161,57 @@ $ ccoctl gcp delete --name=<name> --project=<gcp-project-id>
 ```
 
 where `name` is the name prefix used to create cloud resources. `project` is the ID of the gcp project.
+
+## IBMCloud
+
+### Global flags
+
+By default, the tool will output to the directory the command(s) were run in. To specify a directory, use the `--output-dir` flag.
+
+### Extract the Credentials Request objects from the above release image
+
+`ccoctl ibmcloud` can process two kind of credentials requests - `IBMCloudProviderSpec`, `IBMCloudPowerVSProviderSpec` and here are the steps to extract them from the release image
+
+#### IBM Cloud
+
+This extracts the credentials of kind `IBMCloudProviderSpec`
+
+```bash
+mkdir credreqs ; oc adm release extract --cloud=ibmcloud --credentials-requests $RELEASE_IMAGE --to=./credreqs
+```
+
+#### IBM Cloud Power VS
+
+This extracts the credentials of kind `IBMCloudPowerVSProviderSpec`
+
+```bash
+mkdir credreqs ; oc adm release extract --cloud=powervs --credentials-requests $RELEASE_IMAGE --to=./credreqs
+```
+
+### Creating Service IDs
+
+This command will create the service ID for each credential request, assign the policies defined, creates an API key in the IBM Cloud and generates the secret.
+
+```bash
+ccoctl ibmcloud create-service-id --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name> --resource-group-name <resource-group-name>
+```
+
+> Note: --resource-group-name option is optional, but it is recommended to use to have finer grained access to the resources. 
+
+### Refresh the API keys for Service ID
+
+```bash
+ccoctl ibmcloud refresh-keys --kubeconfig <openshift-kubeconfig-file> --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name> 
+```
+
+> Note: Any new credential request in the credentials request directory will require the --create parameter.
+
+> **WARNING**: The above command will replace the old API key with newly created api key, hence all the effecting pods need to be recreated after successful of the command. 
+
+### Deleting the Service IDs
+
+This command will delete the service id from the IBM Cloud
+
+```bash
+ccoctl ibmcloud delete-service-id --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name> 
+```
