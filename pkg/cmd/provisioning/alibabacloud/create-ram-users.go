@@ -58,7 +58,7 @@ func createRAMUsersCmd(cmd *cobra.Command, args []string) {
 
 	err = createRAMUsers(client, CreateRAMUsersOpts.Name, CreateRAMUsersOpts.CredRequestDir, CreateRAMUsersOpts.TargetDir)
 	if err != nil {
-		log.Fatalf("failed to create RAM users and policies: %s", err)
+		log.Fatalf(err.Error())
 	}
 }
 
@@ -148,6 +148,12 @@ func attachComponentPolicy(client alibabacloud.Client, user, policyName string) 
 	req.UserName = user
 	req.PolicyType = ramPolicyType
 	_, err := client.AttachPolicyToUser(req)
+	if err != nil {
+		aErr, ok := err.(*alibabaerrors.ServerError)
+		if ok && aErr.ErrorCode() == errorUserAleadyAttachedPolicy {
+			return nil
+		}
+	}
 	return err
 }
 
@@ -176,7 +182,7 @@ func createUser(client alibabacloud.Client, name string, credReq *credreqv1.Cred
 			log.Printf("RAM User %s already exists, continuing", shortName)
 			return shortName, nil
 		} else {
-			return "", errors.Wrap(err, "failed to create RAM user")
+			return "", errors.Wrap(err, "Failed to create RAM user")
 		}
 	}
 
@@ -195,10 +201,13 @@ func generateUserAccessKeys(client alibabacloud.Client, userName string) (*ram.C
 			listKeyReq := ram.CreateListAccessKeysRequest()
 			listKeyReq.UserName = userName
 			listKeyRes, err := client.ListAccessKeys(listKeyReq)
+			if err != nil {
+				return nil, errors.Wrap(err, "Failed to list accesskeys")
+			}
 			//get the older one or the keys with in-active status to delete
 			deleteKeys, err := getDeleteAccessKeys(listKeyRes.AccessKeys.AccessKey)
 			if err != nil {
-				return nil, errors.Wrap(err, "failed to get the older ram accesskey")
+				return nil, errors.Wrap(err, "Failed to get the older ram accesskey")
 			}
 			for _, oneAK := range deleteKeys {
 				log.Printf("Ready to delete user %s accesskey %s", userName, oneAK.AccessKeyId)
@@ -218,7 +227,7 @@ func generateUserAccessKeys(client alibabacloud.Client, userName string) (*ram.C
 			log.Printf("Created access keys for RAM User: %s", userName)
 			return accessKeyResp, nil
 		}
-		return nil, errors.Wrap(err, "failed to create RAM user access keys")
+		return nil, errors.Wrap(err, "Failed to create RAM user access keys")
 	}
 	log.Printf("Created access keys for RAM User: %s", userName)
 	return accessKeyResp, nil
