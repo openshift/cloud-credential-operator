@@ -139,6 +139,21 @@ func (mr *MockClientMockRecorder) DeletePolicy(request interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePolicy", reflect.TypeOf((*MockClient)(nil).DeletePolicy), request)
 }
 
+// DeletePolicyVersion mocks base method.
+func (m *MockClient) DeletePolicyVersion(request *ram.DeletePolicyVersionRequest) (*ram.DeletePolicyVersionResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeletePolicyVersion", request)
+	ret0, _ := ret[0].(*ram.DeletePolicyVersionResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeletePolicyVersion indicates an expected call of DeletePolicyVersion.
+func (mr *MockClientMockRecorder) DeletePolicyVersion(request interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeletePolicyVersion", reflect.TypeOf((*MockClient)(nil).DeletePolicyVersion), request)
+}
+
 // DeleteUser mocks base method.
 func (m *MockClient) DeleteUser(arg0 *ram.DeleteUserRequest) (*ram.DeleteUserResponse, error) {
 	m.ctrl.T.Helper()
@@ -227,4 +242,19 @@ func (m *MockClient) ListPoliciesForUser(request *ram.ListPoliciesForUserRequest
 func (mr *MockClientMockRecorder) ListPoliciesForUser(request interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPoliciesForUser", reflect.TypeOf((*MockClient)(nil).ListPoliciesForUser), request)
+}
+
+// ListPolicyVersions mocks base method.
+func (m *MockClient) ListPolicyVersions(request *ram.ListPolicyVersionsRequest) (*ram.ListPolicyVersionsResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListPolicyVersions", request)
+	ret0, _ := ret[0].(*ram.ListPolicyVersionsResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListPolicyVersions indicates an expected call of ListPolicyVersions.
+func (mr *MockClientMockRecorder) ListPolicyVersions(request interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListPolicyVersions", reflect.TypeOf((*MockClient)(nil).ListPolicyVersions), request)
 }
