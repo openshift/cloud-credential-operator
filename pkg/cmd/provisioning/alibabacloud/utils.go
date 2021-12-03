@@ -29,6 +29,8 @@ const (
 
 	//ram error code
 	errorUserAlreadyExists        = "EntityAlreadyExists.User"
+	errorUserNotExists            = "EntityNotExist.User"
+	errorDeleteConlictPolicyUser  = "DeleteConflict.Policy.User"
 	errorUserAleadyAttachedPolicy = "EntityAlreadyExists.User.Policy"
 	errorPolicyNotExists          = "EntityNotExist.Policy"
 	errorAKLimitExceeded          = "LimitExceeded.User.AccessKey"

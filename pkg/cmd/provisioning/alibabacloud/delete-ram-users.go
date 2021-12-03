@@ -2,6 +2,7 @@ package alibabacloud
 
 import (
 	"fmt"
+	alibabaerrors "github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ram"
 	"github.com/openshift/cloud-credential-operator/pkg/alibabacloud"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -31,10 +32,36 @@ func detachComponentPolicy(client alibabacloud.Client, policyName, userName stri
 
 //deleteComponentPolicy delete the specific ram policy
 func deleteComponentPolicy(client alibabacloud.Client, policyName string) error {
-	req := ram.CreateDeletePolicyRequest()
-	req.PolicyName = policyName
-	_, err := client.DeletePolicy(req)
-	return err
+	lpvReq := ram.CreateListPolicyVersionsRequest()
+	lpvReq.PolicyName = policyName
+	lpvReq.PolicyType = ramPolicyType
+	lpvRes, err := client.ListPolicyVersions(lpvReq)
+	if err != nil {
+		return err
+	}
+	for _, policyVersion := range lpvRes.PolicyVersions.PolicyVersion {
+		if !policyVersion.IsDefaultVersion {
+			req := ram.CreateDeletePolicyVersionRequest()
+			req.PolicyName = policyName
+			req.VersionId = policyVersion.VersionId
+			_, err := client.DeletePolicyVersion(req)
+			if err != nil {
+				return err
+			}
+			log.Printf("Version %s of policy %s removed", policyVersion.VersionId, policyName)
+		}
+	}
+	dpReq := ram.CreateDeletePolicyRequest()
+	dpReq.PolicyName = policyName
+	_, err = client.DeletePolicy(dpReq)
+	if err != nil {
+		aErr, ok := err.(*alibabaerrors.ServerError)
+		//the policy may attached by other ram user
+		if ok && aErr.ErrorCode() != errorDeleteConlictPolicyUser {
+			return err
+		}
+	}
+	return nil
 }
 
 //deleteComponentUser delete the specific component ram user
@@ -75,6 +102,12 @@ func deleteRAMUsers(client alibabacloud.Client, name, credReqDir string) error {
 		listPoliciesReq.UserName = userName
 		listPoliciesRes, err := client.ListPoliciesForUser(listPoliciesReq)
 		if err != nil {
+			aErr, ok := err.(*alibabaerrors.ServerError)
+			//the user may already deleted
+			if ok && aErr.ErrorCode() == errorUserNotExists {
+				log.Printf("Ram user %s has already deleted", userName)
+				continue
+			}
 			return errors.Wrap(err, "Failed to list ram policies for component user")
 		}
 		//detach each policy from user
@@ -82,6 +115,12 @@ func deleteRAMUsers(client alibabacloud.Client, name, credReqDir string) error {
 			//detach component policy from the existing ram user
 			err := detachComponentPolicy(client, userPolicy.PolicyName, userName)
 			if err != nil {
+				aErr, ok := err.(*alibabaerrors.ServerError)
+				if ok && aErr.ErrorCode() == errorPolicyNotExists {
+					//create new policy
+					log.Printf("Ram policy %s has already deleted", userPolicy.PolicyName)
+					continue
+				}
 				return errors.Wrap(err, "Failed to detach ram policy from user")
 			}
 			//delete component ram policy

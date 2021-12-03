@@ -57,6 +57,8 @@ func TestDetachRAMPolicy(t *testing.T) {
 				mockDetachPolicyFromUser(mockAlibabaClient)
 				mockDeletePolicy(mockAlibabaClient)
 				mockListPoliciesForUser(mockAlibabaClient)
+				mockListPolicyVersions(mockAlibabaClient)
+				mockListAccessKeys(mockAlibabaClient)
 				mockDeleteUser(mockAlibabaClient)
 				return mockAlibabaClient
 			},
@@ -95,12 +97,12 @@ func TestDetachRAMPolicy(t *testing.T) {
 
 func mockDeletePolicy(mockAlibabaClient *mockalibaba.MockClient) {
 	mockAlibabaClient.EXPECT().DeletePolicy(gomock.Any()).Return(
-		&ram.DeletePolicyResponse{}, nil).Times(1)
+		&ram.DeletePolicyResponse{}, nil).AnyTimes()
 }
 
 func mockDeleteUser(mockAlibabaClient *mockalibaba.MockClient) {
 	mockAlibabaClient.EXPECT().DeleteUser(gomock.Any()).Return(
-		&ram.DeleteUserResponse{}, nil).Times(1)
+		&ram.DeleteUserResponse{}, nil).AnyTimes()
 }
 
 func mockDetachPolicyFromUser(mockAlibabaClient *mockalibaba.MockClient) {
@@ -114,4 +116,16 @@ func mockListPoliciesForUser(mockAlibabaClient *mockalibaba.MockClient) {
 		&ram.ListPoliciesForUserResponse{
 			Policies: mockPoliciesInListPoliciesForUser,
 		}, nil).AnyTimes()
+}
+
+func mockListPolicyVersions(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().ListPolicyVersions(gomock.Any()).Return(
+		&ram.ListPolicyVersionsResponse{}, nil,
+	).AnyTimes()
+}
+
+func mockListAccessKeys(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().ListAccessKeys(gomock.Any()).Return(
+		&ram.ListAccessKeysResponse{}, nil,
+	).AnyTimes()
 }

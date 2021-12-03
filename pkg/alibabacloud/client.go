@@ -41,6 +41,8 @@ type Client interface {
 	DeletePolicy(request *ram.DeletePolicyRequest) (response *ram.DeletePolicyResponse, err error)
 	DetachPolicyFromUser(request *ram.DetachPolicyFromUserRequest) (response *ram.DetachPolicyFromUserResponse, err error)
 	ListPoliciesForUser(request *ram.ListPoliciesForUserRequest) (response *ram.ListPoliciesForUserResponse, err error)
+	DeletePolicyVersion(request *ram.DeletePolicyVersionRequest) (response *ram.DeletePolicyVersionResponse, err error)
+	ListPolicyVersions(request *ram.ListPolicyVersionsRequest) (response *ram.ListPolicyVersionsResponse, err error)
 }
 
 type alibabaCloudClient struct {
@@ -97,6 +99,14 @@ func (c *alibabaCloudClient) CreateAccessKey(input *ram.CreateAccessKeyRequest) 
 
 func (c *alibabaCloudClient) DeleteAccessKey(input *ram.DeleteAccessKeyRequest) (*ram.DeleteAccessKeyResponse, error) {
 	return c.ramClient.DeleteAccessKey(input)
+}
+
+func (c *alibabaCloudClient) DeletePolicyVersion(input *ram.DeletePolicyVersionRequest) (*ram.DeletePolicyVersionResponse, error) {
+	return c.ramClient.DeletePolicyVersion(input)
+}
+
+func (c *alibabaCloudClient) ListPolicyVersions(input *ram.ListPolicyVersionsRequest) (*ram.ListPolicyVersionsResponse, error) {
+	return c.ramClient.ListPolicyVersions(input)
 }
 
 // NewClient creates our client wrapper object for the actual Alibaba Cloud clients we use.
