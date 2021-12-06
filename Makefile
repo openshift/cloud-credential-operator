@@ -9,6 +9,9 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	targets/openshift/deps.mk \
 )
 
+OUTPUT_DIR :=_output
+CROSS_BUILD_BINDIR :=$(OUTPUT_DIR)/bin
+
 # adapted from https://github.com/openshift/build-machinery-go/blob/master/make/targets/openshift/images.mk
 
 # IMAGE_BUILD_EXTRA_FLAGS lets you add extra flags for imagebuilder
@@ -130,3 +133,11 @@ build-no-gen: build
 coverage:
 	hack/codecov.sh
 .PHONY: coverage
+
+cross-build-darwin-amd64:
+	+@GOOS=darwin GOARCH=amd64 $(MAKE) --no-print-directory build GO_BUILD_PACKAGES:=./cmd/ccoctl GO_BUILD_FLAGS:="$(GO_BUILD_DARWIN)" GO_BUILD_BINDIR:=$(CROSS_BUILD_BINDIR)/darwin_amd64
+.PHONY: cross-build-darwin-amd64
+
+cross-build-windows-amd64:
+	+@GOOS=windows GOARCH=amd64 $(MAKE) --no-print-directory build GO_BUILD_PACKAGES:=./cmd/ccoctl GO_BUILD_FLAGS:="$(GO_BUILD_WINDOWS)" GO_BUILD_BINDIR:=$(CROSS_BUILD_BINDIR)/windows_amd64
+.PHONY: cross-build-windows-amd64
