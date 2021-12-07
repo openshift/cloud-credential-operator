@@ -29,8 +29,8 @@ func ClientBuilder(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.
 func setupClientParams(infra *configv1.Infrastructure) *ccaws.ClientParams {
 	region := ""
 	endpoint := ""
-	if infra.Status.PlatformStatus != nil {
-		// If PlatformStatus isn't nil, then we can at least assume Region is provided
+	if infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.AWS != nil {
+		// If PlatformStatus isn't nil and has AWS status, then we can at least assume Region is provided
 		region = infra.Status.PlatformStatus.AWS.Region
 
 		endpoint = getIAMEndpoint(infra)
