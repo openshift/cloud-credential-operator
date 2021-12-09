@@ -228,20 +228,20 @@ For alibaba cloud,  the CCO utility (`ccoctl`) binary will create credentials Se
 
 2. Choose an existing RAM user who has the below permissions, and get this user's accesskey id/secret for creating the RAM users and policies for each in-cluster component.
 
-   ```
-ram:CreatePolicy
-ram:GetPolicy
-ram:CreatePolicyVersion
-ram:DeletePolicy
-ram:DetachPolicyFromUser
-ram:ListPoliciesForUser
-ram:AttachPolicyToUser
-ram:CreateUser
-ram:GetUser
-ram:DeleteUser
-ram:CreateAccessKey
-ram:ListAccessKeys
-ram:DeleteAccessKey
+   ```bash
+   ram:CreatePolicy
+   ram:GetPolicy
+   ram:CreatePolicyVersion
+   ram:DeletePolicy
+   ram:DetachPolicyFromUser
+   ram:ListPoliciesForUser
+   ram:AttachPolicyToUser
+   ram:CreateUser
+   ram:GetUser
+   ram:DeleteUser
+   ram:CreateAccessKey
+   ram:ListAccessKeys
+   ram:DeleteAccessKey
    ```
 
 3. Use the selected RAM user’s accesskey id/secret to configure the Alibaba Cloud SDK client's credential provider chain with [Envionment Creadentials](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#1-environment-credentials) mode or through [Credentials File](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#2-credentials-file) mode
@@ -255,7 +255,7 @@ ram:DeleteAccessKey
    
    ```
 
-**step 2&3 are only needed when preparing for upgrading clusters with manually maintained credentials. When doing a fresh installation please skip step 2&3**
+   >  step 2&3 are only needed when preparing for upgrading clusters with manually maintained credentials. When doing a fresh installation please skip step 2&3**
 
 2. For each CredentialsRequest CR in the release image, ensure that a namespace that matches the text in the spec.secretRef.namespace field exists in the cluster. This field is where the generated secrets that hold the credentials configuration are stored.
 
@@ -284,7 +284,7 @@ ram:DeleteAccessKey
        name: openshift-cloud-credential-operator
    ```
 
- 3. For any `CredentialsRequest` CR for which the cluster does not already have a namespace with the name specified in `spec.secretRef.namespace`, create the namespace:
+3. For any `CredentialsRequest` CR for which the cluster does not already have a namespace with the name specified in `spec.secretRef.namespace`, create the namespace:
 
    ```bash
    $ oc create namespace <component_namespace>
@@ -302,6 +302,8 @@ ram:DeleteAccessKey
    - `region` is the Alibaba Cloud region in which cloud resources will be created.
    - `credentials-requests-dir` is the directory containing files of component CredentialsRequests.
    - `output-dir`/manifests is the directory containing files of component credentials secret.
+    
+   > Note:  A ram user can have up to two accesskeys at the same time, so when the `ccoctl alibabacloud create-ram-users` command is run more than twice,  the previous generated manifests secret will become stale and you should apply the new generated secrets again.**
 
 5. Prepare to run the OpenShift Container Platform installer:
 
@@ -331,7 +333,7 @@ ram:DeleteAccessKey
    ```bash
    $ ccoctl alibabacloud delete-ram-users --name <name> --region=<region> --credentials-requests-dir=<path_to_directory_with_list_of_credentials_requests>/credrequests
    ```
-where:
+   where:
    - `name` is the name used to tag any cloud resources that are created for tracking. 
    - `region` is the Alibaba Cloud region in which cloud resources will be created.
    - `credentials-requests-dir` is the directory containing files of component CredentialsRequests.
