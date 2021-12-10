@@ -177,6 +177,8 @@ func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
 		secretKey.Name = constants.VSphereCloudCredSecretName
 	case configv1.KubevirtPlatformType:
 		secretKey.Name = constants.KubevirtCloudCredSecretName
+	case configv1.NutanixPlatformType:
+		secretKey.Name = constants.NutanixCloudCredSecretName
 	default:
 		mc.log.WithField("cloud", platformType).Info("unsupported cloud for determing CCO mode")
 		return nil, nil
@@ -201,6 +203,8 @@ func cloudProviderSpecToMetricsKey(cloud string) string {
 		return "vsphere"
 	case "KubevirtProviderSpec":
 		return "kubevirt"
+	case "NutanixProviderSpec":
+		return "nutanix"
 	default:
 		return "unknown"
 	}

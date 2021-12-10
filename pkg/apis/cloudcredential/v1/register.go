@@ -61,6 +61,7 @@ func addKnownTypes(scheme *runtime.Scheme) error {
 		&IBMCloudPowerVSProviderStatus{}, &IBMCloudPowerVSProviderSpec{},
 		&VSphereProviderStatus{}, &VSphereProviderSpec{},
 		&KubevirtProviderStatus{}, &KubevirtProviderSpec{},
+		&NutanixProviderStatus{}, &NutanixProviderSpec{},
 	)
 
 	return nil
