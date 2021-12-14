@@ -20,7 +20,6 @@ github.com/AlecAivazis/survey/v2/terminal
 ## explicit
 github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization
 github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac
-github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2015-11-01/resources
 github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-autorest v14.2.0+incompatible
 ## explicit
@@ -150,8 +149,6 @@ github.com/cespare/xxhash/v2
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
-# github.com/dgrijalva/jwt-go v3.2.0+incompatible
-## explicit
 # github.com/dimchansky/utfbom v1.1.1
 ## explicit
 github.com/dimchansky/utfbom
@@ -203,9 +200,6 @@ github.com/go-playground/universal-translator
 # github.com/go-stack/stack v1.8.0
 ## explicit
 github.com/go-stack/stack
-# github.com/gofrs/uuid v4.0.0+incompatible
-## explicit
-github.com/gofrs/uuid
 # github.com/gogo/protobuf v1.3.2
 ## explicit; go 1.15
 github.com/gogo/protobuf/proto

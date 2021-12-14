@@ -10,7 +10,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.22
 	github.com/Azure/go-autorest/autorest/adal v0.9.17 // indirect
 	github.com/Azure/go-autorest/autorest/azure/auth v0.5.9
-	github.com/Azure/go-autorest/autorest/date v0.3.0
+	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/IBM/go-sdk-core/v5 v5.6.3
 	github.com/IBM/platform-services-go-sdk v0.19.4
@@ -20,7 +20,6 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-openapi/errors v0.20.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
-	github.com/gofrs/uuid v4.0.0+incompatible
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.2.0
