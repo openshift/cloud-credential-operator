@@ -167,6 +167,9 @@ const (
 	Ignored CredentialsRequestConditionType = "Ignored"
 	// StaleCredentials is true when CredentialsRequest is no longer required and has to be cleaned ip
 	StaleCredentials CredentialsRequestConditionType = "StaleCredentials"
+	// OrphanedCloudResource is true when CCO was unable to delete a previously created
+	// App Registration / Service Principal while pivoting from Mint mode to Passthrough
+	OrphanedCloudResource CredentialsRequestConditionType = "OrphanedCloudResource"
 )
 
 var (
