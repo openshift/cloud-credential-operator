@@ -168,9 +168,15 @@ func GetListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, 
 				}
 				return nil, errors.Wrap(err, "Failed to decode to CredentialsRequest")
 			}
-			credRequests = append(credRequests, cr)
+			// Ignore CredentialsRequest manifest if it has "release.openshift.io/delete" annotation with value "true"
+			// These manifests are marked for in-cluster deletion and should not be consumed by ccoctl to create credentials
+			// infrastructure.
+			if value, ok := cr.Annotations["release.openshift.io/delete"]; ok && value == "true" {
+				log.Printf("Ignoring CredentialsRequest %s/%s as it is marked for in-cluster deletion", cr.Namespace, cr.Name)
+			} else {
+				credRequests = append(credRequests, cr)
+			}
 		}
-
 	}
 
 	return credRequests, nil
