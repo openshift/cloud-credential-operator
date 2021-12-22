@@ -73,7 +73,7 @@ func TestLogLevelCloudCredentialReconcile(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			rccc := &ReconcileCloudCredentialConfig{
 				Client: fakeClient,
 			}

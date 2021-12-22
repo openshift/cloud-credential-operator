@@ -118,7 +118,7 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			rscr := &ReconcileStaleCredentialsRequest{
 				Client: fakeClient,
 			}
@@ -287,7 +287,7 @@ func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReques
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testStaleCRName,
 			Namespace:   testNamespace,
-			Finalizers:  []string{minterv1.FinalizerDeprovision},
+			Finalizers:  []string{},
 			UID:         types.UID("1234"),
 			Annotations: map[string]string{},
 			Generation:  testStaleCRGeneration,

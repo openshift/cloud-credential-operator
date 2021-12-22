@@ -750,7 +750,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				mockReadGCPClient = test.mockReadGCPClient(mockCtrl)
 			}
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 				Actuator: &actuator.Actuator{
@@ -949,7 +949,7 @@ func mockGetRole(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().GetRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
 		Name:                testRoleName,
 		IncludedPermissions: testRolePermissions,
-	}, nil)
+	}, nil).MaxTimes(2)
 }
 
 func mockListServicesEnabled(mockGCPClient *mockgcp.MockClient) {
@@ -972,7 +972,7 @@ func mockQueryableTestablePermissions(mockGCPClient *mockgcp.MockClient) {
 func mockTestIamPermissions(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().TestIamPermissions(gomock.Any(), gomock.Any()).Return(&cloudresourcemanager.TestIamPermissionsResponse{
 		Permissions: testRolePermissions,
-	}, nil)
+	}, nil).MaxTimes(2)
 }
 
 func mockTestIamPermissionsFail(mockGCPClient *mockgcp.MockClient) {
