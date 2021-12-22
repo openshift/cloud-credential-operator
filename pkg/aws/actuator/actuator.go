@@ -155,14 +155,14 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 	}
 
 	// Various checks for the kinds of reasons that would trigger a needed update
-	_, accessKey, secretKey, credentialsKey := a.loadExistingSecret(cr)
-	awsClient, err := a.AWSClientBuilder([]byte(accessKey), []byte(secretKey), a.Client)
+	_, existingAccessKey, existingSecretKey, existingCredentialsKey := a.loadExistingSecret(cr)
+	awsClient, err := a.AWSClientBuilder([]byte(existingAccessKey), []byte(existingSecretKey), a.Client)
 	if err != nil {
 		return true, err
 	}
 
 	// Make sure we update old Secrets that don't have the new "credentials" field
-	if credentialsKey == "" || credentialsKey != string(generateAWSCredentialsConfig(accessKey, secretKey)) {
+	if existingCredentialsKey == "" || existingCredentialsKey != string(generateAWSCredentialsConfig(existingAccessKey, existingSecretKey)) {
 		logger.Infof("Secret %s key needs updating, will update Secret contents", constants.AWSSecretDataCredentialsKey)
 		return true, nil
 	}
@@ -177,14 +177,14 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
 
-	readAWSClient, err := a.buildReadAWSClient(cr)
-	if err != nil {
-		log.WithError(err).Error("error creating read-only AWS client")
-		return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
-	}
-
 	// Minted-user-specific checks
 	if awsStatus.User != "" {
+		readAWSClient, err := a.buildReadAWSClient(cr)
+		if err != nil {
+			log.WithError(err).Error("error creating read-only AWS client")
+			return true, fmt.Errorf("unable to check whether AWS user is properly tagged")
+		}
+
 		// If AWS user defined (ie minted creds instead of passthrough) check whether user is tagged
 		user, err := readAWSClient.GetUser(&iam.GetUserInput{
 			UserName: aws.String(awsStatus.User),
@@ -225,7 +225,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			logger.WithError(err).Error("error listing all access keys for user")
 			return false, err
 		}
-		accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, accessKey)
+		accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, existingAccessKey)
 		if err != nil {
 			logger.WithError(err).Error("error querying whether access key still valid")
 		}
@@ -241,6 +241,9 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		}
 
 		policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, user.User, readAWSClient, logger)
+		if err != nil {
+			return true, err
+		}
 		if !policyEqual {
 			return true, nil
 		}
@@ -278,7 +281,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 				Region: region,
 			}
 
-			goodEnough, err := ccaws.CheckPermissionsUsingQueryClient(readAWSClient, awsClient, awsSpec.StatementEntries, simParams, logger)
+			goodEnough, err := ccaws.CheckPermissionsAgainstStatementList(awsClient, awsSpec.StatementEntries, simParams, logger)
 			if err != nil {
 				return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
 			}
@@ -371,8 +374,74 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 	existingSecret, _, _, _ := a.loadExistingSecret(cr)
 	accessKeyID := string(cloudCredsSecret.Data[awsannotator.AwsAccessKeyName])
 	secretAccessKey := string(cloudCredsSecret.Data[awsannotator.AwsSecretAccessKeyName])
+
+	mode, _, err := utils.GetOperatorConfiguration(a.Client, logger)
+	if err != nil {
+		msg := "error getting operator configuration"
+		logger.WithError(err).Error(msg)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("%v: %v", msg, err),
+		}
+	}
+	if mode == operatorv1.CloudCredentialsModePassthrough {
+		logger.Debug("will not perform permissions simulation because operator in mode %q", mode)
+	} else {
+		region, err := awsutils.LoadInfrastructureRegion(a.Client, logger)
+		if err != nil {
+			msg := "error reading region from Infrastructure CR"
+			logger.WithError(err).Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v: %v", msg, err),
+			}
+		}
+
+		simParams := &ccaws.SimulateParams{
+			Region: region,
+		}
+
+		// build client with root secret and verify that the creds are good enough to pass through
+		awsClient, err := a.AWSClientBuilder([]byte(accessKeyID), []byte(secretAccessKey), a.Client)
+		if err != nil {
+			msg := "error building AWS client"
+			logger.WithError(err).Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v: %v", msg, err),
+			}
+		}
+
+		awsSpec, err := DecodeProviderSpec(a.Codec, cr)
+		if err != nil {
+			msg := "error decoding AWS ProviderSpec"
+			logger.WithError(err).Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v: %v", msg, err),
+			}
+		}
+		goodEnough, err := ccaws.CheckPermissionsAgainstStatementList(awsClient, awsSpec.StatementEntries, simParams, logger)
+		if err != nil {
+			msg := "error validating whether root creds are good enough"
+			logger.WithError(err).Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v: %v", msg, err),
+			}
+		}
+		if !goodEnough {
+			msg := "root creds not sufficient"
+			logger.Info("root creds not sufficient")
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v", msg),
+			}
+		}
+	}
+
 	// userPolicy param empty because in passthrough mode this doesn't really have any meaning
-	err := a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
+	err = a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
