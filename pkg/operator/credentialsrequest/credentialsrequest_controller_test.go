@@ -19,6 +19,7 @@ package credentialsrequest
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net/url"
 	"testing"
 	"time"
@@ -446,6 +447,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.True(t, cr.Status.Provisioned)
 			},
 		},
+
 		{
 			name: "cred exists access key missing",
 			existing: []runtime.Object{
@@ -599,10 +601,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				return mockAWSClient
-			},
-			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				// will simulate to check that the creds in the target secret actually satisfy the requested perms
+				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -617,7 +618,8 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
-			name: "existing passthrough credential",
+			name:      "new passthrough credential with insuffient root creds",
+			expectErr: true,
 			existing: []runtime.Object{
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
@@ -626,33 +628,86 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testPassthroughCredentialsRequest(t),
 				testPassthroughAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
-				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockSimulatePrincipalPolicyPagesFailure(mockAWSClient)
 				return mockAWSClient
 			},
-			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				assert.Nil(t, targetSecret)
+				cr := getCR(c)
+				assert.False(t, cr.Status.Provisioned)
+			},
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        "CredentialsProvisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "existing up-to-date passthrough credential",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testPassthroughCredentialsRequestWithLastSyncResourceVersion(t, "12345"),
+				testPassthroughAWSCredsSecretWithResourceVersion("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey, "12345"),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				// will simulate to check that the creds in the target secret actually satisfy the requested perms
 				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
 				return mockAWSClient
 			},
-			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testRootAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testRootAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "existing out-of-date passthrough credential (rotating root creds)",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testSecretNamespace),
+				testPassthroughCredentialsRequestWithLastSyncResourceVersion(t, "0001"),
+				testPassthroughAWSCredsSecretWithResourceVersion("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey, "0002"),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testAWSCredsSecret(testSecretNamespace, testSecretName, testAWSAccessKeyID, testAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
+				// will simulate to check that the creds in the target secret actually satisfy the requested perms
+				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
 				require.NotNil(t, targetSecret)
-				assert.Equal(t, testAWSAccessKeyID,
+				assert.Equal(t, testRootAWSAccessKeyID,
 					string(targetSecret.Data["aws_access_key_id"]))
-				assert.Equal(t, testAWSSecretAccessKey,
+				assert.Equal(t, testRootAWSSecretAccessKey,
 					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, "0002", cr.Status.LastSyncCloudCredsSecretResourceVersion)
 			},
 		},
 		{
@@ -671,22 +726,12 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				return mockAWSClient
 			},
-			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
-				return mockAWSClient
-			},
-			mockSecretAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
-				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
-				return mockAWSClient
-			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getSecret(c)
 				require.NotNil(t, targetSecret)
-				assert.Equal(t, testAWSAccessKeyID,
+				assert.Equal(t, testRootAWSAccessKeyID,
 					string(targetSecret.Data["aws_access_key_id"]))
-				assert.Equal(t, testAWSSecretAccessKey,
+				assert.Equal(t, testRootAWSSecretAccessKey,
 					string(targetSecret.Data["aws_secret_access_key"]))
 				cr := getCR(c)
 				assert.True(t, cr.Status.Provisioned)
@@ -1329,7 +1374,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockSecretAWSClient = test.mockSecretAWSClient(mockCtrl)
 			}
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 				Actuator: &actuator.AWSActuator{
@@ -1451,6 +1496,12 @@ func testCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.Credent
 	return cr
 }
 
+func testPassthroughCredentialsRequestWithLastSyncResourceVersion(t *testing.T, resourceVersion string) *minterv1.CredentialsRequest {
+	cr := testPassthroughCredentialsRequest(t)
+	cr.Status.LastSyncCloudCredsSecretResourceVersion = resourceVersion
+	return cr
+}
+
 // passthrough credentialsrequest objects have no awsStatus
 func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	codec, err := minterv1.NewCodec()
@@ -1542,6 +1593,13 @@ func testInsufficientAWSCredsSecret(namespace, name, accessKeyID, secretAccessKe
 	return s
 }
 
+func testPassthroughAWSCredsSecretWithResourceVersion(namespace, name, accessKeyID, secretAccessKey, resourceVersion string) *corev1.Secret {
+	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
+	s.ObjectMeta.ResourceVersion = resourceVersion
+	return s
+}
+
 func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
 	s := testAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey)
 	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
@@ -1549,6 +1607,7 @@ func testPassthroughAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey
 }
 
 func testLegacyAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey string) *corev1.Secret {
+	resourceVersion := fmt.Sprintf("%d", rand.Int())
 	s := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
@@ -1556,6 +1615,7 @@ func testLegacyAWSCredsSecret(namespace, name, accessKeyID, secretAccessKey stri
 			Annotations: map[string]string{
 				constants.AnnotationKey: constants.MintAnnotation,
 			},
+			ResourceVersion: resourceVersion,
 		},
 		Data: map[string][]byte{
 			"aws_access_key_id":     []byte(accessKeyID),
@@ -1781,16 +1841,25 @@ func testClusterVersion() *configv1.ClusterVersion {
 	}
 }
 
-func mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
+// fake a successful permissions check but where the permissions aren't good enough
+func mockSimulatePrincipalPolicyPagesFailure(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Do(
+		func(input *iam.SimulatePrincipalPolicyInput, f func(resp *iam.SimulatePolicyResponse, lastPage bool) bool) {
+			response := &iam.SimulatePolicyResponse{
+				EvaluationResults: []*iam.EvaluationResult{
+					{
+						EvalActionName: aws.String("ec2:DeniedAction"),
+						EvalDecision:   aws.String("notallowed"),
+					},
+				},
+			}
+
+			f(response, false)
+		}).Return(nil)
 }
 
-func mockSimulatePrincipalPolicySuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any()).Return(&iam.SimulatePolicyResponse{
-		EvaluationResults: []*iam.EvaluationResult{
-			{EvalDecision: aws.String("allowed")},
-		},
-	}, nil)
+func mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
 }
 
 func testInfrastructure(infraName string) *configv1.Infrastructure {
