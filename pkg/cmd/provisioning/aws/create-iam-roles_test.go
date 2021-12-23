@@ -24,6 +24,46 @@ const (
 	testPermissionsBoundaryARN = "arn:aws:iam::123456789012:policy/testing123-permissions-boundary"
 	testIdentityProviderURL    = "testing123-oidc.s3.amazonaws.com"
 	testNamePrefix             = "test-cluster1"
+
+	credReqTemplate = `---
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: %s
+  namespace: openshift-cloud-credential-operator
+spec:
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: AWSProviderSpec
+    statementEntries:
+    - action:
+      - ec2:DescribeInstances
+      effect: Allow
+      resource: '*'
+    - action:
+      - kms:Decrypt
+      - kms:Encrypt
+      - kms:GenerateDataKey
+      - kms:GenerateDataKeyWithoutPlainText
+      - kms:DescribeKey
+      effect: Allow
+      resource: '*'
+  secretRef:
+    namespace: %s
+    name: %s
+  serviceAccountNames:
+  - testServiceAccount1
+  - testServiceAccount2`
+
+	credReqMarkedForDeletionTemplate = `---
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: %s
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    release.openshift.io/delete: "true"
+spec:`
 )
 
 func TestIAMRoles(t *testing.T) {
@@ -72,7 +112,7 @@ func TestIAMRoles(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 
 				return tempDirName
@@ -103,7 +143,7 @@ func TestIAMRoles(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 
 				return tempDirName
@@ -116,6 +156,40 @@ func TestIAMRoles(t *testing.T) {
 				files, err = ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
+			},
+		},
+		{
+			name:         "Ignore CredReq marked for deletion",
+			generateOnly: false,
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetOpenIDConnectProvider(mockAWSClient)
+				mockGetRole(mockAWSClient)
+				roleName := fmt.Sprintf("%s-namespace1-secretName1", testNamePrefix)
+				mockCreateRole(mockAWSClient, roleName)
+				mockPutRolePolicy(mockAWSClient)
+				return mockAWSClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+
+				err = testCredentialsRequest(t, "validcredreq", "namespace1", "secretName1", tempDirName, false)
+				require.NoError(t, err, "errored while setting up test CredReq files")
+
+				err = testCredentialsRequest(t, "credreqMarkedForDeletion", "namespace2", "secretName2", tempDirName, true)
+				require.NoError(t, err, "errored while setting up test CredReq files")
+
+				return tempDirName
+			},
+			verify: func(t *testing.T, targetDir, manifestsDir string) {
+				files, err := ioutil.ReadDir(targetDir)
+				require.NoError(t, err, "unexpected error listing files in targetDir")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
+
+				files, err = ioutil.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one valid CredReq, CredReq marked for deletion should be ignored")
 			},
 		},
 		{
@@ -134,7 +208,7 @@ func TestIAMRoles(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 
 				return tempDirName
@@ -156,7 +230,7 @@ func TestIAMRoles(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 
 				return tempDirName
@@ -195,38 +269,13 @@ func TestIAMRoles(t *testing.T) {
 	}
 }
 
-func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string) error {
-	credReqTemplate := `---
-apiVersion: cloudcredential.openshift.io/v1
-kind: CredentialsRequest
-metadata:
-  name: %s
-  namespace: openshift-cloud-credential-operator
-spec:
-  providerSpec:
-    apiVersion: cloudcredential.openshift.io/v1
-    kind: AWSProviderSpec
-    statementEntries:
-    - action:
-      - ec2:DescribeInstances
-      effect: Allow
-      resource: '*'
-    - action:
-      - kms:Decrypt
-      - kms:Encrypt
-      - kms:GenerateDataKey
-      - kms:GenerateDataKeyWithoutPlainText
-      - kms:DescribeKey
-      effect: Allow
-      resource: '*'
-  secretRef:
-    namespace: %s
-    name: %s
-  serviceAccountNames:
-  - testServiceAccount1
-  - testServiceAccount2`
-
-	credReq := fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
+func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string, isMarkedForDeletion bool) error {
+	var credReq string
+	if isMarkedForDeletion {
+		credReq = fmt.Sprintf(credReqMarkedForDeletionTemplate, crName)
+	} else {
+		credReq = fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
+	}
 
 	f, err := ioutil.TempFile(targetDir, "testCredReq")
 	require.NoError(t, err, "error creating temp file for CredentialsRequest")

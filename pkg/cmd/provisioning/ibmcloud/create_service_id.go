@@ -2,19 +2,14 @@ package ibmcloud
 
 import (
 	"fmt"
-	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
-	"k8s.io/apimachinery/pkg/util/yaml"
-
-	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
+	"github.com/pkg/errors"
+	"github.com/spf13/cobra"
 )
 
 // APIKeyEnvVars is a list of environment variable names containing an IBM Cloud API key
@@ -100,7 +95,7 @@ func createServiceIDs(client ibmcloud.Client, accountID *string,
 	}
 
 	// Process directory
-	credReqs, err := getListOfCredentialsRequests(credReqDir)
+	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
@@ -139,41 +134,6 @@ func createServiceIDs(client ibmcloud.Client, accountID *string,
 	}
 
 	return nil
-}
-
-func getListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, error) {
-	var credRequests []*credreqv1.CredentialsRequest
-	files, err := ioutil.ReadDir(dir)
-	if err != nil {
-		return nil, err
-	}
-	for _, file := range files {
-		err = func() error {
-			f, err := os.Open(filepath.Join(dir, file.Name()))
-			if err != nil {
-				return errors.Wrap(err, "Failed to open file")
-			}
-			defer f.Close()
-			decoder := yaml.NewYAMLOrJSONDecoder(f, 4096)
-			for {
-				cr := &credreqv1.CredentialsRequest{}
-				if err := decoder.Decode(cr); err != nil {
-					if err == io.EOF {
-						break
-					}
-					return errors.Wrap(err, "Failed to decode to CredentialsRequest")
-				}
-				credRequests = append(credRequests, cr)
-			}
-			return nil
-		}()
-
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	return credRequests, nil
 }
 
 // initEnvForCreateServiceIDCmd will ensure the destination directory is ready to receive the generated

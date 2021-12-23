@@ -18,7 +18,6 @@ github.com/AlecAivazis/survey/v2/core
 github.com/AlecAivazis/survey/v2/terminal
 # github.com/Azure/azure-sdk-for-go v59.4.0+incompatible
 ## explicit
-github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization
 github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac
 github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-autorest v14.2.0+incompatible

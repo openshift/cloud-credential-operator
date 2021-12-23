@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"log"
 
 	"github.com/pkg/errors"
@@ -77,7 +78,7 @@ func refreshKeys(ibmcloudClient ibmcloud.Client, kubeClient kubernetes.Interface
 	}
 
 	// Process directory
-	credReqs, err := getListOfCredentialsRequests(credReqDir)
+	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
