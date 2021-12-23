@@ -431,8 +431,8 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 			}
 		}
 		if !goodEnough {
-			msg := "root creds not sufficient"
-			logger.Info("root creds not sufficient")
+			msg := "root creds are not sufficient"
+			logger.Info(msg)
 			return &actuatoriface.ActuatorError{
 				ErrReason: minterv1.CredentialsProvisionFailure,
 				Message:   fmt.Sprintf("%v", msg),
