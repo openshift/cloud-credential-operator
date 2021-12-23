@@ -2,6 +2,7 @@ package ibmcloud
 
 import (
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -58,7 +59,7 @@ func deleteServiceIDCmd(cmd *cobra.Command, args []string) error {
 
 func deleteServiceIDs(client ibmcloud.Client, accountID, name, credReqDir string, force bool) error {
 	// Process directory
-	credReqs, err := getListOfCredentialsRequests(credReqDir)
+	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
