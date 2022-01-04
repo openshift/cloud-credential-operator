@@ -105,6 +105,12 @@ func processCredentialsRequests(ctx context.Context, client gcp.Client, credReqs
 }
 
 func createServiceAccount(ctx context.Context, client gcp.Client, name string, credReq *credreqv1.CredentialsRequest, serviceAccountNum int, workloadIdentityPool, workloadIdentityProvider, project, targetDir string, generateOnly bool) (string, error) {
+	// The credReq must have a non zero-length list of ServiceAccountNames
+	// that can be used to restrict which k8s ServiceAccounts can use the GCP ServiceAccount.
+	if len(credReq.Spec.ServiceAccountNames) == 0 {
+		return "", fmt.Errorf("CredentialsRequest %s/%s must provide at least one ServiceAccount in .spec.ServiceAccountNames", credReq.Namespace, credReq.Name)
+	}
+
 	// The service account id has a max length of 30 chars
 	// split it into 12-11-5 where the resuling string becomes:
 	// <infraName chopped to 12 chars>-<crName chopped to 11 chars>-<random 5 chars>
