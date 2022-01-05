@@ -34,6 +34,7 @@ type Client interface {
 	AttachPolicyToUser(*ram.AttachPolicyToUserRequest) (*ram.AttachPolicyToUserResponse, error)
 	CreateUser(*ram.CreateUserRequest) (*ram.CreateUserResponse, error)
 	GetUser(*ram.GetUserRequest) (*ram.GetUserResponse, error)
+	ListUsers(*ram.ListUsersRequest) (*ram.ListUsersResponse, error)
 	DeleteUser(*ram.DeleteUserRequest) (*ram.DeleteUserResponse, error)
 	CreateAccessKey(*ram.CreateAccessKeyRequest) (*ram.CreateAccessKeyResponse, error)
 	ListAccessKeys(*ram.ListAccessKeysRequest) (*ram.ListAccessKeysResponse, error)
@@ -87,6 +88,10 @@ func (c *alibabaCloudClient) GetUser(input *ram.GetUserRequest) (*ram.GetUserRes
 
 func (c *alibabaCloudClient) DeleteUser(input *ram.DeleteUserRequest) (*ram.DeleteUserResponse, error) {
 	return c.ramClient.DeleteUser(input)
+}
+
+func (c *alibabaCloudClient) ListUsers(input *ram.ListUsersRequest) (*ram.ListUsersResponse, error) {
+	return c.ramClient.ListUsers(input)
 }
 
 func (c *alibabaCloudClient) ListAccessKeys(input *ram.ListAccessKeysRequest) (*ram.ListAccessKeysResponse, error) {
