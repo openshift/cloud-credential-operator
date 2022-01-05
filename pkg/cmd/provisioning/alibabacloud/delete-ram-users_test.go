@@ -24,7 +24,7 @@ var mockPoliciesInListPoliciesForUser = ram.PoliciesInListPoliciesForUser{
 	Policy: []ram.PolicyInListPoliciesForUser{mockPolicyInListPoliciesForUser},
 }
 
-func TestDetachRAMPolicy(t *testing.T) {
+func TestDeleteRAMUsers(t *testing.T) {
 	tests := []struct {
 		name              string
 		mockAlibabaClient func(mockCtrl *gomock.Controller) *mockalibaba.MockClient
@@ -35,7 +35,7 @@ func TestDetachRAMPolicy(t *testing.T) {
 		expectError       bool
 	}{
 		{
-			name:         "No CredReqs",
+			name:         "No CredReqs in given dir",
 			generateOnly: true,
 			mockAlibabaClient: func(mockCtrl *gomock.Controller) *mockalibaba.MockClient {
 				mockAlibabaClient := mockalibaba.NewMockClient(mockCtrl)
@@ -50,7 +50,7 @@ func TestDetachRAMPolicy(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name:         "detach ram policy for one CredReq",
+			name:         "delete ram users for one CredReq",
 			generateOnly: true,
 			mockAlibabaClient: func(mockCtrl *gomock.Controller) *mockalibaba.MockClient {
 				mockAlibabaClient := mockalibaba.NewMockClient(mockCtrl)
@@ -70,6 +70,25 @@ func TestDetachRAMPolicy(t *testing.T) {
 				require.NoError(t, err, "errored while setting up test CredReq files")
 
 				return tempDirName
+			},
+			expectError: false,
+		},
+		{
+			name:         "delete ram users without given dir",
+			generateOnly: true,
+			mockAlibabaClient: func(mockCtrl *gomock.Controller) *mockalibaba.MockClient {
+				mockAlibabaClient := mockalibaba.NewMockClient(mockCtrl)
+				mockDetachPolicyFromUser(mockAlibabaClient)
+				mockDeletePolicy(mockAlibabaClient)
+				mockListPoliciesForUser(mockAlibabaClient)
+				mockListPolicyVersions(mockAlibabaClient)
+				mockListAccessKeys(mockAlibabaClient)
+				mockListUsers(mockAlibabaClient)
+				mockDeleteUser(mockAlibabaClient)
+				return mockAlibabaClient
+			},
+			setup: func(t *testing.T) string {
+				return ""
 			},
 			expectError: false,
 		},
@@ -127,5 +146,11 @@ func mockListPolicyVersions(mockAlibabaClient *mockalibaba.MockClient) {
 func mockListAccessKeys(mockAlibabaClient *mockalibaba.MockClient) {
 	mockAlibabaClient.EXPECT().ListAccessKeys(gomock.Any()).Return(
 		&ram.ListAccessKeysResponse{}, nil,
+	).AnyTimes()
+}
+
+func mockListUsers(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().ListUsers(gomock.Any()).Return(
+		&ram.ListUsersResponse{}, nil,
 	).AnyTimes()
 }
