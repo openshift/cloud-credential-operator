@@ -331,10 +331,8 @@ For alibaba cloud,  the CCO utility (`ccoctl`) binary will create credentials Se
 6. To delete resources created by ccoctl, run
 
    ```bash
-   $ ccoctl alibabacloud delete-ram-users --name <name> --region=<region> --credentials-requests-dir=<path_to_directory_with_list_of_credentials_requests>/credrequests
+   $ ccoctl alibabacloud delete-ram-users --name <name> --region=<region>
    ```
    where:
    - `name` is the name used to tag any cloud resources that are created for tracking. 
-   - `region` is the Alibaba Cloud region in which cloud resources will be created.
-   - `credentials-requests-dir` is the directory containing files of component CredentialsRequests.
-   
+   - `region` is the Alibaba Cloud region in which cloud resources will be created.   

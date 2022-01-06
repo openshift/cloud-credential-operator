@@ -5,7 +5,6 @@ import (
 	alibabaerrors "github.com/aliyun/alibaba-cloud-sdk-go/sdk/errors"
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ram"
 	"github.com/openshift/cloud-credential-operator/pkg/alibabacloud"
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"log"
@@ -14,9 +13,8 @@ import (
 var (
 	// DeleteRAMUsersOpts captures the options that affect detaching of ram roles.
 	DeleteRAMUsersOpts = options{
-		Region:         "",
-		Name:           "",
-		CredRequestDir: "",
+		Region: "",
+		Name:   "",
 	}
 )
 
@@ -89,15 +87,30 @@ func deleteComponentUser(client alibabacloud.Client, userName string) error {
 	return err
 }
 
-func deleteRAMUsers(client alibabacloud.Client, name, credReqDir string) error {
-	// Process directory
-	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir)
+func getUsersToDelete(client alibabacloud.Client, name string) ([]string, error) {
+	usersToDelete := make([]string, 0)
+	listUsersReq := ram.CreateListUsersRequest()
+	listUsersRes, err := client.ListUsers(listUsersReq)
 	if err != nil {
-		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
+		return usersToDelete, err
+	}
+	for _, user := range listUsersRes.Users.User {
+		if user.Comments == fmt.Sprintf("%s/%s", ccoctlResourcePrefix, name) {
+			log.Printf("Find ram user %s to delete", user.UserName)
+			usersToDelete = append(usersToDelete, user.UserName)
+		}
+	}
+	return usersToDelete, nil
+}
+
+func deleteRAMUsers(client alibabacloud.Client, name string) error {
+	//find users to delete
+	userNameList, err := getUsersToDelete(client, name)
+	if err != nil {
+		return errors.Wrap(err, "Failed to find users to delete")
 	}
 
-	for _, credReq := range credRequests {
-		userName, _ := generateRAMUserName(fmt.Sprintf("%s-%s-%s", name, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name))
+	for _, userName := range userNameList {
 		listPoliciesReq := ram.CreateListPoliciesForUserRequest()
 		listPoliciesReq.UserName = userName
 		listPoliciesRes, err := client.ListPoliciesForUser(listPoliciesReq)
@@ -144,7 +157,7 @@ func deleteRAMUsersCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create a client: %v", err)
 	}
 
-	err = deleteRAMUsers(client, DeleteRAMUsersOpts.Name, DeleteRAMUsersOpts.CredRequestDir)
+	err = deleteRAMUsers(client, DeleteRAMUsersOpts.Name)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
@@ -160,8 +173,6 @@ func NewDeleteRAMUsersCmd() *cobra.Command {
 
 	detachCmd.PersistentFlags().StringVar(&DeleteRAMUsersOpts.Name, "name", "", "User-defined name for all created Alibaba Cloud resources (can be separate from the cluster's infra-id)")
 	detachCmd.MarkPersistentFlagRequired("name")
-	detachCmd.PersistentFlags().StringVar(&DeleteRAMUsersOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to create RAM AK for (can be created by running 'oc adm release extract --credentials-requests --cloud=alibabacloud' against an OpenShift release image)")
-	detachCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	detachCmd.PersistentFlags().StringVar(&DeleteRAMUsersOpts.Region, "region", "", "Alibaba Cloud region endpoint only required for GovCloud")
 
 	return detachCmd
