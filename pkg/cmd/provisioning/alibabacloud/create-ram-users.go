@@ -37,6 +37,8 @@ type: Opaque`
 	ramPolicyType = "Custom"
 	// autoRotateStrategy will delete the earliest inactive policy version
 	autoRotateStrategy = "DeleteOldestNonDefaultVersionWhenLimitExceeded"
+	// ccoctlResourcePrefix is the prefix of the tag key applied to the Alibaba Cloud ram user created by ccoctl
+	ccoctlResourcePrefix = "openshift.io/ccoctl"
 )
 
 var (
@@ -174,7 +176,7 @@ func createUser(client alibabacloud.Client, name string, credReq *credreqv1.Cred
 	userReq := ram.CreateCreateUserRequest()
 	userReq.UserName = shortName
 	userReq.DisplayName = displayName
-
+	userReq.Comments = fmt.Sprintf("%s/%s", ccoctlResourcePrefix, name)
 	user, err := client.CreateUser(userReq)
 	if err != nil {
 		aErr, ok := err.(*alibabaerrors.ServerError)

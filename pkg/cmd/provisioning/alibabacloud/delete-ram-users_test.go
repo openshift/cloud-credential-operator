@@ -1,8 +1,6 @@
 package alibabacloud
 
 import (
-	"io/ioutil"
-	"os"
 	"testing"
 
 	"github.com/aliyun/alibaba-cloud-sdk-go/services/ram"
@@ -24,33 +22,44 @@ var mockPoliciesInListPoliciesForUser = ram.PoliciesInListPoliciesForUser{
 	Policy: []ram.PolicyInListPoliciesForUser{mockPolicyInListPoliciesForUser},
 }
 
-func TestDetachRAMPolicy(t *testing.T) {
+func TestDeleteRAMUsers(t *testing.T) {
 	tests := []struct {
 		name              string
 		mockAlibabaClient func(mockCtrl *gomock.Controller) *mockalibaba.MockClient
-		setup             func(*testing.T) string
 		verify            func(t *testing.T, manifestDir string)
 		cleanup           func(*testing.T)
 		generateOnly      bool
 		expectError       bool
 	}{
 		{
-			name:         "No CredReqs",
+			name:         "No CredReqs in given dir",
 			generateOnly: true,
 			mockAlibabaClient: func(mockCtrl *gomock.Controller) *mockalibaba.MockClient {
 				mockAlibabaClient := mockalibaba.NewMockClient(mockCtrl)
+				mockListUsers(mockAlibabaClient)
 				mockDetachPolicyFromUser(mockAlibabaClient)
 				return mockAlibabaClient
-			},
-			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
-				require.NoError(t, err, "Failed to create temp directory")
-				return tempDirName
 			},
 			expectError: false,
 		},
 		{
-			name:         "detach ram policy for one CredReq",
+			name:         "delete ram users for one CredReq",
+			generateOnly: true,
+			mockAlibabaClient: func(mockCtrl *gomock.Controller) *mockalibaba.MockClient {
+				mockAlibabaClient := mockalibaba.NewMockClient(mockCtrl)
+				mockDetachPolicyFromUser(mockAlibabaClient)
+				mockDeletePolicy(mockAlibabaClient)
+				mockListUsers(mockAlibabaClient)
+				mockListPoliciesForUser(mockAlibabaClient)
+				mockListPolicyVersions(mockAlibabaClient)
+				mockListAccessKeys(mockAlibabaClient)
+				mockDeleteUser(mockAlibabaClient)
+				return mockAlibabaClient
+			},
+			expectError: false,
+		},
+		{
+			name:         "delete ram users without given dir",
 			generateOnly: true,
 			mockAlibabaClient: func(mockCtrl *gomock.Controller) *mockalibaba.MockClient {
 				mockAlibabaClient := mockalibaba.NewMockClient(mockCtrl)
@@ -59,17 +68,9 @@ func TestDetachRAMPolicy(t *testing.T) {
 				mockListPoliciesForUser(mockAlibabaClient)
 				mockListPolicyVersions(mockAlibabaClient)
 				mockListAccessKeys(mockAlibabaClient)
+				mockListUsers(mockAlibabaClient)
 				mockDeleteUser(mockAlibabaClient)
 				return mockAlibabaClient
-			},
-			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
-				require.NoError(t, err, "Failed to create temp directory")
-
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
-				require.NoError(t, err, "errored while setting up test CredReq files")
-
-				return tempDirName
 			},
 			expectError: false,
 		},
@@ -82,10 +83,7 @@ func TestDetachRAMPolicy(t *testing.T) {
 
 			mockAlibabaClient := test.mockAlibabaClient(mockCtrl)
 
-			credReqDir := test.setup(t)
-			defer os.RemoveAll(credReqDir)
-
-			err := deleteRAMUsers(mockAlibabaClient, testNamePrefix, credReqDir)
+			err := deleteRAMUsers(mockAlibabaClient, testNamePrefix)
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
 			} else {
@@ -127,5 +125,11 @@ func mockListPolicyVersions(mockAlibabaClient *mockalibaba.MockClient) {
 func mockListAccessKeys(mockAlibabaClient *mockalibaba.MockClient) {
 	mockAlibabaClient.EXPECT().ListAccessKeys(gomock.Any()).Return(
 		&ram.ListAccessKeysResponse{}, nil,
+	).AnyTimes()
+}
+
+func mockListUsers(mockAlibabaClient *mockalibaba.MockClient) {
+	mockAlibabaClient.EXPECT().ListUsers(gomock.Any()).Return(
+		&ram.ListUsersResponse{}, nil,
 	).AnyTimes()
 }
