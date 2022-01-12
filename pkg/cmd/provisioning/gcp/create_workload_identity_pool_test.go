@@ -53,10 +53,52 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 			expectError:  false,
 		},
 		{
+			name: "Workload identity pool already exists",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetWorkloadIdentityPoolSuccess(mockGCPClient)
+				return mockGCPClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+				return tempDirName
+			},
+			verify: func(t *testing.T, targetDir string) {
+				files, err := ioutil.ReadDir(targetDir)
+				require.NoError(t, err, "Unexpected error listing files in targetDir")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
+			},
+			generateOnly: false,
+			expectError:  false,
+		},
+		{
+			name: "Workload identity pool is deleted but no more than 30 days ago, can be undeleted",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetWorkloadIdentityPoolDeleted(mockGCPClient)
+				mockUndeleteWorkloadIdentityPoolSuccess(mockGCPClient)
+				return mockGCPClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+				return tempDirName
+			},
+			verify: func(t *testing.T, targetDir string) {
+				files, err := ioutil.ReadDir(targetDir)
+				require.NoError(t, err, "Unexpected error listing files in targetDir")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
+			},
+			generateOnly: false,
+			expectError:  false,
+		},
+		{
 			name: "Success creating workload identity pool",
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 				mockCreateWorkloadIdentityPoolSuccess(mockGCPClient)
+				mockGetWorkloadIdentityPoolFailure(mockGCPClient)
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
@@ -76,6 +118,7 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 			name: "Failure creating workload identity pool",
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetWorkloadIdentityPoolFailure(mockGCPClient)
 				mockCreateWorkloadIdentityPoolFailure(mockGCPClient)
 				return mockGCPClient
 			},
@@ -113,6 +156,30 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 	}
 }
 
+func mockGetWorkloadIdentityPoolSuccess(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().GetWorkloadIdentityPool(gomock.Any(), gomock.Any()).Return(
+		&iam.WorkloadIdentityPool{
+			Name: testName,
+		}, nil).Times(1)
+}
+
+func mockGetWorkloadIdentityPoolFailure(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().GetWorkloadIdentityPool(gomock.Any(), gomock.Any()).Return(
+		nil,
+		&googleapi.Error{
+			Code:    404,
+			Message: "Requested entity was not found",
+		}).Times(1)
+}
+
+func mockGetWorkloadIdentityPoolDeleted(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().GetWorkloadIdentityPool(gomock.Any(), gomock.Any()).Return(
+		&iam.WorkloadIdentityPool{
+			Name:  testName,
+			State: "DELETED",
+		}, nil).Times(1)
+}
+
 func mockCreateWorkloadIdentityPoolSuccess(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().CreateWorkloadIdentityPool(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
 		&iam.Operation{
@@ -127,4 +194,11 @@ func mockCreateWorkloadIdentityPoolFailure(mockGCPClient *mockgcp.MockClient) {
 			Code:    409,
 			Message: "Requested entity already exists, alreadyExists",
 		}).Times(1)
+}
+
+func mockUndeleteWorkloadIdentityPoolSuccess(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().UndeleteWorkloadIdentityPool(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.Operation{
+			Done: true,
+		}, nil).Times(1)
 }

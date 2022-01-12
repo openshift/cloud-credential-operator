@@ -184,6 +184,21 @@ func (mr *MockClientMockRecorder) DeleteWorkloadIdentityPool(arg0, arg1 interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).DeleteWorkloadIdentityPool), arg0, arg1)
 }
 
+// GetBucketAttrs mocks base method.
+func (m *MockClient) GetBucketAttrs(arg0 context.Context, arg1 string) (*storage.BucketAttrs, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBucketAttrs", arg0, arg1)
+	ret0, _ := ret[0].(*storage.BucketAttrs)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBucketAttrs indicates an expected call of GetBucketAttrs.
+func (mr *MockClientMockRecorder) GetBucketAttrs(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBucketAttrs", reflect.TypeOf((*MockClient)(nil).GetBucketAttrs), arg0, arg1)
+}
+
 // GetBucketPolicy mocks base method.
 func (m *MockClient) GetBucketPolicy(arg0 context.Context, arg1 string) (*iam.Policy3, error) {
 	m.ctrl.T.Helper()
@@ -286,6 +301,36 @@ func (m *MockClient) GetServiceAccountIamPolicy(arg0 string) (*iam0.Policy, erro
 func (mr *MockClientMockRecorder) GetServiceAccountIamPolicy(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetServiceAccountIamPolicy", reflect.TypeOf((*MockClient)(nil).GetServiceAccountIamPolicy), arg0)
+}
+
+// GetWorkloadIdentityPool mocks base method.
+func (m *MockClient) GetWorkloadIdentityPool(arg0 context.Context, arg1 string) (*iam0.WorkloadIdentityPool, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWorkloadIdentityPool", arg0, arg1)
+	ret0, _ := ret[0].(*iam0.WorkloadIdentityPool)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWorkloadIdentityPool indicates an expected call of GetWorkloadIdentityPool.
+func (mr *MockClientMockRecorder) GetWorkloadIdentityPool(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).GetWorkloadIdentityPool), arg0, arg1)
+}
+
+// GetWorkloadIdentityProvider mocks base method.
+func (m *MockClient) GetWorkloadIdentityProvider(arg0 context.Context, arg1 string) (*iam0.WorkloadIdentityPoolProvider, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetWorkloadIdentityProvider", arg0, arg1)
+	ret0, _ := ret[0].(*iam0.WorkloadIdentityPoolProvider)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetWorkloadIdentityProvider indicates an expected call of GetWorkloadIdentityProvider.
+func (mr *MockClientMockRecorder) GetWorkloadIdentityProvider(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetWorkloadIdentityProvider", reflect.TypeOf((*MockClient)(nil).GetWorkloadIdentityProvider), arg0, arg1)
 }
 
 // ListObjects mocks base method.
@@ -434,4 +479,19 @@ func (m *MockClient) TestIamPermissions(arg0 string, arg1 *cloudresourcemanager.
 func (mr *MockClientMockRecorder) TestIamPermissions(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TestIamPermissions", reflect.TypeOf((*MockClient)(nil).TestIamPermissions), arg0, arg1)
+}
+
+// UndeleteWorkloadIdentityPool mocks base method.
+func (m *MockClient) UndeleteWorkloadIdentityPool(arg0 context.Context, arg1 string, arg2 *iam0.UndeleteWorkloadIdentityPoolRequest) (*iam0.Operation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UndeleteWorkloadIdentityPool", arg0, arg1, arg2)
+	ret0, _ := ret[0].(*iam0.Operation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UndeleteWorkloadIdentityPool indicates an expected call of UndeleteWorkloadIdentityPool.
+func (mr *MockClientMockRecorder) UndeleteWorkloadIdentityPool(arg0, arg1, arg2 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndeleteWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).UndeleteWorkloadIdentityPool), arg0, arg1, arg2)
 }

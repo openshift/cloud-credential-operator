@@ -12,9 +12,11 @@ import (
 	"testing"
 
 	iamCloud "cloud.google.com/go/iam"
+	"cloud.google.com/go/storage"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iam/v1"
 	pb "google.golang.org/genproto/googleapis/iam/v1"
 
@@ -40,6 +42,7 @@ const (
 		"\nhEnmk6kDfjWWsPkxXrD5qY4KgSp1/fqJP29p0Ypeh0cfrVkdQvn3v7ppcS/7TmWk" +
 		"\nhiFcsE1ngFW/nR6+7K/JdVUCAwEAAQ==" +
 		"\n-----END PUBLIC KEY-----\n"
+	testBucketName = "test-name-oidc"
 )
 
 func TestCreateWorkloadIdentityProvider(t *testing.T) {
@@ -57,6 +60,7 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 			name: "Public key not found",
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetBucketAttrsFailure(mockGCPClient, 1)
 				mockCreateBucketSuccess(mockGCPClient, 1)
 				mockPutObjectSuccess(mockGCPClient, 1)
 				mockGetBucketPolicySuccess(mockGCPClient, 1)
@@ -71,14 +75,37 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "Identity provider created, saved discovery document and json web key set",
+			name: "Bucket and identity provider created, saved discovery document and json web key set",
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetBucketAttrsFailure(mockGCPClient, 1)
 				mockCreateBucketSuccess(mockGCPClient, 1)
 				mockPutObjectSuccess(mockGCPClient, 2)
 				mockGetBucketPolicySuccess(mockGCPClient, 1)
 				mockSetBucketPolicySuccess(mockGCPClient, 1)
+				mockGetWorkloadIdentityProviderFailure(mockGCPClient)
 				mockCreateWorkloadIdentityProviderSuccess(mockGCPClient)
+				return mockGCPClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+
+				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				require.NoError(t, err, "errored while setting up environment for test")
+
+				return tempDirName
+			},
+			verify:      func(t *testing.T, tempDirName string) {},
+			expectError: false,
+		},
+		{
+			name: "Bucket and identity provider already exists",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetBucketAttrsSuccess(mockGCPClient, 1)
+				mockPutObjectSuccess(mockGCPClient, 2)
+				mockGetWorkloadIdentityProviderSuccess(mockGCPClient)
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
@@ -173,6 +200,18 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 	}
 }
 
+func mockGetBucketAttrsSuccess(mockGCPClient *mockgcp.MockClient, times int) {
+	mockGCPClient.EXPECT().GetBucketAttrs(gomock.Any(), gomock.Any()).Return(
+		&storage.BucketAttrs{
+			Name: testBucketName,
+		},
+		nil).Times(times)
+}
+
+func mockGetBucketAttrsFailure(mockGCPClient *mockgcp.MockClient, times int) {
+	mockGCPClient.EXPECT().GetBucketAttrs(gomock.Any(), gomock.Any()).Return(nil, fmt.Errorf("bucket doesn't exist")).Times(times)
+}
+
 func mockCreateBucketSuccess(mockGCPClient *mockgcp.MockClient, times int) {
 	mockGCPClient.EXPECT().CreateBucket(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(times)
 }
@@ -191,6 +230,22 @@ func mockSetBucketPolicySuccess(mockGCPClient *mockgcp.MockClient, times int) {
 
 func mockPutObjectSuccess(mockGCPClient *mockgcp.MockClient, times int) {
 	mockGCPClient.EXPECT().PutObject(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(times)
+}
+
+func mockGetWorkloadIdentityProviderSuccess(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().GetWorkloadIdentityProvider(gomock.Any(), gomock.Any()).Return(
+		&iam.WorkloadIdentityPoolProvider{
+			Name: testName,
+		}, nil).Times(1)
+}
+
+func mockGetWorkloadIdentityProviderFailure(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().GetWorkloadIdentityProvider(gomock.Any(), gomock.Any()).Return(
+		nil,
+		&googleapi.Error{
+			Code:    404,
+			Message: "Requested entity was not found",
+		}).Times(1)
 }
 
 func mockCreateWorkloadIdentityProviderSuccess(mockGCPClient *mockgcp.MockClient) {

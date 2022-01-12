@@ -118,40 +118,40 @@ func createOIDCBucket(ctx context.Context, client gcp.Client, bucketName, region
 			return errors.Wrap(err, fmt.Sprintf("Failed to save shell script to create OIDC bucket locally at %s", createOidcBucketScriptFilepath))
 		}
 	} else {
-		bucketAttrs := &storage.BucketAttrs{
-			Name:                     bucketName,
-			Location:                 region,
-			UniformBucketLevelAccess: storage.UniformBucketLevelAccess{Enabled: true},
-		}
-
-		err := client.CreateBucket(ctx, bucketName, project, bucketAttrs)
+		_, err := client.GetBucketAttrs(ctx, bucketName)
 		if err != nil {
-			if gerr, ok := err.(*googleapi.Error); ok {
-				if gerr.Code == 409 && strings.Contains(gerr.Message, "You already own this bucket") {
-					log.Printf("Bucket %s already exists and is owned by the user", bucketName)
-				} else {
-					return errors.Wrap(gerr, "failed to create a bucket to store OpenID Connect configuration")
+			if strings.Contains(err.Error(), "bucket doesn't exist") {
+				bucketAttrs := &storage.BucketAttrs{
+					Name:                     bucketName,
+					Location:                 region,
+					UniformBucketLevelAccess: storage.UniformBucketLevelAccess{Enabled: true},
 				}
+
+				err := client.CreateBucket(ctx, bucketName, project, bucketAttrs)
+				if err != nil {
+					return errors.Wrapf(err, "failed to create the bucket %s to store OpenID Connect configuration", bucketName)
+				}
+				log.Print("Bucket ", bucketName, " created")
+
+				policy, err := client.GetBucketPolicy(ctx, bucketName)
+				if err != nil {
+					return errors.Wrap(err, fmt.Sprintf("Failed to fetch IAM policy for bucket %s", bucketName))
+				}
+				role := "roles/storage.objectViewer"
+				policy.Bindings = append(policy.Bindings, &iampb.Binding{
+					Role:    role,
+					Members: []string{iamCloud.AllUsers},
+				})
+				if err := client.SetBucketPolicy(ctx, bucketName, policy); err != nil {
+					return fmt.Errorf("Bucket(%q).IAM().SetPolicy: %v", bucketName, err)
+				}
+				log.Printf("Bucket %s is set to be publicly readable", bucketName)
 			} else {
-				return errors.Wrap(err, "failed to create a bucket to store OpenID Connect configuration")
+				return errors.Wrapf(err, "failed to create the bucket %s to store OpenID Connect configuration", bucketName)
 			}
 		} else {
-			log.Print("Bucket ", bucketName, " created")
+			log.Printf("Bucket %s already exists", bucketName)
 		}
-
-		policy, err := client.GetBucketPolicy(ctx, bucketName)
-		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Failed to fetch IAM policy for bucket %s", bucketName))
-		}
-		role := "roles/storage.objectViewer"
-		policy.Bindings = append(policy.Bindings, &iampb.Binding{
-			Role:    role,
-			Members: []string{iamCloud.AllUsers},
-		})
-		if err := client.SetBucketPolicy(ctx, bucketName, policy); err != nil {
-			return fmt.Errorf("Bucket(%q).IAM().SetPolicy: %v", bucketName, err)
-		}
-		log.Printf("Bucket %s is set to be publicly readable", bucketName)
 	}
 
 	return nil
@@ -207,29 +207,40 @@ func createIdentityProvider(ctx context.Context, client gcp.Client, name, projec
 			return errors.Wrap(err, fmt.Sprintf("Failed to save shell script to create workload identity provider locally at %s", createIdentityProviderScriptFilepath))
 		}
 	} else {
-		provider := &iam.WorkloadIdentityPoolProvider{
-			Name:        name,
-			DisplayName: name,
-			Description: createdByCcoctl,
-			State:       "ACTIVE",
-			Disabled:    false,
-			Oidc: &iam.Oidc{
-				AllowedAudiences: []string{openShiftAudience},
-				IssuerUri:        issuerURL,
-			},
-			AttributeMapping: map[string]string{
-				// when token exchange happens, sub from oidc token shared by operator pod will be mapped to google.subject
-				// field of google auth token. The field is used to allow fine-grained access to gcp service accounts.
-				// The format is `system:serviceaccount:<service_account_namespace>:<service_account_name>`
-				"google.subject": "assertion.sub",
-			},
+		providerResource := fmt.Sprintf("projects/%s/locations/global/workloadIdentityPools/%s/providers/%s", project, workloadIdentityPool, name)
+		_, err := client.GetWorkloadIdentityProvider(ctx, providerResource)
+		if err != nil {
+			if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 && strings.Contains(gerr.Message, "Requested entity was not found") {
+				provider := &iam.WorkloadIdentityPoolProvider{
+					Name:        name,
+					DisplayName: name,
+					Description: createdByCcoctl,
+					State:       "ACTIVE",
+					Disabled:    false,
+					Oidc: &iam.Oidc{
+						AllowedAudiences: []string{openShiftAudience},
+						IssuerUri:        issuerURL,
+					},
+					AttributeMapping: map[string]string{
+						// when token exchange happens, sub from oidc token shared by operator pod will be mapped to google.subject
+						// field of google auth token. The field is used to allow fine-grained access to gcp service accounts.
+						// The format is `system:serviceaccount:<service_account_namespace>:<service_account_name>`
+						"google.subject": "assertion.sub",
+					},
+				}
+
+				_, err := client.CreateWorkloadIdentityProvider(ctx, fmt.Sprintf("projects/%s/locations/global/workloadIdentityPools/%s", project, workloadIdentityPool), name, provider)
+				if err != nil {
+					return errors.Wrapf(err, "failed to create workload identity provider %s", name)
+				}
+				log.Printf("workload identity provider created with name %s", name)
+			} else {
+				return errors.Wrapf(err, "failed to check if there is existing workload identity provider %s in pool %s", name, workloadIdentityPool)
+			}
+		} else {
+			log.Printf("Workload identity provider %s already exists in pool %s", name, workloadIdentityPool)
 		}
 
-		_, err := client.CreateWorkloadIdentityProvider(ctx, fmt.Sprintf("projects/%s/locations/global/workloadIdentityPools/%s", project, workloadIdentityPool), name, provider)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create workload identity provider %s", name)
-		}
-		log.Printf("workload identity provider created with name %s", name)
 	}
 	return nil
 }
