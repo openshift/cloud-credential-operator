@@ -7,9 +7,11 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+	"google.golang.org/api/googleapi"
 	"google.golang.org/api/iam/v1"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -94,20 +96,36 @@ func createWorkloadIdentityPool(ctx context.Context, client gcp.Client, name, pr
 			return errors.Wrap(err, fmt.Sprintf("Failed to save script to create workload identity pool %s locally at %s", name, createIdentityPoolScriptFullPath))
 		}
 	} else {
-		pool := &iam.WorkloadIdentityPool{
-			Name:        name,
-			DisplayName: name,
-			Description: createdByCcoctl,
-			State:       "ACTIVE",
-			Disabled:    false,
-		}
-
 		parentResourceForPool := fmt.Sprintf("projects/%s/locations/global", project)
-		_, err := client.CreateWorkloadIdentityPool(ctx, parentResourceForPool, name, pool)
-		if err != nil {
-			return errors.Wrapf(err, "failed to create workload identity pool %s", name)
+		poolResource := fmt.Sprintf("%s/workloadIdentityPools/%s", parentResourceForPool, name)
+		resp, err := client.GetWorkloadIdentityPool(ctx, poolResource)
+		if resp != nil && resp.State == "DELETED" {
+			log.Printf("Workload identity pool %s was deleted, undeleting it", name)
+			_, err := client.UndeleteWorkloadIdentityPool(ctx, poolResource, &iam.UndeleteWorkloadIdentityPoolRequest{})
+			if err != nil {
+				return errors.Wrapf(err, "failed to undelete workload identity pool %s", name)
+			}
+		} else if err != nil {
+			if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 && strings.Contains(gerr.Message, "Requested entity was not found") {
+				pool := &iam.WorkloadIdentityPool{
+					Name:        name,
+					DisplayName: name,
+					Description: createdByCcoctl,
+					State:       "ACTIVE",
+					Disabled:    false,
+				}
+
+				_, err := client.CreateWorkloadIdentityPool(ctx, parentResourceForPool, name, pool)
+				if err != nil {
+					return errors.Wrapf(err, "failed to create workload identity pool %s", name)
+				}
+				log.Printf("Workload identity pool created with name %s", name)
+			} else {
+				return errors.Wrapf(err, "failed to check if there is existing workload identity pool %s", name)
+			}
+		} else {
+			log.Printf("Workload identity pool %s already exists", name)
 		}
-		log.Printf("workload identity Pool created with name %s", name)
 	}
 
 	return nil

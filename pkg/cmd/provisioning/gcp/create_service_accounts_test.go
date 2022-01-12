@@ -14,15 +14,16 @@ import (
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iam/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 )
 
 const (
-	testProjectNumber = int64(123456789)
+	testProjectNumber       = int64(123456789)
+	testCredReqName         = "test-cred-req"
+	testTargetNamespaceName = "test-namespace"
+	testTargetSecretName    = "test-secret"
 )
 
 func TestCreateServiceAccounts(t *testing.T) {
@@ -72,7 +73,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
 				require.NoError(t, err, "Error while setting up test CredReq files")
 
 				return tempDirName
@@ -92,7 +93,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			generateOnly: false,
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
-				mockGetServiceAccountNotExists(mockGCPClient)
+				mockListServiceAccountsEmpty(mockGCPClient)
 				mockCreateServiceAccountSuccessful(mockGCPClient)
 				mockGetProjectName(mockGCPClient, 5)
 				mockGetProject(mockGCPClient)
@@ -106,7 +107,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
 				require.NoError(t, err, "Error while setting up test CredReq files")
 
 				return tempDirName
@@ -129,7 +130,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 				mockGetProjectName(mockGCPClient, 2)
 				mockGetProject(mockGCPClient)
-				mockGetServiceAccountNotExists(mockGCPClient)
+				mockListServiceAccountsEmpty(mockGCPClient)
 				mockCreateServiceAccountFailed(mockGCPClient)
 				return mockGCPClient
 			},
@@ -137,7 +138,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
 				require.NoError(t, err, "Error while setting up test CredReq files")
 
 				return tempDirName
@@ -149,7 +150,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			generateOnly: false,
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
-				mockGetServiceAccountExists(mockGCPClient)
+				mockListServiceAccountsNotEmpty(mockGCPClient)
 				mockGetProjectName(mockGCPClient, 5)
 				mockGetProject(mockGCPClient)
 				mockGetProjectIamPolicy(mockGCPClient)
@@ -162,7 +163,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
+				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
 				require.NoError(t, err, "Error while setting up test CredReq files")
 
 				return tempDirName
@@ -247,18 +248,19 @@ func countNonDirectoryFiles(files []os.FileInfo) int {
 	return NonDirectoryFiles
 }
 
-func mockGetServiceAccountExists(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).Return(
-		&iamadminpb.ServiceAccount{
-			DisplayName: fmt.Sprintf("%s-service-account", testName),
-			Email:       fmt.Sprintf("%s-service-account@test.domain.com", testName),
-		}, nil).Times(1)
+func mockListServiceAccountsEmpty(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().ListServiceAccounts(gomock.Any(), gomock.Any()).Return(
+		[]*iamadminpb.ServiceAccount{}, nil).Times(1)
 }
 
-func mockGetServiceAccountNotExists(mockGCPClient *mockgcp.MockClient) {
-	serviceAccountNotFoundError := status.Error(codes.NotFound, "service account not found")
-	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).Return(
-		nil, serviceAccountNotFoundError).Times(1)
+func mockListServiceAccountsNotEmpty(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().ListServiceAccounts(gomock.Any(), gomock.Any()).Return(
+		[]*iamadminpb.ServiceAccount{
+			{
+				DisplayName: fmt.Sprintf("%s-%s", testName, testCredReqName),
+				Email:       fmt.Sprintf("%s-%s@test.domain.com", testName, testCredReqName),
+			},
+		}, nil).Times(1)
 }
 
 func mockCreateServiceAccountSuccessful(mockGCPClient *mockgcp.MockClient) {

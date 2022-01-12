@@ -13,8 +13,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -124,7 +122,6 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 	if err != nil {
 		return "", errors.Wrap(err, "Error generating service account name")
 	}
-	serviceAccountName = serviceAccountName[:len(serviceAccountName)-6] // chop off the trailing random chars
 
 	// Decode GCPProviderSpec
 	codec, err := credreqv1.NewCodec()
@@ -205,9 +202,9 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 
 	default:
 		var serviceAccount *iamadminpb.ServiceAccount
-		serviceAccount, err = actuator.GetServiceAccount(client, serviceAccountID)
+		serviceAccount, err = getServiceAccountByName(ctx, client, serviceAccountName)
 		if err != nil {
-			if status.Code(err) == codes.NotFound {
+			if strings.Contains(err.Error(), "not found") {
 				createdByCcoctlForSvcAcct := fmt.Sprintf("%s for service account %s", createdByCcoctl, serviceAccountName)
 				serviceAccount, err = actuator.CreateServiceAccount(client, serviceAccountID, serviceAccountName, createdByCcoctlForSvcAcct, project)
 				if err != nil {
@@ -235,6 +232,8 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to add workload identity user role for IAM service account %s", serviceAccount.DisplayName))
 			}
 		}
+
+		log.Printf("Updated policy bindings for IAM service account %s", serviceAccount.DisplayName)
 
 		projectNumStr := fmt.Sprint(projectNum)
 		credentialsConfig := fmt.Sprintf(credentialsConfigTemplate, projectNumStr, workloadIdentityPool, workloadIdentityProvider, serviceAccount.Email, provisioning.OidcTokenPath)
@@ -269,6 +268,28 @@ func getIdentityProviderBindingNames(projectNum int64, workloadIdentityPool, nam
 			projectNum, workloadIdentityPool, namespace, sa))
 	}
 	return members
+}
+
+// getServiceAccountByName fetches the IAM service account based on the given name
+func getServiceAccountByName(ctx context.Context, client gcp.Client, serviceAccountName string) (*iamadminpb.ServiceAccount, error) {
+	projectName := client.GetProjectName()
+	projectResourceName := fmt.Sprintf("projects/%s", projectName)
+	listServiceAccountsRequest := &iamadminpb.ListServiceAccountsRequest{
+		Name: projectResourceName,
+	}
+
+	svcAcctList, err := client.ListServiceAccounts(ctx, listServiceAccountsRequest)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to fetch list of service accounts")
+	}
+
+	for _, svcAcct := range svcAcctList {
+		if svcAcct.DisplayName == serviceAccountName {
+			return svcAcct, nil
+		}
+	}
+
+	return nil, fmt.Errorf("IAM service account with name %s not found", serviceAccountName)
 }
 
 // writeCredReqSecret will take a credentialsRequest and a base 64 encoded credentials configuration to create
