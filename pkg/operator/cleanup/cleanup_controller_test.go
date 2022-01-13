@@ -139,7 +139,7 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 
 			cr := getCR(fakeClient)
 			if test.expectDeletion {
-				assert.Nil(t, cr, "expected credentials request to be deleted")
+				assert.NotNil(t, cr.DeletionTimestamp, "expected credentials request to be deleted")
 			} else {
 				require.NotNil(t, cr, "expected credentials request to exist")
 				for _, condition := range test.expectedConditions {
@@ -287,7 +287,7 @@ func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReques
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        testStaleCRName,
 			Namespace:   testNamespace,
-			Finalizers:  []string{},
+			Finalizers:  []string{minterv1.FinalizerDeprovision},
 			UID:         types.UID("1234"),
 			Annotations: map[string]string{},
 			Generation:  testStaleCRGeneration,

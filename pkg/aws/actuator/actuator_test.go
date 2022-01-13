@@ -448,7 +448,7 @@ func TestSecretFormat(t *testing.T) {
 			if test.existingSecret != nil {
 				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(test.existingSecret).Build()
 			} else {
-				fakeClient = fake.NewClientBuilder().WithRuntimeObjects().Build()
+				fakeClient = fake.NewClientBuilder().Build()
 			}
 
 			a := &AWSActuator{
