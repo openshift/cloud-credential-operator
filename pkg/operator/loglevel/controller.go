@@ -124,7 +124,7 @@ func (r *ReconcileCloudCredentialConfig) Reconcile(ctx context.Context, request 
 	}
 
 	// Set klog logLevel to the desired level
-	err = logLevelUtils.SetLogLEvel(maxLogLevel)
+	err = logLevelUtils.SetLogLevel(maxLogLevel)
 	if err != nil {
 		return reconcile.Result{}, err
 	}

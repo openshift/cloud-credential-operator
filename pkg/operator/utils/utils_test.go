@@ -186,7 +186,7 @@ func TestUpgradeableCheck(t *testing.T) {
 				}
 			}
 			runtimeObjects = append(runtimeObjects, test.extraRuntimeObjects...)
-			fakeKubeClient := fake.NewFakeClient(runtimeObjects...)
+			fakeKubeClient := fake.NewClientBuilder().WithRuntimeObjects(runtimeObjects...).Build()
 
 			// Test
 			returnedCondition := UpgradeableCheck(fakeKubeClient, test.mode, test.rootSecretNameParam)

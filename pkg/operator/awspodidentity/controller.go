@@ -120,7 +120,7 @@ type awsPodIdentityController struct {
 func (c *awsPodIdentityController) Start(ctx context.Context) error {
 	retryTimer := time.NewTimer(retryInterval)
 	for {
-		err := c.reconciler.ReconcileResources()
+		err := c.reconciler.ReconcileResources(ctx)
 		if err != nil {
 			retryTimer.Reset(retryInterval)
 			<-retryTimer.C
@@ -170,6 +170,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 		eventRecorder: eventRecorder,
 		imagePullSpec: imagePullSpec,
 		conditions:    []configv1.ClusterOperatorStatusCondition{},
+		cache:         resourceapply.NewResourceCache(),
 	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
@@ -241,13 +242,14 @@ type staticResourceReconciler struct {
 	deploymentGeneration int64
 	imagePullSpec        string
 	conditions           []configv1.ClusterOperatorStatusCondition
+	cache                resourceapply.ResourceCache
 }
 
 var _ reconcile.Reconciler = &staticResourceReconciler{}
 
 func (r *staticResourceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	r.logger.Debugf("reconciling after watch event %#v", request)
-	err := r.ReconcileResources()
+	err := r.ReconcileResources(ctx)
 	if err != nil {
 		r.logger.Errorf("reconciliation failed, retrying in %s", retryInterval.String())
 		r.conditions = []configv1.ClusterOperatorStatusCondition{
@@ -264,10 +266,12 @@ func (r *staticResourceReconciler) Reconcile(ctx context.Context, request reconc
 	return reconcile.Result{}, nil
 }
 
-func (r *staticResourceReconciler) ReconcileResources() error {
+func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error {
 	applyResults := resourceapply.ApplyDirectly(
+		ctx,
 		(&resourceapply.ClientHolder{}).WithKubernetes(r.clientset),
 		r.eventRecorder,
+		r.cache,
 		v410_00_assets.Asset,
 		staticFiles...,
 	)
@@ -285,7 +289,7 @@ func (r *staticResourceReconciler) ReconcileResources() error {
 	// "v4.1.0/aws-pod-identity-webhook/deployment.yaml"
 	requestedDeployment := resourceread.ReadDeploymentV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/deployment.yaml"))
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
-	resultDeployment, modified, err := resourceapply.ApplyDeployment(r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration)
+	resultDeployment, modified, err := resourceapply.ApplyDeployment(ctx, r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration)
 	if err != nil {
 		r.logger.WithError(err).Error("error applying Deployment")
 		return err

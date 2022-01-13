@@ -121,7 +121,7 @@ func TestSecretGetter(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			fakeClient := fake.NewFakeClient(test.clusterInfra, test.cloudCredsSecret)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.clusterInfra, test.cloudCredsSecret).Build()
 			calc := &Calculator{
 				Client: fakeClient,
 				log:    logger,
@@ -245,7 +245,7 @@ func TestCredentialsRequests(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewFakeClient(test.existingObjects...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingObjects...).Build()
 
 			accumulator := newAccumulator(fakeClient, logger)
 
