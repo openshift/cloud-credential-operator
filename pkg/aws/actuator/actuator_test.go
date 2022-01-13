@@ -194,7 +194,7 @@ func TestCredentialsFetching(t *testing.T) {
 			}
 
 			test.existing = append(test.existing, test.credentialsRequest)
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -354,7 +354,7 @@ func TestUpgradeable(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 
 			fakeClient.Create(context.TODO(), testClusterVersion())
 
@@ -446,9 +446,9 @@ func TestSecretFormat(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			var fakeClient client.Client
 			if test.existingSecret != nil {
-				fakeClient = fake.NewFakeClient(test.existingSecret)
+				fakeClient = fake.NewClientBuilder().WithRuntimeObjects(test.existingSecret).Build()
 			} else {
-				fakeClient = fake.NewFakeClient()
+				fakeClient = fake.NewClientBuilder().Build()
 			}
 
 			a := &AWSActuator{

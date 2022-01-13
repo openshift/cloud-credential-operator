@@ -62,7 +62,7 @@ func TestClusterOperatorVersion(t *testing.T) {
 			existingCO := testClusterOperator("4.0.0-5", twentyHoursAgo)
 			operatorConfig := testOperatorConfig("")
 			existing := []runtime.Object{existingCO, operatorConfig}
-			fakeClient := fake.NewFakeClient(existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
 
 			require.NoError(t, os.Setenv("RELEASE_VERSION", test.releaseVersionEnv), "unable to set environment variable for testing")
 
@@ -297,7 +297,7 @@ func TestConditions(t *testing.T) {
 			testOperatorConfig(""),
 		}
 
-		fakeClient := fake.NewFakeClient(objects...)
+		fakeClient := fake.NewClientBuilder().WithRuntimeObjects(objects...).Build()
 
 		r := &ReconcileStatus{
 			Client:   fakeClient,

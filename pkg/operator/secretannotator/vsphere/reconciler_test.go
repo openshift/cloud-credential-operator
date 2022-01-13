@@ -109,7 +109,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 
 			existing := append(test.existing, infra)
 
-			fakeClient := fake.NewFakeClient(existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
 
 			rcc := &ReconcileCloudCredSecret{
 				Client: fakeClient,

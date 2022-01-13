@@ -118,7 +118,7 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			rscr := &ReconcileStaleCredentialsRequest{
 				Client: fakeClient,
 			}
@@ -139,7 +139,7 @@ func TestStaleCredentialsRequestReconcile(t *testing.T) {
 
 			cr := getCR(fakeClient)
 			if test.expectDeletion {
-				assert.Nil(t, cr, "expected credentials request to be deleted")
+				assert.NotNil(t, cr.DeletionTimestamp, "expected credentials request to be deleted")
 			} else {
 				require.NotNil(t, cr, "expected credentials request to exist")
 				for _, condition := range test.expectedConditions {

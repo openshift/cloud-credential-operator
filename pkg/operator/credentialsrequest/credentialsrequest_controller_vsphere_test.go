@@ -181,7 +181,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			fakeClient := fake.NewFakeClient(test.existing...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 				Actuator: &actuator.VSphereActuator{
