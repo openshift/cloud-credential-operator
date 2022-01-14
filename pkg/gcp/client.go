@@ -50,8 +50,11 @@ type Client interface {
 	ListServiceAccounts(context.Context, *iamadminpb.ListServiceAccountsRequest) ([]*iamadminpb.ServiceAccount, error)
 	QueryTestablePermissions(context.Context, *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error)
 	CreateWorkloadIdentityPool(context.Context, string, string, *iam.WorkloadIdentityPool) (*iam.Operation, error)
+	GetWorkloadIdentityPool(context.Context, string) (*iam.WorkloadIdentityPool, error)
 	DeleteWorkloadIdentityPool(context.Context, string) (*iam.Operation, error)
+	UndeleteWorkloadIdentityPool(context.Context, string, *iam.UndeleteWorkloadIdentityPoolRequest) (*iam.Operation, error)
 	CreateWorkloadIdentityProvider(context.Context, string, string, *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error)
+	GetWorkloadIdentityProvider(context.Context, string) (*iam.WorkloadIdentityPoolProvider, error)
 
 	//CloudResourceManager
 	GetProjectName() string
@@ -67,6 +70,7 @@ type Client interface {
 
 	//Storage
 	CreateBucket(context.Context, string, string, *storage.BucketAttrs) error
+	GetBucketAttrs(context.Context, string) (*storage.BucketAttrs, error)
 	GetBucketPolicy(context.Context, string) (*iamcloud.Policy3, error)
 	SetBucketPolicy(context.Context, string, *iamcloud.Policy3) error
 	DeleteBucket(context.Context, string) error
@@ -210,16 +214,34 @@ func (c *gcpClient) CreateWorkloadIdentityPool(ctx context.Context, parent, pool
 	return c.iamService.Projects.Locations.WorkloadIdentityPools.Create(parent, pool).WorkloadIdentityPoolId(poolID).Context(ctx).Do()
 }
 
+func (c *gcpClient) GetWorkloadIdentityPool(ctx context.Context, resource string) (*iam.WorkloadIdentityPool, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamService.Projects.Locations.WorkloadIdentityPools.Get(resource).Context(ctx).Do()
+}
+
 func (c *gcpClient) DeleteWorkloadIdentityPool(ctx context.Context, resource string) (*iam.Operation, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
 	return c.iamService.Projects.Locations.WorkloadIdentityPools.Delete(resource).Context(ctx).Do()
 }
 
+func (c *gcpClient) UndeleteWorkloadIdentityPool(ctx context.Context, resource string, request *iam.UndeleteWorkloadIdentityPoolRequest) (*iam.Operation, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamService.Projects.Locations.WorkloadIdentityPools.Undelete(resource, request).Context(ctx).Do()
+}
+
 func (c *gcpClient) CreateWorkloadIdentityProvider(ctx context.Context, parent, providerID string, provider *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
 	return c.iamService.Projects.Locations.WorkloadIdentityPools.Providers.Create(parent, provider).WorkloadIdentityPoolProviderId(providerID).Context(ctx).Do()
+}
+
+func (c *gcpClient) GetWorkloadIdentityProvider(ctx context.Context, resource string) (*iam.WorkloadIdentityPoolProvider, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamService.Projects.Locations.WorkloadIdentityPools.Providers.Get(resource).Context(ctx).Do()
 }
 
 func (c *gcpClient) ListServicesEnabled() (map[string]bool, error) {
@@ -272,6 +294,12 @@ func (c *gcpClient) CreateBucket(ctx context.Context, bucketName, project string
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
 	return c.storageClient.Bucket(bucketName).Create(ctx, project, attributes)
+}
+
+func (c *gcpClient) GetBucketAttrs(ctx context.Context, bucketName string) (*storage.BucketAttrs, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.storageClient.Bucket(bucketName).Attrs(ctx)
 }
 
 func (c *gcpClient) GetBucketPolicy(ctx context.Context, bucketName string) (*iamcloud.Policy3, error) {
