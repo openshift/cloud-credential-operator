@@ -1,0 +1,116 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: system:openshift:cloud-credential-operator:cluster-reader
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+  name: credentialsrequests.cloudcredential.openshift.io
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+  name: openshift-cloud-credential-operator
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: prometheus-k8s
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: cloud-credential-operator
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+kind: ClusterRoleBinding
+metadata:
+  name: cloud-credential-operator-rolebinding
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cloud-credential-operator-role
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: operator.openshift.io/v1
+kind: CloudCredential
+metadata:
+  name: cluster
+  annotations:
+    include.release.openshift.io/self-managed-high-availability: "true"
+    release.openshift.io/delete: "true"
+---
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: cloud-credential-operator
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: cloud-credential-operator-role
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cco-trusted-ca
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: cloud-credential-operator
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
