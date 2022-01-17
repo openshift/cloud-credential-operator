@@ -2,11 +2,11 @@ package ibmcloud
 
 import (
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
 )
 

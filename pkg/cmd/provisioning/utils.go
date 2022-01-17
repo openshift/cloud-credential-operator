@@ -173,9 +173,21 @@ func GetListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, 
 			// infrastructure.
 			if value, ok := cr.Annotations["release.openshift.io/delete"]; ok && value == "true" {
 				log.Printf("Ignoring CredentialsRequest %s/%s as it is marked for in-cluster deletion", cr.Namespace, cr.Name)
-			} else {
-				credRequests = append(credRequests, cr)
+				continue
 			}
+
+			// Ignore CredentialsRequest with the feature-gate annotation
+			if value, ok := cr.Annotations[featureGateAnnotation]; ok {
+				// By edict, the only valid value is "TechPreviewNoUpgrade"
+				if value != validTechPreviewAnnotationValue {
+					log.Printf("CredentialsRequests %s/%s has unexpected feature-gate value", cr.Namespace, cr.Name)
+
+				}
+				log.Printf("Ignoring CredentialsRequest %s/%s with tech-preview annotation", cr.Namespace, cr.Name)
+				continue
+			}
+
+			credRequests = append(credRequests, cr)
 		}
 	}
 
