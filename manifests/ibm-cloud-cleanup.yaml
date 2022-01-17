@@ -93,6 +93,17 @@ metadata:
 apiVersion: v1
 kind: Service
 metadata:
+  name: controller-manager-service
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    release.openshift.io/delete: "true"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cco-metrics
+  namespace: openshift-cloud-credential-operator
   annotations:
     include.release.openshift.io/ibm-cloud-managed: "true"
     release.openshift.io/delete: "true"
