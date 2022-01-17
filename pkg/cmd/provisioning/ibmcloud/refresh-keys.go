@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"log"
 
 	"github.com/pkg/errors"
@@ -15,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
 )
 

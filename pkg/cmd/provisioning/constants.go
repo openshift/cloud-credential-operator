@@ -37,4 +37,8 @@ const (
         "sub"
     ]
 }`
+	// featureGateAnnotation is the annotation used to indicate that a specific manifest is hidden behind a feature gate.
+	featureGateAnnotation = "release.openshift.io/feature-gate"
+	// validTechPreviewAnnotationValue is the only valid value for the feature-gate annoation
+	validTechPreviewAnnotationValue = "TechPreviewNoUpgrade"
 )
