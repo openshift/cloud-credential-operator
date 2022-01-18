@@ -258,7 +258,7 @@ func TestIAMRoles(t *testing.T) {
 			require.NoError(t, err, "unexpected error creating manifests dir for test")
 			defer os.RemoveAll(manifestsDir)
 
-			err = createIAMRoles(mockAWSClient, testIdentityProviderARN, testPermissionsBoundaryARN, testNamePrefix, credReqDir, targetDir, test.generateOnly)
+			err = createIAMRoles(mockAWSClient, testIdentityProviderARN, testPermissionsBoundaryARN, testNamePrefix, credReqDir, targetDir, false, test.generateOnly)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")

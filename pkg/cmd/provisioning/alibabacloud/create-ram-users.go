@@ -58,16 +58,17 @@ func createRAMUsersCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create a client: %v", err)
 	}
 
-	err = createRAMUsers(client, CreateRAMUsersOpts.Name, CreateRAMUsersOpts.CredRequestDir, CreateRAMUsersOpts.TargetDir)
+	err = createRAMUsers(client, CreateRAMUsersOpts.Name, CreateRAMUsersOpts.CredRequestDir,
+		CreateRAMUsersOpts.TargetDir, CreateRAMUsersOpts.EnableTechPreview)
 	if err != nil {
 		log.Fatalf(err.Error())
 	}
 }
 
 //createRAMUsers will create a ram user for the given credenital request and attach the specific ram policy
-func createRAMUsers(client alibabacloud.Client, name, credReqDir, targetDir string) error {
+func createRAMUsers(client alibabacloud.Client, name, credReqDir, targetDir string, enableTechPreview bool) error {
 	// Process directory
-	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir)
+	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
@@ -345,6 +346,7 @@ func NewCreateRAMUsersCmd() *cobra.Command {
 	createRAMUsersCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createRAMUsersCmd.PersistentFlags().StringVar(&CreateRAMUsersOpts.Region, "region", "", "Alibaba Cloud region endpoint only required for GovCloud")
 	createRAMUsersCmd.PersistentFlags().StringVar(&CreateRAMUsersOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createRAMUsersCmd.PersistentFlags().BoolVar(&CreateRAMUsersOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createRAMUsersCmd
 }

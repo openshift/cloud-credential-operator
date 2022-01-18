@@ -59,7 +59,8 @@ func deleteServiceIDCmd(cmd *cobra.Command, args []string) error {
 
 func deleteServiceIDs(client ibmcloud.Client, accountID, name, credReqDir string, force bool) error {
 	// Process directory
-	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir)
+	// always tech-preview==true because we should do a full cleanup to be on the safe side
+	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir, true)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}

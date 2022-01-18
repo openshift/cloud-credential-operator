@@ -5,10 +5,11 @@ import (
 )
 
 type options struct {
-	TargetDir      string
-	Name           string
-	Region         string
-	CredRequestDir string
+	TargetDir         string
+	Name              string
+	Region            string
+	CredRequestDir    string
+	EnableTechPreview bool
 }
 
 // NewAliababaCloudCmd implements the "alibabacloud" subcommand for the credentials provisioning

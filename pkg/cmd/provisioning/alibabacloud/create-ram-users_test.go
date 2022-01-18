@@ -133,7 +133,7 @@ func TestCreateRAMUsers(t *testing.T) {
 			require.NoError(t, err, "unexpected error creating manifests dir for test")
 			defer os.RemoveAll(manifestsDir)
 
-			err = createRAMUsers(mockAlibabaClient, testNamePrefix, credReqDir, targetDir)
+			err = createRAMUsers(mockAlibabaClient, testNamePrefix, credReqDir, targetDir, false)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
