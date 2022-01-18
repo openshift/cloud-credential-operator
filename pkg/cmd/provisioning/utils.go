@@ -20,6 +20,8 @@ import (
 
 	"k8s.io/apimachinery/pkg/util/yaml"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 )
 
@@ -146,7 +148,7 @@ func KeyIDFromPublicKey(publicKey interface{}) (string, error) {
 }
 
 // GetListOfCredentialsRequests decodes manifests in a given directory and returns a list of CredentialsRequests
-func GetListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, error) {
+func GetListOfCredentialsRequests(dir string, enableTechPreview bool) ([]*credreqv1.CredentialsRequest, error) {
 	credRequests := []*credreqv1.CredentialsRequest{}
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
@@ -176,15 +178,16 @@ func GetListOfCredentialsRequests(dir string) ([]*credreqv1.CredentialsRequest, 
 				continue
 			}
 
-			// Ignore CredentialsRequest with the feature-gate annotation
+			// Handle CredentialsRequest with the feature-gate annotation
 			if value, ok := cr.Annotations[featureGateAnnotation]; ok {
-				// By edict, the only valid value is "TechPreviewNoUpgrade"
-				if value != validTechPreviewAnnotationValue {
-					log.Printf("CredentialsRequests %s/%s has unexpected feature-gate value", cr.Namespace, cr.Name)
-
+				if !enableTechPreview {
+					log.Printf("Ignoring CredentialsRequest %s/%s with tech-preview annotation", cr.Namespace, cr.Name)
+					continue
 				}
-				log.Printf("Ignoring CredentialsRequest %s/%s with tech-preview annotation", cr.Namespace, cr.Name)
-				continue
+				if value != string(configv1.TechPreviewNoUpgrade) {
+					log.Printf("Ignoring CredentialsRequest %s/%s with tech-preview value %s", cr.Namespace, cr.Name, value)
+					continue
+				} // else allow it to be added it to the list of CredReqs to process
 			}
 
 			credRequests = append(credRequests, cr)

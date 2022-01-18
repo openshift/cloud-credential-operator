@@ -12,6 +12,7 @@ type options struct {
 	Force             bool
 	KubeConfigFile    string
 	Create            bool
+	EnableTechPreview bool
 }
 
 // NewIBMCloudCmd implements the "ibmcloud" subcommand for the credentials provisioning
