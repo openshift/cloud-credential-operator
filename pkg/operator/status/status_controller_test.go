@@ -372,6 +372,8 @@ func testClusterOperator(version string, progressingLastTransition metav1.Time) 
 				{
 					Type:               configv1.OperatorProgressing,
 					Status:             configv1.ConditionFalse,
+					Reason:             "AsExpected",
+					Message:            "All is well",
 					LastTransitionTime: progressingLastTransition,
 				},
 			},
