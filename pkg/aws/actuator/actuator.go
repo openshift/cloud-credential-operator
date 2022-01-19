@@ -840,7 +840,30 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 		})
 	}
 
-	_, err := awsClient.TagUser(&iam.TagUserInput{
+	// appending the tags present in the Infrastructure CR
+	infra, err := utils.GetInfrastructure(a.Client)
+	if err != nil {
+		logger.WithError(err).Error("unable to get the infrastructure object")
+	} else {
+		// The ResourceTags field would be migrated from the Status field to the Spec field.
+		// Till the field is deprecated, the ResourceTags present in the Spec field takes the priority
+		var userTags []configv1.AWSResourceTag
+		if len(infra.Spec.PlatformSpec.AWS.ResourceTags) == 0 {
+			userTags = infra.Status.PlatformStatus.AWS.ResourceTags
+		} else {
+			userTags = infra.Spec.PlatformSpec.AWS.ResourceTags
+		}
+		if len(userTags) != 0 {
+			logger.WithField("userTags", userTags).Info("tagging the user with the tags present in the infrastructure object")
+		}
+		for _, userTag := range userTags {
+			tags = append(tags, &iam.Tag{
+				Key:   aws.String(userTag.Key),
+				Value: aws.String(userTag.Value),
+			})
+		}
+	}
+	_, err = awsClient.TagUser(&iam.TagUserInput{
 		UserName: aws.String(username),
 		Tags:     tags,
 	})
