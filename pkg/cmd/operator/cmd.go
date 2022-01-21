@@ -39,7 +39,6 @@ import (
 
 	"github.com/openshift/library-go/pkg/controller/fileobserver"
 
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
@@ -52,8 +51,8 @@ import (
 )
 
 const (
-	defaultLogLevel         = "info"
-	leaderElectionConfigMap = "cloud-credential-operator-leader"
+	defaultLogLevel        = "info"
+	leaderElectionLockName = "cloud-credential-operator-leader"
 
 	caConfigMapMountPath = "/var/run/configmaps/trusted-ca-bundle"
 	caConfigMapName      = "tls-ca-bundle.pem"
@@ -142,15 +141,19 @@ func NewOperator() *cobra.Command {
 			leLog := log.WithField("id", id)
 			leLog.Info("generated leader election ID")
 
-			lock := &resourcelock.ConfigMapLock{
-				ConfigMapMeta: metav1.ObjectMeta{
-					Namespace: minterv1.CloudCredOperatorNamespace,
-					Name:      leaderElectionConfigMap,
-				},
-				Client: kubernetes.NewForConfigOrDie(cfg).CoreV1(),
-				LockConfig: resourcelock.ResourceLockConfig{
+			kubeClient := kubernetes.NewForConfigOrDie(cfg)
+			lock, err := resourcelock.New(
+				resourcelock.ConfigMapsLeasesResourceLock,
+				minterv1.CloudCredOperatorNamespace,
+				leaderElectionLockName,
+				kubeClient.CoreV1(),
+				kubeClient.CoordinationV1(),
+				resourcelock.ResourceLockConfig{
 					Identity: id,
 				},
+			)
+			if err != nil {
+				log.WithError(err).Fatal("failed to create lock for leader election config")
 			}
 
 			if os.Getenv("CCO_SKIP_LEADER_ELECTION") != "" {
