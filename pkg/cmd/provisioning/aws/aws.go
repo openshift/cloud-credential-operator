@@ -18,6 +18,7 @@ type options struct {
 	IdentityProviderARN    string
 	PermissionsBoundaryARN string
 	DryRun                 bool
+	EnableTechPreview      bool
 }
 
 // NewAWSCmd implements the "aws" subcommand for the credentials provisioning

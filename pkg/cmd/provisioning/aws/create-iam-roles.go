@@ -46,13 +46,14 @@ var (
 	// CreateIAMRolesOpts captures the options that affect creation/updating
 	// of the IAM Roles.
 	CreateIAMRolesOpts = options{
-		TargetDir: "",
+		TargetDir:         "",
+		EnableTechPreview: false,
 	}
 )
 
-func createIAMRoles(client aws.Client, identityProviderARN, PermissionsBoundaryARN, name, credReqDir, targetDir string, generateOnly bool) error {
+func createIAMRoles(client aws.Client, identityProviderARN, PermissionsBoundaryARN, name, credReqDir, targetDir string, enableTechPreview, generateOnly bool) error {
 	// Process directory
-	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir)
+	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
@@ -288,7 +289,8 @@ func createIAMRolesCmd(cmd *cobra.Command, args []string) {
 
 	awsClient := aws.NewClientFromSession(s)
 
-	err = createIAMRoles(awsClient, CreateIAMRolesOpts.IdentityProviderARN, CreateIAMRolesOpts.PermissionsBoundaryARN, CreateIAMRolesOpts.Name, CreateIAMRolesOpts.CredRequestDir, CreateIAMRolesOpts.TargetDir, CreateIAMRolesOpts.DryRun)
+	err = createIAMRoles(awsClient, CreateIAMRolesOpts.IdentityProviderARN, CreateIAMRolesOpts.PermissionsBoundaryARN, CreateIAMRolesOpts.Name,
+		CreateIAMRolesOpts.CredRequestDir, CreateIAMRolesOpts.TargetDir, CreateIAMRolesOpts.EnableTechPreview, CreateIAMRolesOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -410,6 +412,7 @@ func NewCreateIAMRolesCmd() *cobra.Command {
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.Region, "region", "", "AWS region endpoint only required for GovCloud")
 	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createIAMRolesCmd
 }

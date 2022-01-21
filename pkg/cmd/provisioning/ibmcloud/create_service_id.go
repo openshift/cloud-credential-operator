@@ -51,6 +51,7 @@ func NewCreateServiceIDCmd() *cobra.Command {
 	createServiceIDCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createServiceIDCmd.PersistentFlags().StringVar(&Options.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
 	createServiceIDCmd.PersistentFlags().StringVar(&Options.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createServiceIDCmd.PersistentFlags().BoolVar(&Options.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createServiceIDCmd
 }
@@ -78,7 +79,7 @@ func createServiceIDCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	err = createServiceIDs(ibmclient, apiKeyDetails.AccountID, Options.Name, Options.ResourceGroupName,
-		Options.CredRequestDir, Options.TargetDir)
+		Options.CredRequestDir, Options.TargetDir, Options.EnableTechPreview)
 	if err != nil {
 		return err
 	}
@@ -87,7 +88,7 @@ func createServiceIDCmd(cmd *cobra.Command, args []string) error {
 }
 
 func createServiceIDs(client ibmcloud.Client, accountID *string,
-	name, resourceGroupName, credReqDir, targetDir string) error {
+	name, resourceGroupName, credReqDir, targetDir string, enableTechPreview bool) error {
 
 	resourceGroupID, err := getResourceGroupID(client, accountID, resourceGroupName)
 	if err != nil {
@@ -95,7 +96,7 @@ func createServiceIDs(client ibmcloud.Client, accountID *string,
 	}
 
 	// Process directory
-	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir)
+	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}

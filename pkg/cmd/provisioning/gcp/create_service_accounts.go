@@ -75,9 +75,9 @@ var (
 	}
 )
 
-func createServiceAccounts(ctx context.Context, client gcp.Client, name, workloadIdentityPool, workloadIdentityProvider, credReqDir, targetDir string, generateOnly bool) error {
+func createServiceAccounts(ctx context.Context, client gcp.Client, name, workloadIdentityPool, workloadIdentityProvider, credReqDir, targetDir string, enableTechPreview, generateOnly bool) error {
 	// Process directory
-	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir)
+	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
@@ -331,7 +331,9 @@ func createServiceAccountsCmd(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	err = createServiceAccounts(ctx, gcpClient, CreateServiceAccountsOpts.Name, CreateServiceAccountsOpts.WorkloadIdentityPool, CreateServiceAccountsOpts.WorkloadIdentityProvider, CreateServiceAccountsOpts.CredRequestDir, CreateServiceAccountsOpts.TargetDir, CreateServiceAccountsOpts.DryRun)
+	err = createServiceAccounts(ctx, gcpClient, CreateServiceAccountsOpts.Name, CreateServiceAccountsOpts.WorkloadIdentityPool,
+		CreateServiceAccountsOpts.WorkloadIdentityProvider, CreateServiceAccountsOpts.CredRequestDir, CreateServiceAccountsOpts.TargetDir,
+		CreateServiceAccountsOpts.EnableTechPreview, CreateServiceAccountsOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -389,6 +391,7 @@ func NewCreateServiceAccountsCmd() *cobra.Command {
 	createServiceAccountsCmd.MarkPersistentFlagRequired("project")
 	createServiceAccountsCmd.PersistentFlags().BoolVar(&CreateServiceAccountsOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createServiceAccountsCmd.PersistentFlags().StringVar(&CreateServiceAccountsOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createServiceAccountsCmd.PersistentFlags().BoolVar(&CreateServiceAccountsOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createServiceAccountsCmd
 }

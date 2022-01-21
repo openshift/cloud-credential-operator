@@ -16,6 +16,7 @@ type options struct {
 	WorkloadIdentityProvider string
 	CredRequestDir           string
 	DryRun                   bool
+	EnableTechPreview        bool
 }
 
 // NewGCPCmd implements the "gcp" subcommand for the credentials provisioning
