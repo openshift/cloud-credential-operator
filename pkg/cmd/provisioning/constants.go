@@ -37,4 +37,9 @@ const (
         "sub"
     ]
 }`
+	// featureGateAnnotation is the annotation used to indicate that a specific manifest is hidden behind a feature gate.
+	featureGateAnnotation = "release.openshift.io/feature-gate"
+
+	// deletionAnnotation is the annotation used to tell the CVO that a resource should be deleted
+	deletionAnnotation = "release.openshift.io/delete"
 )

@@ -268,7 +268,7 @@ func Test_refreshKeys(t *testing.T) {
 			credReqDir := tt.setup(t)
 			defer os.RemoveAll(credReqDir)
 
-			err := refreshKeys(mockIBMCloudClient, fakeKubeClient, &testAccountID, testName, tt.resourceGroupName, credReqDir, tt.create)
+			err := refreshKeys(mockIBMCloudClient, fakeKubeClient, &testAccountID, testName, tt.resourceGroupName, credReqDir, tt.create, false)
 			if tt.expectError == "" {
 				assert.NoError(t, err)
 			} else {

@@ -424,7 +424,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			require.NoError(t, err, "unexpected error creating manifests dir for test")
 			defer os.RemoveAll(manifestsDir)
 
-			if err := createServiceIDs(mockIBMCloudClient, core.StringPtr("1234"), "name", tt.resourceGroupName, credReqDir, targetDir); (err != nil) != tt.wantErr {
+			if err := createServiceIDs(mockIBMCloudClient, core.StringPtr("1234"), "name", tt.resourceGroupName, credReqDir, targetDir, false); (err != nil) != tt.wantErr {
 				t.Errorf("createServiceIDs() error = %v, wantErr %v", err, tt.wantErr)
 			}
 			tt.verify(t, targetDir, manifestsDir)
@@ -477,7 +477,7 @@ func TestCreateSharedSecretsInvalidTargetDir(t *testing.T) {
 
 			targetDir := "doesnotexist"
 
-			if err := createServiceIDs(mockIBMCloudClient, core.StringPtr("1234"), "name1", tt.resourceGroupName, credReqDir, targetDir); (err != nil) != tt.wantErr {
+			if err := createServiceIDs(mockIBMCloudClient, core.StringPtr("1234"), "name1", tt.resourceGroupName, credReqDir, targetDir, false); (err != nil) != tt.wantErr {
 				t.Errorf("createServiceIDs() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

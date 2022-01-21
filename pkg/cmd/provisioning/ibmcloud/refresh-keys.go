@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"log"
 
 	"github.com/pkg/errors"
@@ -15,6 +14,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/ibmcloud"
 )
 
@@ -34,6 +34,7 @@ func NewRefreshKeysCmd() *cobra.Command {
 	refreshKeysCmd.MarkPersistentFlagRequired("kubeconfig")
 	refreshKeysCmd.PersistentFlags().StringVar(&Options.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
 	refreshKeysCmd.PersistentFlags().BoolVar(&Options.Create, "create", false, "Create the ServiceID if does not exists")
+	refreshKeysCmd.PersistentFlags().BoolVar(&Options.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return refreshKeysCmd
 }
@@ -64,21 +65,21 @@ func refreshKeysCmd(cmd *cobra.Command, args []string) error {
 	if err != nil {
 		return errors.Wrap(err, "Failed to create the kubernetes clientset")
 	}
-	err = refreshKeys(ibmclient, cs, apiKeyDetails.AccountID, Options.Name, Options.ResourceGroupName, Options.CredRequestDir, Options.Create)
+	err = refreshKeys(ibmclient, cs, apiKeyDetails.AccountID, Options.Name, Options.ResourceGroupName, Options.CredRequestDir, Options.Create, Options.EnableTechPreview)
 	if err != nil {
 		return errors.Wrap(err, "Failed to refresh keys")
 	}
 	return nil
 }
 
-func refreshKeys(ibmcloudClient ibmcloud.Client, kubeClient kubernetes.Interface, accountID *string, name, resourceGroupName, credReqDir string, create bool) error {
+func refreshKeys(ibmcloudClient ibmcloud.Client, kubeClient kubernetes.Interface, accountID *string, name, resourceGroupName, credReqDir string, create, enableTechPreview bool) error {
 	resourceGroupID, err := getResourceGroupID(ibmcloudClient, accountID, resourceGroupName)
 	if err != nil {
 		return errors.Wrap(err, "Failed to getResourceGroupID")
 	}
 
 	// Process directory
-	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir)
+	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
