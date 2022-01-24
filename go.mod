@@ -29,7 +29,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/openshift/api v0.0.0-20211209135129-c58d9f695577
 	github.com/openshift/build-machinery-go v0.0.0-20211213093930-7e33a7eb4ce3
-	github.com/openshift/library-go v0.0.0-20211220195323-eca2c467c492
+	github.com/openshift/library-go v0.0.0-20220121154930-b7889002d63e
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.11.0
 	github.com/sirupsen/logrus v1.8.1
