@@ -4,21 +4,15 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 
-	admissionregistrationv1 "k8s.io/api/admissionregistration/v1"
 	corev1 "k8s.io/api/core/v1"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
-	admissionregistrationclientv1 "k8s.io/client-go/kubernetes/typed/admissionregistration/v1"
-
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -32,8 +26,6 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcehelper"
-	"github.com/openshift/library-go/pkg/operator/resource/resourcemerge"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
 
 	"github.com/openshift/cloud-credential-operator/pkg/assets/v410_00_assets"
@@ -300,8 +292,8 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 	}
 
 	// "v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"
-	requestedMutatingWebhookConfiguration := ReadMutatingWebhookConfigurationV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"))
-	_, modified, err = ApplyMutatingWebhookConfiguration(r.clientset.AdmissionregistrationV1(), r.eventRecorder, requestedMutatingWebhookConfiguration)
+	requestedMutatingWebhookConfiguration := resourceread.ReadMutatingWebhookConfigurationV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"))
+	_, modified, err = resourceapply.ApplyMutatingWebhookConfigurationImproved(context.TODO(), r.clientset.AdmissionregistrationV1(), r.eventRecorder, requestedMutatingWebhookConfiguration, r.cache)
 	if err != nil {
 		r.logger.WithError(err).Error("error applying MutatingWebhookConfiguration")
 		return err
@@ -310,65 +302,6 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 		r.logger.Infof("MutatingWebhookConfiguration reconciled successfully")
 	}
 	return nil
-}
-
-// TODO: add MutatingWebhookConfiguration helpers to library-go/operator/resource
-
-func ReadMutatingWebhookConfigurationV1OrDie(objBytes []byte) *admissionregistrationv1.MutatingWebhookConfiguration {
-	requiredObj, err := runtime.Decode(defaultCodecs.UniversalDecoder(admissionregistrationv1.SchemeGroupVersion), objBytes)
-	if err != nil {
-		panic(err)
-	}
-	return requiredObj.(*admissionregistrationv1.MutatingWebhookConfiguration)
-}
-
-// ApplyMutatingWebhookConfiguration merges objectmeta, does not worry about anything else
-func ApplyMutatingWebhookConfiguration(client admissionregistrationclientv1.MutatingWebhookConfigurationsGetter, recorder events.Recorder, required *admissionregistrationv1.MutatingWebhookConfiguration) (*admissionregistrationv1.MutatingWebhookConfiguration, bool, error) {
-	existing, err := client.MutatingWebhookConfigurations().Get(context.TODO(), required.Name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		actual, err := client.MutatingWebhookConfigurations().Create(context.TODO(), required, metav1.CreateOptions{})
-		reportCreateEvent(recorder, required, err)
-		return actual, true, err
-	}
-	if err != nil {
-		return nil, false, err
-	}
-
-	modified := resourcemerge.BoolPtr(false)
-	existingCopy := existing.DeepCopy()
-
-	resourcemerge.EnsureObjectMeta(modified, &existingCopy.ObjectMeta, required.ObjectMeta)
-
-	// TODO: add deeper inspection of the existing resource to make sure it is what we require
-
-	if !*modified {
-		return existingCopy, false, nil
-	}
-
-	actual, err := client.MutatingWebhookConfigurations().Update(context.TODO(), existingCopy, metav1.UpdateOptions{})
-	reportUpdateEvent(recorder, required, err)
-	return actual, true, err
-}
-
-func reportCreateEvent(recorder events.Recorder, obj runtime.Object, originalErr error) {
-	gvk := resourcehelper.GuessObjectGroupVersionKind(obj)
-	if originalErr == nil {
-		recorder.Eventf(fmt.Sprintf("%sCreated", gvk.Kind), "Created %s because it was missing", resourcehelper.FormatResourceForCLI(obj))
-		return
-	}
-	recorder.Warningf(fmt.Sprintf("%sCreateFailed", gvk.Kind), "Failed to create %s: %v", resourcehelper.FormatResourceForCLI(obj), originalErr)
-}
-
-func reportUpdateEvent(recorder events.Recorder, obj runtime.Object, originalErr error, details ...string) {
-	gvk := resourcehelper.GuessObjectGroupVersionKind(obj)
-	switch {
-	case originalErr != nil:
-		recorder.Warningf(fmt.Sprintf("%sUpdateFailed", gvk.Kind), "Failed to update %s: %v", resourcehelper.FormatResourceForCLI(obj), originalErr)
-	case len(details) == 0:
-		recorder.Eventf(fmt.Sprintf("%sUpdated", gvk.Kind), "Updated %s because it changed", resourcehelper.FormatResourceForCLI(obj))
-	default:
-		recorder.Eventf(fmt.Sprintf("%sUpdated", gvk.Kind), "Updated %s:\n%s", resourcehelper.FormatResourceForCLI(obj), strings.Join(details, "\n"))
-	}
 }
 
 var _ status.Handler = &staticResourceReconciler{}
