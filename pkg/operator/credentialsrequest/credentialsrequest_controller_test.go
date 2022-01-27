@@ -59,6 +59,8 @@ var c client.Client
 
 const (
 	openshiftClusterIDKey = "openshiftClusterID"
+	infraResourceTagKey   = "test-tag"
+	infraResourceTagValue = "test-value"
 )
 
 func init() {
@@ -206,6 +208,47 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockPutUserPolicy(mockAWSClient)
 				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
 				mockTagUserLegacy(mockAWSClient)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockGetUserPolicyMissing(mockAWSClient)
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
+		{
+			name: "new credential cluster has infra resource tags",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+				testInfrastructurewithTags(testInfraName),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockCreateUser(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				mockTagUserInfra(mockAWSClient)
 				return mockAWSClient
 			},
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -1785,6 +1828,24 @@ func mockTagUser(mockAWSClient *mockaws.MockClient) {
 		}).Return(&iam.TagUserOutput{}, nil)
 }
 
+// mockTagUserInfra should be used in case of the user tags provided as part of the Infrastructure Resource.
+func mockTagUserInfra(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().TagUser(
+		&iam.TagUserInput{
+			UserName: aws.String(testAWSUser),
+			Tags: []*iam.Tag{
+				{
+					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
+					Value: aws.String("owned"),
+				},
+				{
+					Key:   aws.String(infraResourceTagKey),
+					Value: aws.String(infraResourceTagValue),
+				},
+			},
+		}).Return(&iam.TagUserOutput{}, nil)
+}
+
 // mockTagUserLegacy should be used when infraname is not set in the cluster.
 func mockTagUserLegacy(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().TagUser(
@@ -1866,6 +1927,33 @@ func testInfrastructure(infraName string) *configv1.Infrastructure {
 	return &configv1.Infrastructure{
 		ObjectMeta: metav1.ObjectMeta{
 			Name: "cluster",
+		},
+		Status: configv1.InfrastructureStatus{
+			Platform:           configv1.AWSPlatformType,
+			InfrastructureName: infraName,
+			PlatformStatus: &configv1.PlatformStatus{
+				AWS: &configv1.AWSPlatformStatus{
+					Region: "test-region-2",
+				},
+			},
+		},
+	}
+}
+
+// testInfrastructurewithTags returns an Infrastructure object with the user provided resourceTags field populated.
+func testInfrastructurewithTags(infraName string) *configv1.Infrastructure {
+	return &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: configv1.InfrastructureSpec{
+			PlatformSpec: configv1.PlatformSpec{
+				AWS: &configv1.AWSPlatformSpec{
+					ResourceTags: []configv1.AWSResourceTag{
+						{Key: infraResourceTagKey, Value: infraResourceTagValue},
+					},
+				},
+			},
 		},
 		Status: configv1.InfrastructureStatus{
 			Platform:           configv1.AWSPlatformType,

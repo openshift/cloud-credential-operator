@@ -210,11 +210,12 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			return true, err
 		}
 
-		infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+		infra, err := utils.GetInfrastructure(a.Client)
 		if err != nil {
 			return true, err
 		}
-		if !userHasExpectedTags(logger, user.User, infraName, string(clusterUUID)) {
+
+		if !userHasExpectedTags(logger, user.User, string(clusterUUID), infra) {
 			return true, nil
 		}
 
@@ -468,7 +469,8 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		return err
 	}
 
-	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
+	// checking if the infrastructure resource can be fetched.
+	infra, err := utils.GetInfrastructure(a.Client)
 	if err != nil {
 		return err
 	}
@@ -476,7 +478,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	// Generate a randomized User for the credentials:
 	// TODO: check if the generated name is free
 	if awsStatus.User == "" {
-		username, err := generateUserName(infraName, cr.Name)
+		username, err := generateUserName(infra.Status.InfrastructureName, cr.Name)
 		if err != nil {
 			return err
 		}
@@ -545,12 +547,12 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 
 	// Check if the user has the expected tags:
-	if !userHasExpectedTags(logger, userOut, infraName, string(clusterUUID)) {
+	if !userHasExpectedTags(logger, userOut, string(clusterUUID), infra) {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 		}
 
-		err = a.tagUser(logger, rootAWSClient, awsStatus.User, infraName, string(clusterUUID))
+		err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID), infra)
 		if err != nil {
 			return err
 		}
@@ -651,14 +653,28 @@ func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, aws
 	return true, nil
 }
 
-func userHasExpectedTags(logger log.FieldLogger, user *iam.User, infraName, clusterUUID string) bool {
+func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterUUID string, infraResource *configv1.Infrastructure) bool {
 	// Check if the user has the expected tags:
 	if user == nil {
 		return false
 	}
 
-	if infraName != "" {
-		clusterTag := fmt.Sprintf("kubernetes.io/cluster/%s", infraName)
+	// Check if the user has the expected tags from the Infrastructure resource
+	if infraResource != nil {
+		if infraResource.Spec.PlatformSpec.AWS != nil {
+			if len(infraResource.Spec.PlatformSpec.AWS.ResourceTags) != 0 {
+				for _, userTag := range infraResource.Spec.PlatformSpec.AWS.ResourceTags {
+					if !userHasTag(user, userTag.Key, userTag.Value) {
+						log.Infof("user missing tag: %s=%s", userTag.Key, userTag.Value)
+						return false
+					}
+				}
+			}
+		}
+	}
+
+	if infraResource.Status.InfrastructureName != "" {
+		clusterTag := fmt.Sprintf("kubernetes.io/cluster/%s", infraResource.Status.InfrastructureName)
 		if !userHasTag(user, clusterTag, "owned") {
 			log.Warnf("user missing tag: %s=%s", clusterTag, "owned")
 			return false
@@ -825,12 +841,12 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	return existingSecret, existingAccessKeyID, existingSecretAccessKey, existingCredentialsKey
 }
 
-func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, infraName, clusterUUID string) error {
-	logger.WithField("infraName", infraName).Info("tagging user with infrastructure name")
+func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterUUID string, infra *configv1.Infrastructure) error {
+	logger.WithField("infraName", infra.Status.InfrastructureName).Info("tagging user with infrastructure name")
 	tags := []*iam.Tag{}
-	if infraName != "" {
+	if infra.Status.InfrastructureName != "" {
 		tags = append(tags, &iam.Tag{
-			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", infraName)),
+			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", infra.Status.InfrastructureName)),
 			Value: aws.String("owned"),
 		})
 	} else {
@@ -841,29 +857,18 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 	}
 
 	// appending the tags present in the Infrastructure CR
-	infra, err := utils.GetInfrastructure(a.Client)
-	if err != nil {
-		logger.WithError(err).Error("unable to get the infrastructure object")
-	} else {
-		// The ResourceTags field would be migrated from the Status field to the Spec field.
-		// Till the field is deprecated, the ResourceTags present in the Spec field takes the priority
-		var userTags []configv1.AWSResourceTag
-		if len(infra.Spec.PlatformSpec.AWS.ResourceTags) == 0 {
-			userTags = infra.Status.PlatformStatus.AWS.ResourceTags
-		} else {
-			userTags = infra.Spec.PlatformSpec.AWS.ResourceTags
-		}
-		if len(userTags) != 0 {
-			logger.WithField("userTags", userTags).Info("tagging the user with the tags present in the infrastructure object")
-		}
-		for _, userTag := range userTags {
-			tags = append(tags, &iam.Tag{
-				Key:   aws.String(userTag.Key),
-				Value: aws.String(userTag.Value),
-			})
+	if infra.Spec.PlatformSpec.AWS != nil {
+		if len(infra.Spec.PlatformSpec.AWS.ResourceTags) != 0 {
+			logger.WithField("userTags", infra.Spec.PlatformSpec.AWS.ResourceTags).Info("tagging the user with the tags present in the infrastructure object")
+			for _, userTag := range infra.Spec.PlatformSpec.AWS.ResourceTags {
+				tags = append(tags, &iam.Tag{
+					Key:   aws.String(userTag.Key),
+					Value: aws.String(userTag.Value),
+				})
+			}
 		}
 	}
-	_, err = awsClient.TagUser(&iam.TagUserInput{
+	_, err := awsClient.TagUser(&iam.TagUserInput{
 		UserName: aws.String(username),
 		Tags:     tags,
 	})

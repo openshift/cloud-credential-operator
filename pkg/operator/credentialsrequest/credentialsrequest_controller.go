@@ -227,6 +227,24 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// predicate functions to filter the events based on the AWS resourceTags presence.
+	infraResourcePredicate := predicate.Funcs{
+		CreateFunc: func(e event.CreateEvent) bool {
+			return hasResourceTags(e.Object)
+		},
+		DeleteFunc: func(event.DeleteEvent) bool {
+			return false
+		},
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return areTagsUpdated(e.ObjectOld, e.ObjectNew)
+		},
+	}
+	// Watch for the changes happening to Infrastructure Resource
+	err = c.Watch(&source.Kind{Type: &configv1.Infrastructure{}}, allCredRequestsMapFn, infraResourcePredicate)
+	if err != nil {
+		return err
+	}
+
 	// Monitor namespace creation, and check out list of credentials requests for any destined
 	// for that new namespace. This allows us to be up and running for other components that don't
 	// yet exist, but will.
@@ -334,6 +352,34 @@ func isAdminCredSecret(namespace, secretName string) bool {
 		}
 	}
 	return false
+}
+
+// hasResourceTags returns true if the AWS resourceTags are present in the Infrastructure resource
+func hasResourceTags(event client.Object) bool {
+	switch infra := event.(type) {
+	case *configv1.Infrastructure:
+		if infra != nil {
+			if infra.Spec.PlatformSpec.AWS != nil {
+				if len(infra.Spec.PlatformSpec.AWS.ResourceTags) != 0 {
+					return true
+				}
+			}
+		}
+	default:
+		return false
+	}
+	return false
+}
+
+// areTagsUpdated validates and returns a true if the resourceTags are updated in the new event
+func areTagsUpdated(oldEvent, newEvent client.Object) bool {
+	if !hasResourceTags(newEvent) {
+		return false
+	}
+	if hasResourceTags(oldEvent) && hasResourceTags(newEvent) {
+		return !reflect.DeepEqual(oldEvent.(*configv1.Infrastructure).Spec.PlatformSpec.AWS.ResourceTags, newEvent.(*configv1.Infrastructure).Spec.PlatformSpec.AWS.ResourceTags)
+	}
+	return true
 }
 
 var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
