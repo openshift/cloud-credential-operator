@@ -39,6 +39,10 @@ const (
 
 	// CloudCredOperatorNamespace is the namespace where the credentials operator runs.
 	CloudCredOperatorNamespace = "openshift-cloud-credential-operator"
+
+	// OrphanedCloudResource is true when CCO was unable to delete a previously created
+	// App Registration / Service Principal while pivoting from Mint mode to Passthrough
+	OrphanedCloudResource CredentialsRequestConditionType = "OrphanedCloudResource"
 )
 
 // NOTE: Run "make" to regenerate code after modifying this file
