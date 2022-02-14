@@ -50,21 +50,6 @@ func (mr *MockClientMockRecorder) CreateAccessKey(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccessKey", reflect.TypeOf((*MockClient)(nil).CreateAccessKey), arg0)
 }
 
-// CreateBucket mocks base method.
-func (m *MockClient) CreateBucket(arg0 *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBucket", arg0)
-	ret0, _ := ret[0].(*s3.CreateBucketOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateBucket indicates an expected call of CreateBucket.
-func (mr *MockClientMockRecorder) CreateBucket(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), arg0)
-}
-
 // CreateOpenIDConnectProvider mocks base method.
 func (m *MockClient) CreateOpenIDConnectProvider(arg0 *iam.CreateOpenIDConnectProviderInput) (*iam.CreateOpenIDConnectProviderOutput, error) {
 	m.ctrl.T.Helper()
@@ -125,81 +110,6 @@ func (mr *MockClientMockRecorder) DeleteAccessKey(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAccessKey", reflect.TypeOf((*MockClient)(nil).DeleteAccessKey), arg0)
 }
 
-// DeleteBucket mocks base method.
-func (m *MockClient) DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteBucket", input)
-	ret0, _ := ret[0].(*s3.DeleteBucketOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteBucket indicates an expected call of DeleteBucket.
-func (mr *MockClientMockRecorder) DeleteBucket(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBucket", reflect.TypeOf((*MockClient)(nil).DeleteBucket), input)
-}
-
-// DeleteObject mocks base method.
-func (m *MockClient) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteObject", input)
-	ret0, _ := ret[0].(*s3.DeleteObjectOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteObject indicates an expected call of DeleteObject.
-func (mr *MockClientMockRecorder) DeleteObject(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteObject", reflect.TypeOf((*MockClient)(nil).DeleteObject), input)
-}
-
-// DeleteOpenIDConnectProvider mocks base method.
-func (m *MockClient) DeleteOpenIDConnectProvider(input *iam.DeleteOpenIDConnectProviderInput) (*iam.DeleteOpenIDConnectProviderOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteOpenIDConnectProvider", input)
-	ret0, _ := ret[0].(*iam.DeleteOpenIDConnectProviderOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteOpenIDConnectProvider indicates an expected call of DeleteOpenIDConnectProvider.
-func (mr *MockClientMockRecorder) DeleteOpenIDConnectProvider(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).DeleteOpenIDConnectProvider), input)
-}
-
-// DeleteRole mocks base method.
-func (m *MockClient) DeleteRole(input *iam.DeleteRoleInput) (*iam.DeleteRoleOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteRole", input)
-	ret0, _ := ret[0].(*iam.DeleteRoleOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteRole indicates an expected call of DeleteRole.
-func (mr *MockClientMockRecorder) DeleteRole(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRole", reflect.TypeOf((*MockClient)(nil).DeleteRole), input)
-}
-
-// DeleteRolePolicy mocks base method.
-func (m *MockClient) DeleteRolePolicy(input *iam.DeleteRolePolicyInput) (*iam.DeleteRolePolicyOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteRolePolicy", input)
-	ret0, _ := ret[0].(*iam.DeleteRolePolicyOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteRolePolicy indicates an expected call of DeleteRolePolicy.
-func (mr *MockClientMockRecorder) DeleteRolePolicy(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolePolicy", reflect.TypeOf((*MockClient)(nil).DeleteRolePolicy), input)
-}
-
 // DeleteUser mocks base method.
 func (m *MockClient) DeleteUser(arg0 *iam.DeleteUserInput) (*iam.DeleteUserOutput, error) {
 	m.ctrl.T.Helper()
@@ -230,36 +140,6 @@ func (mr *MockClientMockRecorder) DeleteUserPolicy(arg0 interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserPolicy", reflect.TypeOf((*MockClient)(nil).DeleteUserPolicy), arg0)
 }
 
-// GetBucketTagging mocks base method.
-func (m *MockClient) GetBucketTagging(input *s3.GetBucketTaggingInput) (*s3.GetBucketTaggingOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBucketTagging", input)
-	ret0, _ := ret[0].(*s3.GetBucketTaggingOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetBucketTagging indicates an expected call of GetBucketTagging.
-func (mr *MockClientMockRecorder) GetBucketTagging(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBucketTagging", reflect.TypeOf((*MockClient)(nil).GetBucketTagging), input)
-}
-
-// GetObjectTagging mocks base method.
-func (m *MockClient) GetObjectTagging(input *s3.GetObjectTaggingInput) (*s3.GetObjectTaggingOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetObjectTagging", input)
-	ret0, _ := ret[0].(*s3.GetObjectTaggingOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetObjectTagging indicates an expected call of GetObjectTagging.
-func (mr *MockClientMockRecorder) GetObjectTagging(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetObjectTagging", reflect.TypeOf((*MockClient)(nil).GetObjectTagging), input)
-}
-
 // GetOpenIDConnectProvider mocks base method.
 func (m *MockClient) GetOpenIDConnectProvider(input *iam.GetOpenIDConnectProviderInput) (*iam.GetOpenIDConnectProviderOutput, error) {
 	m.ctrl.T.Helper()
@@ -288,6 +168,66 @@ func (m *MockClient) GetRole(input *iam.GetRoleInput) (*iam.GetRoleOutput, error
 func (mr *MockClientMockRecorder) GetRole(input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRole", reflect.TypeOf((*MockClient)(nil).GetRole), input)
+}
+
+// ListRoles mocks base method.
+func (m *MockClient) ListRoles(input *iam.ListRolesInput) (*iam.ListRolesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRoles", input)
+	ret0, _ := ret[0].(*iam.ListRolesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRoles indicates an expected call of ListRoles.
+func (mr *MockClientMockRecorder) ListRoles(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoles", reflect.TypeOf((*MockClient)(nil).ListRoles), input)
+}
+
+// DeleteRole mocks base method.
+func (m *MockClient) DeleteRole(input *iam.DeleteRoleInput) (*iam.DeleteRoleOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRole", input)
+	ret0, _ := ret[0].(*iam.DeleteRoleOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteRole indicates an expected call of DeleteRole.
+func (mr *MockClientMockRecorder) DeleteRole(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRole", reflect.TypeOf((*MockClient)(nil).DeleteRole), input)
+}
+
+// ListRolePolicies mocks base method.
+func (m *MockClient) ListRolePolicies(input *iam.ListRolePoliciesInput) (*iam.ListRolePoliciesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRolePolicies", input)
+	ret0, _ := ret[0].(*iam.ListRolePoliciesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRolePolicies indicates an expected call of ListRolePolicies.
+func (mr *MockClientMockRecorder) ListRolePolicies(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolePolicies", reflect.TypeOf((*MockClient)(nil).ListRolePolicies), input)
+}
+
+// DeleteRolePolicy mocks base method.
+func (m *MockClient) DeleteRolePolicy(input *iam.DeleteRolePolicyInput) (*iam.DeleteRolePolicyOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRolePolicy", input)
+	ret0, _ := ret[0].(*iam.DeleteRolePolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteRolePolicy indicates an expected call of DeleteRolePolicy.
+func (mr *MockClientMockRecorder) DeleteRolePolicy(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolePolicy", reflect.TypeOf((*MockClient)(nil).DeleteRolePolicy), input)
 }
 
 // GetUser mocks base method.
@@ -335,21 +275,6 @@ func (mr *MockClientMockRecorder) ListAccessKeys(arg0 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAccessKeys", reflect.TypeOf((*MockClient)(nil).ListAccessKeys), arg0)
 }
 
-// ListObjects mocks base method.
-func (m *MockClient) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListObjects", input)
-	ret0, _ := ret[0].(*s3.ListObjectsOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListObjects indicates an expected call of ListObjects.
-func (mr *MockClientMockRecorder) ListObjects(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListObjects", reflect.TypeOf((*MockClient)(nil).ListObjects), input)
-}
-
 // ListOpenIDConnectProviders mocks base method.
 func (m *MockClient) ListOpenIDConnectProviders(arg0 *iam.ListOpenIDConnectProvidersInput) (*iam.ListOpenIDConnectProvidersOutput, error) {
 	m.ctrl.T.Helper()
@@ -365,34 +290,19 @@ func (mr *MockClientMockRecorder) ListOpenIDConnectProviders(arg0 interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOpenIDConnectProviders", reflect.TypeOf((*MockClient)(nil).ListOpenIDConnectProviders), arg0)
 }
 
-// ListRolePolicies mocks base method.
-func (m *MockClient) ListRolePolicies(input *iam.ListRolePoliciesInput) (*iam.ListRolePoliciesOutput, error) {
+// DeleteOpenIDConnectProvider mocks base method.
+func (m *MockClient) DeleteOpenIDConnectProvider(input *iam.DeleteOpenIDConnectProviderInput) (*iam.DeleteOpenIDConnectProviderOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRolePolicies", input)
-	ret0, _ := ret[0].(*iam.ListRolePoliciesOutput)
+	ret := m.ctrl.Call(m, "DeleteOpenIDConnectProvider", input)
+	ret0, _ := ret[0].(*iam.DeleteOpenIDConnectProviderOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListRolePolicies indicates an expected call of ListRolePolicies.
-func (mr *MockClientMockRecorder) ListRolePolicies(input interface{}) *gomock.Call {
+// DeleteOpenIDConnectProvider indicates an expected call of DeleteOpenIDConnectProvider.
+func (mr *MockClientMockRecorder) DeleteOpenIDConnectProvider(input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolePolicies", reflect.TypeOf((*MockClient)(nil).ListRolePolicies), input)
-}
-
-// ListRoles mocks base method.
-func (m *MockClient) ListRoles(input *iam.ListRolesInput) (*iam.ListRolesOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRoles", input)
-	ret0, _ := ret[0].(*iam.ListRolesOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListRoles indicates an expected call of ListRoles.
-func (mr *MockClientMockRecorder) ListRoles(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoles", reflect.TypeOf((*MockClient)(nil).ListRoles), input)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).DeleteOpenIDConnectProvider), input)
 }
 
 // ListUserPolicies mocks base method.
@@ -408,36 +318,6 @@ func (m *MockClient) ListUserPolicies(arg0 *iam.ListUserPoliciesInput) (*iam.Lis
 func (mr *MockClientMockRecorder) ListUserPolicies(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserPolicies", reflect.TypeOf((*MockClient)(nil).ListUserPolicies), arg0)
-}
-
-// PutBucketTagging mocks base method.
-func (m *MockClient) PutBucketTagging(arg0 *s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutBucketTagging", arg0)
-	ret0, _ := ret[0].(*s3.PutBucketTaggingOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PutBucketTagging indicates an expected call of PutBucketTagging.
-func (mr *MockClientMockRecorder) PutBucketTagging(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketTagging", reflect.TypeOf((*MockClient)(nil).PutBucketTagging), arg0)
-}
-
-// PutObject mocks base method.
-func (m *MockClient) PutObject(arg0 *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutObject", arg0)
-	ret0, _ := ret[0].(*s3.PutObjectOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// PutObject indicates an expected call of PutObject.
-func (mr *MockClientMockRecorder) PutObject(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), arg0)
 }
 
 // PutRolePolicy mocks base method.
@@ -542,4 +422,124 @@ func (m *MockClient) UpdateAssumeRolePolicy(arg0 *iam.UpdateAssumeRolePolicyInpu
 func (mr *MockClientMockRecorder) UpdateAssumeRolePolicy(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAssumeRolePolicy", reflect.TypeOf((*MockClient)(nil).UpdateAssumeRolePolicy), arg0)
+}
+
+// CreateBucket mocks base method.
+func (m *MockClient) CreateBucket(arg0 *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateBucket", arg0)
+	ret0, _ := ret[0].(*s3.CreateBucketOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateBucket indicates an expected call of CreateBucket.
+func (mr *MockClientMockRecorder) CreateBucket(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), arg0)
+}
+
+// PutBucketTagging mocks base method.
+func (m *MockClient) PutBucketTagging(arg0 *s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutBucketTagging", arg0)
+	ret0, _ := ret[0].(*s3.PutBucketTaggingOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutBucketTagging indicates an expected call of PutBucketTagging.
+func (mr *MockClientMockRecorder) PutBucketTagging(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketTagging", reflect.TypeOf((*MockClient)(nil).PutBucketTagging), arg0)
+}
+
+// GetBucketTagging mocks base method.
+func (m *MockClient) GetBucketTagging(input *s3.GetBucketTaggingInput) (*s3.GetBucketTaggingOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetBucketTagging", input)
+	ret0, _ := ret[0].(*s3.GetBucketTaggingOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetBucketTagging indicates an expected call of GetBucketTagging.
+func (mr *MockClientMockRecorder) GetBucketTagging(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBucketTagging", reflect.TypeOf((*MockClient)(nil).GetBucketTagging), input)
+}
+
+// DeleteBucket mocks base method.
+func (m *MockClient) DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteBucket", input)
+	ret0, _ := ret[0].(*s3.DeleteBucketOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteBucket indicates an expected call of DeleteBucket.
+func (mr *MockClientMockRecorder) DeleteBucket(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBucket", reflect.TypeOf((*MockClient)(nil).DeleteBucket), input)
+}
+
+// PutObject mocks base method.
+func (m *MockClient) PutObject(arg0 *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutObject", arg0)
+	ret0, _ := ret[0].(*s3.PutObjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutObject indicates an expected call of PutObject.
+func (mr *MockClientMockRecorder) PutObject(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), arg0)
+}
+
+// ListObjects mocks base method.
+func (m *MockClient) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListObjects", input)
+	ret0, _ := ret[0].(*s3.ListObjectsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListObjects indicates an expected call of ListObjects.
+func (mr *MockClientMockRecorder) ListObjects(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListObjects", reflect.TypeOf((*MockClient)(nil).ListObjects), input)
+}
+
+// GetObjectTagging mocks base method.
+func (m *MockClient) GetObjectTagging(input *s3.GetObjectTaggingInput) (*s3.GetObjectTaggingOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetObjectTagging", input)
+	ret0, _ := ret[0].(*s3.GetObjectTaggingOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetObjectTagging indicates an expected call of GetObjectTagging.
+func (mr *MockClientMockRecorder) GetObjectTagging(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetObjectTagging", reflect.TypeOf((*MockClient)(nil).GetObjectTagging), input)
+}
+
+// DeleteObject mocks base method.
+func (m *MockClient) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteObject", input)
+	ret0, _ := ret[0].(*s3.DeleteObjectOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteObject indicates an expected call of DeleteObject.
+func (mr *MockClientMockRecorder) DeleteObject(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteObject", reflect.TypeOf((*MockClient)(nil).DeleteObject), input)
 }

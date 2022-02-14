@@ -9,6 +9,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/ibmcloud"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/nutanix"
 )
 
 func main() {
@@ -21,6 +22,7 @@ func main() {
 	rootCmd.AddCommand(gcp.NewGCPCmd())
 	rootCmd.AddCommand(ibmcloud.NewIBMCloudCmd())
 	rootCmd.AddCommand(alibabacloud.NewAliababaCloudCmd())
+	rootCmd.AddCommand(nutanix.NewNutanixCmd())
 
 	if err := rootCmd.Execute(); err != nil {
 		log.Fatal(err)
