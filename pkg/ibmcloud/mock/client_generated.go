@@ -37,22 +37,6 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 	return m.recorder
 }
 
-// CreateAPIKey mocks base method.
-func (m *MockClient) CreateAPIKey(arg0 *iamidentityv1.CreateAPIKeyOptions) (*iamidentityv1.APIKey, *core.DetailedResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateAPIKey", arg0)
-	ret0, _ := ret[0].(*iamidentityv1.APIKey)
-	ret1, _ := ret[1].(*core.DetailedResponse)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// CreateAPIKey indicates an expected call of CreateAPIKey.
-func (mr *MockClientMockRecorder) CreateAPIKey(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAPIKey", reflect.TypeOf((*MockClient)(nil).CreateAPIKey), arg0)
-}
-
 // CreatePolicy mocks base method.
 func (m *MockClient) CreatePolicy(arg0 *iampolicymanagementv1.CreatePolicyOptions) (*iampolicymanagementv1.Policy, *core.DetailedResponse, error) {
 	m.ctrl.T.Helper()
@@ -85,19 +69,20 @@ func (mr *MockClientMockRecorder) CreateServiceID(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateServiceID", reflect.TypeOf((*MockClient)(nil).CreateServiceID), arg0)
 }
 
-// DeleteAPIKey mocks base method.
-func (m *MockClient) DeleteAPIKey(arg0 *iamidentityv1.DeleteAPIKeyOptions) (*core.DetailedResponse, error) {
+// ListServiceID mocks base method.
+func (m *MockClient) ListServiceID(arg0 *iamidentityv1.ListServiceIdsOptions) (*iamidentityv1.ServiceIDList, *core.DetailedResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAPIKey", arg0)
-	ret0, _ := ret[0].(*core.DetailedResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret := m.ctrl.Call(m, "ListServiceID", arg0)
+	ret0, _ := ret[0].(*iamidentityv1.ServiceIDList)
+	ret1, _ := ret[1].(*core.DetailedResponse)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
-// DeleteAPIKey indicates an expected call of DeleteAPIKey.
-func (mr *MockClientMockRecorder) DeleteAPIKey(arg0 interface{}) *gomock.Call {
+// ListServiceID indicates an expected call of ListServiceID.
+func (mr *MockClientMockRecorder) ListServiceID(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAPIKey", reflect.TypeOf((*MockClient)(nil).DeleteAPIKey), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServiceID", reflect.TypeOf((*MockClient)(nil).ListServiceID), arg0)
 }
 
 // DeleteServiceID mocks base method.
@@ -115,20 +100,20 @@ func (mr *MockClientMockRecorder) DeleteServiceID(arg0 interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteServiceID", reflect.TypeOf((*MockClient)(nil).DeleteServiceID), arg0)
 }
 
-// GetAPIKeysDetails mocks base method.
-func (m *MockClient) GetAPIKeysDetails(arg0 *iamidentityv1.GetAPIKeysDetailsOptions) (*iamidentityv1.APIKey, *core.DetailedResponse, error) {
+// CreateAPIKey mocks base method.
+func (m *MockClient) CreateAPIKey(arg0 *iamidentityv1.CreateAPIKeyOptions) (*iamidentityv1.APIKey, *core.DetailedResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetAPIKeysDetails", arg0)
+	ret := m.ctrl.Call(m, "CreateAPIKey", arg0)
 	ret0, _ := ret[0].(*iamidentityv1.APIKey)
 	ret1, _ := ret[1].(*core.DetailedResponse)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// GetAPIKeysDetails indicates an expected call of GetAPIKeysDetails.
-func (mr *MockClientMockRecorder) GetAPIKeysDetails(arg0 interface{}) *gomock.Call {
+// CreateAPIKey indicates an expected call of CreateAPIKey.
+func (mr *MockClientMockRecorder) CreateAPIKey(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAPIKeysDetails", reflect.TypeOf((*MockClient)(nil).GetAPIKeysDetails), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAPIKey", reflect.TypeOf((*MockClient)(nil).CreateAPIKey), arg0)
 }
 
 // ListAPIKeys mocks base method.
@@ -147,36 +132,35 @@ func (mr *MockClientMockRecorder) ListAPIKeys(arg0 interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAPIKeys", reflect.TypeOf((*MockClient)(nil).ListAPIKeys), arg0)
 }
 
-// ListResourceGroups mocks base method.
-func (m *MockClient) ListResourceGroups(arg0 *resourcemanagerv2.ListResourceGroupsOptions) (*resourcemanagerv2.ResourceGroupList, *core.DetailedResponse, error) {
+// DeleteAPIKey mocks base method.
+func (m *MockClient) DeleteAPIKey(arg0 *iamidentityv1.DeleteAPIKeyOptions) (*core.DetailedResponse, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListResourceGroups", arg0)
-	ret0, _ := ret[0].(*resourcemanagerv2.ResourceGroupList)
+	ret := m.ctrl.Call(m, "DeleteAPIKey", arg0)
+	ret0, _ := ret[0].(*core.DetailedResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteAPIKey indicates an expected call of DeleteAPIKey.
+func (mr *MockClientMockRecorder) DeleteAPIKey(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAPIKey", reflect.TypeOf((*MockClient)(nil).DeleteAPIKey), arg0)
+}
+
+// GetAPIKeysDetails mocks base method.
+func (m *MockClient) GetAPIKeysDetails(arg0 *iamidentityv1.GetAPIKeysDetailsOptions) (*iamidentityv1.APIKey, *core.DetailedResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAPIKeysDetails", arg0)
+	ret0, _ := ret[0].(*iamidentityv1.APIKey)
 	ret1, _ := ret[1].(*core.DetailedResponse)
 	ret2, _ := ret[2].(error)
 	return ret0, ret1, ret2
 }
 
-// ListResourceGroups indicates an expected call of ListResourceGroups.
-func (mr *MockClientMockRecorder) ListResourceGroups(arg0 interface{}) *gomock.Call {
+// GetAPIKeysDetails indicates an expected call of GetAPIKeysDetails.
+func (mr *MockClientMockRecorder) GetAPIKeysDetails(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListResourceGroups", reflect.TypeOf((*MockClient)(nil).ListResourceGroups), arg0)
-}
-
-// ListServiceID mocks base method.
-func (m *MockClient) ListServiceID(arg0 *iamidentityv1.ListServiceIdsOptions) (*iamidentityv1.ServiceIDList, *core.DetailedResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListServiceID", arg0)
-	ret0, _ := ret[0].(*iamidentityv1.ServiceIDList)
-	ret1, _ := ret[1].(*core.DetailedResponse)
-	ret2, _ := ret[2].(error)
-	return ret0, ret1, ret2
-}
-
-// ListServiceID indicates an expected call of ListServiceID.
-func (mr *MockClientMockRecorder) ListServiceID(arg0 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListServiceID", reflect.TypeOf((*MockClient)(nil).ListServiceID), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAPIKeysDetails", reflect.TypeOf((*MockClient)(nil).GetAPIKeysDetails), arg0)
 }
 
 // NewGetAPIKeysDetailsOptions mocks base method.
@@ -191,4 +175,20 @@ func (m *MockClient) NewGetAPIKeysDetailsOptions() *iamidentityv1.GetAPIKeysDeta
 func (mr *MockClientMockRecorder) NewGetAPIKeysDetailsOptions() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewGetAPIKeysDetailsOptions", reflect.TypeOf((*MockClient)(nil).NewGetAPIKeysDetailsOptions))
+}
+
+// ListResourceGroups mocks base method.
+func (m *MockClient) ListResourceGroups(arg0 *resourcemanagerv2.ListResourceGroupsOptions) (*resourcemanagerv2.ResourceGroupList, *core.DetailedResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListResourceGroups", arg0)
+	ret0, _ := ret[0].(*resourcemanagerv2.ResourceGroupList)
+	ret1, _ := ret[1].(*core.DetailedResponse)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// ListResourceGroups indicates an expected call of ListResourceGroups.
+func (mr *MockClientMockRecorder) ListResourceGroups(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListResourceGroups", reflect.TypeOf((*MockClient)(nil).ListResourceGroups), arg0)
 }
