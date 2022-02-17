@@ -128,7 +128,7 @@ Pros:
 Cons:
   * Requires admin credential storage in a cluster kube-system secret. (however if a user has access to all secrets in your cluster, you are severely compromised regardless)
 
-Supported clouds: AWS, GCP, Azure
+Supported clouds: AWS, GCP
 
 ### 1.1 Mint Mode With Removal/Rotation Of Admin Credential
 
@@ -193,11 +193,13 @@ Future supported clouds: AWS
 Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 --- | --- | --- | --- | --- | ---
 AWS | Y | 4.4+ | Y | 4.3+ | 4.6+ (expected)
-Azure | Y | N | Y | unknown | N
 GCP | Y | N | Y | unknown | N
+Azure | N<sup>1</sup> | N | Y | unknown | N
 OpenStack | N | N | Y | N | N
 oVirt | N | N | Y | N | N
 VMWare | N | N | Y | N | N
+
+1 - Mint mode was previously supported, but with the sunsetting of the Azure Active Directory Graph API, Mint mode support on Azure has since been [removed](./docs/azure-mint-mode-removal.md).
 
 # Developer Instructions
 
