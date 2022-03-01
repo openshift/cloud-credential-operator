@@ -69,6 +69,9 @@ const (
 	cloudCredDeprovisionSuccess = "CloudCredDeprovisionSuccess"
 
 	credentialsRequestInfraMismatch = "InfrastructureMismatch"
+
+	cloudResourceOrphaned = "CloudResourceOrphaned"
+	cloudResourceCleaned  = "CloudResourceCleaned"
 )
 
 var (
@@ -568,14 +571,21 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	} else {
 		syncErr = r.Actuator.Update(context.TODO(), cr)
 	}
+	var provisionErr bool
 	if syncErr != nil {
-		logger.Errorf("error syncing credentials: %v", syncErr)
-		// TODO: set condition if previously satisfied credrequest can now
-		// not be satisfied (but keeping provisioned==True).
-		cr.Status.Provisioned = false
-
 		switch t := syncErr.(type) {
 		case actuator.ActuatorStatus:
+			if t.Reason() == minterv1.OrphanedCloudResource {
+				// not a critical error, just set the condition to communicate
+				// what happened
+				provisionErr = false
+			} else {
+				logger.Errorf("error syncing credentials: %v", syncErr)
+				provisionErr = true
+			}
+
+			cr.Status.Provisioned = !provisionErr
+
 			logger.Errorf("errored with condition: %v", t.Reason())
 			r.updateActuatorConditions(cr, t.Reason(), syncErr)
 		default:
@@ -586,8 +596,12 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	} else {
 		// it worked so clear any actuator conditions if they exist
 		r.updateActuatorConditions(cr, "", nil)
-
 		cr.Status.Provisioned = true
+	}
+
+	// if provisionErr == false, it means we successfully provisioned even if there
+	// were non-critical errors encountered
+	if !provisionErr {
 		cr.Status.LastSyncTimestamp = &metav1.Time{
 			Time: time.Now(),
 		}
@@ -606,7 +620,14 @@ func (r *ReconcileCredentialsRequest) Reconcile(request reconcile.Request) (reco
 	// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
 	// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
 	// users/permissions/tags/etc.
-	return reconcile.Result{RequeueAfter: defaultRequeueTime}, syncErr
+	if syncErr != nil && !provisionErr {
+		// We could have a non-critical error (eg OrphanedCloudResource) in the syncErr
+		// but we wouldn't want to treat that as an overall controller error while
+		// reconciling.
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	} else {
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, syncErr
+	}
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
@@ -623,6 +644,12 @@ func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.Cred
 	} else {
 		// If this is not our error, ensure the condition is cleared.
 		setInsufficientCredsCondition(cr, false)
+	}
+
+	if reason == minterv1.OrphanedCloudResource {
+		setOrphanedCloudResourceCondition(cr, true, conditionError)
+	} else {
+		setOrphanedCloudResourceCondition(cr, false, conditionError)
 	}
 
 	return
@@ -646,6 +673,28 @@ func setMissingTargetNamespaceCondition(cr *minterv1.CredentialsRequest, missing
 		updateCheck = utils.UpdateConditionNever
 	}
 	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.MissingTargetNamespace,
+		status, reason, msg, updateCheck)
+}
+
+func setOrphanedCloudResourceCondition(cr *minterv1.CredentialsRequest, orphaned bool, orphanedErr error) {
+	var (
+		msg, reason string
+		status      corev1.ConditionStatus
+		updateCheck utils.UpdateConditionCheck
+	)
+
+	if orphaned {
+		msg = fmt.Sprintf("unable to clean up previously created cloud resource: %s", orphanedErr.Error())
+		status = corev1.ConditionTrue
+		reason = cloudResourceOrphaned
+		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
+	} else {
+		msg = "cleaned up cloud resources"
+		status = corev1.ConditionFalse
+		reason = cloudResourceCleaned
+		updateCheck = utils.UpdateConditionNever
+	}
+	cr.Status.Conditions = utils.SetCredentialsRequestCondition(cr.Status.Conditions, minterv1.OrphanedCloudResource,
 		status, reason, msg, updateCheck)
 }
 

@@ -21,28 +21,30 @@ import (
 	"fmt"
 	"reflect"
 	"testing"
+	"time"
 
-	"github.com/Azure/azure-sdk-for-go/services/authorization/mgmt/2015-07-01/authorization"
 	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
-	"github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2015-11-01/resources"
 	"github.com/Azure/go-autorest/autorest/to"
 	"github.com/golang/mock/gomock"
-	openshiftapiv1 "github.com/openshift/api/config/v1"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/azure"
-	azuremock "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	log "github.com/sirupsen/logrus"
+	"github.com/stretchr/testify/require"
+
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/kubernetes/scheme"
-
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
+	openshiftapiv1 "github.com/openshift/api/config/v1"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/azure"
+	azuremock "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
@@ -58,16 +60,21 @@ const (
 	rootSubscriptionID = "root_subscription_id"
 	rootTenantID       = "root_tenant_id"
 
-	testNamespace          = "default"
-	testAppRegName         = "Test App Reg"
-	testAppRegID           = "some-unique-app-id"
-	testAppRegObjID        = "some-unique-app-obj-id"
-	testCredRequestName    = "testCredRequest"
-	testRandomSuffix       = "rando"
-	testRoleName           = "Contributor"
-	testRoleDefinitionID   = "some-role-def-id"
-	testResourceGroupName  = "Test Resource Group"
-	testInfrastructureName = "test-cluster-abcd"
+	mintedClientID     = "minted_client_id"
+	mintedClientSecret = "minted_client_secret"
+
+	testNamespace             = "default"
+	testAppRegName            = "Test App Reg"
+	testAppRegID              = "some-unique-app-id"
+	testAppRegObjID           = "some-unique-app-obj-id"
+	testCredRequestName       = "testCredRequest"
+	testRandomSuffix          = "rando"
+	testRoleName              = "Contributor"
+	testRoleDefinitionID      = "some-role-def-id"
+	testResourceGroupName     = "Test Resource Group"
+	testInfrastructureName    = "test-cluster-abcd"
+	testTargetSecretNamespace = "my-namespace"
+	testTargetSecretName      = "my-secret"
 )
 
 var (
@@ -78,6 +85,7 @@ var (
 			Annotations: map[string]string{
 				constants.AnnotationKey: constants.MintAnnotation,
 			},
+			ResourceVersion: "rootResourceVersion",
 		},
 	}
 
@@ -209,7 +217,7 @@ func TestAnnotations(t *testing.T) {
 
 func getCredRequest(t *testing.T, c client.Client) *minterv1.CredentialsRequest {
 	cr := &minterv1.CredentialsRequest{}
-	assert.NoError(t, c.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: testCredRequestName}, cr))
+	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: testCredRequestName}, cr), "error while retriving credreq from fake client")
 	return cr
 }
 
@@ -240,19 +248,16 @@ func TestActuator(t *testing.T) {
 	}
 
 	tests := []struct {
-		name                       string
-		existing                   []runtime.Object
-		mockAppClient              func(*gomock.Controller) *azuremock.MockAppClient
-		mockServicePrincipalClient func(*gomock.Controller) *azuremock.MockServicePrincipalClient
-		mockRoleDefinitionClient   func(*gomock.Controller) *azuremock.MockRoleDefinitionClient
-		mockRoleAssignmentsClient  func(*gomock.Controller) *azuremock.MockRoleAssignmentsClient
-		op                         func(*azure.Actuator, *minterv1.CredentialsRequest) error
-		credentialsRequest         *minterv1.CredentialsRequest
-		expectedErr                error
-		validate                   func(*testing.T, client.Client)
+		name               string
+		existing           []runtime.Object
+		mockAppClient      func(*gomock.Controller) *azuremock.MockAppClient
+		op                 func(*azure.Actuator, *minterv1.CredentialsRequest) error
+		credentialsRequest *minterv1.CredentialsRequest
+		expectedErr        error
+		validate           func(*testing.T, client.Client)
 	}{
 		{
-			name:               "Create SP",
+			name:               "Process a CredentialsRequest",
 			existing:           defaultExistingObjects(),
 			credentialsRequest: testCredentialsRequest(t),
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
@@ -261,164 +266,264 @@ func TestActuator(t *testing.T) {
 			validate: func(t *testing.T, c client.Client) {
 				cr := getCredRequest(t, c)
 
-				azStatus := getProviderStatus(t, cr)
-				assert.Equal(t, testAppRegID, azStatus.AppID)
+				targetSecret := getCredRequestTargetSecret(t, c, cr)
 
-				expectedSPName := generateDisplayName()
-				assert.Equal(t, expectedSPName, azStatus.ServicePrincipalName)
+				rootSecret := getRootSecret(t, c)
+
+				assertSecretEquality(t, rootSecret, targetSecret)
 			},
 		},
 		{
-			name:     "Create SP (service principal display name different from expected)",
-			existing: defaultExistingObjects(),
+			name: "Migrate to passthrough",
+			existing: func() []runtime.Object {
+				objects := defaultExistingObjects()
+
+				// Add the existing targetSecret since we are mocking up
+				// a previously minted scenario.
+				targetSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testTargetSecretName,
+						Namespace: testTargetSecretNamespace,
+					},
+					Data: map[string][]byte{
+						azure.AzureClientID:       []byte(mintedClientID),
+						azure.AzureClientSecret:   []byte(mintedClientSecret),
+						azure.AzureRegion:         []byte(rootRegion),
+						azure.AzureResourceGroup:  []byte(rootResourceGroup),
+						azure.AzureResourcePrefix: []byte(rootResourcePrefix),
+						azure.AzureSubscriptionID: []byte(rootSubscriptionID),
+						azure.AzureTenantID:       []byte(rootTenantID),
+					},
+				}
+
+				objects = append(objects, targetSecret)
+
+				return objects
+			}(),
 			credentialsRequest: func() *minterv1.CredentialsRequest {
+				// Create a credreq that resembles what one previously handled via mint mode
+				// would look like.
 				cr := testCredentialsRequest(t)
-				cr.Name = "differentname"
+				rawStatus := &minterv1.AzureProviderStatus{
+					ServicePrincipalName:      testAppRegName,
+					AppID:                     testAppRegID,
+					SecretLastResourceVersion: "oldVersion",
+				}
+				encodedStatus, err := codec.EncodeProviderStatus(rawStatus)
+				require.NoError(t, err, "error encoding status")
+
+				cr.Status.ProviderStatus = encodedStatus
+				cr.Status.Provisioned = true
+
+				// to appear that we need an update
+				cr.Status.LastSyncCloudCredsSecretResourceVersion = "oldResourceVersion"
+
 				return cr
 			}(),
-			mockRoleAssignmentsClient: mockRoleAssignmentClientNoCalls,
-			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
-				return actuator.Create(context.TODO(), cr)
-			},
-			expectedErr: fmt.Errorf("error syncing creds in mint-mode: service principal name \"%v\" retrieved from Azure is different from the name \"%v\" that was requested", generateDisplayName(), testInfrastructureName+"-differentname"+"-"+testRandomSuffix),
-		},
-		{
-			name:               "Update SP",
-			existing:           defaultExistingObjects(),
-			credentialsRequest: testCredentialsRequest(t),
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Update(context.TODO(), cr)
 			},
 			validate: func(t *testing.T, c client.Client) {
 				cr := getCredRequest(t, c)
 
-				azStatus := getProviderStatus(t, cr)
-				assert.Equal(t, testAppRegID, azStatus.AppID)
+				targetSecret := getCredRequestTargetSecret(t, c, cr)
+				rootSecret := getRootSecret(t, c)
 
-				expectedSPName := generateDisplayName()
-				assert.Equal(t, expectedSPName, azStatus.ServicePrincipalName)
+				// Post mint-to-passthrough pivot the targetSecret should be a copy of the
+				// root secret.
+				assertSecretEquality(t, rootSecret, targetSecret)
+
+				// Make sure we've cleared out the old fields
+				azureStatus := getProviderStatus(t, cr)
+				assert.Empty(t, azureStatus.AppID, "expected AppID to be empty after cleanup")
+				assert.Empty(t, azureStatus.ServicePrincipalName, "expected ServicePrincipalName to be empty after cleanup")
+				assert.Empty(t, azureStatus.SecretLastResourceVersion, "expected SecretLatResourceVersion to be empty after cleanup")
+
 			},
-		},
-		{
-			name: "Delete SP (no AAD application found)",
-			existing: []runtime.Object{
-				&clusterInfra,
-				&rootSecretMintAnnotation,
-				&clusterDNS,
-				testCredRequestTargetSecret(testCredentialsRequest(t)),
-			},
-			credentialsRequest: testCredentialsRequest(t),
 			mockAppClient: func(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
 				client := azuremock.NewMockAppClient(mockCtrl)
 				client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-					// return that no AAD was found
-					[]graphrbac.Application{}, nil,
+					[]graphrbac.Application{testAADApplication()}, nil,
 				)
 
+				client.EXPECT().Delete(gomock.Any(), testAppRegObjID)
 				return client
 			},
-			mockServicePrincipalClient: mockServicePrincipalClientNoCalls,
-			mockRoleAssignmentsClient:  mockRoleAssignmentClientNoCalls,
+		},
+		{
+			name: "Migrated but still need to cleanup",
+			existing: func() []runtime.Object {
+				objects := defaultExistingObjects()
+
+				// Add the existing targetSecret since we are mocking up
+				// a previously migrated scenario.
+				targetSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testTargetSecretName,
+						Namespace: testTargetSecretNamespace,
+					},
+					Data: map[string][]byte{
+						azure.AzureClientID:       []byte(rootClientID),
+						azure.AzureClientSecret:   []byte(rootClientSecret),
+						azure.AzureRegion:         []byte(rootRegion),
+						azure.AzureResourceGroup:  []byte(rootResourceGroup),
+						azure.AzureResourcePrefix: []byte(rootResourcePrefix),
+						azure.AzureSubscriptionID: []byte(rootSubscriptionID),
+						azure.AzureTenantID:       []byte(rootTenantID),
+					},
+				}
+
+				objects = append(objects, targetSecret)
+
+				return objects
+			}(),
+			credentialsRequest: func() *minterv1.CredentialsRequest {
+				// Create a credreq that resembles what one previously handled via mint mode
+				// would look like.
+				cr := testCredentialsRequest(t)
+
+				rawStatus := &minterv1.AzureProviderStatus{
+					ServicePrincipalName: testAppRegName,
+					AppID:                testAppRegID,
+					//SecretLastResourceVersion: "oldVersion",
+				}
+				encodedStatus, err := codec.EncodeProviderStatus(rawStatus)
+				require.NoError(t, err, "error encoding status")
+
+				cr.Status.ProviderStatus = encodedStatus
+				cr.Status.Provisioned = true
+
+				// to appear that we need an update
+				cr.Status.LastSyncTimestamp = &metav1.Time{
+					Time: time.Now().Add(-time.Hour * 2),
+				}
+
+				return cr
+			}(),
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
-				return actuator.Delete(context.TODO(), cr)
+				return actuator.Update(context.TODO(), cr)
 			},
 			validate: func(t *testing.T, c client.Client) {
 				cr := getCredRequest(t, c)
-				s := &corev1.Secret{}
-				// secret should be deleted
-				assert.Error(t, c.Get(context.TODO(),
-					types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace},
-					s),
-				)
+				targetSecret := getCredRequestTargetSecret(t, c, cr)
+
+				rootSecret := getRootSecret(t, c)
+
+				// The targetSecret should be a copy of the root secret.
+				assertSecretEquality(t, rootSecret, targetSecret)
+
+				// Make sure we've cleared out the old fields
+				azureStatus := getProviderStatus(t, cr)
+				assert.Empty(t, azureStatus.AppID, "expected AppID to be empty after cleanup")
+				assert.Empty(t, azureStatus.ServicePrincipalName, "expected ServicePrincipalName to be empty after cleanup")
+				assert.Empty(t, azureStatus.SecretLastResourceVersion, "expected SecretLatResourceVersion to be empty after cleanup")
 			},
-		},
-		{
-			name: "Delete SP (AAD application found)",
-			existing: []runtime.Object{
-				&clusterInfra,
-				&rootSecretMintAnnotation,
-				&clusterDNS,
-				testCredRequestTargetSecret(testCredentialsRequest(t)),
-			},
-			credentialsRequest: testCredentialsRequest(t),
 			mockAppClient: func(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
 				client := azuremock.NewMockAppClient(mockCtrl)
 				client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-					[]graphrbac.Application{testAADApplication()},
-					nil,
+					[]graphrbac.Application{testAADApplication()}, nil,
 				)
 				client.EXPECT().Delete(gomock.Any(), testAppRegObjID)
 
 				return client
 			},
-			mockRoleAssignmentsClient:  mockRoleAssignmentClientNoCalls,
-			mockServicePrincipalClient: mockServicePrincipalClientNoCalls,
-			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
-				return actuator.Delete(context.TODO(), cr)
-			},
-			validate: func(t *testing.T, c client.Client) {
-				cr := getCredRequest(t, c)
-				s := &corev1.Secret{}
-				// secret should be deleted
-				assert.Error(t, c.Get(context.TODO(),
-					types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace},
-					s),
-				)
-			},
 		},
 		{
-			name:               "Tag SP on create",
-			existing:           defaultExistingObjects(),
-			credentialsRequest: testCredentialsRequest(t),
-			mockServicePrincipalClient: func(mockCtrl *gomock.Controller) *azuremock.MockServicePrincipalClient {
-				client := azuremock.NewMockServicePrincipalClient(mockCtrl)
-				client.EXPECT().List(gomock.Any(), gomock.Any()).Return([]graphrbac.ServicePrincipal{}, nil)
-				client.EXPECT().Create(gomock.Any(), graphrbac.ServicePrincipalCreateParameters{
-					AppID:          to.StringPtr(testAppRegID),
-					AccountEnabled: to.BoolPtr(true),
-					Tags:           &[]string{fmt.Sprintf("kubernetes.io_cluster.%s=owned", testInfrastructureName)},
-				}).Return(testServicePrincipal(), nil)
-				return client
+			name: "Failed to cleanup",
+			expectedErr: &actuatoriface.ActuatorError{
+				ErrReason: minterv1.OrphanedCloudResource,
+				Message:   fmt.Sprintf("unable to clean up App Registration / Service Principal: %s", testAppRegName),
 			},
-			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
-				return actuator.Create(context.TODO(), cr)
-			},
-			validate: func(t *testing.T, c client.Client) {
-				// validation done in gomock.EXEPCT()
-			},
-		},
-		{
-			name:               "Skip role assignment creation when they already exist",
-			existing:           defaultExistingObjects(),
-			credentialsRequest: testCredentialsRequest(t),
-			mockRoleAssignmentsClient: func(mockCtrl *gomock.Controller) *azuremock.MockRoleAssignmentsClient {
-				client := azuremock.NewMockRoleAssignmentsClient(mockCtrl)
-				expectedFilter := fmt.Sprintf("principalId eq '%s'", *testServicePrincipal().ObjectID)
-				// ensure that when listing the role assignments, everything is already assigned
-				client.EXPECT().List(gomock.Any(), gomock.Eq(expectedFilter)).Return(
-					[]authorization.RoleAssignment{
-						{
-							Properties: &authorization.RoleAssignmentPropertiesWithScope{
-								RoleDefinitionID: to.StringPtr(testRoleDefinitionID),
-								Scope:            to.StringPtr("/subscriptions//resourceGroups/" + testResourceGroupName),
-							},
-						},
-						{
-							Properties: &authorization.RoleAssignmentPropertiesWithScope{
-								RoleDefinitionID: to.StringPtr(testRoleDefinitionID),
-								Scope:            to.StringPtr("/subscriptions//resourceGroups/" + testDNSResourceGroupName),
-							},
-						},
-					}, nil,
-				).Times(2) // once for gathering current role assignments, and once for checking for extra role assignments
+			existing: func() []runtime.Object {
+				objects := defaultExistingObjects()
 
-				return client
-			},
+				// Add the existing targetSecret since we are mocking up
+				// a previously migrated scenario.
+				targetSecret := &corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      testTargetSecretName,
+						Namespace: testTargetSecretNamespace,
+					},
+					Data: map[string][]byte{
+						azure.AzureClientID:       []byte(mintedClientID),
+						azure.AzureClientSecret:   []byte(mintedClientSecret),
+						azure.AzureRegion:         []byte(rootRegion),
+						azure.AzureResourceGroup:  []byte(rootResourceGroup),
+						azure.AzureResourcePrefix: []byte(rootResourcePrefix),
+						azure.AzureSubscriptionID: []byte(rootSubscriptionID),
+						azure.AzureTenantID:       []byte(rootTenantID),
+					},
+				}
+
+				objects = append(objects, targetSecret)
+
+				return objects
+			}(),
+			credentialsRequest: func() *minterv1.CredentialsRequest {
+				// Create a credreq that resembles what one previously handled via mint mode
+				// would look like.
+				cr := testCredentialsRequest(t)
+
+				rawStatus := &minterv1.AzureProviderStatus{
+					ServicePrincipalName: testAppRegName,
+					AppID:                testAppRegID,
+				}
+				encodedStatus, err := codec.EncodeProviderStatus(rawStatus)
+				require.NoError(t, err, "error encoding status")
+
+				cr.Status.ProviderStatus = encodedStatus
+				cr.Status.Provisioned = true
+
+				return cr
+			}(),
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Update(context.TODO(), cr)
 			},
 			validate: func(t *testing.T, c client.Client) {
-				// validation done in gomock.EXPECT()
+				cr := getCredRequest(t, c)
+
+				targetSecret := getCredRequestTargetSecret(t, c, cr)
+
+				rootSecret := getRootSecret(t, c)
+
+				// The targetSecret should be a copy of the root secret.
+				assertSecretEquality(t, rootSecret, targetSecret)
+			},
+			mockAppClient: func(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
+				client := azuremock.NewMockAppClient(mockCtrl)
+				client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
+					[]graphrbac.Application{}, fmt.Errorf("Azure AD Graph API has been sunset"),
+				)
+				// No Delete() call b/c of List() error above
+				return client
+			},
+		},
+		{
+			name:        "Missing annotation",
+			expectedErr: fmt.Errorf("error determining whether a credentials update is needed"),
+			existing: func() []runtime.Object {
+
+				objects := []runtime.Object{&rootSecretNoAnnotation}
+
+				return objects
+			}(),
+			credentialsRequest: testCredentialsRequest(t),
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Create(context.TODO(), cr)
+			},
+		},
+		{
+			name:        "Mint annotation",
+			expectedErr: fmt.Errorf("error determining whether a credentials update is needed"),
+			existing: func() []runtime.Object {
+
+				objects := []runtime.Object{&rootSecretMintAnnotation}
+
+				return objects
+			}(),
+			credentialsRequest: testCredentialsRequest(t),
+			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
+				return actuator.Create(context.TODO(), cr)
 			},
 		},
 	}
@@ -432,24 +537,9 @@ func TestActuator(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			if test.mockAppClient == nil {
-				test.mockAppClient = defaultMockAppClient
+				test.mockAppClient = mockAppClientNoCalls
 			}
 			appClient := test.mockAppClient(mockCtrl)
-
-			if test.mockServicePrincipalClient == nil {
-				test.mockServicePrincipalClient = defaultMockServicePrincipalClient
-			}
-			spClient := test.mockServicePrincipalClient(mockCtrl)
-
-			if test.mockRoleDefinitionClient == nil {
-				test.mockRoleDefinitionClient = defaultMockRoleDefinitionClient
-			}
-			rdClient := test.mockRoleDefinitionClient(mockCtrl)
-
-			if test.mockRoleAssignmentsClient == nil {
-				test.mockRoleAssignmentsClient = defaultMockRoleAssignmentsClient
-			}
-			raClient := test.mockRoleAssignmentsClient(mockCtrl)
 
 			actuator := azure.NewFakeActuator(
 				fakeClient,
@@ -461,12 +551,8 @@ func TestActuator(t *testing.T) {
 						tenantID,
 						subscriptionID,
 						appClient,
-						spClient,
-						raClient,
-						rdClient,
 					)
 				},
-				testGenerateServicePrincipalName,
 			)
 
 			testErr := test.op(actuator, test.credentialsRequest)
@@ -475,6 +561,10 @@ func TestActuator(t *testing.T) {
 				assert.Error(t, testErr)
 				assert.Equal(t, test.expectedErr.Error(), testErr.Error())
 			} else {
+				require.NoError(t, testErr, "unexpected error returned during test case")
+			}
+
+			if test.validate != nil {
 				test.validate(t, fakeClient)
 			}
 
@@ -482,11 +572,12 @@ func TestActuator(t *testing.T) {
 	}
 }
 
-func testCredRequestTargetSecret(cr *minterv1.CredentialsRequest) *corev1.Secret {
+func getCredRequestTargetSecret(t *testing.T, c client.Client, cr *minterv1.CredentialsRequest) *corev1.Secret {
 	s := &corev1.Secret{}
-	s.Name = cr.Spec.SecretRef.Name
-	s.Namespace = cr.Spec.SecretRef.Namespace
+	sKey := types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
 
+	err := c.Get(context.TODO(), sKey, s)
+	require.NoError(t, err, "unexpected error while fetching target secret")
 	return s
 }
 
@@ -499,26 +590,9 @@ func testAADApplication() graphrbac.Application {
 	return app
 }
 
-func testServicePrincipal() graphrbac.ServicePrincipal {
-	sp := graphrbac.ServicePrincipal{
-		AppID:       testAADApplication().AppID,
-		ObjectID:    to.StringPtr("sp-object-id"),
-		DisplayName: to.StringPtr(generateDisplayName()),
-	}
-	return sp
-}
-
 func generateDisplayName() string {
 	name, _ := testGenerateServicePrincipalName(testInfrastructureName, testCredRequestName)
 	return name
-}
-
-func testResourceGroup() resources.Group {
-	rg := resources.Group{
-		Name: to.StringPtr(testResourceGroupName),
-		Tags: map[string]*string{},
-	}
-	return rg
 }
 
 func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
@@ -538,7 +612,7 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 			Name:      testCredRequestName,
 		},
 		Spec: minterv1.CredentialsRequestSpec{
-			SecretRef:    corev1.ObjectReference{Namespace: "default", Name: "credentials"},
+			SecretRef:    corev1.ObjectReference{Namespace: testTargetSecretNamespace, Name: testTargetSecretName},
 			ProviderSpec: rawObj,
 		},
 	}
@@ -546,99 +620,15 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	return cr
 }
 
-func defaultMockAppClient(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
-	client := azuremock.NewMockAppClient(mockCtrl)
-	client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-		[]graphrbac.Application{testAADApplication()}, nil,
-	)
-	client.EXPECT().UpdatePasswordCredentials(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-	return client
-}
-
 func mockAppClientNoCalls(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
 	client := azuremock.NewMockAppClient(mockCtrl)
-	return client
-}
-
-func defaultMockServicePrincipalClient(mockCtrl *gomock.Controller) *azuremock.MockServicePrincipalClient {
-	client := azuremock.NewMockServicePrincipalClient(mockCtrl)
-	client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-		[]graphrbac.ServicePrincipal{},
-		nil,
-	)
-	client.EXPECT().Create(gomock.Any(), gomock.Any()).Return(testServicePrincipal(), nil)
-	return client
-}
-
-func mockServicePrincipalClientNoCalls(mockCtrl *gomock.Controller) *azuremock.MockServicePrincipalClient {
-	client := azuremock.NewMockServicePrincipalClient(mockCtrl)
-	return client
-}
-
-func testRoleDefinition() authorization.RoleDefinition {
-	rd := authorization.RoleDefinition{
-		Name: to.StringPtr(testRoleName),
-		ID:   to.StringPtr(testRoleDefinitionID),
-	}
-	return rd
-}
-
-func defaultMockRoleDefinitionClient(mockCtrl *gomock.Controller) *azuremock.MockRoleDefinitionClient {
-	client := azuremock.NewMockRoleDefinitionClient(mockCtrl)
-	client.EXPECT().List(gomock.Any(), gomock.Any(), gomock.Any()).Return(
-		[]authorization.RoleDefinition{testRoleDefinition()},
-		nil,
-	).AnyTimes()
-	return client
-}
-
-func mockRoleAssignmentClientNoCalls(mockCtrl *gomock.Controller) *azuremock.MockRoleAssignmentsClient {
-	client := azuremock.NewMockRoleAssignmentsClient(mockCtrl)
-	return client
-}
-
-func testRoleAssignment() authorization.RoleAssignment {
-	ra := authorization.RoleAssignment{
-		ID: to.StringPtr("some-role-assignment-id"),
-		Properties: &authorization.RoleAssignmentPropertiesWithScope{
-			RoleDefinitionID: testRoleDefinition().ID,
-			Scope:            to.StringPtr(fmt.Sprintf("subscriptions/%s/resourceGroups/%s", "", testResourceGroupName)),
-		},
-	}
-	return ra
-}
-
-func defaultMockRoleAssignmentsClient(mockCtrl *gomock.Controller) *azuremock.MockRoleAssignmentsClient {
-	client := azuremock.NewMockRoleAssignmentsClient(mockCtrl)
-	// one create for the resource group where the cluster lives
-	client.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
-		testRoleAssignment(),
-		nil,
-	)
-	// one create for the resource group where the dns entries exist
-	client.EXPECT().Create(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(
-		// code doesn't check the returned roleassignment result, so it's okay
-		// to send a generic role assignment.
-		testRoleAssignment(),
-		nil,
-	)
-	// One list when gathering current role assignments
-	client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-		[]authorization.RoleAssignment{}, nil,
-	)
-
-	// One more list when checking whether any extra roles are assigned
-	client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-		[]authorization.RoleAssignment{testRoleAssignment()},
-		nil,
-	)
 	return client
 }
 
 func defaultExistingObjects() []runtime.Object {
 	objs := []runtime.Object{
 		&clusterInfra,
-		&rootSecretMintAnnotation,
+		&validPassthroughRootSecret,
 		&clusterDNS,
 	}
 	return objs
@@ -651,4 +641,22 @@ func testGenerateServicePrincipalName(infraName string, credName string) (string
 	}
 	generated = generated + "-" + testRandomSuffix
 	return generated, nil
+}
+
+func getRootSecret(t *testing.T, c client.Client) *corev1.Secret {
+	rootSecretKey := types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AzureCloudCredSecretName}
+	rootSecret := &corev1.Secret{}
+	err := c.Get(context.TODO(), rootSecretKey, rootSecret)
+	require.NoError(t, err, "error fetching root secret from fake client")
+	return rootSecret
+}
+
+func assertSecretEquality(t *testing.T, expectedSecret, assertingSecret *corev1.Secret) {
+	assert.Equal(t, expectedSecret.Data[azure.AzureClientID], assertingSecret.Data[azure.AzureClientID])
+	assert.Equal(t, expectedSecret.Data[azure.AzureClientSecret], assertingSecret.Data[azure.AzureClientSecret])
+	assert.Equal(t, expectedSecret.Data[azure.AzureRegion], assertingSecret.Data[azure.AzureRegion])
+	assert.Equal(t, expectedSecret.Data[azure.AzureResourceGroup], assertingSecret.Data[azure.AzureResourceGroup])
+	assert.Equal(t, expectedSecret.Data[azure.AzureResourcePrefix], assertingSecret.Data[azure.AzureResourcePrefix])
+	assert.Equal(t, expectedSecret.Data[azure.AzureSubscriptionID], assertingSecret.Data[azure.AzureSubscriptionID])
+	assert.Equal(t, expectedSecret.Data[azure.AzureTenantID], assertingSecret.Data[azure.AzureTenantID])
 }
