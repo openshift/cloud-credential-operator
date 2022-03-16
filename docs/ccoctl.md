@@ -336,3 +336,93 @@ For alibaba cloud,  the CCO utility (`ccoctl`) binary will create credentials Se
    where:
    - `name` is the name used to tag any cloud resources that are created for tracking. 
    - `region` is the Alibaba Cloud region in which cloud resources will be created.   
+
+## Nutanix
+
+This is a guide for using manual mode on Nutanix, for more info about manual mode, please refer to [cco-mode-manual](https://github.com/openshift/cloud-credential-operator/blob/master/docs/mode-manual-creds.md).
+
+For Nutanix,  the CCO utility (`ccoctl`) binary will create credentials Secret manifests for the OpenShift installer.
+
+
+### Prerequisite
+
+1. Extract and prepare the ccoctl binary from the release image.
+
+2. Ensure the following environment variables are set:
+   - NUTANIX_ENDPOINT=<endpoint_for_prism_central>
+   - NUTANIX_PORT=<port_for_prism_central>
+   - NUTANIX_USER=<username_for_prism_central>
+   - NUTANIX_PASSWORD=<password_for_prism_central>
+
+### Procedure
+
+1. Extract the list of CredentialsRequest custom resources (CRs) from the OpenShift Container Platform release image:
+
+   ```bash
+   $ oc adm release extract --credentials-requests --cloud=nutanix --to=<path_to_directory_with_list_of_credentials_requests>/credrequests quay.io/<path_to>/ocp-release:<version>
+   ```
+
+   >  step 2&3 are only needed when preparing for upgrading clusters with manually maintained credentials. When doing a fresh installation please skip step 2&3**
+
+2. For each CredentialsRequest CR in the release image, ensure that a namespace that matches the text in the spec.secretRef.namespace field exists in the cluster. You can check the list of namespaces on the cluster by running `oc get namespace`. This field is where the generated secrets that hold the credentials configuration are stored.
+
+   Sample Nutanix CredentialsRequest object
+   ```yaml
+   apiVersion: cloudcredential.openshift.io/v1
+   kind: CredentialsRequest
+   metadata:
+     annotations:
+       include.release.openshift.io/self-managed-high-availability: "true"
+     labels:
+       controller-tools.k8s.io: "1.0"
+     name: openshift-machine-api-nutanix
+     namespace: openshift-cloud-credential-operator
+   spec:
+     providerSpec:
+       apiVersion: cloudcredential.openshift.io/v1
+       kind: NutanixProviderSpec
+     secretRef:
+       name: nutanix-credentials
+       namespace: openshift-machine-api
+   ```
+
+3. For any `CredentialsRequest` CR for which the cluster does not already have a namespace with the name specified in `spec.secretRef.namespace`, create the namespace:
+
+   ```bash
+   $ oc create namespace <component_namespace>
+   ```
+
+4. Use the `ccoctl` tool to process all `CredentialsRequest` objects in the `credrequests` directory:
+
+   ```bash
+   $ ccoctl nutanix create-shared-secrets --credentials-requests-dir=<path_to_directory_with_list_of_credentials_requests>/credrequests --output-dir=xxxxxx
+   ```
+
+   where:
+
+   - `credentials-requests-dir` is the directory containing files of component CredentialsRequests.
+   - `output-dir` is the directory containing files of component credentials secret under the `manifests` directory.
+
+5. Prepare to run the OpenShift Container Platform installer:
+
+   a. Create the install-config.yaml file:
+   ```bash
+   $ openshift-install create install-config --dir ./path/to/installation/dir
+   ```
+   b. Configure the cluster to install with the CCO in manual mode:
+
+   ```bash
+   $ echo "credentialsMode: Manual" >> ./path/to/installation/dir/install-config.yaml
+   ```
+
+   c. Create install manifests:
+
+   ```bash
+   $ openshift-install create manifests --dir ./path/to/installation/dir
+   ```
+
+   d. Copy the generated credential files to the target manifests directory:
+
+   ```bash
+   $ cp <output_dir>/manifests/*credentials.yaml ./path/to/installation/dir/manifests/
+   ```

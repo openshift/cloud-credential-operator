@@ -216,6 +216,7 @@ Azure | N<sup>1</sup> | N | Y | Y | N
 GCP | Y | 4.7+ | Y | Y | 4.10+
 IBMCloud | N | N | N | Y | N
 KubeVirt | N | N | Y | N | N
+Nutanix | N | N | N | Y | N
 OpenStack | N | N | Y | N | N
 oVirt | N | N | Y | N | N
 VMWare | N | N | Y | N | N
