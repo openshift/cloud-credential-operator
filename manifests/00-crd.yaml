@@ -145,6 +145,11 @@ spec:
                   object has changed and requires a sync.
                 type: integer
                 format: int64
+              lastSyncInfrastructureResourceVersion:
+                description: LastSyncInfrastructureResourceVersion is the resource
+                  version of the Infrastructure resource. It is used to determine
+                  if the user provided tags have been updated since the last sync.
+                type: string
               lastSyncTimestamp:
                 description: LastSyncTimestamp is the time that the credentials were
                   last synced.
