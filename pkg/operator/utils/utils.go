@@ -365,3 +365,14 @@ func UpgradeableCheck(kubeClient client.Client,
 	// Only return non-default conditions as the status controller will set defaults
 	return nil
 }
+
+// FindClusterOperatorCondition iterates all conditions on a ClusterOperator looking for the
+// specified condition type. If none exists nil will be returned.
+func FindClusterOperatorCondition(conditions []configv1.ClusterOperatorStatusCondition, conditionType configv1.ClusterStatusConditionType) *configv1.ClusterOperatorStatusCondition {
+	for i, condition := range conditions {
+		if condition.Type == conditionType {
+			return &conditions[i]
+		}
+	}
+	return nil
+}
