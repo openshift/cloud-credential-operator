@@ -1,4 +1,10 @@
-self_dir :=$(dir $(lastword $(MAKEFILE_LIST)))
+include $(addprefix $(dir $(lastword $(MAKEFILE_LIST))), \
+	../../lib/golang.mk \
+	../../lib/tmp.mk \
+	../../targets/openshift/controller-gen.mk \
+	../../targets/openshift/yq.mk \
+	../../targets/openshift/yaml-patch.mk \
+)
 
 # $1 - crd file
 # $2 - patch file
@@ -51,7 +57,7 @@ update-codegen-crds: update-codegen-crds-$(1)
 verify-codegen-crds-$(1): VERIFY_CODEGEN_CRD_TMP_DIR:=$$(shell mktemp -d)
 verify-codegen-crds-$(1): ensure-controller-gen ensure-yq ensure-yaml-patch
 	$(call run-crd-gen,$(2),$(3),$$(VERIFY_CODEGEN_CRD_TMP_DIR))
-	$$(foreach p,$$(wildcard $(3)/*crd.yaml),$$(call diff-file,$$(p),$$(subst $(3),$$(VERIFY_CODEGEN_CRD_TMP_DIR),$$(p))))
+	$$(foreach p,$$(wildcard $(4)/*crd.yaml),$$(call diff-file,$$(p),$$(subst $(4),$$(VERIFY_CODEGEN_CRD_TMP_DIR),$$(p))))
 .PHONY: verify-codegen-crds-$(1)
 
 verify-codegen-crds: verify-codegen-crds-$(1)
@@ -76,15 +82,3 @@ verify: verify-generated
 define add-crd-gen
 $(eval $(call add-crd-gen-internal,$(1),$(2),$(3),$(4)))
 endef
-
-
-# We need to be careful to expand all the paths before any include is done
-# or self_dir could be modified for the next include by the included file.
-# Also doing this at the end of the file allows us to use self_dir before it could be modified.
-include $(addprefix $(self_dir), \
-	../../lib/golang.mk \
-	../../lib/tmp.mk \
-	../../targets/openshift/controller-gen.mk \
-	../../targets/openshift/yq.mk \
-    ../../targets/openshift/yaml-patch.mk \
-)
