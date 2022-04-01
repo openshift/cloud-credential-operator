@@ -660,17 +660,13 @@ func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterUUID str
 	}
 
 	// Check if the user has the expected tags from the Infrastructure resource
-	if infraResource != nil {
-		if infraResource.Spec.PlatformSpec.AWS != nil {
-			if len(infraResource.Spec.PlatformSpec.AWS.ResourceTags) != 0 {
+	if infraResource != nil && infraResource.Spec.PlatformSpec.AWS != nil && len(infraResource.Spec.PlatformSpec.AWS.ResourceTags) != 0 {
 				for _, userTag := range infraResource.Spec.PlatformSpec.AWS.ResourceTags {
 					if !userHasTag(user, userTag.Key, userTag.Value) {
 						log.Infof("user missing tag: %s=%s", userTag.Key, userTag.Value)
 						return false
 					}
 				}
-			}
-		}
 	}
 
 	if infraResource.Status.InfrastructureName != "" {
