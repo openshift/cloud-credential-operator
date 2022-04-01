@@ -358,12 +358,8 @@ func isAdminCredSecret(namespace, secretName string) bool {
 func hasResourceTags(event client.Object) bool {
 	switch infra := event.(type) {
 	case *configv1.Infrastructure:
-		if infra != nil {
-			if infra.Spec.PlatformSpec.AWS != nil {
-				if len(infra.Spec.PlatformSpec.AWS.ResourceTags) != 0 {
+		if infra != nil && infra.Spec.PlatformSpec.AWS != nil && len(infra.Spec.PlatformSpec.AWS.ResourceTags) != 0 {
 					return true
-				}
-			}
 		}
 	default:
 		return false
