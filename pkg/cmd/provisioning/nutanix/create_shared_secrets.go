@@ -2,16 +2,16 @@ package nutanix
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
+	"os/user"
 	"path/filepath"
-	"runtime"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	"gopkg.in/square/go-jose.v2/json"
 	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
 
@@ -99,11 +99,14 @@ func createSecretsCmd(cmd *cobra.Command, args []string) error {
 
 	filePath := CreateSharedSecretsOpts.CredentialsSourceFilePath
 	if filePath == "" {
-		homePath := GetHomePath()
-		if homePath == "" {
-			return errors.New("The default source credential file path is invalid")
+		user, err := user.Current()
+		if err != nil {
+			return errors.New("Failed to get the current user for the default credentials-source-filepath. You need to use the option --credentials-source-filepath to specify the filepath of the credentials data file.")
 		}
-		filePath = filepath.Join(homePath, ".nutanix", "credentials")
+		if user.HomeDir == "" {
+			return errors.New("Failed to get the current user's homeDir for the default credentials-source-filepath. You need to use the option --credentials-source-filepath to specify the filepath of the credentials data file.")
+		}
+		filePath = filepath.Join(user.HomeDir, ".nutanix", "credentials")
 	}
 
 	if _, err := os.Stat(filePath); err != nil {
@@ -146,10 +149,6 @@ func getCredentialsData(creds *NutanixCredentials) (*NutanixCredentials, error) 
 			}
 			if basicAuthCreds.PrismCentral.Username == "" || basicAuthCreds.PrismCentral.Password == "" {
 				return nil, errors.New("The Prism Central username and/or password are not set correctly.")
-			}
-			if len(basicAuthCreds.PrismElements) == 0 || basicAuthCreds.PrismElements[0].Name == "" ||
-				basicAuthCreds.PrismElements[0].Username == "" || basicAuthCreds.PrismElements[0].Password == "" {
-				return nil, errors.New("The Prism Element (cluster) username and/or password are not set correctly.")
 			}
 
 			credsJsonBytes, err := json.Marshal(*basicAuthCreds)
@@ -196,7 +195,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir string, cred
 	}
 	b64CredsJson := base64.StdEncoding.EncodeToString(credsJsonBytes)
 
-	fileData := fmt.Sprintf(secretManifestsTemplate, string(b64CredsJson),
+	fileData := fmt.Sprintf(secretManifestsTemplate, b64CredsJson,
 		cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
 
 	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
@@ -256,21 +255,4 @@ func initEnvForCreateCmd(cmd *cobra.Command, args []string) {
 	if err != nil {
 		log.Fatalf("failed to create manifests directory at %s", manifestsDir)
 	}
-}
-
-// GetHomePath return home directory according to the system.
-// if the environmental virables does not exist, will return empty
-func GetHomePath() string {
-	if runtime.GOOS == "windows" {
-		path, ok := os.LookupEnv("USERPROFILE")
-		if !ok {
-			return ""
-		}
-		return path
-	}
-	path, ok := os.LookupEnv("HOME")
-	if !ok {
-		return ""
-	}
-	return path
 }
