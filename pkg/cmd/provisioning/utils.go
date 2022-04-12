@@ -149,13 +149,16 @@ func KeyIDFromPublicKey(publicKey interface{}) (string, error) {
 
 // GetListOfCredentialsRequests decodes manifests in a given directory and returns a list of CredentialsRequests
 func GetListOfCredentialsRequests(dir string, enableTechPreview bool) ([]*credreqv1.CredentialsRequest, error) {
-	credRequests := []*credreqv1.CredentialsRequest{}
+	credRequests := make([]*credreqv1.CredentialsRequest, 0)
 	files, err := ioutil.ReadDir(dir)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, file := range files {
+		if file.IsDir() || !(strings.HasSuffix(file.Name(), ".yaml") || strings.HasSuffix(file.Name(), ".yml")){
+			continue
+		}
 		f, err := os.Open(filepath.Join(dir, file.Name()))
 		if err != nil {
 			return nil, errors.Wrap(err, "Failed to open file")
