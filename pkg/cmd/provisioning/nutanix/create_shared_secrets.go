@@ -23,13 +23,13 @@ const (
 	manifestsDirName = "manifests"
 
 	secretManifestsTemplate = `apiVersion: v1
-data:
-  credentials: %s
 kind: Secret
 metadata:
   name: %s
   namespace: %s
-type: Opaque`
+type: Opaque
+data:
+  credentials: %s`
 
 	BasicAuthCredentialType CredentialType = "basic_auth"
 )
@@ -61,6 +61,7 @@ type PrismCentralBasicAuth struct {
 }
 
 type PrismElementBasicAuth struct {
+	// name is the unique resource name of the Prism Element (cluster) in the Prism Central's domain
 	Name     string `json:"name"`
 	Username string `json:"username"`
 	Password string `json:"password"`
@@ -115,12 +116,12 @@ func createSecretsCmd(cmd *cobra.Command, args []string) error {
 
 	bytes, err := ioutil.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("Failed to read the credentials file %s. %v", filePath, err)
+		return fmt.Errorf("Failed to read the credentials file %s. %w", filePath, err)
 	}
 
 	creds := &NutanixCredentials{}
 	if err = yaml.Unmarshal(bytes, creds); err != nil {
-		return fmt.Errorf("Failed to convert the credentials data read from file %s. %v", filePath, err)
+		return fmt.Errorf("Failed to unmarshal the credentials data read from file %s. %w", filePath, err)
 	}
 
 	retCreds, err := getCredentialsData(creds)
@@ -145,7 +146,7 @@ func getCredentialsData(creds *NutanixCredentials) (*NutanixCredentials, error) 
 		case BasicAuthCredentialType:
 			basicAuthCreds := &BasicAuthCredential{}
 			if err = yaml.Unmarshal(cred.Data.Raw, basicAuthCreds); err != nil {
-				return nil, errors.Wrap(err, "Failed to convert the basic-auth data.")
+				return nil, errors.Wrap(err, "Failed to unmarshal the basic-auth data.")
 			}
 			if basicAuthCreds.PrismCentral.Username == "" || basicAuthCreds.PrismCentral.Password == "" {
 				return nil, errors.New("The Prism Central username and/or password are not set correctly.")
@@ -195,8 +196,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir string, cred
 	}
 	b64CredsJson := base64.StdEncoding.EncodeToString(credsJsonBytes)
 
-	fileData := fmt.Sprintf(secretManifestsTemplate, b64CredsJson,
-		cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
+	fileData := fmt.Sprintf(secretManifestsTemplate, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, b64CredsJson)
 
 	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
 		return errors.Wrap(err, "Failed to save Secret file")
