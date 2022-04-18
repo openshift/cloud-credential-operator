@@ -277,7 +277,7 @@ func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetS
 		credReq = fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
 	}
 
-	f, err := ioutil.TempFile(targetDir, "testCredReq")
+	f, err := ioutil.TempFile(targetDir, "testCredReq*.yaml")
 	require.NoError(t, err, "error creating temp file for CredentialsRequest")
 	defer f.Close()
 
