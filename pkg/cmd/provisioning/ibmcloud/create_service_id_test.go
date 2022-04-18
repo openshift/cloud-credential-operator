@@ -485,7 +485,7 @@ func TestCreateSharedSecretsInvalidTargetDir(t *testing.T) {
 }
 
 func writeToTempFile(t *testing.T, targetDir, content string) {
-	f, err := ioutil.TempFile(targetDir, "testCredReq")
+	f, err := ioutil.TempFile(targetDir, "testCredReq*.yaml")
 	require.NoError(t, err, "error creating temp file for CredentialsRequest")
 	defer f.Close()
 
