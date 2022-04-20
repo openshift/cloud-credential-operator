@@ -5,9 +5,10 @@ import (
 )
 
 type options struct {
-	TargetDir         string
-	CredRequestDir    string
-	EnableTechPreview bool
+	TargetDir                 string
+	CredRequestDir            string
+	CredentialsSourceFilePath string
+	EnableTechPreview         bool
 }
 
 // NewNutanixCmd implements the "nutanix" subcommand for the credentials provisioning
