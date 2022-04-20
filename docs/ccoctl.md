@@ -348,11 +348,20 @@ For Nutanix,  the CCO utility (`ccoctl`) binary will create credentials Secret m
 
 1. Extract and prepare the ccoctl binary from the release image.
 
-2. Ensure the following environment variables are set:
-   - NUTANIX_ENDPOINT=<endpoint_for_prism_central>
-   - NUTANIX_PORT=<port_for_prism_central>
-   - NUTANIX_USER=<username_for_prism_central>
-   - NUTANIX_PASSWORD=<password_for_prism_central>
+2. Ensure to edit a local yaml format file with the credentials data to access the Prism Central and Prism Element (cluster). Currently we only support the credentials type "basic_auth". The credentials data file can be put in the default filepath $HOME/.nutanix/credentials, or any file path of your choice. In the latter case, you need to use the ccoctl option "--credentials-source-filepath" to specify the file path.
+
+Below is the expected credentials data format (case-sensitive):
+
+credentials:
+- type: basic_auth
+  data:
+    prismCentral:
+      username: <username_for_prism_central>
+      password: <password_for_prism_central>
+    prismElements:
+    - name: <name_of_prism_element>
+      username: <username_for_prism_element>
+      password: <password_for_prism_element>
 
 ### Procedure
 
@@ -395,13 +404,14 @@ For Nutanix,  the CCO utility (`ccoctl`) binary will create credentials Secret m
 4. Use the `ccoctl` tool to process all `CredentialsRequest` objects in the `credrequests` directory:
 
    ```bash
-   $ ccoctl nutanix create-shared-secrets --credentials-requests-dir=<path_to_directory_with_list_of_credentials_requests>/credrequests --output-dir=xxxxxx
+   $ ccoctl nutanix create-shared-secrets --credentials-requests-dir=<path_to_directory_with_list_of_credentials_requests>/credrequests --output-dir=xxxxxx --credentials-source-filepath=<filepath_of_the_yaml_file_with_the_credentials_data>
    ```
 
    where:
 
    - `credentials-requests-dir` is the directory containing files of component CredentialsRequests.
    - `output-dir` is the directory containing files of component credentials secret under the `manifests` directory.
+   - `credentials-source-filepath` is the filepath of the nutanix credentials data. If not specified, will use the default path $HOME/.nutanix/credentials
 
 5. Prepare to run the OpenShift Container Platform installer:
 
