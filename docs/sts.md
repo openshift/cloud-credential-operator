@@ -24,7 +24,7 @@ The token is a projected ServiceAccount into the Pod, and is short lived for an 
 
 ### Steps to install an OpenShift Cluster with STS
 
-1. Set $RELEASE_IMAGE to point to a sufficiently new OpenShift release
+1. Set `$RELEASE_IMAGE` to point to a sufficiently new OpenShift release
 2. Extract the AWS Credentials Request objects from the above release image
    
    With newer version of oc CLI (4.7+):
@@ -66,11 +66,11 @@ The token is a projected ServiceAccount into the Pod, and is short lived for an 
 
 ### Post install verification
 
-1. Connect to the newly installed cluster and verify that the OpenShift cluster does not have `root` credentials. Below command should throw secret not found error
+1. Connect to the newly installed cluster and verify that the OpenShift cluster does not have `root` credentials. The following command should throw a secret not found error:
    ```yaml
    oc get secrets -n kube-system aws-creds
    ```
-2. Verify that components are assuming the IAM Role specified in the secret manifests, instead of creds minted by the cloud-credential-operator. Below command should show you the `role` and `web identity token` used by the image registry operator
+2. Verify that components are assuming the IAM Role specified in the secret manifests, instead of creds minted by the cloud-credential-operator. The following command should show you the `role` and `web identity token` used by the image registry operator
    ```yaml
    oc get secrets -n openshift-image-registry installer-cloud-credentials -o json | jq -r .data.credentials | base64 -d
    ```
@@ -84,7 +84,7 @@ The token is a projected ServiceAccount into the Pod, and is short lived for an 
 
 ---
 **NOTE**
-This is just for developers interested in taking an existing cluster to STS. This is explicitly NOT RECOMMENED NOR SUPPORTED.
+This is just for developers interested in taking an existing cluster to STS. This is explicitly NOT RECOMMENED OR SUPPORTED.
 
 ---
 
