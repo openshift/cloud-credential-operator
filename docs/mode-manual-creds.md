@@ -1,6 +1,12 @@
 # Manual Mode
 
-Cloud Credential Operator can be put into manual mode prior to install in environments where the cloud IAM APIs are not reachable, or the administrator simply prefers not to store an admin level credential Secret in the cluster kube-system Namespace. Depending on the cluster's cloud credentials configuration (eg AWS STS, GCP workload identity, etc), the `ccoctl` [tool](https://github.com/openshift/cloud-credential-operator/blob/master/docs/ccoctl.md) may help automate many of these steps.
+- [Overview](#overview)
+  - [Azure Credentials Secret Format](#azure-credentials-secret-format)
+- [Create Your Cluster](#create-your-cluster)
+- [Upgrades](#upgrades)
+
+## Overview
+Cloud Credential Operator can be put into manual mode prior to install in environments where the cloud IAM APIs are not reachable, or the administrator simply prefers not to store an admin level credential Secret in the cluster kube-system Namespace. Depending on the cluster's cloud credentials configuration (eg AWS STS, GCP workload identity, etc), the `ccoctl` [tool](ccoctl.md) may help automate many of these steps.
 
 Run the OpenShift installer to generate manifests:
 
@@ -19,21 +25,11 @@ $ bin/openshift-install version
 release image quay.io/openshift-release-dev/ocp-release:4.4.6-x86_64
 ```
 
-Now you must locate all CredentialsRequests in this release image that target the cloud you are deploying on.
+Now you must locate all CredentialsRequests in this release image that target the cloud you are deploying on. For example:
 
 ```bash
-$ oc adm release extract quay.io/openshift-release-dev/ocp-release:4.4.6-x86_64 --to ./release-image
+$ oc adm release extract quay.io/openshift-release-dev/ocp-release:4.4.6-x86_64 --credentials-requests --cloud=aws --to ./release-image
 ```
-
-To locate the CredentialsRequests in the extracted file you can run a command such as:
-
-```bash
-$ grep -l "apiVersion: cloudcredential.openshift.io" * | xargs cat
-```
-
-NOTE: there will soon be an oc adm release command to scan for these and display them (4.6)
-
-This displays the details for each request. Remember to ignore any CredentialsRequests where the spec.providerSpec.kind does not match the cloud provider you will be installing to.
 
 Sample CredentialsRequest:
 
@@ -59,7 +55,7 @@ spec:
       resource: "*"
 ```
 
-You must now create Secret yaml files in your openshift-install manifests directory generated earlier. The Secrets must be stored in the namespace and name defined in each request.spec.secretRef. The format for the Secret data varies by cloud provider, please see the [Admin Credentials Secret Format](../README.md) in the README for examples.
+You must now create Secret yaml files in your openshift-install manifests directory generated earlier. The Secrets must be stored in the namespace and name defined in each request.spec.secretRef. The format for the Secret data varies by cloud provider, please see the [Admin Credentials Secret Format](../README.md#credentials-root-secret-formats) in the README for examples.
 
 ### Azure Credentials Secret Format
 
@@ -99,10 +95,10 @@ $ oc adm release extract --credentials-requests --cloud=aws|azure|gcp quay.io/op
 
 Review each extracted CredentialsRequests and ensure the appropriate permissions are granted to each set of credentials held in each Secret. Create new Secrets/credentials in the cluster in the appropriate namespace for any new components requiring cloud credentials in the OpenShift release being upgraded to.
 
-One the list of CredentialsRequests has been processed and/or verified, signal to the cluster that it is safe to upgrade by applying the appropriate annotation to the Cloud Credential Operator's config resource:
+Once the list of CredentialsRequests has been processed and/or verified, signal to the cluster that it is safe to upgrade by applying the appropriate annotation to the Cloud Credential Operator's config resource:
 
 ```bash
 oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"annotations": {"cloudcredential.openshift.io/upgradeable-to": "4.8"}}}' --type=merge
 ```
 
-Set the "upgradeable-to" annotation value to correspond with the OpenShift minor version that the admin has prepared the cluster's cloud credentials for.
+Set the "upgradeable-to" annotation value to correspond with the OpenShift minor version for which the admin has prepared the cluster's cloud credentials.
