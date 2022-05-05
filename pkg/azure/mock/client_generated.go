@@ -35,6 +35,20 @@ func (m *MockAppClient) EXPECT() *MockAppClientMockRecorder {
 	return m.recorder
 }
 
+// Delete mocks base method.
+func (m *MockAppClient) Delete(ctx context.Context, applicationObjectID string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, applicationObjectID)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockAppClientMockRecorder) Delete(ctx, applicationObjectID interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockAppClient)(nil).Delete), ctx, applicationObjectID)
+}
+
 // List mocks base method.
 func (m *MockAppClient) List(ctx context.Context, filter string) ([]graphrbac.Application, error) {
 	m.ctrl.T.Helper()
@@ -48,18 +62,4 @@ func (m *MockAppClient) List(ctx context.Context, filter string) ([]graphrbac.Ap
 func (mr *MockAppClientMockRecorder) List(ctx, filter interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "List", reflect.TypeOf((*MockAppClient)(nil).List), ctx, filter)
-}
-
-// Delete mocks base method.
-func (m *MockAppClient) Delete(ctx context.Context, applicationObjectID string) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "Delete", ctx, applicationObjectID)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// Delete indicates an expected call of Delete.
-func (mr *MockAppClientMockRecorder) Delete(ctx, applicationObjectID interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockAppClient)(nil).Delete), ctx, applicationObjectID)
 }
