@@ -97,7 +97,6 @@ func createSharedSecretsCmd() *cobra.Command {
 }
 
 func createSecretsCmd(cmd *cobra.Command, args []string) error {
-
 	filePath := CreateSharedSecretsOpts.CredentialsSourceFilePath
 	if filePath == "" {
 		user, err := user.Current()
@@ -166,7 +165,6 @@ func getCredentialsData(creds *NutanixCredentials) (*NutanixCredentials, error) 
 		}
 	}
 
-	log.Printf("There are %d valid credentials", len(retCreds.Credentials))
 	return retCreds, nil
 }
 
@@ -174,6 +172,10 @@ func createSecrets(credReqDir, targetDir string, creds *NutanixCredentials, enab
 	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
 		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
+	}
+
+	if len(credRequests) == 0 {
+		return errors.New(fmt.Sprintf("no CredentialsRequest manifests found in %q", credReqDir))
 	}
 
 	for _, cr := range credRequests {

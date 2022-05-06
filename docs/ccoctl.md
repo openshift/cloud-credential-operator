@@ -394,6 +394,8 @@ credentials:
       password: <password_for_prism_element>
 ```
 
+  >  Note: In the credentials file above, 'prismCentral' entry is required and 'prismElements' entry is optional.
+
 ### Procedure
 
 1. Extract the list of CredentialsRequest custom resources (CRs) from the OpenShift Container Platform release image:
