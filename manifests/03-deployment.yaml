@@ -25,6 +25,10 @@ spec:
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - args:
         - --secure-listen-address=0.0.0.0:8443
@@ -35,6 +39,10 @@ spec:
         image: quay.io/openshift/origin-kube-rbac-proxy:latest
         imagePullPolicy: IfNotPresent
         name: kube-rbac-proxy
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         ports:
         - containerPort: 8443
           name: metrics
@@ -66,6 +74,10 @@ spec:
         image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: IfNotPresent
         name: cloud-credential-operator
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
         resources:
           requests:
             cpu: 10m
