@@ -32,8 +32,6 @@ The `ccoctl` tool provides various commands to assist with the creating and main
   - [Prerequisite](#prerequisite-1)
   - [Procedure](#procedure-1)
 
-_Note: This command cannot be run directly in a Darwin kernel. Please refer to the documentation: [Run ccoctl on macOS](./ccoctl_darwin.md) for further information._
-
 ## AWS
 
 ### Global flags
