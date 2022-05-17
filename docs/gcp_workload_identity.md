@@ -48,17 +48,18 @@ With Workload Identity, the type of the credentials is `external_account`. `audi
 
 1. Set the variable `$RELEASE_IMAGE`
 
-   `$RELEASE_IMAGE` should be a sufficiently new OpenShift release image that you want to deploy in your cluster.
+   `$RELEASE_IMAGE` should be a recent and supported  OpenShift release image that you want to deploy in your cluster.
+   Please refer to the [support matrix](../README.md#support-matrix) for compatibilities.
 
    It should be like: `RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:${RHOCP_version}-${Arch}`
 
-   Where the `RHOCP_version` is something like: `4.10.0-fc.4`, `4.9.3` and the `Arch` is `x86_64`
+   Where the `RHOCP_version` is something like: `4.10.0-fc.4`s or `4.9.3` and the `Arch` is `x86_64`
 
 2. Extract the GCP Credentials Request objects from the above release image. You must use version 4.7 or newer of the `oc` CLI.
    ```
    mkdir credreqs ; oc adm release extract --cloud=gcp --credentials-requests $RELEASE_IMAGE --to=./credreqs
    ```
-3. Extract the OpenShift install binary from the release image and ccoctl from the related image
+3. Extract the `openshift-install` and `ccoctl` binaries from the release image.
    ```
    oc adm release extract --command=openshift-install $RELEASE_IMAGE
    CCO_IMAGE=$(oc adm release info --image-for='cloud-credential-operator' ${RELEASE_IMAGE}) && oc image extract ${CCO_IMAGE} --file='/usr/bin/ccoctl' --registry-config=${PULL_SECRET_PATH:-.}/pull-secret
@@ -79,8 +80,6 @@ With Workload Identity, the type of the credentials is `external_account`. `audi
    ```
    ccoctl gcp create-all --name=<gcp_infra_name> --region=<gcp_region> --project=<gcp-project-id> --credentials-requests-dir=/path/to/credreqs/directory/created/in/step/2 --output-dir=<output_dir>
    ```
-
-   _Note: This command cannot be run directly in a Darwin kernel. Please refer to the documentation: [Run ccoctl on macOS](./ccoctl_darwin.md) for further information._
 8. Copy the manifests created in the step 7 and put them in the same location as install-config.yaml in the `manifests` directory
    ```
    cp _output/manifests/* /path/to/dir/with/install-config.yaml/manifests/
