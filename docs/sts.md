@@ -29,9 +29,9 @@ The token is a projected ServiceAccount into the Pod, and is short lived for an 
    `$RELEASE_IMAGE` should be a recent and supported  OpenShift release image that you want to deploy in your cluster.
    Please refer to the [support matrix](../README.md#support-matrix) for compatibilities.
 
-   It should be like: `RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:${RHOCP_version}-${Arch}`
+   A sample release image would be `RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:${RHOCP_version}-${Arch}`
 
-   Where the `RHOCP_version` is something like: `4.10.0-fc.4`s or, `4.9.3` and the `Arch` is `x86_64`
+   Where `RHOCP_version` is the OpenShift version (e.g `4.10.0-fc.4` or `4.9.3`) and the `Arch` is the architecture type (e.g `x86_64`)
 
 2. Extract the AWS Credentials Request objects from the above release image
 
