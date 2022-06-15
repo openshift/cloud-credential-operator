@@ -139,6 +139,10 @@ spec:
       - name: pod-identity-webhook
         image: ${IMAGE}
         imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: [ "ALL" ]
         command:
         - /usr/bin/aws-pod-identity-webhook
         - --in-cluster=false
@@ -162,6 +166,10 @@ spec:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
       serviceAccountName: pod-identity-webhook
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
