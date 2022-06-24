@@ -38,7 +38,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		}
 
 	} else {
-		gcpClient, err = gcp.NewClient_GCE(CreateAllOpts.Project, creds)
+		gcpClient, err = gcp.NewClientGCE(CreateAllOpts.Project, creds)
 		if err != nil {
 			log.Fatalf("Failed to initiate GCP client: %s", err)
 		}
