@@ -60,9 +60,19 @@ func createWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds.JSON)
-	if err != nil {
-		log.Fatal(err)
+	var gcpClient gcp.Client
+
+	if len(creds.JSON) != 0 {
+		gcpClient, err = gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds.JSON)
+		if err != nil {
+			log.Fatalf("Failed to initiate GCP client: %s", err)
+		}
+
+	} else {
+		gcpClient, err = gcp.NewClientGCE(CreateWorkloadIdentityProviderOpts.Project, creds)
+		if err != nil {
+			log.Fatalf("Failed to initiate GCP client: %s", err)
+		}
 	}
 
 	publicKeyPath := CreateWorkloadIdentityProviderOpts.PublicKeyPath

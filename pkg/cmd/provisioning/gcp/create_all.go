@@ -43,6 +43,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 			log.Fatalf("Failed to initiate GCP client: %s", err)
 		}
 	}
+
 	publicKeyPath := CreateAllOpts.PublicKeyPath
 	if publicKeyPath == "" {
 		publicKeyPath = path.Join(CreateAllOpts.TargetDir, provisioning.PublicKeyFile)

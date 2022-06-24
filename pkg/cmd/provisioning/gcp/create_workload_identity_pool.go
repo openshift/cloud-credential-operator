@@ -46,9 +46,19 @@ func createWorkloadIdentityPoolCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityPoolOpts.Project, creds.JSON)
-	if err != nil {
-		log.Fatalf("Failed to setup GCP client: %s", err)
+	var gcpClient gcp.Client
+
+	if len(creds.JSON) != 0 {
+		gcpClient, err = gcp.NewClient(CreateWorkloadIdentityPoolOpts.Project, creds.JSON)
+		if err != nil {
+			log.Fatalf("Failed to initiate GCP client: %s", err)
+		}
+
+	} else {
+		gcpClient, err = gcp.NewClientGCE(CreateWorkloadIdentityPoolOpts.Project, creds)
+		if err != nil {
+			log.Fatalf("Failed to initiate GCP client: %s", err)
+		}
 	}
 
 	err = createWorkloadIdentityPool(ctx, gcpClient, CreateWorkloadIdentityPoolOpts.Name, CreateWorkloadIdentityPoolOpts.Project, CreateWorkloadIdentityPoolOpts.TargetDir, CreateWorkloadIdentityPoolOpts.DryRun)
