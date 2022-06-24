@@ -404,3 +404,44 @@ func NewClient(projectName string, authJSON []byte) (Client, error) {
 		storageClient:              storageClient,
 	}, nil
 }
+
+func NewClient_GCE(projectName string, creds *google.Credentials) (Client, error) {
+	ctx := context.TODO()
+	var err error
+	// since we're using a single creds var, we should specify all the required scopes when initializing
+
+	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
+	iamClient, err := iamadmin.NewIamClient(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
+	iamService, err := iam.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
+	serviceUsageClient, err := serviceusage.NewService(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
+	storageClient, err := storage.NewClient(ctx, option.WithCredentials(creds))
+	if err != nil {
+		return nil, err
+	}
+
+	return &gcpClient{
+		projectName:                projectName,
+		creds:                      creds,
+		cloudResourceManagerClient: cloudResourceManagerClient,
+		iamClient:                  iamClient,
+		iamService:                 iamService,
+		serviceUsageClient:         serviceUsageClient,
+		storageClient:              storageClient,
+	}, nil
+}
