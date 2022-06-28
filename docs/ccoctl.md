@@ -339,24 +339,24 @@ For alibaba cloud, the CCO utility (`ccoctl`) will create credentials Secret man
 
    a. Create the install-config.yaml file:
    ```bash
-   $ openshift-install create install-config --dir ./path/to/installation/dir
+   $ openshift-install create install-config --dir ./path/to/dir/of/install-config
    ```
    b. Configure the cluster to install with the CCO in manual mode:
 
    ```bash
-   $ echo "credentialsMode: Manual" >> ./path/to/installation/dir/install-config.yaml
+   $ echo "credentialsMode: Manual" >> ./path/to/dir/of/install-config/install-config.yaml
    ```
    
    c. Create install manifests:
 
    ```bash
-   $ openshift-install create manifests --dir ./path/to/installation/dir
+   $ openshift-install create manifests --dir ./path/to/dir/of/install-config
    ```
 
    d. Copy the generated credential files to the target manifests directory:
 
    ```bash
-   $ cp <output_dir>/manifests/*credentials.yaml ./path/to/installation/dir/manifests/
+   $ cp <output_dir>/manifests/*credentials.yaml ./path/to/dir/of/install-config/manifests/
    ```
 6. To delete resources created by ccoctl, run
 
@@ -450,22 +450,22 @@ credentials:
 
    a. Create the install-config.yaml file:
    ```bash
-   $ openshift-install create install-config --dir ./path/to/installation/dir
+   $ openshift-install create install-config --dir ./path/to/dir/of/install-config
    ```
    b. Configure the cluster to install with the CCO in manual mode:
 
    ```bash
-   $ echo "credentialsMode: Manual" >> ./path/to/installation/dir/install-config.yaml
+   $ echo "credentialsMode: Manual" >> ./path/to/dir/of/install-config/install-config.yaml
    ```
 
    c. Create install manifests:
 
    ```bash
-   $ openshift-install create manifests --dir ./path/to/installation/dir
+   $ openshift-install create manifests --dir ./path/to/dir/of/install-config
    ```
 
    d. Copy the generated credential files to the target manifests directory:
 
    ```bash
-   $ cp <output_dir>/manifests/*credentials.yaml ./path/to/installation/dir/manifests/
+   $ cp <output_dir>/manifests/*credentials.yaml ./path/to/dir/of/install-config/manifests/
    ```
