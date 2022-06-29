@@ -95,16 +95,18 @@ Then you can use `ccoctl` to process all CredentialsRequest objects in the `./cr
 $ ccoctl aws create-all --name=<name> --region=<aws-region> --credentials-requests-dir=<path-to-directory-with-list-of-credentials-requests>
 ```
 
-### Deleting resources
+### Deleting resources<a name="aws-delete"></a>
+
 
 To delete resources created by ccoctl, run
 
 ```bash
 $ ccoctl aws delete --name=<name> --region=<aws-region>
-
 ```
 
 where `name` is the name used to tag and account any cloud resources that were created, and `region` is the aws region in which cloud resources were created.
+
+> If you are using CloudFront Distribution, you need to follow [those](./sts-private-bucket.md#steps-delete) steps to remove the Distribution and OAI manually.
 
 ## GCP
 
