@@ -46,14 +46,23 @@ With Workload Identity, the type of the credentials is `external_account`. `audi
 
 ### Steps to install an OpenShift Cluster with Workload Identity
 
-1. Set `$RELEASE_IMAGE` to point to a sufficiently new OpenShift release.
+1. Set the variable `$RELEASE_IMAGE`
+
+   `$RELEASE_IMAGE` should be a recent and supported  OpenShift release image that you want to deploy in your cluster.
+   Please refer to the [support matrix](../README.md#support-matrix) for compatibilities.
+
+   A sample release image would be `RELEASE_IMAGE=quay.io/openshift-release-dev/ocp-release:${RHOCP_version}-${Arch}`
+
+   Where `RHOCP_version` is the OpenShift version (e.g `4.10.0-fc.4` or `4.9.3`) and the `Arch` is the architecture type (e.g `x86_64`)
+
 2. Extract the GCP Credentials Request objects from the above release image. You must use version 4.7 or newer of the `oc` CLI.
    ```
    mkdir credreqs ; oc adm release extract --cloud=gcp --credentials-requests $RELEASE_IMAGE --to=./credreqs
    ```
-3. Extract the OpenShift install binary from the release image
+3. Extract the `openshift-install` and `ccoctl` binaries from the release image.
    ```
    oc adm release extract --command=openshift-install $RELEASE_IMAGE
+   CCO_IMAGE=$(oc adm release info --image-for='cloud-credential-operator' ${RELEASE_IMAGE}) && oc image extract ${CCO_IMAGE} --file='/usr/bin/ccoctl' --registry-config=${PULL_SECRET_PATH:-.}/pull-secret
    ```
 4. Create an install-config.yaml
    ```
