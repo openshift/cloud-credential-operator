@@ -76,7 +76,7 @@ func NewActuator(c client.Client, projectName string) (*Actuator, error) {
 		ProjectName:      projectName,
 		Client:           c,
 		Codec:            codec,
-		GCPClientBuilder: ccgcp.NewClient,
+		GCPClientBuilder: ccgcp.NewClientFromJSON,
 	}, nil
 }
 
