@@ -46,7 +46,7 @@ func createWorkloadIdentityPoolCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityPoolOpts.Project, creds.JSON)
+	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityPoolOpts.Project, creds)
 	if err != nil {
 		log.Fatalf("Failed to setup GCP client: %s", err)
 	}

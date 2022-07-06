@@ -29,7 +29,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(CreateAllOpts.Project, creds.JSON)
+	gcpClient, err := gcp.NewClient(CreateAllOpts.Project, creds)
 	if err != nil {
 		log.Fatalf("Failed to initiate GCP client: %s", err)
 	}

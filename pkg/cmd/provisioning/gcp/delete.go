@@ -106,7 +106,7 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(DeleteOpts.Project, creds.JSON)
+	gcpClient, err := gcp.NewClient(DeleteOpts.Project, creds)
 	if err != nil {
 		log.Fatal(err)
 	}
