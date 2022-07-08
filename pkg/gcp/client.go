@@ -359,15 +359,8 @@ func (c *gcpClient) DeleteObject(ctx context.Context, bucketName, objectName str
 }
 
 // NewClient creates our client wrapper object for interacting with GCP.
-func NewClient(projectName string, authJSON []byte) (Client, error) {
+func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 	ctx := context.TODO()
-	var creds *google.Credentials
-	var err error
-	// since we're using a single creds var, we should specify all the required scopes when initializing
-	creds, err = google.CredentialsFromJSON(context.TODO(), authJSON, compute.CloudPlatformScope)
-	if err != nil {
-		return nil, err
-	}
 
 	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, option.WithCredentials(creds))
 	if err != nil {
@@ -403,4 +396,15 @@ func NewClient(projectName string, authJSON []byte) (Client, error) {
 		serviceUsageClient:         serviceUsageClient,
 		storageClient:              storageClient,
 	}, nil
+}
+
+func NewClientFromJSON(projectName string, authJSON []byte) (Client, error) {
+	var creds *google.Credentials
+	var err error
+	// since we're using a single creds var, we should specify all the required scopes when initializing
+	creds, err = google.CredentialsFromJSON(context.TODO(), authJSON, compute.CloudPlatformScope)
+	if err != nil {
+		return nil, err
+	}
+	return NewClient(projectName, creds)
 }

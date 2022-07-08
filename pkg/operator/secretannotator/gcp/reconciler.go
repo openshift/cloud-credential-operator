@@ -45,7 +45,7 @@ func NewReconciler(mgr manager.Manager, projectName string) reconcile.Reconciler
 	r := &ReconcileCloudCredSecret{
 		Client:           c,
 		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
-		GCPClientBuilder: ccgcp.NewClient,
+		GCPClientBuilder: ccgcp.NewClientFromJSON,
 		ProjectName:      projectName,
 	}
 
