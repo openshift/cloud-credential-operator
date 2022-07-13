@@ -326,7 +326,7 @@ func createServiceAccountsCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds.JSON)
+	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds)
 	if err != nil {
 		log.Fatal(err)
 	}
