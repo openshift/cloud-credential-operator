@@ -5,15 +5,16 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
+	"github.com/nutanix-cloud-native/prism-go-client/environment/providers/kubernetes"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -179,7 +180,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, len(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
-			expectedErr: "The source credentials file does/not/exist does not exist",
+			expectedErr: "source credentials file does/not/exist does not exist",
 		},
 		{
 			name: "Non-existent credentials requests directory",
@@ -199,7 +200,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, len(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
-			expectedErr: "Failed to process files containing CredentialsRequests: open does/not/exist: no such file or directory",
+			expectedErr: "failed to process files containing CredentialsRequests: open does/not/exist: no such file or directory",
 		},
 	}
 	for _, tt := range tests {
@@ -269,7 +270,7 @@ func writeToTempFile(t *testing.T, targetDir, content, prefix, extension string)
 	return f.Name()
 }
 
-func getSecretFromFileContents(t *testing.T, path string) *BasicAuthCredential {
+func getSecretFromFileContents(t *testing.T, path string) *kubernetes.BasicAuthCredential {
 	contents, err := ioutil.ReadFile(path)
 	require.NoError(t, err, "should be able to real contents of file")
 
@@ -284,14 +285,14 @@ func getSecretFromFileContents(t *testing.T, path string) *BasicAuthCredential {
 	decoded, err := base64.StdEncoding.DecodeString(data.Data.Credentials)
 	require.NoError(t, err, "should be able to decode base64")
 
-	creds := make([]Credential, 0)
+	creds := make([]kubernetes.Credential, 0)
 	err = json.NewDecoder(bytes.NewReader(decoded)).Decode(&creds)
 	require.NoError(t, err, "should be able to decode json")
 	require.Len(t, creds, 1, "should not be more than one credential")
-	require.Equal(t, BasicAuthCredentialType, creds[0].Type)
+	require.Equal(t, kubernetes.BasicAuthCredentialType, creds[0].Type)
 
-	basicAuthCreds := BasicAuthCredential{}
-	err = json.NewDecoder(bytes.NewReader(creds[0].Data.Raw)).Decode(&basicAuthCreds)
+	basicAuthCreds := kubernetes.BasicAuthCredential{}
+	err = json.NewDecoder(bytes.NewReader(creds[0].Data)).Decode(&basicAuthCreds)
 	require.NoError(t, err, "should be able to decode json")
 
 	return &basicAuthCreds

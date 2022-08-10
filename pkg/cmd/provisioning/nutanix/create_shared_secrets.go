@@ -10,9 +10,9 @@ import (
 	"os/user"
 	"path/filepath"
 
+	"github.com/nutanix-cloud-native/prism-go-client/environment/providers/kubernetes"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	k8sruntime "k8s.io/apimachinery/pkg/runtime"
 	"sigs.k8s.io/yaml"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -30,42 +30,7 @@ metadata:
 type: Opaque
 data:
   credentials: %s`
-
-	BasicAuthCredentialType CredentialType = "basic_auth"
 )
-
-type CredentialType string
-
-type NutanixCredentials struct {
-	Credentials []Credential `json:"credentials"`
-}
-
-type Credential struct {
-	Type CredentialType           `json:"type"`
-	Data *k8sruntime.RawExtension `json:"data"`
-}
-
-type BasicAuthCredential struct {
-	// The Basic Auth (username, password) for the Prism Central
-	PrismCentral PrismCentralBasicAuth `json:"prismCentral"`
-
-	// The Basic Auth (username, password) for the Prism Elements (clusters).
-	// Currently only one Prism Element (cluster) is used for each openshift cluster.
-	// Later this may spread to multiple Prism Element (cluster).
-	PrismElements []PrismElementBasicAuth `json:"prismElements"`
-}
-
-type PrismCentralBasicAuth struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-type PrismElementBasicAuth struct {
-	// name is the unique resource name of the Prism Element (cluster) in the Prism Central's domain
-	Name     string `json:"name"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
 
 var (
 	// CreateSharedSecretsOpts captures the options that affect creation of the generated
@@ -99,117 +64,111 @@ func createSharedSecretsCmd() *cobra.Command {
 func createSecretsCmd(cmd *cobra.Command, args []string) error {
 	filePath := CreateSharedSecretsOpts.CredentialsSourceFilePath
 	if filePath == "" {
-		user, err := user.Current()
+		currentUser, err := user.Current()
 		if err != nil {
-			return errors.New("Failed to get the current user for the default credentials-source-filepath. You need to use the option --credentials-source-filepath to specify the filepath of the credentials data file.")
+			return errors.New("failed to get the current user for the default credentials-source-filepath; use the option --credentials-source-filepath to specify the filepath of the credentials data file")
 		}
-		if user.HomeDir == "" {
-			return errors.New("Failed to get the current user's homeDir for the default credentials-source-filepath. You need to use the option --credentials-source-filepath to specify the filepath of the credentials data file.")
+		if currentUser.HomeDir == "" {
+			return errors.New("failed to get the current user's homeDir for the default credentials-source-filepath; use the option --credentials-source-filepath to specify the filepath of the credentials data file")
 		}
-		filePath = filepath.Join(user.HomeDir, ".nutanix", "credentials")
+		filePath = filepath.Join(currentUser.HomeDir, ".nutanix", "credentials")
 	}
 
-	if _, err := os.Stat(filePath); err != nil {
-		return fmt.Errorf("The source credentials file %s does not exist.", filePath)
-	}
-
-	bytes, err := ioutil.ReadFile(filePath)
+	creds, err := getCredentialsFromFile(filePath)
 	if err != nil {
-		return fmt.Errorf("Failed to read the credentials file %s. %w", filePath, err)
+		return errors.Wrapf(err, "credentials data read from file %s is invalid", filePath)
 	}
 
-	creds := &NutanixCredentials{}
-	if err = yaml.Unmarshal(bytes, creds); err != nil {
-		return fmt.Errorf("Failed to unmarshal the credentials data read from file %s. %w", filePath, err)
-	}
-
-	retCreds, err := getCredentialsData(creds)
-	if err != nil {
-		return errors.Wrapf(err, "The credentials data read from file %s is invalid.", filePath)
-	}
-
-	err = createSecrets(CreateSharedSecretsOpts.CredRequestDir, CreateSharedSecretsOpts.TargetDir, retCreds, CreateSharedSecretsOpts.EnableTechPreview)
-	if err != nil {
-		return errors.Wrap(err, "Failed to create credentials secrets")
+	if err := createSecrets(CreateSharedSecretsOpts.CredRequestDir, CreateSharedSecretsOpts.TargetDir, creds, CreateSharedSecretsOpts.EnableTechPreview); err != nil {
+		return errors.Wrap(err, "failed to create credentials secrets")
 	}
 
 	return nil
 }
 
 // Retrieve the credentials data
-func getCredentialsData(creds *NutanixCredentials) (*NutanixCredentials, error) {
-	var err error
-	retCreds := &NutanixCredentials{}
+func getCredentialsFromFile(filePath string) (*kubernetes.NutanixCredentials, error) {
+	if _, err := os.Stat(filePath); err != nil {
+		return nil, errors.Wrapf(err, "source credentials file %s does not exist", filePath)
+	}
+
+	bytes, err := ioutil.ReadFile(filePath)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to read the credentials file %s", filePath)
+	}
+
+	creds := &kubernetes.NutanixCredentials{}
+	if err = yaml.Unmarshal(bytes, creds); err != nil {
+		return nil, errors.Wrapf(err, "failed to unmarshal the credentials data read from file %s", filePath)
+	}
+
+	retCreds := &kubernetes.NutanixCredentials{}
 	for _, cred := range creds.Credentials {
 		switch cred.Type {
-		case BasicAuthCredentialType:
-			basicAuthCreds := &BasicAuthCredential{}
-			if err = yaml.Unmarshal(cred.Data.Raw, basicAuthCreds); err != nil {
-				return nil, errors.Wrap(err, "Failed to unmarshal the basic-auth data.")
+		case kubernetes.BasicAuthCredentialType:
+			basicAuthCreds := &kubernetes.BasicAuthCredential{}
+			if err = yaml.Unmarshal(cred.Data, basicAuthCreds); err != nil {
+				return nil, errors.Wrap(err, "failed to unmarshal the basic-auth data")
 			}
 			if basicAuthCreds.PrismCentral.Username == "" || basicAuthCreds.PrismCentral.Password == "" {
-				return nil, errors.New("The Prism Central username and/or password are not set correctly.")
+				return nil, errors.New("prism central username and/or password are not set correctly")
 			}
 
 			credsJsonBytes, err := json.Marshal(*basicAuthCreds)
 			if err != nil {
-				return nil, errors.Errorf("Failed to convert the basic_auth type credentials object to json. %v", err)
+				return nil, errors.Wrap(err, "failed to convert the basic_auth type credentials object to json")
 			}
-			retCreds.Credentials = append(retCreds.Credentials, Credential{
-				Type: BasicAuthCredentialType,
-				Data: &k8sruntime.RawExtension{Raw: credsJsonBytes},
+			retCreds.Credentials = append(retCreds.Credentials, kubernetes.Credential{
+				Type: kubernetes.BasicAuthCredentialType,
+				Data: credsJsonBytes,
 			})
 
 		default:
-			return nil, fmt.Errorf("Unsupported credentials type: %v", cred.Type)
+			return nil, errors.Errorf("unsupported credentials type: %v", cred.Type)
 		}
 	}
 
 	return retCreds, nil
 }
 
-func createSecrets(credReqDir, targetDir string, creds *NutanixCredentials, enableTechPreview bool) error {
+func createSecrets(credReqDir, targetDir string, creds *kubernetes.NutanixCredentials, enableTechPreview bool) error {
 	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
-		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
+		return errors.Wrap(err, "failed to process files containing CredentialsRequests")
 	}
 
 	if len(credRequests) == 0 {
-		return errors.New(fmt.Sprintf("no CredentialsRequest manifests found in %q", credReqDir))
+		return errors.Errorf("no CredentialsRequest manifests found in %q", credReqDir)
 	}
 
 	for _, cr := range credRequests {
 		if err := processCredReq(cr, targetDir, creds); err != nil {
-			return errors.Wrap(err, "Failed to process CredentialsReqeust")
+			return errors.Wrap(err, "failed to process CredentialsReqeust")
 		}
 	}
 	return nil
 }
 
-func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir string, creds *NutanixCredentials) error {
+func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir string, creds *kubernetes.NutanixCredentials) error {
 	manifestsDir := filepath.Join(targetDir, manifestsDirName)
-
 	fileName := fmt.Sprintf("%s-%s-credentials.yaml", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
 	filePath := filepath.Join(manifestsDir, fileName)
-
 	credsJsonBytes, err := json.Marshal(creds.Credentials)
 	if err != nil {
-		return errors.Errorf("Failed to convert the credentials object to json. %v", err)
+		return errors.Wrap(err, "failed to convert the credentials object to json")
 	}
+
 	b64CredsJson := base64.StdEncoding.EncodeToString(credsJsonBytes)
-
 	fileData := fmt.Sprintf(secretManifestsTemplate, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, b64CredsJson)
-
 	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
-		return errors.Wrap(err, "Failed to save Secret file")
+		return errors.Wrap(err, "failed to save secret manifest")
 	}
 
 	log.Printf("Saved credentials configuration to: %s", filePath)
-
 	return nil
 }
 
-func processCredReq(cr *credreqv1.CredentialsRequest, targetDir string, creds *NutanixCredentials) error {
+func processCredReq(cr *credreqv1.CredentialsRequest, targetDir string, creds *kubernetes.NutanixCredentials) error {
 	// Decode NutanixProviderSpec
 	codec, err := credreqv1.NewCodec()
 	if err != nil {
@@ -222,7 +181,7 @@ func processCredReq(cr *credreqv1.CredentialsRequest, targetDir string, creds *N
 	}
 
 	if nutanixProviderSpec.Kind != "NutanixProviderSpec" {
-		return fmt.Errorf("CredentialsRequest %s/%s is not of type Nutanix", cr.Namespace, cr.Name)
+		return errors.Errorf("CredentialsRequest %s/%s is not of type Nutanix", cr.Namespace, cr.Name)
 	}
 
 	return writeCredReqSecret(cr, targetDir, creds)
@@ -234,7 +193,7 @@ func initEnvForCreateCmd(cmd *cobra.Command, args []string) {
 	if CreateSharedSecretsOpts.TargetDir == "" {
 		pwd, err := os.Getwd()
 		if err != nil {
-			log.Fatalf("Failed to get current directory: %s", err)
+			log.Fatalf("failed to get current directory: %s", err)
 		}
 
 		CreateSharedSecretsOpts.TargetDir = pwd
@@ -242,7 +201,7 @@ func initEnvForCreateCmd(cmd *cobra.Command, args []string) {
 
 	fPath, err := filepath.Abs(CreateSharedSecretsOpts.TargetDir)
 	if err != nil {
-		log.Fatalf("Failed to resolve full path: %s", err)
+		log.Fatalf("failed to resolve full path: %s", err)
 	}
 
 	// create target dir if necessary
