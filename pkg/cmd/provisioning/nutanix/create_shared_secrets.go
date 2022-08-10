@@ -142,6 +142,9 @@ func createSecrets(credReqDir, targetDir string, creds *kubernetes.NutanixCreden
 	}
 
 	for _, cr := range credRequests {
+		if cr.Spec.ProviderSpec == nil {
+			continue
+		}
 		if err := processCredReq(cr, targetDir, creds); err != nil {
 			return errors.Wrap(err, "failed to process CredentialsReqeust")
 		}
