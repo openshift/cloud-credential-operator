@@ -202,6 +202,28 @@ func TestCreateSharedSecrets(t *testing.T) {
 			},
 			expectedErr: "failed to process files containing CredentialsRequests: open does/not/exist: no such file or directory",
 		},
+		{
+			name: "Same directory for credentials requests, credentials source, and credentials",
+			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
+				tmpDir, err := ioutil.TempDir(os.TempDir(), testCredentialsDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory for credentials")
+				credReqDir = tmpDir
+				targetDir = tmpDir
+				testCredentialsRequest(t, "credreq-test", "NutanixProviderSpec", "secret-ns", "secret-name", tmpDir)
+				credentialsSourceFilepath = testBasicAuthCredentials(t, "username", "password", tmpDir)
+				return
+			},
+			verify: func(t *testing.T, manifestsDir string) {
+				files, err := ioutil.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Len(t, files, 1, "Should be exactly one files in manifestsDir when one CredReq to process")
+				contents := getSecretFromFileContents(t, filepath.Join(manifestsDir, files[0].Name()))
+				assert.Equal(t, "username", contents.PrismCentral.Username)
+				assert.Equal(t, "password", contents.PrismCentral.Password)
+				assert.Nil(t, contents.PrismElements, "should have no Prism Element credential")
+			},
+			expectedErr: "",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
