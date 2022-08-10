@@ -85,6 +85,10 @@ func (s *ServiceID) Validate() error {
 		return errors.Wrap(err, "Failed to create credReq codec")
 	}
 
+	if s.cr.Spec.ProviderSpec == nil {
+		return fmt.Errorf("Spec.ProviderSpec is empty in %s credentials request", s.cr.Name)
+	}
+
 	var unknown runtime.Unknown
 	err = codec.DecodeProviderSpec(s.cr.Spec.ProviderSpec, &unknown)
 	if err != nil {
