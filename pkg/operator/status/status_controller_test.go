@@ -3,6 +3,7 @@ package status
 import (
 	"context"
 	"os"
+	"reflect"
 	"testing"
 	"time"
 
@@ -323,6 +324,129 @@ func TestConditions(t *testing.T) {
 			if condition.reason != "" {
 				assert.Exactly(t, condition.reason, foundCondition.Reason)
 			}
+		}
+	}
+}
+
+func TestSortedStatus(t *testing.T) {
+	schemeutils.SetupScheme(scheme.Scheme)
+	time := metav1.Now()
+	tests := []struct {
+		name     string
+		status   configv1.ClusterOperatorStatus
+		expected configv1.ClusterOperatorStatus
+	}{
+		{
+			name: "should sort conditions by type",
+			status: configv1.ClusterOperatorStatus{
+				Conditions: []configv1.ClusterOperatorStatusCondition{
+					{
+						Type:               configv1.OperatorDegraded,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+					{
+						Type:               configv1.OperatorAvailable,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+					{
+						Type:               configv1.OperatorUpgradeable,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+					{
+						Type:               configv1.OperatorProgressing,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+				},
+			},
+			expected: configv1.ClusterOperatorStatus{
+				Conditions: []configv1.ClusterOperatorStatusCondition{
+					{
+						Type:               configv1.OperatorAvailable,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+					{
+						Type:               configv1.OperatorDegraded,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+					{
+						Type:               configv1.OperatorProgressing,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+					{
+						Type:               configv1.OperatorUpgradeable,
+						Status:             configv1.ConditionFalse,
+						Reason:             "",
+						LastTransitionTime: time,
+					},
+				},
+			},
+		},
+		{
+			name: "should sort related objects by name",
+			status: configv1.ClusterOperatorStatus{
+				RelatedObjects: []configv1.ObjectReference{
+					{
+						Namespace: "sample",
+						Name:      "omega",
+					},
+					{
+						Namespace: "sample",
+						Name:      "alpha",
+					},
+					{
+						Namespace: "sample",
+						Name:      "beta",
+					},
+				},
+			},
+			expected: configv1.ClusterOperatorStatus{
+				RelatedObjects: []configv1.ObjectReference{
+					{
+						Namespace: "sample",
+						Name:      "alpha",
+					},
+					{
+						Namespace: "sample",
+						Name:      "beta",
+					},
+					{
+						Namespace: "sample",
+						Name:      "omega",
+					},
+				},
+			},
+		},
+	}
+
+	for _, test := range tests {
+		sortStatusArrays(&test.status)
+		assert.ElementsMatchf(t, test.status.Conditions, test.expected.Conditions, "conditions = %v, want %v", test.status.Conditions, test.expected.Conditions)
+		assert.ElementsMatchf(t, test.status.RelatedObjects, test.expected.RelatedObjects, "conditions = %v, want %v", test.status.RelatedObjects, test.expected.RelatedObjects)
+
+		for i, expected := range test.expected.Conditions {
+			assert.Equal(t, expected, test.status.Conditions[i])
+		}
+
+		for i, expected := range test.expected.RelatedObjects {
+			assert.Equal(t, expected, test.expected.RelatedObjects[i])
+		}
+
+		if !reflect.DeepEqual(test.status, test.expected) {
+			t.Error("status' are not equal")
 		}
 	}
 }
