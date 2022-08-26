@@ -25,11 +25,11 @@ This will write out public/private key files named `serviceaccount-signer.privat
 To set up an OpenID Connect provider in the cloud, run
 
 ```bash
-$ ccoctl aws create-identity-provider --name=<name> --region=<aws-region> --public-key-file=/path/to/public/key/file
+$ ccoctl aws create-identity-provider --name=<name> --region=<aws-region> --public-key-file=/path/to/public/key/file --create-private-s3-bucket
 
 ```
 
-where `name` is the name used to tag and account any cloud resources that are created. `region` is the aws region in which cloud resources will be created and `public-key-file` is the path to a public key file generated using `ccoctl aws create-key-pair` command.
+where `name` is the name used to tag and account any cloud resources that are created; `region` is the aws region in which cloud resources will be created; and `public-key-file` is the path to a public key file generated using `ccoctl aws create-key-pair` as [above](#creating-rsa-keys). `create-private-s3-bucket` is an optional parameter which can be used to create private S3 bucket with public CloudFront OIDC endpoint (More details [here](./sts-private-bucket.md)).  
 
 The above command will write out discovery document file named `02-openid-configuration` and JSON web key set file named `03-keys.json` when `--dry-run` flag is set.
 
@@ -62,7 +62,7 @@ $ oc adm release extract --credentials-requests --cloud=aws --to=./credrequests 
 Then you can use `ccoctl` to process all CredentialsRequest objects in the `./credrequests` directory (from the example above)
 
 ```bash
-$ ccoctl aws create-all --name=<name> --region=<aws-region> --credentials-requests-dir=<path-to-directory-with-list-of-credentials-requests>
+$ ccoctl aws create-all --name=<name> --region=<aws-region> --credentials-requests-dir=<path-to-directory-with-list-of-credentials-requests> --create-private-s3-bucket
 ```
 
 ### Deleting resources
@@ -74,7 +74,7 @@ $ ccoctl aws delete --name=<name> --region=<aws-region>
 
 ```
 
-where `name` is the name used to tag and account any cloud resources that were created. `region` is the aws region in which cloud resources were created.
+where `name` is the name used to tag and account any cloud resources that were created, and `region` is the aws region in which cloud resources were created.
 
 ## GCP
 

@@ -47,10 +47,27 @@ The token is a projected ServiceAccount into the Pod, and is short lived for an 
    ```
    ./openshift-install create manifests   
    ```
-7. Create AWS resources using the [ccoctl](ccoctl.md) tool (you will need aws credentials with sufficient permissions). The command below will generate public/private ServiceAccount signing keys, create the S3 bucket, upload the OIDC config into the bucket, set up an IAM Identity Provider that trusts that bucket configuration, and create IAM Roles for each AWS CredentialsRequest extracted above. It will also dump the files needed by the installer in the `_output` directory
+7. There are two options to expose the public endpoint used by the IAM OIDC identity provider on AWS: A) public S3 Bucket (default); B) AWS CloudFront Distribution serving thumbprints stored on private S3 Bucket:
+
+A. Create AWS resources using the [ccoctl](ccoctl.md#steps-create) tool (you will need aws credentials with sufficient permissions). The command below will generate public/private ServiceAccount signing keys, create the S3 bucket (with public read-only access), upload the OIDC config into the bucket, set up an IAM Identity Provider that trusts that bucket configuration, and create IAM Roles for each AWS CredentialsRequest extracted above. It will also dump the files needed by the installer in the `_output` directory
    ```
-   ./ccoctl aws create-all --name <aws_infra_name> --region <aws_region> --credentials-requests-dir /path/to/credreqs.yaml/downloaded/in/step/2   
+   ./ccoctl aws create-all \
+     --name <aws_infra_name> \
+     --region <aws_region> \
+     --credentials-requests-dir ./credreqs \
+     --output-dir _output/
    ```
+
+B. To create a CloudFront Distribution with a private S3 bucket to store OIDC config, run the following command. More information on the technical details [here](./sts-private-bucket.md)
+   ```
+   ./ccoctl aws create-all \
+     --name <aws_infra_name> \
+     --region <aws_region> \
+     --credentials-requests-dir ./credreqs \
+     --output-dir _output/
+     --create-private-s3-bucket
+   ```
+
 8. Copy the manifests created in the step 7 and put them in the same location as install-config.yaml in the `manifests` directory
    ```
    cp _output/manifests/* /path/to/dir/with/install-config.yaml/manifests/
