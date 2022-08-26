@@ -67,7 +67,15 @@ A. Create AWS resources using the [ccoctl](ccoctl.md#steps-create) tool (you wil
      --output-dir _output/
    ```
 
-B. Steps to create a CloudFront Distribution with a private S3 bucket to store OIDC config are available [here](./sts-private-bucket.md)
+B. To create a CloudFront Distribution with a private S3 bucket to store OIDC config, run the following command. More information on the technical details [here](./sts-private-bucket.md)
+   ```
+   ./ccoctl aws create-all \
+     --name <aws_infra_name> \
+     --region <aws_region> \
+     --credentials-requests-dir ./credreqs \
+     --output-dir _output/
+     --create-private-s3-bucket
+   ```
 
 8. Copy the manifests created in the step 7 and put them in the same location as install-config.yaml in the `manifests` directory
    ```
