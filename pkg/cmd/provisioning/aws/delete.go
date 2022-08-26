@@ -3,8 +3,10 @@ package aws
 import (
 	"fmt"
 	"log"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
@@ -76,7 +78,100 @@ func deleteOIDCBucket(client aws.Client, bucketName, namePrefix string) error {
 			break
 		}
 	}
+	return nil
+}
 
+// deleteCloudFrontOriginAccessIdentity deletes the CloudFront origin access identities if created
+func deleteCloudFrontOriginAccessIdentity(client aws.Client, namePrefix string) error {
+	listCloudFrontOriginAccessIdentitiesOutput, err := client.ListCloudFrontOriginAccessIdentities(&cloudfront.ListCloudFrontOriginAccessIdentitiesInput{})
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch a list of CloudFront origin access identities")
+	}
+	for _, originAccessIdentity := range listCloudFrontOriginAccessIdentitiesOutput.CloudFrontOriginAccessIdentityList.Items {
+		if *originAccessIdentity.Comment == fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix) {
+			getCloudFrontOriginAccessIdentityOutput, err := client.GetCloudFrontOriginAccessIdentity(&cloudfront.GetCloudFrontOriginAccessIdentityInput{
+				Id: originAccessIdentity.Id,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to get the CloudFront origin access identity with ID %s", *originAccessIdentity.Id)
+			}
+
+			_, err = client.DeleteCloudFrontOriginAccessIdentity(&cloudfront.DeleteCloudFrontOriginAccessIdentityInput{
+				Id:      originAccessIdentity.Id,
+				IfMatch: getCloudFrontOriginAccessIdentityOutput.ETag,
+			})
+			if err != nil {
+				return errors.Wrapf(err, "failed to delete the CloudFront origin access identity with ID %s", *originAccessIdentity.Id)
+			}
+			log.Printf("CloudFront origin access identity with ID %s deleted", *originAccessIdentity.Id)
+		}
+	}
+	return nil
+}
+
+// deleteCloudFrontDistribution deletes the CloudFront distribution if created
+func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
+	ListCloudFrontDistributionsOutput, err := client.ListCloudFrontDistributions(&cloudfront.ListDistributionsInput{})
+	if err != nil {
+		return errors.Wrapf(err, "failed to fetch a list of CloudFront distributions")
+	}
+	for _, distribution := range ListCloudFrontDistributionsOutput.DistributionList.Items {
+		listTagsForCloudFrontResourceOutput, err := client.ListTagsForCloudFrontResource(&cloudfront.ListTagsForResourceInput{
+			Resource: distribution.ARN,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to fetch tags for CloudFront distribution with ID %s", *distribution.Id)
+		}
+
+		for _, tag := range listTagsForCloudFrontResourceOutput.Tags.Items {
+			if *tag.Key == fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix) {
+				getCloudFrontDistributionOutput, err := client.GetCloudFrontDistribution(&cloudfront.GetDistributionInput{
+					Id: distribution.Id,
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to get CloudFront Distribution with ID %s", *distribution.Id)
+				}
+
+				getCloudFrontDistributionOutput.Distribution.DistributionConfig.Enabled = awssdk.Bool(false)
+
+				updateCloudFrontDistributionOutput, err := client.UpdateCloudFrontDistribution(&cloudfront.UpdateDistributionInput{
+					Id:                 distribution.Id,
+					IfMatch:            getCloudFrontDistributionOutput.ETag,
+					DistributionConfig: getCloudFrontDistributionOutput.Distribution.DistributionConfig,
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to disable CloudFront Distribution with ID %s", *distribution.Id)
+				}
+
+				for {
+					getCloudFrontDistributionOutput, err := client.GetCloudFrontDistribution(&cloudfront.GetDistributionInput{
+						Id: distribution.Id,
+					})
+					if err != nil {
+						return errors.Wrapf(err, "failed to get CloudFront Distribution with ID %s", *distribution.Id)
+					}
+
+					if *getCloudFrontDistributionOutput.Distribution.Status == cloudFrontDistributionDeployedStatus {
+						log.Printf("CloudFront distribution with ID %s is successfully disabled", *distribution.Id)
+						break
+					}
+					log.Printf("Waiting %s for CloudFront distribution with ID %s to be disabled...", cloudFrontDistributionStatusCheckDelay, *distribution.Id)
+					time.Sleep(cloudFrontDistributionStatusCheckDelay)
+				}
+
+				_, err = client.DeleteCloudFrontDistribution(&cloudfront.DeleteDistributionInput{
+					Id:      distribution.Id,
+					IfMatch: updateCloudFrontDistributionOutput.ETag,
+				})
+				if err != nil {
+					return errors.Wrapf(err, "failed to delete CloudFront distribution with ID %s", *distribution.Id)
+				}
+				log.Printf("CloudFront distribution with ID %s deleted", *distribution.Id)
+				break
+			}
+		}
+
+	}
 	return nil
 }
 
@@ -189,6 +284,14 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 	}
 
 	if err := deleteOIDCBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
+		log.Print(err)
+	}
+
+	if err := deleteCloudFrontDistribution(awsClient, DeleteOpts.Name); err != nil {
+		log.Print(err)
+	}
+
+	if err := deleteCloudFrontOriginAccessIdentity(awsClient, DeleteOpts.Name); err != nil {
 		log.Print(err)
 	}
 
