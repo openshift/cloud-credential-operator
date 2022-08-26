@@ -37,7 +37,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create public/private key pair: %s", err)
 	}
 
-	identityProviderARN, err := createIdentityProvider(awsClient, CreateAllOpts.Name, CreateAllOpts.Region, publicKeyPath, CreateAllOpts.TargetDir, false)
+	identityProviderARN, err := createIdentityProvider(awsClient, CreateAllOpts.Name, CreateAllOpts.Region, publicKeyPath, CreateAllOpts.TargetDir, CreateAllOpts.CreatePrivateS3Bucket, false)
 	if err != nil {
 		log.Fatalf("Failed to create Identity provider: %s", err)
 	}
@@ -105,6 +105,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
+	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.CreatePrivateS3Bucket, "create-private-s3-bucket", false, "Create private S3 bucket with public CloudFront OIDC endpoint")
 
 	return createAllCmd
 }
