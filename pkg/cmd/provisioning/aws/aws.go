@@ -19,6 +19,7 @@ type options struct {
 	PermissionsBoundaryARN string
 	DryRun                 bool
 	EnableTechPreview      bool
+	CreatePrivateS3Bucket  bool
 }
 
 // NewAWSCmd implements the "aws" subcommand for the credentials provisioning

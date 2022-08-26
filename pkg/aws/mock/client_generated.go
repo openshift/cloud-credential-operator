@@ -7,6 +7,7 @@ package mock
 import (
 	reflect "reflect"
 
+	cloudfront "github.com/aws/aws-sdk-go/service/cloudfront"
 	iam "github.com/aws/aws-sdk-go/service/iam"
 	s3 "github.com/aws/aws-sdk-go/service/s3"
 	gomock "github.com/golang/mock/gomock"
@@ -63,6 +64,36 @@ func (m *MockClient) CreateBucket(arg0 *s3.CreateBucketInput) (*s3.CreateBucketO
 func (mr *MockClientMockRecorder) CreateBucket(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), arg0)
+}
+
+// CreateCloudFrontDistributionWithTags mocks base method.
+func (m *MockClient) CreateCloudFrontDistributionWithTags(input *cloudfront.CreateDistributionWithTagsInput) (*cloudfront.CreateDistributionWithTagsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateCloudFrontDistributionWithTags", input)
+	ret0, _ := ret[0].(*cloudfront.CreateDistributionWithTagsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateCloudFrontDistributionWithTags indicates an expected call of CreateCloudFrontDistributionWithTags.
+func (mr *MockClientMockRecorder) CreateCloudFrontDistributionWithTags(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudFrontDistributionWithTags", reflect.TypeOf((*MockClient)(nil).CreateCloudFrontDistributionWithTags), input)
+}
+
+// CreateCloudFrontOriginAccessIdentity mocks base method.
+func (m *MockClient) CreateCloudFrontOriginAccessIdentity(input *cloudfront.CreateCloudFrontOriginAccessIdentityInput) (*cloudfront.CreateCloudFrontOriginAccessIdentityOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateCloudFrontOriginAccessIdentity", input)
+	ret0, _ := ret[0].(*cloudfront.CreateCloudFrontOriginAccessIdentityOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateCloudFrontOriginAccessIdentity indicates an expected call of CreateCloudFrontOriginAccessIdentity.
+func (mr *MockClientMockRecorder) CreateCloudFrontOriginAccessIdentity(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).CreateCloudFrontOriginAccessIdentity), input)
 }
 
 // CreateOpenIDConnectProvider mocks base method.
@@ -138,6 +169,36 @@ func (m *MockClient) DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucket
 func (mr *MockClientMockRecorder) DeleteBucket(input interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBucket", reflect.TypeOf((*MockClient)(nil).DeleteBucket), input)
+}
+
+// DeleteCloudFrontDistribution mocks base method.
+func (m *MockClient) DeleteCloudFrontDistribution(input *cloudfront.DeleteDistributionInput) (*cloudfront.DeleteDistributionOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCloudFrontDistribution", input)
+	ret0, _ := ret[0].(*cloudfront.DeleteDistributionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteCloudFrontDistribution indicates an expected call of DeleteCloudFrontDistribution.
+func (mr *MockClientMockRecorder) DeleteCloudFrontDistribution(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCloudFrontDistribution", reflect.TypeOf((*MockClient)(nil).DeleteCloudFrontDistribution), input)
+}
+
+// DeleteCloudFrontOriginAccessIdentity mocks base method.
+func (m *MockClient) DeleteCloudFrontOriginAccessIdentity(input *cloudfront.DeleteCloudFrontOriginAccessIdentityInput) (*cloudfront.DeleteCloudFrontOriginAccessIdentityOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteCloudFrontOriginAccessIdentity", input)
+	ret0, _ := ret[0].(*cloudfront.DeleteCloudFrontOriginAccessIdentityOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteCloudFrontOriginAccessIdentity indicates an expected call of DeleteCloudFrontOriginAccessIdentity.
+func (mr *MockClientMockRecorder) DeleteCloudFrontOriginAccessIdentity(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).DeleteCloudFrontOriginAccessIdentity), input)
 }
 
 // DeleteObject mocks base method.
@@ -245,6 +306,36 @@ func (mr *MockClientMockRecorder) GetBucketTagging(input interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBucketTagging", reflect.TypeOf((*MockClient)(nil).GetBucketTagging), input)
 }
 
+// GetCloudFrontDistribution mocks base method.
+func (m *MockClient) GetCloudFrontDistribution(input *cloudfront.GetDistributionInput) (*cloudfront.GetDistributionOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCloudFrontDistribution", input)
+	ret0, _ := ret[0].(*cloudfront.GetDistributionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCloudFrontDistribution indicates an expected call of GetCloudFrontDistribution.
+func (mr *MockClientMockRecorder) GetCloudFrontDistribution(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudFrontDistribution", reflect.TypeOf((*MockClient)(nil).GetCloudFrontDistribution), input)
+}
+
+// GetCloudFrontOriginAccessIdentity mocks base method.
+func (m *MockClient) GetCloudFrontOriginAccessIdentity(input *cloudfront.GetCloudFrontOriginAccessIdentityInput) (*cloudfront.GetCloudFrontOriginAccessIdentityOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCloudFrontOriginAccessIdentity", input)
+	ret0, _ := ret[0].(*cloudfront.GetCloudFrontOriginAccessIdentityOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCloudFrontOriginAccessIdentity indicates an expected call of GetCloudFrontOriginAccessIdentity.
+func (mr *MockClientMockRecorder) GetCloudFrontOriginAccessIdentity(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).GetCloudFrontOriginAccessIdentity), input)
+}
+
 // GetObjectTagging mocks base method.
 func (m *MockClient) GetObjectTagging(input *s3.GetObjectTaggingInput) (*s3.GetObjectTaggingOutput, error) {
 	m.ctrl.T.Helper()
@@ -335,6 +426,36 @@ func (mr *MockClientMockRecorder) ListAccessKeys(arg0 interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAccessKeys", reflect.TypeOf((*MockClient)(nil).ListAccessKeys), arg0)
 }
 
+// ListCloudFrontDistributions mocks base method.
+func (m *MockClient) ListCloudFrontDistributions(input *cloudfront.ListDistributionsInput) (*cloudfront.ListDistributionsOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCloudFrontDistributions", input)
+	ret0, _ := ret[0].(*cloudfront.ListDistributionsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCloudFrontDistributions indicates an expected call of ListCloudFrontDistributions.
+func (mr *MockClientMockRecorder) ListCloudFrontDistributions(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudFrontDistributions", reflect.TypeOf((*MockClient)(nil).ListCloudFrontDistributions), input)
+}
+
+// ListCloudFrontOriginAccessIdentities mocks base method.
+func (m *MockClient) ListCloudFrontOriginAccessIdentities(input *cloudfront.ListCloudFrontOriginAccessIdentitiesInput) (*cloudfront.ListCloudFrontOriginAccessIdentitiesOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListCloudFrontOriginAccessIdentities", input)
+	ret0, _ := ret[0].(*cloudfront.ListCloudFrontOriginAccessIdentitiesOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListCloudFrontOriginAccessIdentities indicates an expected call of ListCloudFrontOriginAccessIdentities.
+func (mr *MockClientMockRecorder) ListCloudFrontOriginAccessIdentities(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudFrontOriginAccessIdentities", reflect.TypeOf((*MockClient)(nil).ListCloudFrontOriginAccessIdentities), input)
+}
+
 // ListObjects mocks base method.
 func (m *MockClient) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
 	m.ctrl.T.Helper()
@@ -395,6 +516,21 @@ func (mr *MockClientMockRecorder) ListRoles(input interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoles", reflect.TypeOf((*MockClient)(nil).ListRoles), input)
 }
 
+// ListTagsForCloudFrontResource mocks base method.
+func (m *MockClient) ListTagsForCloudFrontResource(input *cloudfront.ListTagsForResourceInput) (*cloudfront.ListTagsForResourceOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListTagsForCloudFrontResource", input)
+	ret0, _ := ret[0].(*cloudfront.ListTagsForResourceOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListTagsForCloudFrontResource indicates an expected call of ListTagsForCloudFrontResource.
+func (mr *MockClientMockRecorder) ListTagsForCloudFrontResource(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTagsForCloudFrontResource", reflect.TypeOf((*MockClient)(nil).ListTagsForCloudFrontResource), input)
+}
+
 // ListUserPolicies mocks base method.
 func (m *MockClient) ListUserPolicies(arg0 *iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error) {
 	m.ctrl.T.Helper()
@@ -408,6 +544,21 @@ func (m *MockClient) ListUserPolicies(arg0 *iam.ListUserPoliciesInput) (*iam.Lis
 func (mr *MockClientMockRecorder) ListUserPolicies(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserPolicies", reflect.TypeOf((*MockClient)(nil).ListUserPolicies), arg0)
+}
+
+// PutBucketPolicy mocks base method.
+func (m *MockClient) PutBucketPolicy(input *s3.PutBucketPolicyInput) (*s3.PutBucketPolicyOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutBucketPolicy", input)
+	ret0, _ := ret[0].(*s3.PutBucketPolicyOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutBucketPolicy indicates an expected call of PutBucketPolicy.
+func (mr *MockClientMockRecorder) PutBucketPolicy(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketPolicy", reflect.TypeOf((*MockClient)(nil).PutBucketPolicy), input)
 }
 
 // PutBucketTagging mocks base method.
@@ -438,6 +589,21 @@ func (m *MockClient) PutObject(arg0 *s3.PutObjectInput) (*s3.PutObjectOutput, er
 func (mr *MockClientMockRecorder) PutObject(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), arg0)
+}
+
+// PutPublicAccessBlock mocks base method.
+func (m *MockClient) PutPublicAccessBlock(input *s3.PutPublicAccessBlockInput) (*s3.PutPublicAccessBlockOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutPublicAccessBlock", input)
+	ret0, _ := ret[0].(*s3.PutPublicAccessBlockOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutPublicAccessBlock indicates an expected call of PutPublicAccessBlock.
+func (mr *MockClientMockRecorder) PutPublicAccessBlock(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPublicAccessBlock", reflect.TypeOf((*MockClient)(nil).PutPublicAccessBlock), input)
 }
 
 // PutRolePolicy mocks base method.
@@ -542,4 +708,19 @@ func (m *MockClient) UpdateAssumeRolePolicy(arg0 *iam.UpdateAssumeRolePolicyInpu
 func (mr *MockClientMockRecorder) UpdateAssumeRolePolicy(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAssumeRolePolicy", reflect.TypeOf((*MockClient)(nil).UpdateAssumeRolePolicy), arg0)
+}
+
+// UpdateCloudFrontDistribution mocks base method.
+func (m *MockClient) UpdateCloudFrontDistribution(input *cloudfront.UpdateDistributionInput) (*cloudfront.UpdateDistributionOutput, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateCloudFrontDistribution", input)
+	ret0, _ := ret[0].(*cloudfront.UpdateDistributionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateCloudFrontDistribution indicates an expected call of UpdateCloudFrontDistribution.
+func (mr *MockClientMockRecorder) UpdateCloudFrontDistribution(input interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudFrontDistribution", reflect.TypeOf((*MockClient)(nil).UpdateCloudFrontDistribution), input)
 }
