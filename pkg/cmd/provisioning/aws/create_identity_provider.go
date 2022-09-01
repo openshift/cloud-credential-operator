@@ -11,9 +11,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
@@ -47,6 +49,17 @@ var (
 	"Bucket": "%s"
 }`
 
+	// Block public access to S3 bucket template (usable with aws CLI --cli-input-json param)
+	blockPublicAccessToOidcBucketTemplate = `{
+	"Bucket": "%s",
+	"PublicAccessBlockConfiguration": {
+        "BlockPublicAcls": true,
+        "IgnorePublicAcls": true,
+        "BlockPublicPolicy": true,
+        "RestrictPublicBuckets": true
+    },
+}`
+
 	// iam identity provider with "openshift" and "sts.amazonaws.com" as static audiences
 	iamIdentityProviderTemplate = `{
 	"Url": "%s",
@@ -59,38 +72,178 @@ var (
 	]
 }
 `
+	// oidcBucketTemplateAllowingOAIAccess is the S3 bucket policy allowing access to CloudFront Origin Access Identity
+	oidcBucketTemplateAllowingOAIAccess = `{
+    "Version": "2008-10-17",
+    "Id": "PolicyForCloudFrontPrivateContent",
+    "Statement": [
+        {
+            "Sid": "1",
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity %s"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::%s/*"
+        }
+    ]
+}`
+	// cloudFrontOriginAccessIdentityTemplate is the template for CloudFront Origin Access Identity (usable with aws CLI --cli-input-json param)
+	cloudFrontOriginAccessIdentityTemplate = `{
+   "CloudFrontOriginAccessIdentityConfig":{
+      "CallerReference":"%s",
+      "Comment":"%s"
+   }
+}`
+	// putBucketPolicyToAllowOriginAccessIdentityTemplate is a template for making OIDC S3 bucket accessible by
+	// CloudFront Origin Access Identity (usable with aws CLI --cli-input-json param)
+	putBucketPolicyToAllowOriginAccessIdentityTemplate = `{
+        "Bucket": "%s",
+        "Policy": "{\"Version\":\"2008-10-17\",\"Id\":\"PolicyForCloudFrontPrivateContent\",\"Statement\":[{\"Sid\":\"1\",\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::cloudfront:user\/CloudFront Origin Access Identity <enter_cloudfront_origin_access_identity_here>\"},\"Action\":\"s3:GetObject\",\"Resource\":\"arn:aws:s3:::%s\/*\"}]}"
+}`
+	// cloudFrontDistributionWithTagsTemplate is a template for creating CloudFront Distribution with tags
+	// (usable with aws CLI --cli-input-json param)
+	cloudFrontDistributionWithTagsTemplate = `{
+   "DistributionConfigWithTags":{
+      "DistributionConfig":{
+         "CallerReference":"%s",
+         "Aliases":{
+            "Quantity":0
+         },
+         "Origins":{
+            "Quantity":1,
+            "Items":[
+               {
+                  "Id":"%s.s3.%s.amazonaws.com",
+                  "DomainName":"%s.s3.%s.amazonaws.com",
+                  "OriginPath":"",
+                  "CustomHeaders":{
+                     "Quantity":0
+                  },
+                  "S3OriginConfig":{
+                     "OriginAccessIdentity":"origin-access-identity/cloudfront/<enter_cloudfront_origin_access_identity_here>"
+                  },
+                  "ConnectionAttempts":3,
+                  "ConnectionTimeout":10,
+                  "OriginShield":{
+                     "Enabled":false
+                  }
+               }
+            ]
+         },
+         "DefaultCacheBehavior":{
+            "TargetOriginId":"%s.s3.%s.amazonaws.com",
+            "TrustedSigners":{
+               "Enabled":false,
+               "Quantity":0
+            },
+            "TrustedKeyGroups":{
+               "Enabled":false,
+               "Quantity":0
+            },
+            "ViewerProtocolPolicy":"https-only",
+            "AllowedMethods":{
+               "Quantity":2,
+               "Items":[
+                  "HEAD",
+                  "GET"
+               ],
+               "CachedMethods":{
+                  "Quantity":2,
+                  "Items":[
+                     "HEAD",
+                     "GET"
+                  ]
+               }
+            },
+            "SmoothStreaming":false,
+            "Compress":false,
+            "LambdaFunctionAssociations":{
+               "Quantity":0
+            },
+            "FunctionAssociations":{
+               "Quantity":0
+            },
+            "FieldLevelEncryptionId":"",
+            "CachePolicyId":"4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+         },
+         "CacheBehaviors":{
+            "Quantity":0
+         },
+         "CustomErrorResponses":{
+            "Quantity":0
+         },
+         "Comment":"%s",
+         "Logging":{
+            "Enabled":false,
+            "IncludeCookies":false,
+            "Bucket":"",
+            "Prefix":""
+         },
+         "PriceClass":"PriceClass_All",
+         "Enabled":true,
+         "ViewerCertificate":{
+            "CloudFrontDefaultCertificate":true
+         }
+      },
+      "Tags":{
+         "Items":[
+            {
+               "Key":"Name",
+               "Value":"%s"
+            }
+         ]
+      }
+   }
+}`
+
 	// ccoctlAWSResourceTagKeyPrefix is the prefix of the tag key applied to the AWS resources created/shared by ccoctl
 	ccoctlAWSResourceTagKeyPrefix = "openshift.io/cloud-credential-operator"
 	// ownedCcoctlAWSResourceTagValue is the value of the tag applied to the AWS resources created by ccoctl
 	ownedCcoctlAWSResourceTagValue = "owned"
 	// nameTagKey is the key of the "Name" tag applied to the AWS resources created by ccoctl
 	nameTagKey = "Name"
+	// cloudFrontCachingDisabledPolicyID is the ID of the policy that disables caching for a CloudFront distribution
+	cloudFrontCachingDisabledPolicyID = "4135ea2d-6df8-44a3-9df3-4b5a84be39ad"
+	// cloudFrontDistributionDeployedStatus is status of the CloudFront when it is fully deployed
+	cloudFrontDistributionDeployedStatus = "Deployed"
+	// cloudFrontDistributionStatusCheckDelay is the time delay between subsequent status checks of CloudFront distribution
+	cloudFrontDistributionStatusCheckDelay = time.Second * 30
+	// cloudFrontOriginAccessIdentityActivationGracePeriod is a period to allow CloudFront Origin Access Identity to become
+	// active
+	cloudFrontOriginAccessIdentityActivationGracePeriod = time.Second * 30
+	// placeholderCloudFrontURL is a placeholder for cloudfront distribution URL that user needs to enter after generating files
+	placeholderCloudFrontURL = "<enter_cloudfront_distribution_url_here>"
 	// Generated identity provider files
-	oidcBucketFilename          = "01-oidc-bucket.json"
-	oidcConfigurationFilename   = "02-openid-configuration"
-	oidcKeysFilename            = "03-keys.json"
-	iamIdentityProviderFilename = "04-iam-identity-provider.json"
+	oidcBucketFilename                                 = "01-oidc-bucket.json"
+	oidcConfigurationFilename                          = "02-openid-configuration"
+	oidcKeysFilename                                   = "03-keys.json"
+	iamIdentityProviderFilename                        = "04-iam-identity-provider.json"
+	cloudFrontOriginAccessIdentityFilename             = "05-cloudfront-origin-access-identity.json"
+	putBucketPolicyToAllowOriginAccessIdentityFilename = "06-put-bucket-policy-to-allow-origin-access-identity.json"
+	blockPublicAccessToOidcBucketFilename              = "07-block-public-access-to-oidc-bucket.json"
+	cloudFrontDistributionFilename                     = "08-cloudfront-distribution.json"
 )
 
 type JSONWebKeySet struct {
 	Keys []jose.JSONWebKey `json:"keys"`
 }
 
-func createIdentityProvider(client aws.Client, name, region, publicKeyPath, targetDir string, generateOnly bool) (string, error) {
-	// Create the S3 bucket
+func createIdentityProvider(client aws.Client, name, region, publicKeyPath, targetDir string, createPrivateS3, generateOnly bool) (string, error) {
+	// Create the S3 bucket and (if specified) a CloudFront Distribution to serve OIDC endpoint
 	bucketName := fmt.Sprintf("%s-oidc", name)
-	if err := createOIDCBucket(client, bucketName, name, region, targetDir, generateOnly); err != nil {
+	issuerURL, err := createOIDCEndpoint(client, bucketName, name, region, targetDir, createPrivateS3, generateOnly)
+	if err != nil {
 		return "", err
 	}
-	issuerURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
 
 	// Create the OIDC config file
-	if err := createOIDCConfiguration(client, bucketName, issuerURL, name, targetDir, generateOnly); err != nil {
+	if err := createOIDCConfiguration(client, bucketName, issuerURL, name, targetDir, createPrivateS3, generateOnly); err != nil {
 		return "", err
 	}
 
 	// Create the OIDC key list
-	if err := createJSONWebKeySet(client, publicKeyPath, bucketName, name, targetDir, generateOnly); err != nil {
+	if err := createJSONWebKeySet(client, publicKeyPath, bucketName, name, targetDir, createPrivateS3, generateOnly); err != nil {
 		return "", err
 	}
 
@@ -135,14 +288,8 @@ func getTLSFingerprint(bucketURL string) (string, error) {
 func createIAMIdentityProvider(client aws.Client, issuerURL, name, targetDir string, generateOnly bool) (string, error) {
 	var providerARN string
 
-	fingerprint, err := getTLSFingerprint(issuerURL)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get fingerprint")
-	}
-
 	if generateOnly {
-		oidcIdentityProviderJSON := fmt.Sprintf(iamIdentityProviderTemplate, issuerURL, fingerprint)
-
+		oidcIdentityProviderJSON := fmt.Sprintf(iamIdentityProviderTemplate, issuerURL, "<enter_tls_fingerprint_for_issuer_url_here>")
 		iamIdentityProviderFullPath := filepath.Join(targetDir, iamIdentityProviderFilename)
 		log.Printf("Saving AWS IAM Identity Provider locally at %s", iamIdentityProviderFullPath)
 		if err := ioutil.WriteFile(iamIdentityProviderFullPath, []byte(oidcIdentityProviderJSON), fileModeCcoctlDryRun); err != nil {
@@ -150,6 +297,11 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, name, targetDir str
 		}
 
 	} else {
+		fingerprint, err := getTLSFingerprint(issuerURL)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to get fingerprint")
+		}
+
 		oidcProviderList, err := client.ListOpenIDConnectProviders(&iam.ListOpenIDConnectProvidersInput{})
 		if err != nil {
 			return "", errors.Wrap(err, "failed to fetch list of Identity Providers")
@@ -208,7 +360,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, name, targetDir str
 	return providerARN, nil
 }
 
-func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name, targetDir string, generateOnly bool) error {
+func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name, targetDir string, createPrivateS3, generateOnly bool) error {
 	jwks, err := provisioning.BuildJsonWebKeySet(publicKeyFilepath)
 	if err != nil {
 		return errors.Wrap(err, "failed to build JSON web key set from the public key")
@@ -221,8 +373,12 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 			return errors.Wrap(err, fmt.Sprintf("Failed to save JSON web key set (JWKS) locally at %s", oidcKeysFullPath))
 		}
 	} else {
+		acl := "public-read"
+		if createPrivateS3 {
+			acl = "private"
+		}
 		_, err = client.PutObject(&s3.PutObjectInput{
-			ACL:     awssdk.String("public-read"),
+			ACL:     awssdk.String(acl),
 			Body:    awssdk.ReadSeekCloser(bytes.NewReader(jwks)),
 			Bucket:  awssdk.String(bucketName),
 			Key:     awssdk.String(provisioning.KeysURI),
@@ -237,7 +393,7 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 	return nil
 }
 
-func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, targetDir string, generateOnly bool) error {
+func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, targetDir string, createPrivateS3, generateOnly bool) error {
 	discoveryDocumentJSON := fmt.Sprintf(provisioning.DiscoveryDocumentTemplate, issuerURL, issuerURL, provisioning.KeysURI)
 	if generateOnly {
 		oidcConfigurationFullPath := filepath.Join(targetDir, oidcConfigurationFilename)
@@ -246,8 +402,12 @@ func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, tar
 			return errors.Wrap(err, fmt.Sprintf("Failed to save discovery document locally at %s", oidcConfigurationFullPath))
 		}
 	} else {
+		acl := "public-read"
+		if createPrivateS3 {
+			acl = "private"
+		}
 		_, err := client.PutObject(&s3.PutObjectInput{
-			ACL:     awssdk.String("public-read"),
+			ACL:     awssdk.String(acl),
 			Body:    awssdk.ReadSeekCloser(strings.NewReader(discoveryDocumentJSON)),
 			Bucket:  awssdk.String(bucketName),
 			Key:     awssdk.String(provisioning.DiscoveryDocumentURI),
@@ -261,8 +421,8 @@ func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, tar
 	return nil
 }
 
-func createOIDCBucket(client aws.Client, bucketName, name, region, targetDir string, generateOnly bool) error {
-
+func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir string, createPrivateS3, generateOnly bool) (string, error) {
+	s3BucketURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
 	if generateOnly {
 		oidcBucketFilepath := filepath.Join(targetDir, oidcBucketFilename)
 		var oidcBucketJSON string
@@ -275,7 +435,39 @@ func createOIDCBucket(client aws.Client, bucketName, name, region, targetDir str
 
 		log.Printf("Saving OIDC S3 bucket locally at %s", oidcBucketFilepath)
 		if err := ioutil.WriteFile(oidcBucketFilepath, []byte(oidcBucketJSON), fileModeCcoctlDryRun); err != nil {
-			return errors.Wrap(err, fmt.Sprintf("Failed to save OIDC S3 bucket locally at %s", oidcBucketFilepath))
+			return "", errors.Wrap(err, fmt.Sprintf("Failed to save OIDC S3 bucket locally at %s", oidcBucketFilepath))
+		}
+
+		if createPrivateS3 {
+			cloudFrontOriginAccessIdentityFilepath := filepath.Join(targetDir, cloudFrontOriginAccessIdentityFilename)
+			cloudFrontOriginAccessIdentityJSON := fmt.Sprintf(cloudFrontOriginAccessIdentityTemplate, name, fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name))
+			log.Printf("Saving JSON to create CloudFront Origin Access Identity locally at %s", cloudFrontOriginAccessIdentityFilepath)
+			if err := ioutil.WriteFile(cloudFrontOriginAccessIdentityFilepath, []byte(cloudFrontOriginAccessIdentityJSON), fileModeCcoctlDryRun); err != nil {
+				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to create CloudFront Origin Access Identity locally at %s", cloudFrontOriginAccessIdentityFilepath))
+			}
+
+			putBucketPolicyToAllowOriginAccessIdentityFilepath := filepath.Join(targetDir, putBucketPolicyToAllowOriginAccessIdentityFilename)
+			putBucketPolicyToAllowOriginAccessIdentityJSON := fmt.Sprintf(putBucketPolicyToAllowOriginAccessIdentityTemplate, bucketName, bucketName)
+			log.Printf("Saving JSON to put bucket policy allowing access from CloudFront Origin Access Identity locally at %s", putBucketPolicyToAllowOriginAccessIdentityFilepath)
+			if err := ioutil.WriteFile(putBucketPolicyToAllowOriginAccessIdentityFilepath, []byte(putBucketPolicyToAllowOriginAccessIdentityJSON), fileModeCcoctlDryRun); err != nil {
+				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to put bucket policy allowing access from CloudFront Origin Access Identity locally at %s", putBucketPolicyToAllowOriginAccessIdentityFilepath))
+			}
+
+			blockPublicAccessToOidcBucketFilepath := filepath.Join(targetDir, blockPublicAccessToOidcBucketFilename)
+			blockPublicAccessToOidcBucketJSON := fmt.Sprintf(blockPublicAccessToOidcBucketTemplate, bucketName)
+			log.Printf("Saving JSON to block public access to OIDC S3 bucket locally at %s", oidcBucketFilepath)
+			if err := ioutil.WriteFile(blockPublicAccessToOidcBucketFilepath, []byte(blockPublicAccessToOidcBucketJSON), fileModeCcoctlDryRun); err != nil {
+				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to block public access to OIDC S3 bucket locally at %s", blockPublicAccessToOidcBucketFilepath))
+			}
+
+			cloudFrontDistributionFilepath := filepath.Join(targetDir, cloudFrontDistributionFilename)
+			cloudFrontDistributionJSON := fmt.Sprintf(cloudFrontDistributionWithTagsTemplate, name, bucketName, region, bucketName, region, bucketName, region, fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name), name)
+			log.Printf("Saving JSON to create CloudFront Distribution locally at %s", cloudFrontDistributionFilepath)
+			if err := ioutil.WriteFile(cloudFrontDistributionFilepath, []byte(cloudFrontDistributionJSON), fileModeCcoctlDryRun); err != nil {
+				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to create CloudFront Distribution locally at %s", cloudFrontDistributionFilepath))
+			}
+
+			return placeholderCloudFrontURL, nil
 		}
 	} else {
 		s3BucketInput := &s3.CreateBucketInput{
@@ -296,10 +488,10 @@ func createOIDCBucket(client aws.Client, bucketName, name, region, targetDir str
 				case s3.ErrCodeBucketAlreadyOwnedByYou:
 					log.Printf("Bucket %s already exists and is owned by the user", bucketName)
 				default:
-					return errors.Wrap(aerr, "failed to create a bucket to store OpenID Connect configuration")
+					return "", errors.Wrap(aerr, "failed to create a bucket to store OpenID Connect configuration")
 				}
 			} else {
-				return errors.Wrap(err, "failed to create a bucket to store OpenID Connect configuration")
+				return "", errors.Wrap(err, "failed to create a bucket to store OpenID Connect configuration")
 			}
 		} else {
 			log.Print("Bucket ", bucketName, " created")
@@ -319,12 +511,133 @@ func createOIDCBucket(client aws.Client, bucketName, name, region, targetDir str
 				},
 			})
 			if err != nil {
-				return errors.Wrapf(err, "failed to tag the bucket %s", bucketName)
+				return "", errors.Wrapf(err, "failed to tag the bucket %s", bucketName)
+			}
+
+			if createPrivateS3 {
+				createOriginAccessIdentityOutput, err := client.CreateCloudFrontOriginAccessIdentity(&cloudfront.CreateCloudFrontOriginAccessIdentityInput{
+					CloudFrontOriginAccessIdentityConfig: &cloudfront.OriginAccessIdentityConfig{
+						CallerReference: awssdk.String(name),
+						Comment:         awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name)),
+					},
+				})
+				if err != nil {
+					return "", errors.Wrapf(err, "failed to create CloudFront origin access identity")
+				}
+				originAccessIdentityID := *createOriginAccessIdentityOutput.CloudFrontOriginAccessIdentity.Id
+				log.Printf("CloudFront origin access identity created with ID %s, waiting %s for it to become active", originAccessIdentityID, cloudFrontOriginAccessIdentityActivationGracePeriod)
+				// CloudFront origin access identity takes some time to become active. Adding policy to bucket before
+				// it gets active results in an error. Introducing a delay to avoid it.
+				time.Sleep(cloudFrontOriginAccessIdentityActivationGracePeriod)
+
+				oidcBucketPolicyAllowingOAIAccess := fmt.Sprintf(oidcBucketTemplateAllowingOAIAccess, originAccessIdentityID, bucketName)
+				_, err = client.PutBucketPolicy(&s3.PutBucketPolicyInput{
+					Bucket: awssdk.String(bucketName),
+					Policy: awssdk.String(oidcBucketPolicyAllowingOAIAccess),
+				})
+				if err != nil {
+					return "", errors.Wrapf(err, "failed to add policy for the bucket %s", bucketName)
+				}
+				log.Printf("Update policy for bucket %s to allow access from CloudFront origin access identity with ID %s", bucketName, originAccessIdentityID)
+
+				_, err = client.PutPublicAccessBlock(&s3.PutPublicAccessBlockInput{
+					Bucket: awssdk.String(bucketName),
+					PublicAccessBlockConfiguration: &s3.PublicAccessBlockConfiguration{
+						BlockPublicAcls:       awssdk.Bool(true),
+						BlockPublicPolicy:     awssdk.Bool(true),
+						IgnorePublicAcls:      awssdk.Bool(true),
+						RestrictPublicBuckets: awssdk.Bool(true),
+					},
+				})
+				if err != nil {
+					return "", errors.Wrapf(err, "failed to block public access for the bucket %s", bucketName)
+				}
+				log.Printf("Blocked public access for the bucket %s", bucketName)
+
+				cloudFrontDistributionDomainName := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucketName, region)
+				cloudFrontDistributionOriginAccessIdentity := fmt.Sprintf("origin-access-identity/cloudfront/%s", originAccessIdentityID)
+				createCloudFrontDistributionOutput, err := client.CreateCloudFrontDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
+					DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
+						DistributionConfig: &cloudfront.DistributionConfig{
+							CallerReference: awssdk.String(name),
+							Comment:         awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name)),
+							Origins: &cloudfront.Origins{
+								Items: []*cloudfront.Origin{
+									{
+										Id:         awssdk.String(s3BucketURL),
+										DomainName: awssdk.String(cloudFrontDistributionDomainName),
+										S3OriginConfig: &cloudfront.S3OriginConfig{
+											OriginAccessIdentity: awssdk.String(cloudFrontDistributionOriginAccessIdentity),
+										},
+									},
+								},
+								Quantity: awssdk.Int64(1),
+							},
+							Enabled: awssdk.Bool(true),
+							DefaultCacheBehavior: &cloudfront.DefaultCacheBehavior{
+								AllowedMethods: &cloudfront.AllowedMethods{
+									Quantity: awssdk.Int64(2),
+									Items: []*string{
+										awssdk.String(cloudfront.MethodHead),
+										awssdk.String(cloudfront.MethodGet),
+									},
+									CachedMethods: &cloudfront.CachedMethods{
+										Quantity: awssdk.Int64(2),
+										Items: []*string{
+											awssdk.String(cloudfront.MethodHead),
+											awssdk.String(cloudfront.MethodGet),
+										},
+									},
+								},
+								TargetOriginId:       awssdk.String(s3BucketURL),
+								ViewerProtocolPolicy: awssdk.String(cloudfront.ViewerProtocolPolicyHttpsOnly),
+								CachePolicyId:        awssdk.String(cloudFrontCachingDisabledPolicyID),
+							},
+							ViewerCertificate: &cloudfront.ViewerCertificate{
+								CloudFrontDefaultCertificate: awssdk.Bool(true),
+							},
+						},
+						Tags: &cloudfront.Tags{
+							Items: []*cloudfront.Tag{
+								{
+									Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name)),
+									Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
+								},
+								{
+									Key:   awssdk.String(nameTagKey),
+									Value: awssdk.String(name),
+								},
+							},
+						},
+					},
+				})
+				if err != nil {
+					return "", errors.Wrapf(err, "failed to create CloudFront Distribution")
+				}
+				distributionID := *createCloudFrontDistributionOutput.Distribution.Id
+				log.Printf("CloudFront distribution created with ID %s", distributionID)
+
+				for {
+					getCloudFrontDistributionOutput, err := client.GetCloudFrontDistribution(&cloudfront.GetDistributionInput{
+						Id: &distributionID,
+					})
+					if err != nil {
+						return "", errors.Wrapf(err, "failed to get CloudFront Distribution with ID %v", distributionID)
+					}
+
+					if *getCloudFrontDistributionOutput.Distribution.Status == cloudFrontDistributionDeployedStatus {
+						log.Printf("CloudFront distribution with ID %s is successfully deployed", distributionID)
+						break
+					}
+					log.Printf("Waiting %s for CloudFront distribution with ID %s to be deployed...", cloudFrontDistributionStatusCheckDelay, distributionID)
+					time.Sleep(cloudFrontDistributionStatusCheckDelay)
+				}
+				cloudFrontURL := fmt.Sprintf("https://%s", *createCloudFrontDistributionOutput.Distribution.DomainName)
+				return cloudFrontURL, nil
 			}
 		}
 	}
-
-	return nil
+	return s3BucketURL, nil
 }
 
 // isExistingIdentifyProvider checks if given identity provider is owned by given name prefix
@@ -357,7 +670,7 @@ func createIdentityProviderCmd(cmd *cobra.Command, args []string) {
 		publicKeyPath = filepath.Join(CreateIdentityProviderOpts.TargetDir, provisioning.PublicKeyFile)
 	}
 
-	_, err = createIdentityProvider(awsClient, CreateIdentityProviderOpts.Name, CreateIdentityProviderOpts.Region, publicKeyPath, CreateIdentityProviderOpts.TargetDir, CreateIdentityProviderOpts.DryRun)
+	_, err = createIdentityProvider(awsClient, CreateIdentityProviderOpts.Name, CreateIdentityProviderOpts.Region, publicKeyPath, CreateIdentityProviderOpts.TargetDir, CreateIdentityProviderOpts.CreatePrivateS3Bucket, CreateIdentityProviderOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -410,6 +723,7 @@ func NewCreateIdentityProviderCmd() *cobra.Command {
 	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 	createIdentityProviderCmd.PersistentFlags().BoolVar(&CreateIdentityProviderOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createIdentityProviderCmd.PersistentFlags().StringVar(&CreateIdentityProviderOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createIdentityProviderCmd.PersistentFlags().BoolVar(&CreateIdentityProviderOpts.CreatePrivateS3Bucket, "create-private-s3-bucket", false, "Create private S3 bucket with public CloudFront OIDC endpoint")
 
 	return createIdentityProviderCmd
 }
