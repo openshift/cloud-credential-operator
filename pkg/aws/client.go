@@ -23,6 +23,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
+	"github.com/aws/aws-sdk-go/service/cloudfront/cloudfrontiface"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/iam/iamiface"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -72,6 +74,20 @@ type Client interface {
 	ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error)
 	GetObjectTagging(input *s3.GetObjectTaggingInput) (*s3.GetObjectTaggingOutput, error)
 	DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error)
+	PutPublicAccessBlock(input *s3.PutPublicAccessBlockInput) (*s3.PutPublicAccessBlockOutput, error)
+	PutBucketPolicy(input *s3.PutBucketPolicyInput) (*s3.PutBucketPolicyOutput, error)
+
+	//CloudFront
+	CreateCloudFrontOriginAccessIdentity(input *cloudfront.CreateCloudFrontOriginAccessIdentityInput) (*cloudfront.CreateCloudFrontOriginAccessIdentityOutput, error)
+	DeleteCloudFrontOriginAccessIdentity(input *cloudfront.DeleteCloudFrontOriginAccessIdentityInput) (*cloudfront.DeleteCloudFrontOriginAccessIdentityOutput, error)
+	GetCloudFrontOriginAccessIdentity(input *cloudfront.GetCloudFrontOriginAccessIdentityInput) (*cloudfront.GetCloudFrontOriginAccessIdentityOutput, error)
+	ListCloudFrontOriginAccessIdentities(input *cloudfront.ListCloudFrontOriginAccessIdentitiesInput) (*cloudfront.ListCloudFrontOriginAccessIdentitiesOutput, error)
+	CreateCloudFrontDistributionWithTags(input *cloudfront.CreateDistributionWithTagsInput) (*cloudfront.CreateDistributionWithTagsOutput, error)
+	DeleteCloudFrontDistribution(input *cloudfront.DeleteDistributionInput) (*cloudfront.DeleteDistributionOutput, error)
+	GetCloudFrontDistribution(input *cloudfront.GetDistributionInput) (*cloudfront.GetDistributionOutput, error)
+	UpdateCloudFrontDistribution(input *cloudfront.UpdateDistributionInput) (*cloudfront.UpdateDistributionOutput, error)
+	ListCloudFrontDistributions(input *cloudfront.ListDistributionsInput) (*cloudfront.ListDistributionsOutput, error)
+	ListTagsForCloudFrontResource(input *cloudfront.ListTagsForResourceInput) (*cloudfront.ListTagsForResourceOutput, error)
 }
 
 // ClientParams holds the various optional tunables that can be used to modify the AWS
@@ -84,8 +100,9 @@ type ClientParams struct {
 }
 
 type awsClient struct {
-	iamClient iamiface.IAMAPI
-	s3Client  s3iface.S3API
+	iamClient        iamiface.IAMAPI
+	s3Client         s3iface.S3API
+	cloudFrontClient cloudfrontiface.CloudFrontAPI
 }
 
 func (c *awsClient) CreateAccessKey(input *iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error) {
@@ -223,6 +240,53 @@ func (c *awsClient) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectO
 	return c.s3Client.DeleteObject(input)
 }
 
+func (c *awsClient) PutPublicAccessBlock(input *s3.PutPublicAccessBlockInput) (*s3.PutPublicAccessBlockOutput, error) {
+	return c.s3Client.PutPublicAccessBlock(input)
+}
+
+func (c *awsClient) PutBucketPolicy(input *s3.PutBucketPolicyInput) (*s3.PutBucketPolicyOutput, error) {
+	return c.s3Client.PutBucketPolicy(input)
+}
+
+func (c *awsClient) CreateCloudFrontOriginAccessIdentity(input *cloudfront.CreateCloudFrontOriginAccessIdentityInput) (*cloudfront.CreateCloudFrontOriginAccessIdentityOutput, error) {
+	return c.cloudFrontClient.CreateCloudFrontOriginAccessIdentity(input)
+}
+
+func (c *awsClient) DeleteCloudFrontOriginAccessIdentity(input *cloudfront.DeleteCloudFrontOriginAccessIdentityInput) (*cloudfront.DeleteCloudFrontOriginAccessIdentityOutput, error) {
+	return c.cloudFrontClient.DeleteCloudFrontOriginAccessIdentity(input)
+}
+
+func (c *awsClient) GetCloudFrontOriginAccessIdentity(input *cloudfront.GetCloudFrontOriginAccessIdentityInput) (*cloudfront.GetCloudFrontOriginAccessIdentityOutput, error) {
+	return c.cloudFrontClient.GetCloudFrontOriginAccessIdentity(input)
+}
+
+func (c *awsClient) ListCloudFrontOriginAccessIdentities(input *cloudfront.ListCloudFrontOriginAccessIdentitiesInput) (*cloudfront.ListCloudFrontOriginAccessIdentitiesOutput, error) {
+	return c.cloudFrontClient.ListCloudFrontOriginAccessIdentities(input)
+}
+func (c *awsClient) CreateCloudFrontDistributionWithTags(input *cloudfront.CreateDistributionWithTagsInput) (*cloudfront.CreateDistributionWithTagsOutput, error) {
+	return c.cloudFrontClient.CreateDistributionWithTags(input)
+}
+
+func (c *awsClient) DeleteCloudFrontDistribution(input *cloudfront.DeleteDistributionInput) (*cloudfront.DeleteDistributionOutput, error) {
+	return c.cloudFrontClient.DeleteDistribution(input)
+}
+
+func (c *awsClient) GetCloudFrontDistribution(input *cloudfront.GetDistributionInput) (*cloudfront.GetDistributionOutput, error) {
+	return c.cloudFrontClient.GetDistribution(input)
+}
+
+func (c *awsClient) UpdateCloudFrontDistribution(input *cloudfront.UpdateDistributionInput) (*cloudfront.UpdateDistributionOutput, error) {
+	return c.cloudFrontClient.UpdateDistribution(input)
+}
+
+func (c *awsClient) ListCloudFrontDistributions(input *cloudfront.ListDistributionsInput) (*cloudfront.ListDistributionsOutput, error) {
+	return c.cloudFrontClient.ListDistributions(input)
+}
+
+func (c *awsClient) ListTagsForCloudFrontResource(input *cloudfront.ListTagsForResourceInput) (*cloudfront.ListTagsForResourceOutput, error) {
+	return c.cloudFrontClient.ListTagsForResource(input)
+}
+
 // NewClient creates our client wrapper object for the actual AWS clients we use.
 func NewClient(accessKeyID, secretAccessKey []byte, params *ClientParams) (Client, error) {
 	var awsOpts session.Options
@@ -266,7 +330,8 @@ func NewClient(accessKeyID, secretAccessKey []byte, params *ClientParams) (Clien
 // NewClientFromSession will return a basic Client using only the provided awsSession
 func NewClientFromSession(sess *session.Session) Client {
 	return &awsClient{
-		iamClient: iam.New(sess),
-		s3Client:  s3.New(sess),
+		iamClient:        iam.New(sess),
+		s3Client:         s3.New(sess),
+		cloudFrontClient: cloudfront.New(sess),
 	}
 }

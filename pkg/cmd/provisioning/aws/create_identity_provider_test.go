@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/golang/mock/gomock"
@@ -39,19 +40,23 @@ const (
 		"\nhEnmk6kDfjWWsPkxXrD5qY4KgSp1/fqJP29p0Ypeh0cfrVkdQvn3v7ppcS/7TmWk" +
 		"\nhiFcsE1ngFW/nR6+7K/JdVUCAwEAAQ==" +
 		"\n-----END PUBLIC KEY-----\n"
-	testDirPrefix = "identityprovidertestdir"
+	testDirPrefix                        = "identityprovidertestdir"
+	testOriginAccessIdentityID           = "test-origin-access-identity-id"
+	testCloudFrontDistributionID         = "test-cloudfront-distribution-id"
+	testCloudFrontDistributionDomainName = "test.cloudfront.com"
 )
 
 func TestCreateIdentityProvider(t *testing.T) {
 
 	tests := []struct {
-		name          string
-		mockAWSClient func(mockCtrl *gomock.Controller) *mockaws.MockClient
-		setup         func(*testing.T) string
-		verify        func(t *testing.T, tempDirName string)
-		cleanup       func(*testing.T)
-		generateOnly  bool
-		expectError   bool
+		name            string
+		mockAWSClient   func(mockCtrl *gomock.Controller) *mockaws.MockClient
+		setup           func(*testing.T) string
+		verify          func(t *testing.T, tempDirName string)
+		cleanup         func(*testing.T)
+		createPrivateS3 bool
+		generateOnly    bool
+		expectError     bool
 	}{
 		{
 			name: "Public key not found",
@@ -70,7 +75,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 			expectError: true,
 		},
 		{
-			name: "Identity provider created, saved discovery document and json web key set",
+			name: "Identity provider created with public S3 bucket to store OIDC configs, saved discovery document and json web key set",
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockCreateBucketSuccess(mockAWSClient)
@@ -94,7 +99,37 @@ func TestCreateIdentityProvider(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "generate files only",
+			name: "Identity provider created with private S3 bucket to store OIDC configs, saved discovery document and json web key set",
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockCreateBucketSuccess(mockAWSClient)
+				mockPutBucketTaggingSuccess(mockAWSClient)
+				mockPutObjectSuccess(mockAWSClient)
+				mockListOpenIDConnectProviders(mockAWSClient)
+				mockCreateOpenIDConnectProvider(mockAWSClient)
+				mockTagOpenIDConnectProvider(mockAWSClient)
+				mockCreateCloudFrontOriginAccessIdentity(mockAWSClient)
+				mockPutPublicAccessBlock(mockAWSClient)
+				mockCreateCloudFrontDistributionWithTags(mockAWSClient)
+				mockGetCloudFrontDistribution(mockAWSClient)
+				mockPutBucketPolicy(mockAWSClient)
+				return mockAWSClient
+			},
+			createPrivateS3: true,
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+
+				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				require.NoError(t, err, "errored while setting up environment for test")
+
+				return tempDirName
+			},
+			verify:      func(t *testing.T, tempDirName string) {},
+			expectError: false,
+		},
+		{
+			name: "generate files only, with public S3 bucket",
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				return mockAWSClient
@@ -149,6 +184,62 @@ func TestCreateIdentityProvider(t *testing.T) {
 			generateOnly: true,
 			expectError:  false,
 		},
+		{
+			name: "generate files only, with private S3 bucket",
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+
+				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				require.NoError(t, err, "errored while setting up environment for test")
+
+				return tempDirName
+			},
+			verify: func(t *testing.T, tempDirName string) {
+				// Validating the issuer URL in the discovery document
+				discoveryDocument, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcConfigurationFilename))
+				require.NoError(t, err, "error reading in discovery document")
+
+				var discoveryDocumentJSON map[string]interface{}
+				err = json.Unmarshal(discoveryDocument, &discoveryDocumentJSON)
+				require.NoError(t, err, "discovery document is not a JSON")
+
+				issuerURL, ok := discoveryDocumentJSON["issuer"]
+				require.True(t, ok, "issuer field absent in discovery document")
+				assert.Equal(t, placeholderCloudFrontURL, issuerURL, "unexpected issuer url")
+
+				jwksURI, ok := discoveryDocumentJSON["jwks_uri"]
+				require.True(t, ok, "jwks_uri field absent in discovery document")
+				assert.Equal(t, fmt.Sprintf("%s/%s", placeholderCloudFrontURL, provisioning.KeysURI), jwksURI, "unexpected jwks uri")
+
+				// Comparing key ID from the JSON web key with the one generated from the public key
+				jwks, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcKeysFilename))
+				require.NoError(t, err, "error reading in JSON web key set (JWKS)")
+
+				var jwksJSON map[string]interface{}
+				err = json.Unmarshal(jwks, &jwksJSON)
+				require.NoError(t, err, "JSON web key set is not a JSON")
+
+				keys, ok := jwksJSON["keys"].([]interface{})
+				require.True(t, ok, "No keys in the JSON web key set")
+				key := keys[0].(map[string]interface{})
+				kid, ok := key["kid"]
+				require.True(t, ok, "key id absent in JSON web key", key)
+
+				block, _ := pem.Decode([]byte(testPublicKeyData))
+				publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+				expectedKeyID, err := provisioning.KeyIDFromPublicKey(publicKey)
+				require.NoError(t, err, "error calculating expected key id")
+				assert.Equalf(t, expectedKeyID, kid, "unexpected key id")
+			},
+			createPrivateS3: true,
+			generateOnly:    true,
+			expectError:     false,
+		},
 	}
 
 	for _, test := range tests {
@@ -163,7 +254,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
 
-			_, err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName, test.generateOnly)
+			_, err := createIdentityProvider(mockAWSClient, testInfraName, testRegionName, testPublicKeyPath, tempDirName, test.createPrivateS3, test.generateOnly)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
@@ -206,4 +297,44 @@ func mockCreateOpenIDConnectProvider(mockAWSClient *mockaws.MockClient) {
 func mockTagOpenIDConnectProvider(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().TagOpenIDConnectProvider(gomock.Any()).Return(
 		&iam.TagOpenIDConnectProviderOutput{}, nil).AnyTimes()
+}
+
+func mockCreateCloudFrontOriginAccessIdentity(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().CreateCloudFrontOriginAccessIdentity(gomock.Any()).Return(
+		&cloudfront.CreateCloudFrontOriginAccessIdentityOutput{
+			CloudFrontOriginAccessIdentity: &cloudfront.OriginAccessIdentity{
+				Id: awssdk.String(testOriginAccessIdentityID),
+			},
+		}, nil).AnyTimes()
+}
+
+func mockPutPublicAccessBlock(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().PutPublicAccessBlock(gomock.Any()).Return(
+		&s3.PutPublicAccessBlockOutput{}, nil).AnyTimes()
+}
+
+func mockCreateCloudFrontDistributionWithTags(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().CreateCloudFrontDistributionWithTags(gomock.Any()).Return(
+		&cloudfront.CreateDistributionWithTagsOutput{
+			Distribution: &cloudfront.Distribution{
+				Id:         awssdk.String(testCloudFrontDistributionID),
+				DomainName: awssdk.String(testCloudFrontDistributionDomainName),
+			},
+		}, nil).AnyTimes()
+}
+
+func mockGetCloudFrontDistribution(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetCloudFrontDistribution(gomock.Any()).Return(
+		&cloudfront.GetDistributionOutput{
+			Distribution: &cloudfront.Distribution{
+				Id:         awssdk.String(testCloudFrontDistributionID),
+				Status:     awssdk.String(cloudFrontDistributionDeployedStatus),
+				DomainName: awssdk.String(testCloudFrontDistributionDomainName),
+			},
+		}, nil).AnyTimes()
+}
+
+func mockPutBucketPolicy(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().PutBucketPolicy(gomock.Any()).Return(
+		&s3.PutBucketPolicyOutput{}, nil).AnyTimes()
 }
