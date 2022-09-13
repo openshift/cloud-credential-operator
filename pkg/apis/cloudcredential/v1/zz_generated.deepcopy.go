@@ -372,6 +372,11 @@ func (in *GCPProviderSpec) DeepCopyInto(out *GCPProviderSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.Permissions != nil {
+		in, out := &in.Permissions, &out.Permissions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
