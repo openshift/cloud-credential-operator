@@ -45,6 +45,10 @@ type Client interface {
 	DeleteServiceAccount(context.Context, *iamadminpb.DeleteServiceAccountRequest) error
 	DeleteServiceAccountKey(context.Context, *iamadminpb.DeleteServiceAccountKeyRequest) error
 	GetRole(context.Context, *iamadminpb.GetRoleRequest) (*iamadminpb.Role, error)
+	CreateRole(context.Context, *iamadminpb.CreateRoleRequest) (*iamadminpb.Role, error)
+	UpdateRole(context.Context, *iamadminpb.UpdateRoleRequest) (*iamadminpb.Role, error)
+	DeleteRole(context.Context, *iamadminpb.DeleteRoleRequest) (*iamadminpb.Role, error)
+	ListRoles(context.Context, *iamadminpb.ListRolesRequest) (*iamadminpb.ListRolesResponse, error)
 	GetServiceAccount(context.Context, *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error)
 	ListServiceAccountKeys(context.Context, *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error)
 	ListServiceAccounts(context.Context, *iamadminpb.ListServiceAccountsRequest) ([]*iamadminpb.ServiceAccount, error)
@@ -126,6 +130,30 @@ func (c *gcpClient) GetRole(ctx context.Context, request *iamadminpb.GetRoleRequ
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
 	return c.iamClient.GetRole(ctx, request)
+}
+
+func (c *gcpClient) CreateRole(ctx context.Context, request *iamadminpb.CreateRoleRequest) (*iamadminpb.Role, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamClient.CreateRole(ctx, request)
+}
+
+func (c *gcpClient) UpdateRole(ctx context.Context, request *iamadminpb.UpdateRoleRequest) (*iamadminpb.Role, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamClient.UpdateRole(ctx, request)
+}
+
+func (c *gcpClient) DeleteRole(ctx context.Context, request *iamadminpb.DeleteRoleRequest) (*iamadminpb.Role, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamClient.DeleteRole(ctx, request)
+}
+
+func (c *gcpClient) ListRoles(ctx context.Context, request *iamadminpb.ListRolesRequest) (*iamadminpb.ListRolesResponse, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamClient.ListRoles(ctx, request)
 }
 
 func (c *gcpClient) GetServiceAccount(ctx context.Context, request *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error) {
