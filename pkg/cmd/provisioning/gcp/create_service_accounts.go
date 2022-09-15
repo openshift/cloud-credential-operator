@@ -49,6 +49,8 @@ type: Opaque`
 }`
 	// createServiceAccountCmd is a gcloud cli command to create service account
 	createServiceAccountCmd = "gcloud iam service-accounts create %s --display-name=%s"
+	// createCustomRoleCmd is a gcloud cli command to create custom role
+	createCustomRoleCmd = "gcloud iam roles create %s --project=%s --title=%s ---permissions=%s"
 	// addPolicyBindingForProjectCmd is a gcloud cli command to add IAM policy binding for project
 	addPolicyBindingForProjectCmd = "gcloud projects add-iam-policy-binding %s --member=%s --role=%s"
 	// addPolicyBindingForSvcAcctCmd is a gcloud cli command to add IAM policy binding for IAM service account
@@ -60,11 +62,13 @@ type: Opaque`
 	workloadIdentityUserRole = "roles/iam.workloadIdentityUser"
 	// createIAMServiceAccountScriptName is the name of the script to create IAM service account
 	createIAMServiceAccountScriptName = "06-%d-create-%s-sa.sh"
+	// createIAMCustomRoleScriptName is the name of the script to create IAM custom role
+	createIAMCustomRoleScriptName = "07-%d-create-%s-role.sh"
 	// addIAMPolicyBindingScriptName is the name of the script to add policy bindings to service account/project
-	addIAMPolicyBindingScriptName = "07-%d-add-iam-policy-binding-for-%s-sa.sh"
+	addIAMPolicyBindingScriptName = "08-%d-add-iam-policy-binding-for-%s-sa.sh"
 	// generateCredentialsConfigScriptName is the name of the script to generate credentials config required to
 	// impersonate service account
-	generateCredentialsConfigScriptName = "08-%d-generate-credentials-config-for-%s-sa.sh"
+	generateCredentialsConfigScriptName = "09-%d-generate-credentials-config-for-%s-sa.sh"
 )
 
 var (
@@ -123,6 +127,19 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		return "", errors.Wrap(err, "Error generating service account name")
 	}
 
+	// The role ID has a max length of 64 chars and can include only letters, numbers, period and underscores
+	// we sanitize infraName and crName to make them alphanumeric and then
+	// split role ID into 29_28_5 where the resulting string becomes:
+	// <infraName chopped to 29 chars>_<crName chopped to 28 chars>_<random 5 chars>
+	roleID, err := actuator.GenerateRoleID(name, credReq.Name)
+
+	// The role name field has a 100 char max, so generate a name consisting of the
+	// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
+	roleName, err := utils.GenerateNameWithFieldLimits(name, 50, credReq.Name, 49)
+	if err != nil {
+		return "", fmt.Errorf("error generating custom role name: %v", err)
+	}
+
 	// Decode GCPProviderSpec
 	codec, err := credreqv1.NewCodec()
 	if err != nil {
@@ -159,10 +176,26 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save script to create service account %s locally at %s", serviceAccountName, createSvcAcctScriptFullPath))
 		}
 
+		roles := gcpProviderSpec.PredefinedRoles
+		if len(gcpProviderSpec.Permissions) > 0 {
+			// Create shell script to create IAM custom role
+			createCustomRoleScript := createShellScript([]string{
+				fmt.Sprintf(createCustomRoleCmd, roleID, project, roleName, strings.Join(gcpProviderSpec.Permissions, ",")),
+			})
+			createCustomRoleScriptName := fmt.Sprintf(createIAMCustomRoleScriptName, serviceAccountNum, serviceAccountName)
+			createCustomRoleScriptFullPath := filepath.Join(targetDir, createCustomRoleScriptName)
+			log.Printf("Saving script to create custom role %s locally at %s", roleName, createCustomRoleScriptFullPath)
+			if err := ioutil.WriteFile(createCustomRoleScriptFullPath, []byte(createCustomRoleScript), fileModeCcoctlDryRun); err != nil {
+				return "", errors.Wrap(err, fmt.Sprintf("Failed to save script to create custom role %s locally at %s", roleName, createCustomRoleScriptFullPath))
+			}
+			// add full resource name of the role
+			roles = append(roles, fmt.Sprintf("projects/%s/roles/%s", project, roleID))
+		}
+
 		// Create shell script to add policy/role bindings for service accounts/project
 		svcAcctBindingName := "serviceAccount:<POPULATE_SERVICE_ACCOUNT_EMAIL>"
 		var addPolicyBindingCmds []string
-		for _, role := range gcpProviderSpec.PredefinedRoles {
+		for _, role := range roles {
 			addPolicyBindingCmds = append(addPolicyBindingCmds, fmt.Sprintf(addPolicyBindingForProjectCmd, project, svcAcctBindingName, role))
 		}
 		// commands to add bindings for workload identity user role to service account
@@ -201,16 +234,17 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		return "", nil
 
 	default:
+		createdByCcoctlForSvcAcct := fmt.Sprintf("%s for service account %s", createdByCcoctl, serviceAccountName)
+
 		var serviceAccount *iamadminpb.ServiceAccount
 		serviceAccount, err = getServiceAccountByName(ctx, client, serviceAccountName)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
-				createdByCcoctlForSvcAcct := fmt.Sprintf("%s for service account %s", createdByCcoctl, serviceAccountName)
 				serviceAccount, err = actuator.CreateServiceAccount(client, serviceAccountID, serviceAccountName, createdByCcoctlForSvcAcct, project)
 				if err != nil {
 					return "", errors.Wrap(err, "Failed to create IAM service account")
 				}
-				log.Printf("IAM Service account %s created", serviceAccount.DisplayName)
+				log.Printf("IAM service account %s created", serviceAccount.DisplayName)
 			} else {
 				return "", err
 			}
@@ -218,9 +252,37 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 			log.Printf("Existing IAM service account %s found", serviceAccount.DisplayName)
 		}
 
+		roles := gcpProviderSpec.PredefinedRoles
+		// Create custom role for all the specific permissions defined in credentials request spec.permissions field
+		if len(gcpProviderSpec.Permissions) > 0 {
+			role, err := getRoleByName(ctx, client, roleName)
+			if err != nil {
+				if strings.Contains(err.Error(), "not found") {
+					role, err := actuator.CreateRole(client, gcpProviderSpec.Permissions, roleName, roleID, createdByCcoctlForSvcAcct, project)
+					if err != nil {
+						return "", errors.Wrap(err, "Failed to create custom role")
+					}
+					roles = append(roles, role.Name)
+					log.Printf("IAM custom role %s created", role.Title)
+				} else {
+					return "", err
+				}
+			} else {
+				log.Printf("Existing IAM custom role %s found, updating permissions", role.Title)
+				if !actuator.AreSlicesEqualWithoutOrder(role.IncludedPermissions, gcpProviderSpec.Permissions) {
+					role.IncludedPermissions = gcpProviderSpec.Permissions
+					_, err := actuator.UpdateRole(client, role, role.Name)
+					if err != nil {
+						return "", errors.Wrapf(err, "Failed to update custom role %s", role.Title)
+					}
+				}
+				roles = append(roles, role.Name)
+			}
+		}
+
 		// Add member <-> role bindings for the project
 		svcAcctBindingName := actuator.ServiceAccountBindingName(serviceAccount)
-		err = actuator.EnsurePolicyBindingsForProject(client, gcpProviderSpec.PredefinedRoles, svcAcctBindingName)
+		err = actuator.EnsurePolicyBindingsForProject(client, roles, svcAcctBindingName)
 		if err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to add predefined roles for IAM service account %s", serviceAccount.DisplayName))
 		}
@@ -290,6 +352,46 @@ func getServiceAccountByName(ctx context.Context, client gcp.Client, serviceAcco
 	}
 
 	return nil, fmt.Errorf("IAM service account with name %s not found", serviceAccountName)
+}
+
+// getRoleByName fetches the IAM role based on the given name
+func getRoleByName(ctx context.Context, client gcp.Client, roleName string) (*iamadminpb.Role, error) {
+	projectName := client.GetProjectName()
+	projectResourceName := fmt.Sprintf("projects/%s", projectName)
+
+	listRolesResponse, err := client.ListRoles(ctx, &iamadminpb.ListRolesRequest{
+		Parent: projectResourceName,
+		View:   iamadminpb.RoleView_FULL,
+	})
+	if err != nil {
+		return nil, errors.Wrapf(err, "Failed to fetch list of IAM roles")
+	}
+
+	for _, role := range listRolesResponse.Roles {
+		if role.Title == roleName {
+			return role, nil
+		}
+	}
+	nextPageToken := listRolesResponse.NextPageToken
+
+	for nextPageToken != "" {
+		listRolesResponse, err := client.ListRoles(ctx, &iamadminpb.ListRolesRequest{
+			Parent:    projectResourceName,
+			PageToken: nextPageToken,
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to fetch list of IAM roles")
+		}
+
+		for _, role := range listRolesResponse.Roles {
+			if role.Title == roleName {
+				return role, nil
+			}
+		}
+		nextPageToken = listRolesResponse.NextPageToken
+	}
+
+	return nil, fmt.Errorf("IAM custom role with name %s not found", roleName)
 }
 
 // writeCredReqSecret will take a credentialsRequest and a base 64 encoded credentials configuration to create
