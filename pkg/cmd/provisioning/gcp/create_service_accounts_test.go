@@ -24,6 +24,16 @@ const (
 	testCredReqName         = "test-cred-req"
 	testTargetNamespaceName = "test-namespace"
 	testTargetSecretName    = "test-secret"
+	testCustomRoleName      = "test-custom-role-name"
+)
+
+var (
+	testCustomRolePermissions = []string{
+		"iam.roles.get",
+		"iam.roles.list",
+		"resourcemanager.projects.get",
+		"resourcemanager.projects.getIamPolicy",
+	}
 )
 
 func TestCreateServiceAccounts(t *testing.T) {
@@ -81,7 +91,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				files, err := ioutil.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
-				assert.Equal(t, 3, countNonDirectoryFiles(files), "Should be exactly 3 shell scripts")
+				assert.Equal(t, 4, countNonDirectoryFiles(files), "Should be exactly 4 shell scripts")
 
 				files, err = ioutil.ReadDir(manifestsDir)
 				require.NoError(t, err, "Unexpected error listing files in manifestsDir")
@@ -94,13 +104,15 @@ func TestCreateServiceAccounts(t *testing.T) {
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 				mockListServiceAccountsEmpty(mockGCPClient)
+				mockListRolesEmpty(mockGCPClient)
 				mockCreateServiceAccountSuccessful(mockGCPClient)
-				mockGetProjectName(mockGCPClient, 5)
+				mockGetProjectName(mockGCPClient, 6)
 				mockGetProject(mockGCPClient)
 				mockGetProjectIamPolicy(mockGCPClient)
 				mockSetProjectIamPolicy(mockGCPClient)
 				mockGetServiceAccountIamPolicy(mockGCPClient)
 				mockSetServiceAccountIamPolicy(mockGCPClient)
+				mockCreateRole(mockGCPClient)
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
@@ -146,17 +158,19 @@ func TestCreateServiceAccounts(t *testing.T) {
 			verify: func(t *testing.T, targetDir, manifestsDir string) {},
 		},
 		{
-			name:         "Service account already exists",
+			name:         "Service account already exists, along with custom role created for permissions",
 			generateOnly: false,
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 				mockListServiceAccountsNotEmpty(mockGCPClient)
-				mockGetProjectName(mockGCPClient, 5)
+				mockListRolesNotEmpty(mockGCPClient)
+				mockGetProjectName(mockGCPClient, 6)
 				mockGetProject(mockGCPClient)
 				mockGetProjectIamPolicy(mockGCPClient)
 				mockSetProjectIamPolicy(mockGCPClient)
 				mockGetServiceAccountIamPolicy(mockGCPClient)
 				mockSetServiceAccountIamPolicy(mockGCPClient)
+				mockUpdateRole(mockGCPClient)
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
@@ -211,12 +225,15 @@ metadata:
   namespace: openshift-cloud-credential-operator
 spec:
   providerSpec:
-    providerSpec:
     apiVersion: cloudcredential.openshift.io/v1
     kind: GCPProviderSpec
     predefinedRoles:
     - roles/iam.securityReviewer
-    - roles/iam.roleViewer
+    permissions:
+    - iam.roles.get
+    - iam.roles.list
+    - resourcemanager.projects.get
+    - resourcemanager.projects.getIamPolicy
     skipServiceCheck: true
   secretRef:
     namespace: %s
@@ -263,6 +280,22 @@ func mockListServiceAccountsNotEmpty(mockGCPClient *mockgcp.MockClient) {
 		}, nil).Times(1)
 }
 
+func mockListRolesEmpty(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().ListRoles(gomock.Any(), gomock.Any()).Return(
+		&iamadminpb.ListRolesResponse{}, nil).Times(1)
+}
+
+func mockListRolesNotEmpty(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().ListRoles(gomock.Any(), gomock.Any()).Return(
+		&iamadminpb.ListRolesResponse{
+			Roles: []*iamadminpb.Role{
+				{
+					Title: fmt.Sprintf("%s-%s", testName, testCredReqName),
+				},
+			},
+		}, nil).Times(1)
+}
+
 func mockCreateServiceAccountSuccessful(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any()).Return(
 		&iamadminpb.ServiceAccount{
@@ -305,4 +338,18 @@ func mockSetProjectIamPolicy(mockGCPClient *mockgcp.MockClient) {
 func mockSetServiceAccountIamPolicy(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().SetServiceAccountIamPolicy(gomock.Any(), gomock.Any()).Return(
 		&iam.Policy{}, nil).Times(2)
+}
+
+func mockCreateRole(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+		Name:                testCustomRoleName,
+		IncludedPermissions: testCustomRolePermissions,
+	}, nil)
+}
+
+func mockUpdateRole(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().UpdateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+		Name:                testCustomRoleName,
+		IncludedPermissions: testCustomRolePermissions,
+	}, nil)
 }
