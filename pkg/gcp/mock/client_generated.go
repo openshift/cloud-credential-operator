@@ -53,6 +53,21 @@ func (mr *MockClientMockRecorder) CreateBucket(arg0, arg1, arg2, arg3 interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), arg0, arg1, arg2, arg3)
 }
 
+// CreateRole mocks base method.
+func (m *MockClient) CreateRole(arg0 context.Context, arg1 *admin.CreateRoleRequest) (*admin.Role, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRole", arg0, arg1)
+	ret0, _ := ret[0].(*admin.Role)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateRole indicates an expected call of CreateRole.
+func (mr *MockClientMockRecorder) CreateRole(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRole", reflect.TypeOf((*MockClient)(nil).CreateRole), arg0, arg1)
+}
+
 // CreateServiceAccount mocks base method.
 func (m *MockClient) CreateServiceAccount(arg0 context.Context, arg1 *admin.CreateServiceAccountRequest) (*admin.ServiceAccount, error) {
 	m.ctrl.T.Helper()
@@ -139,6 +154,21 @@ func (m *MockClient) DeleteObject(arg0 context.Context, arg1, arg2 string) error
 func (mr *MockClientMockRecorder) DeleteObject(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteObject", reflect.TypeOf((*MockClient)(nil).DeleteObject), arg0, arg1, arg2)
+}
+
+// DeleteRole mocks base method.
+func (m *MockClient) DeleteRole(arg0 context.Context, arg1 *admin.DeleteRoleRequest) (*admin.Role, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRole", arg0, arg1)
+	ret0, _ := ret[0].(*admin.Role)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteRole indicates an expected call of DeleteRole.
+func (mr *MockClientMockRecorder) DeleteRole(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRole", reflect.TypeOf((*MockClient)(nil).DeleteRole), arg0, arg1)
 }
 
 // DeleteServiceAccount mocks base method.
@@ -348,6 +378,21 @@ func (mr *MockClientMockRecorder) ListObjects(arg0, arg1 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListObjects", reflect.TypeOf((*MockClient)(nil).ListObjects), arg0, arg1)
 }
 
+// ListRoles mocks base method.
+func (m *MockClient) ListRoles(arg0 context.Context, arg1 *admin.ListRolesRequest) (*admin.ListRolesResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRoles", arg0, arg1)
+	ret0, _ := ret[0].(*admin.ListRolesResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRoles indicates an expected call of ListRoles.
+func (mr *MockClientMockRecorder) ListRoles(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoles", reflect.TypeOf((*MockClient)(nil).ListRoles), arg0, arg1)
+}
+
 // ListServiceAccountKeys mocks base method.
 func (m *MockClient) ListServiceAccountKeys(arg0 context.Context, arg1 *admin.ListServiceAccountKeysRequest) (*admin.ListServiceAccountKeysResponse, error) {
 	m.ctrl.T.Helper()
@@ -494,4 +539,19 @@ func (m *MockClient) UndeleteWorkloadIdentityPool(arg0 context.Context, arg1 str
 func (mr *MockClientMockRecorder) UndeleteWorkloadIdentityPool(arg0, arg1, arg2 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndeleteWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).UndeleteWorkloadIdentityPool), arg0, arg1, arg2)
+}
+
+// UpdateRole mocks base method.
+func (m *MockClient) UpdateRole(arg0 context.Context, arg1 *admin.UpdateRoleRequest) (*admin.Role, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRole", arg0, arg1)
+	ret0, _ := ret[0].(*admin.Role)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRole indicates an expected call of UpdateRole.
+func (mr *MockClientMockRecorder) UpdateRole(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRole", reflect.TypeOf((*MockClient)(nil).UpdateRole), arg0, arg1)
 }
