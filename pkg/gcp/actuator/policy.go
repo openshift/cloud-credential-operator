@@ -236,7 +236,7 @@ func addMemberToBindingForServiceAccount(memberName string, binding *iam.Binding
 	return true
 }
 
-func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccountID string, roles []string) (bool, error) {
+func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccountID, roleID string, predefinedRoles, permissions []string) (bool, error) {
 
 	projectName := gcpClient.GetProjectName()
 	svcAcct, err := GetServiceAccount(gcpClient, serviceAccountID)
@@ -251,7 +251,7 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 	}
 
 	// check do we have bindings for everything in the credentialsRequest
-	for _, roleName := range roles {
+	for _, roleName := range predefinedRoles {
 		foundRole := false
 		for _, binding := range policy.Bindings {
 			if binding.Role == roleName {
@@ -267,11 +267,37 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 		}
 	}
 
+	// if permissions are specified check if binding exists for custom role and if custom role has all the permissions
+	if len(permissions) > 0 {
+		foundCustomRole := false
+		for _, binding := range policy.Bindings {
+			if binding.Role == fmt.Sprintf("projects/%s/roles/%s", projectName, roleID) {
+				foundCustomRole = true
+				if !isServiceAccountInBinding(svcAcctBindingName, binding) {
+					return true, nil
+				}
+			}
+		}
+		if !foundCustomRole {
+			// permissions are specified but we do not have any policy binding for the custom role
+			return true, nil
+		}
+
+		role, err := GetRole(gcpClient, roleID, projectName)
+		if err != nil {
+			return true, fmt.Errorf("error fetching custom role: %v", err)
+		}
+
+		if !AreSlicesEqualWithoutOrder(role.IncludedPermissions, permissions) {
+			return true, nil
+		}
+	}
+
 	// check whether we have extra policy bindings
 	for _, binding := range policy.Bindings {
 		if isServiceAccountInBinding(svcAcctBindingName, binding) {
 			extraRoleDetected := true
-			for _, roleName := range roles {
+			for _, roleName := range predefinedRoles {
 				if roleName == binding.Role {
 					extraRoleDetected = false
 					break

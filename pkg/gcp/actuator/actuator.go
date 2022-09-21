@@ -111,6 +111,15 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return err
 	}
 
+	if gcpStatus.RoleID != "" {
+		logger.Infof("deleting custom role %s from GCP", gcpStatus.RoleID)
+		roleName := fmt.Sprintf("projects/%s/roles/%s", a.ProjectName, gcpStatus.RoleID)
+		_, err := DeleteRole(gcpClient, roleName)
+		if err != nil {
+			return fmt.Errorf("failed to delete custom role %s: %v", gcpStatus.RoleID, err)
+		}
+	}
+
 	svcAcct, err := GetServiceAccount(gcpClient, gcpStatus.ServiceAccountID)
 	if err != nil {
 		return fmt.Errorf("error getting service account details: %v", err)
@@ -257,6 +266,9 @@ func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.Credentials
 	if err != nil {
 		return fmt.Errorf("error gathering permissions for each role: %v", err)
 	}
+	if len(provSpec.Permissions) > 0 {
+		permList = append(permList, provSpec.Permissions...)
+	}
 
 	enoughPerms, err := gcputils.CheckPermissionsAgainstPermissionList(rootClient, permList, logger)
 	if err != nil {
@@ -308,10 +320,25 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		}
 		gcpStatus.ServiceAccountID = svcAcctID
 		logger.WithField("serviceaccount", gcpStatus.ServiceAccountID).Info("generated random name for GCP service account")
-		err = a.updateProviderStatus(ctx, logger, cr, gcpStatus)
+	}
+
+	if gcpStatus.RoleID == "" && len(gcpSpec.Permissions) > 0 {
+		// The role ID has a max length of 64 chars and can include only letters, numbers, period and underscores
+		// we sanitize infraName and crName to make them alphanumeric and then
+		// split role ID into 29_28_5 where the resulting string becomes:
+		// <infraName chopped to 29 chars>_<crName chopped to 28 chars>_<random 5 chars>
+		roleID, err := GenerateRoleID(infraName, cr.Name)
 		if err != nil {
-			return err
+			return fmt.Errorf("error generating role ID: %v", err)
 		}
+		gcpStatus.RoleID = roleID
+		logger.WithField("role", gcpStatus.RoleID).Info("generated random ID for GCP custom role")
+
+	}
+
+	err = a.updateProviderStatus(ctx, logger, cr, gcpStatus)
+	if err != nil {
+		return err
 	}
 
 	rootGCPClient, err := a.buildRootGCPClient(cr)
@@ -327,6 +354,9 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	permList, err := getPermissionsFromRoles(rootGCPClient, gcpSpec.PredefinedRoles)
 	if err != nil {
 		return fmt.Errorf("error gathering permissions for each role: %v", err)
+	}
+	if len(gcpSpec.Permissions) > 0 {
+		permList = append(permList, gcpSpec.Permissions...)
 	}
 
 	var serviceAPIsEnabled bool
@@ -377,9 +407,45 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 	// TODO: set service account labels once we come up with a scheme for GCP
 
+	roles := gcpSpec.PredefinedRoles
+	// Create custom role for all the specific permissions defined in credentials request spec.permissions field
+	if len(gcpSpec.Permissions) > 0 {
+		role, err := GetRole(rootGCPClient, gcpStatus.RoleID, projectName)
+		if err != nil {
+			if status.Code(err) != codes.NotFound {
+				return fmt.Errorf("error checking for existing custom role: %v", err)
+			}
+
+			logger.WithField("role", gcpStatus.RoleID).Debug("custom role does not exist, creating")
+
+			// The role name field has a 100 char max, so generate a name consisting of the
+			// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
+			roleName, err := utils.GenerateNameWithFieldLimits(infraName, 50, cr.Name, 49)
+			if err != nil {
+				return fmt.Errorf("error generating custom role name: %v", err)
+			}
+
+			role, err := CreateRole(rootGCPClient, gcpSpec.Permissions, roleName, gcpStatus.RoleID, "", projectName)
+			if err != nil {
+				return fmt.Errorf("error creating custom role: %v", err)
+			}
+			roles = append(roles, role.Name)
+		} else {
+			if !AreSlicesEqualWithoutOrder(role.IncludedPermissions, gcpSpec.Permissions) {
+				logger.WithField("role", gcpStatus.RoleID).Info("custom role exists, updating the permissions")
+				role.IncludedPermissions = gcpSpec.Permissions
+				_, err := UpdateRole(rootGCPClient, role, role.Name)
+				if err != nil {
+					return fmt.Errorf("error updating custom role %s: %v", role.Name, err)
+				}
+			}
+			roles = append(roles, role.Name)
+		}
+	}
+
 	// Set policy/role binding to the service account
 	svcAcctBindingName := ServiceAccountBindingName(serviceAccount)
-	err = EnsurePolicyBindingsForProject(rootGCPClient, gcpSpec.PredefinedRoles, svcAcctBindingName)
+	err = EnsurePolicyBindingsForProject(rootGCPClient, roles, svcAcctBindingName)
 	if err != nil {
 		return err
 	}
@@ -423,10 +489,14 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		return false, true, fmt.Errorf("unable to check whether credentialsRequest needs update")
 	}
 
-	// gather the individual permissions from each role
+	// gather the individual permissions from each pre-defined role
 	permList, err := getPermissionsFromRoles(readClient, gcpSpec.PredefinedRoles)
 	if err != nil {
 		return false, true, fmt.Errorf("error gathering permissions for each role: %v", err)
+	}
+	// gather individual permissions if specified
+	if len(gcpSpec.Permissions) > 0 {
+		permList = append(permList, gcpSpec.Permissions...)
 	}
 
 	var serviceAPIsEnabled bool
@@ -485,7 +555,7 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 		// TODO: add tagging check once we decide on tagging scheme
 
 		// check that the current permissions match what is being requested
-		needPermissionsUpdate, err := serviceAccountNeedsPermissionsUpdate(readClient, gcpStatus.ServiceAccountID, gcpSpec.PredefinedRoles)
+		needPermissionsUpdate, err := serviceAccountNeedsPermissionsUpdate(readClient, gcpStatus.ServiceAccountID, gcpStatus.RoleID, gcpSpec.PredefinedRoles, gcpSpec.Permissions)
 		if err != nil {
 			return serviceAPIsEnabled, true, fmt.Errorf("error determining whether policy binding update is needed: %v", err)
 		}
