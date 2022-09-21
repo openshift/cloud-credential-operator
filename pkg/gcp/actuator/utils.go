@@ -20,11 +20,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-
-	"sigs.k8s.io/controller-runtime/pkg/client"
+	"reflect"
+	"sort"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 )
@@ -90,4 +91,22 @@ func loadCredsFromSecret(kubeClient client.Client, namespace, secretName string)
 	}
 
 	return jsonBytes, nil
+}
+
+// AreSlicesEqualWithoutOrder check for equality on slices without order
+func AreSlicesEqualWithoutOrder(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+
+	aCopy := make([]string, len(a))
+	bCopy := make([]string, len(b))
+
+	copy(aCopy, a)
+	copy(bCopy, b)
+
+	sort.Strings(aCopy)
+	sort.Strings(bCopy)
+
+	return reflect.DeepEqual(aCopy, bCopy)
 }

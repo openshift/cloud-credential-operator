@@ -60,7 +60,9 @@ const (
 	testServiceAccountKeyPrivateData = "SECRET SERVICE ACCOUNT KEY DATA"
 	testOldPassthroughPrivateData    = "OLD SERVICE ACCOUNT KEY DATA"
 	testGCPServiceAccountID          = "a-test-svc-acct"
+	testCustomRoleID                 = "a-test-role-id"
 	testRoleName                     = "roles/appengine.appAdmin"
+	testCustomRoleName               = "projects/test-GCP-project/roles/a-test-role-id"
 	testServiceAPIName               = "appengine.googleapis.com"
 	testGCPProjectName               = "test-GCP-project"
 	testServiceAccountKeyName        = "testGCPKeyName"
@@ -127,6 +129,51 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// needsupdate
 				mockGetRole(mockGCPClient)
 				mockListServicesEnabled(mockGCPClient)
+
+				// create service account
+				mockGetRole(mockGCPClient)
+				mockListServicesEnabled(mockGCPClient)
+				mockGetServiceAccount(mockGCPClient)
+				mockGetProjectIamPolicy(mockGCPClient, nil)
+				mockSetProjectIamPolicy(mockGCPClient)
+				mockListServiceAccountKeysEmpty(mockGCPClient)
+				mockCreateServiceAccountKey(mockGCPClient, "")
+
+				return mockGCPClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
+		{
+			name: "new credential with permissions set to create custom role",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredentialsRequestWithPermissions(t),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetProjectName(mockGCPClient)
+
+				// needsupdate
+				mockListServicesEnabled(mockGCPClient)
+
+				// create custom role
+				mockGetRole(mockGCPClient)
+				mockGetRoleFailed(mockGCPClient)
+				mockCreateRole(mockGCPClient)
 
 				// create service account
 				mockGetRole(mockGCPClient)
@@ -504,7 +551,77 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				},
 			},
 		},
+		{
+			name: "updated permissions for provisioned credentials request",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
 
+				// already minted, last synced 2 hours ago
+				func() *minterv1.CredentialsRequest {
+					cr := testGCPCredentialsRequestWithPermissions(t)
+					gcpStatus, err := codec.EncodeProviderStatus(
+						&minterv1.GCPProviderStatus{
+							TypeMeta: metav1.TypeMeta{
+								Kind: "GCPProviderSpec",
+							},
+							ServiceAccountID: testGCPServiceAccountID,
+							RoleID:           testCustomRoleID,
+						},
+					)
+					if err != nil {
+						t.Logf("error encoding: %v", err)
+						t.FailNow()
+						return nil
+					}
+
+					cr.Status.ProviderStatus = gcpStatus
+					cr.Status.LastSyncTimestamp = &metav1.Time{Time: time.Now().Add(-2 * time.Hour)}
+
+					return cr
+				}(),
+
+				// target secret exists
+				createTestNamespace(testSecretNamespace),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, `{"private_key_id": "testGCPKeyName"}`),
+
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
+			},
+			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetProjectName(mockGCPClient)
+
+				// needsupdate
+				mockListServicesEnabled(mockGCPClient)
+
+				// update custom role
+				mockGetRole(mockGCPClient)
+				mockGetCustomRoleSuccess(mockGCPClient)
+				mockUpdateRole(mockGCPClient)
+
+				// create service account
+				mockGetRole(mockGCPClient)
+				mockListServicesEnabled(mockGCPClient)
+				mockGetServiceAccount(mockGCPClient)
+				mockGetProjectIamPolicy(mockGCPClient, nil)
+				mockSetProjectIamPolicy(mockGCPClient)
+				mockListServiceAccountKeys(mockGCPClient, testServiceAccountKeyName)
+
+				return mockGCPClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, `{"private_key_id": "testGCPKeyName"}`, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
 		{
 			name: "cred deletion",
 			existing: []runtime.Object{
@@ -524,6 +641,34 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				mockGetProjectIamPolicy(mockGCPClient, testValidPolicyBindings)
 				mockSetProjectIamPolicy(mockGCPClient)
 				mockDeleteServiceAccount(mockGCPClient)
+
+				return mockGCPClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				assert.Nil(t, targetSecret)
+			},
+		},
+		{
+			name: "cred deletion when permissions are set in CR and custom role is created",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testGCPCredentialsRequestWithPermissionsWithDeletionTimestamp(t),
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetProjectName(mockGCPClient)
+				mockGetServiceAccount(mockGCPClient)
+				mockGetProjectIamPolicy(mockGCPClient, testValidPolicyBindings)
+				mockSetProjectIamPolicy(mockGCPClient)
+				mockDeleteServiceAccount(mockGCPClient)
+				mockDeleteRole(mockGCPClient)
 
 				return mockGCPClient
 			},
@@ -854,6 +999,38 @@ func testGCPCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.Cred
 	return cr
 }
 
+func testGCPCredentialsRequestWithPermissionsWithDeletionTimestamp(t *testing.T) *minterv1.CredentialsRequest {
+	cr := testGCPCredentialsRequestWithPermissions(t)
+
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		t.Logf("error creating new codec: %v", err)
+		t.FailNow()
+		return nil
+	}
+
+	gcpStatus, err := codec.EncodeProviderStatus(
+		&minterv1.GCPProviderStatus{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "GCPProviderSpec",
+			},
+			ServiceAccountID: testGCPServiceAccountID,
+			RoleID:           testCustomRoleID,
+		},
+	)
+	if err != nil {
+		t.Logf("error encoding: %v", err)
+		t.FailNow()
+		return nil
+	}
+	cr.Status.ProviderStatus = gcpStatus
+
+	now := metav1.Now()
+	cr.DeletionTimestamp = &now
+	cr.Status.Provisioned = true
+	return cr
+}
+
 func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
@@ -915,6 +1092,48 @@ func testGCPCredsSecret(namespace, name, jsonAUTH string) *corev1.Secret {
 	return s
 }
 
+func testGCPCredentialsRequestWithPermissions(t *testing.T) *minterv1.CredentialsRequest {
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		t.Logf("error creating new codec: %v", err)
+		t.FailNow()
+		return nil
+	}
+	gcpProvSpec, err := codec.EncodeProviderSpec(
+		&minterv1.GCPProviderSpec{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "GCPProviderSpec",
+			},
+			Permissions: []string{
+				testServiceAPIName,
+			},
+			PredefinedRoles: []string{
+				testRoleName,
+			},
+		},
+	)
+	if err != nil {
+		t.Logf("error encoding: %v", err)
+		t.FailNow()
+		return nil
+	}
+
+	return &minterv1.CredentialsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:        testCRName,
+			Namespace:   testNamespace,
+			Finalizers:  []string{minterv1.FinalizerDeprovision},
+			UID:         types.UID("1234"),
+			Annotations: map[string]string{},
+			Generation:  testCRGeneration,
+		},
+		Spec: minterv1.CredentialsRequestSpec{
+			SecretRef:    corev1.ObjectReference{Name: testSecretName, Namespace: testSecretNamespace},
+			ProviderSpec: gcpProvSpec,
+		},
+	}
+}
+
 func mockGetProjectName(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().GetProjectName().AnyTimes().Return(testGCPProjectName)
 }
@@ -942,14 +1161,48 @@ func mockGetProjectIamPolicy(mockGCPClient *mockgcp.MockClient, bindings []*clou
 	}
 	mockGCPClient.EXPECT().GetProjectIamPolicy(gomock.Any(), gomock.Any()).Return(&cloudresourcemanager.Policy{
 		Bindings: mockBindings,
-	}, nil)
+	}, nil).MaxTimes(2)
 }
 
 func mockGetRole(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().GetRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+	mockGCPClient.EXPECT().GetRole(gomock.Any(), &iamadminpb.GetRoleRequest{
+		Name: testRoleName,
+	}).Return(&iamadminpb.Role{
 		Name:                testRoleName,
 		IncludedPermissions: testRolePermissions,
 	}, nil).MaxTimes(2)
+}
+
+func mockGetCustomRoleSuccess(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().GetRole(gomock.Any(), &iamadminpb.GetRoleRequest{
+		Name: testCustomRoleName,
+	}).Return(&iamadminpb.Role{
+		Name:                testCustomRoleName,
+		IncludedPermissions: testRolePermissions,
+	}, nil)
+}
+
+func mockGetRoleFailed(mockGCPClient *mockgcp.MockClient) {
+	roleNotFoundError := status.Error(codes.NotFound, "role not found")
+	mockGCPClient.EXPECT().GetRole(gomock.Any(), gomock.Any()).Return(nil, roleNotFoundError)
+}
+
+func mockCreateRole(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+		Name:                testCustomRoleName,
+		IncludedPermissions: testRolePermissions,
+	}, nil)
+}
+
+func mockUpdateRole(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().UpdateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+		Name:                testCustomRoleName,
+		IncludedPermissions: testRolePermissions,
+	}, nil)
+}
+
+func mockDeleteRole(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().DeleteRole(gomock.Any(), gomock.Any()).Return(nil, nil)
 }
 
 func mockListServicesEnabled(mockGCPClient *mockgcp.MockClient) {
@@ -1010,7 +1263,7 @@ func mockListServiceAccountKeys(mockGCPClient *mockgcp.MockClient, customName st
 				Name: keyName,
 			},
 		},
-	}, nil)
+	}, nil).MaxTimes(2)
 }
 
 func mockDeleteServiceAccount(mockGCPClient *mockgcp.MockClient) {
