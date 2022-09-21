@@ -126,7 +126,7 @@ metadata:
   name: pod-identity-webhook
   namespace: openshift-cloud-credential-operator
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: pod-identity-webhook
