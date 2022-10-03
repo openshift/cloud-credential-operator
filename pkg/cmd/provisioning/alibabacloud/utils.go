@@ -81,7 +81,7 @@ func parseArn(arn string) (ARN, error) {
 	}, nil
 }
 
-//getRAMUserName return the RAM username in the given ARN
+// getRAMUserName return the RAM username in the given ARN
 func getRAMUserName(arn string) (string, error) {
 	parsed, err := parseArn(arn)
 	if err != nil {
@@ -96,7 +96,7 @@ func getRAMUserName(arn string) (string, error) {
 	return parts[1], nil
 }
 
-//generateRAMUserName generate ram user name and displayname(the max length of display name is 128 characters)
+// generateRAMUserName generate ram user name and displayname(the max length of display name is 128 characters)
 func generateRAMUserName(userName string) (string, string) {
 	var shortenedUserName string
 	if len(userName) > 64 {
@@ -112,7 +112,7 @@ func generateRAMUserName(userName string) (string, string) {
 	return shortenedUserName, displayName
 }
 
-//generatePolicyName generate ram policy for given name, the max length of policy name is 128 characters
+// generatePolicyName generate ram policy for given name, the max length of policy name is 128 characters
 func generatePolicyName(name string) string {
 	if len(name) > 121 {
 		name = name[0:121]
@@ -127,7 +127,7 @@ func refineMissingRegionIdErr(err error) error {
 	return err
 }
 
-//getDeleteAccessKeys return which accesskey would be deleted, including the older one and the ones with in-active status
+// getDeleteAccessKeys return which accesskey would be deleted, including the older one and the ones with in-active status
 func getDeleteAccessKeys(keys []ram.AccessKeyInListAccessKeys) ([]ram.AccessKeyInListAccessKeys, error) {
 	var deleteAccessKeys = make([]ram.AccessKeyInListAccessKeys, 0)
 	var keysCreated = make([]time.Time, 2)
