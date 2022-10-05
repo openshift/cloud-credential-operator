@@ -120,7 +120,8 @@ func GetCredentialsRequestCloudType(providerSpec *runtime.RawExtension) (string,
 // than their respective MaxLen argument. it will then add a unique ending to the resulting name
 // by appending '-<5 random chars>' to the resulting string.
 // Example: passing "thisIsInfraName", 8, "thisIsCrName", 8 will return:
-//		'thisIsIn-thisIsCr-<5 random chars>'
+//
+//	'thisIsIn-thisIsCr-<5 random chars>'
 func GenerateUniqueNameWithFieldLimits(infraName string, infraNameMaxLen int, crName string, crNameMaxlen int) (string, error) {
 	genName, err := GenerateNameWithFieldLimits(infraName, infraNameMaxLen, crName, crNameMaxlen)
 	if err != nil {
@@ -133,7 +134,8 @@ func GenerateUniqueNameWithFieldLimits(infraName string, infraNameMaxLen int, cr
 // GenerateNameWithFieldLimits lets you pass in two strings which will be clipped to their respective
 // maximum lengths.
 // Example: passing "thisIsInfraName", 8, "thisIsCrName", 8 will return:
-//      'thisIsIn-thisIsCr'
+//
+//	'thisIsIn-thisIsCr'
 func GenerateNameWithFieldLimits(infraName string, infraNameMaxLen int, crName string, crNameLen int) (string, error) {
 	if crName == "" {
 		return "", fmt.Errorf("empty credential request name")
@@ -318,8 +320,10 @@ func IsValidMode(operatorMode operatorv1.CloudCredentialsMode) bool {
 }
 
 // UpgradeableCheck will set the Upgradeable condition based on the mode CCO is in:
-//   Mint/Passthrough: check that the root creds secret exists
-//   Manual: check that the CCO's config CR has been annotated properly to signal that the user has performed the pre-upgrade credentials tasks.
+//
+//	Mint/Passthrough: check that the root creds secret exists
+//	Manual: check that the CCO's config CR has been annotated properly to signal that the user has performed the pre-upgrade credentials tasks.
+//
 // Note: the upgradeable flag can only stop upgrades from 4.x to 4.y, not 4.x.y to 4.x.z.
 func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentialsMode, rootSecret types.NamespacedName) *configv1.ClusterOperatorStatusCondition {
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
