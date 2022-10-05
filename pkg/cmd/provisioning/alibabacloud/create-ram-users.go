@@ -65,7 +65,7 @@ func createRAMUsersCmd(cmd *cobra.Command, args []string) {
 	}
 }
 
-//createRAMUsers will create a ram user for the given credenital request and attach the specific ram policy
+// createRAMUsers will create a ram user for the given credenital request and attach the specific ram policy
 func createRAMUsers(client alibabacloud.Client, name, credReqDir, targetDir string, enableTechPreview bool) error {
 	// Process directory
 	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
@@ -144,7 +144,7 @@ func createComponentPolicy(client alibabacloud.Client, policyName string, statem
 	return err
 }
 
-//attachComponentPolicy will attach the given policy to the preset component user
+// attachComponentPolicy will attach the given policy to the preset component user
 func attachComponentPolicy(client alibabacloud.Client, user, policyName string) error {
 	req := ram.CreateAttachPolicyToUserRequest()
 	req.PolicyName = policyName

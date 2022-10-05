@@ -18,7 +18,7 @@ var (
 	}
 )
 
-//detachComponentPolicy detach the specific ram policy from the ram user
+// detachComponentPolicy detach the specific ram policy from the ram user
 func detachComponentPolicy(client alibabacloud.Client, policyName, userName string) error {
 	req := ram.CreateDetachPolicyFromUserRequest()
 	req.PolicyName = policyName
@@ -28,7 +28,7 @@ func detachComponentPolicy(client alibabacloud.Client, policyName, userName stri
 	return err
 }
 
-//deleteComponentPolicy delete the specific ram policy
+// deleteComponentPolicy delete the specific ram policy
 func deleteComponentPolicy(client alibabacloud.Client, policyName string) error {
 	lpvReq := ram.CreateListPolicyVersionsRequest()
 	lpvReq.PolicyName = policyName
@@ -62,7 +62,7 @@ func deleteComponentPolicy(client alibabacloud.Client, policyName string) error 
 	return nil
 }
 
-//deleteComponentUser delete the specific component ram user
+// deleteComponentUser delete the specific component ram user
 func deleteComponentUser(client alibabacloud.Client, userName string) error {
 	//remove all user AccessKeys firstly
 	listKeyReq := ram.CreateListAccessKeysRequest()
