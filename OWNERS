@@ -1,7 +1,7 @@
 approvers:
 - abutcher
 - 2uasimojo
-- joelddiaz
+- dlom
 - suhanime
 
 component: "Cloud Credential Operator"
