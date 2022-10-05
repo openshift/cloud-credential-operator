@@ -51,6 +51,7 @@ var (
 		"v4.1.0/aws-pod-identity-webhook/clusterrolebinding.yaml",
 		"v4.1.0/aws-pod-identity-webhook/rolebinding.yaml",
 		"v4.1.0/aws-pod-identity-webhook/svc.yaml",
+		"v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml",
 	}
 	templateFiles = []string{
 		"v4.1.0/aws-pod-identity-webhook/deployment.yaml",
