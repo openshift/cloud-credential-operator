@@ -28,8 +28,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/microsoftgraph/msgraph-sdk-go/models"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -192,7 +191,7 @@ func TestDecodeToUnknown(t *testing.T) {
 }
 
 func TestAnnotations(t *testing.T) {
-	var tests = []struct {
+	tests := []struct {
 		name      string
 		in        corev1.Secret
 		errRegexp string
@@ -346,7 +345,7 @@ func TestActuator(t *testing.T) {
 			mockAppClient: func(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
 				client := azuremock.NewMockAppClient(mockCtrl)
 				client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-					[]graphrbac.Application{testAADApplication()}, nil,
+					[]models.Applicationable{testAADApplication()}, nil,
 				)
 				client.EXPECT().Delete(gomock.Any(), testAppRegObjID)
 				return client
@@ -387,7 +386,7 @@ func TestActuator(t *testing.T) {
 				rawStatus := &minterv1.AzureProviderStatus{
 					ServicePrincipalName: testAppRegName,
 					AppID:                testAppRegID,
-					//SecretLastResourceVersion: "oldVersion",
+					// SecretLastResourceVersion: "oldVersion",
 				}
 				encodedStatus, err := codec.EncodeProviderStatus(rawStatus)
 				require.NoError(t, err, "error encoding status")
@@ -424,7 +423,7 @@ func TestActuator(t *testing.T) {
 			mockAppClient: func(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
 				client := azuremock.NewMockAppClient(mockCtrl)
 				client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-					[]graphrbac.Application{testAADApplication()}, nil,
+					[]models.Applicationable{testAADApplication()}, nil,
 				)
 				client.EXPECT().Delete(gomock.Any(), testAppRegObjID)
 				return client
@@ -494,7 +493,7 @@ func TestActuator(t *testing.T) {
 			mockAppClient: func(mockCtrl *gomock.Controller) *azuremock.MockAppClient {
 				client := azuremock.NewMockAppClient(mockCtrl)
 				client.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-					[]graphrbac.Application{}, fmt.Errorf("Azure AD Graph API has been sunset"),
+					[]models.Applicationable{}, fmt.Errorf("Azure AD Graph API has been sunset"),
 				)
 				// No Delete() call b/c of List() error above
 				return client
@@ -504,7 +503,6 @@ func TestActuator(t *testing.T) {
 			name:        "Missing annotation",
 			expectedErr: fmt.Errorf("error determining whether a credentials update is needed"),
 			existing: func() []runtime.Object {
-
 				objects := []runtime.Object{&rootSecretNoAnnotation}
 
 				return objects
@@ -518,7 +516,6 @@ func TestActuator(t *testing.T) {
 			name:        "Mint annotation",
 			expectedErr: fmt.Errorf("error determining whether a credentials update is needed"),
 			existing: func() []runtime.Object {
-
 				objects := []runtime.Object{&rootSecretMintAnnotation}
 
 				return objects
@@ -569,7 +566,6 @@ func TestActuator(t *testing.T) {
 				require.NoError(t, testErr, "unexpected error returned during test case")
 				test.validate(t, fakeClient)
 			}
-
 		})
 	}
 }
@@ -584,12 +580,15 @@ func getCredRequestTargetSecret(t *testing.T, c client.Client, cr *minterv1.Cred
 	return s
 }
 
-func testAADApplication() graphrbac.Application {
-	app := graphrbac.Application{
-		AppID:       to.StringPtr(testAppRegID),
-		DisplayName: to.StringPtr(generateDisplayName()),
-		ObjectID:    to.StringPtr(testAppRegObjID),
-	}
+func testAADApplication() models.Applicationable {
+	app := models.NewApplication()
+	appId := testAppRegID
+	app.SetAppId(&appId)
+	objId := testAppRegObjID
+	app.SetId(&objId)
+	name := generateDisplayName()
+	app.SetDisplayName(&name)
+
 	return app
 }
 
