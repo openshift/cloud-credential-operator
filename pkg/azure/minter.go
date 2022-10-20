@@ -6,19 +6,15 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	"github.com/Azure/go-autorest/autorest"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
+	azidentity "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
 	"github.com/Azure/go-autorest/autorest/azure"
-	"github.com/Azure/go-autorest/autorest/azure/auth"
+	azurekiota "github.com/microsoft/kiota-authentication-azure-go"
+	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 
 	configv1 "github.com/openshift/api/config/v1"
 )
-
-func getAuthorizer(clientID, clientSecret, tenantID string, env azure.Environment, resourceEndpoint string) (autorest.Authorizer, error) {
-	config := auth.NewClientCredentialsConfig(clientID, clientSecret, tenantID)
-	config.Resource = resourceEndpoint
-	config.AADEndpoint = env.ActiveDirectoryEndpoint
-	return config.Authorizer()
-}
 
 type credentialMinterBuilder func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error)
 
@@ -43,13 +39,46 @@ func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret st
 	if err != nil {
 		return nil, fmt.Errorf("Unable to determine Azure environment: %w", err)
 	}
-	graphAuthorizer, err := getAuthorizer(clientID, clientSecret, tenantID, env, env.GraphEndpoint)
+	var cloudConfig cloud.Configuration
+	switch cloudName {
+	case "AzureStackCloud":
+		cloudConfig = cloud.Configuration{
+			ActiveDirectoryAuthorityHost: env.ActiveDirectoryEndpoint,
+			Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
+				cloud.ResourceManager: {
+					Audience: env.TokenAudience,
+					Endpoint: env.ResourceManagerEndpoint,
+				},
+			},
+		}
+	case "AzureUSGovernmentCloud":
+		cloudConfig = cloud.AzureGovernment
+	case "AzureChinaCloud":
+		cloudConfig = cloud.AzureChina
+	default:
+		cloudConfig = cloud.AzurePublic
+	}
+
+	options := azidentity.ClientSecretCredentialOptions{
+		ClientOptions: azcore.ClientOptions{
+			Cloud: cloudConfig,
+		},
+	}
+	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &options)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to acquire credentials: %v", err)
+	}
+	authorizer, err := azurekiota.NewAzureIdentityAuthenticationProvider(cred)
 	if err != nil {
 		return nil, fmt.Errorf("Unable to construct GraphEndpoint authorizer: %v", err)
 	}
+	adapter, err := msgraphsdk.NewGraphRequestAdapter(authorizer)
+	if err != nil {
+		return nil, fmt.Errorf("Unable to construct GraphRequest adatper: %v", err)
+	}
 
 	return &AzureCredentialsMinter{
-		appClient:      NewAppClient(env, tenantID, graphAuthorizer),
+		appClient:      NewAppClient(adapter),
 		tenantID:       tenantID,
 		subscriptionID: subscriptionID,
 		logger:         logger,
@@ -70,11 +99,16 @@ func (credMinter *AzureCredentialsMinter) DeleteAADApplication(ctx context.Conte
 		return nil
 	case 1:
 		credMinter.logger.Infof("Deleting AAD application %q", aadAppName)
-		if err := credMinter.appClient.Delete(ctx, *appItems[0].ObjectID); err != nil {
-			if appItems[0].DisplayName != nil {
-				return fmt.Errorf("unable to delete AAD application %v (%v): %v", *appItems[0].DisplayName, *appItems[0].ObjectID, err)
+		appId := appItems[0].GetId()
+		if appId == nil {
+			return fmt.Errorf("unable to delete AAD application %q: no ID found", aadAppName)
+		}
+		displayName := appItems[0].GetDisplayName()
+		if err := credMinter.appClient.Delete(ctx, *appId); err != nil {
+			if displayName != nil {
+				return fmt.Errorf("unable to delete AAD application %v (%v): %v", *displayName, *appId, err)
 			}
-			return fmt.Errorf("unable to delete AAD application %v: %v", appItems[0].ObjectID, err)
+			return fmt.Errorf("unable to delete AAD application %v: %v", appId, err)
 		}
 		return nil
 	default:
