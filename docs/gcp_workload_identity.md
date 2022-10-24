@@ -119,4 +119,4 @@ Make sure you clean up the following resources after you uninstall your cluster.
 2. Cloud storage bucket used to store OpenID Connect configuration and the public key
 3. IAM service accounts created by ccoctl tool along with project policy bindings
 
-You can use `ccoctl gcp delete --name=<name> --project=<gcp-project-id>` command to delete all the above resources.
+You can use `ccoctl gcp delete --name=<name> --project=<gcp-project-id> --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests>` to delete all the above resources.

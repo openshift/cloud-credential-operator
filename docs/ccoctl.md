@@ -156,7 +156,7 @@ $ ccoctl gcp create-all --name=<name> --region=<gcp-region> --project=<gcp-proje
 To delete resources created by ccoctl, run
 
 ```bash
-$ ccoctl gcp delete --name=<name> --project=<gcp-project-id>
+$ ccoctl gcp delete --name=<name> --project=<gcp-project-id> --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests>
 
 ```
 
