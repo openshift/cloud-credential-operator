@@ -27,6 +27,7 @@ const (
 stringData:
   credentials: |-
     [default]
+    sts_regional_endpoints = regional
     role_arn = %s
     web_identity_token_file = %s
 kind: Secret

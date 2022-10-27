@@ -17,6 +17,7 @@ With STS we have a full-fledged AWS configuration that defines a `role` and `web
 
 ```yaml
 [default]
+sts_regional_endpoints = regional
 role_name = arn:...:role/some-role-name
 web_identity_token_file = /path/to/token
 ```
