@@ -1,5 +1,6 @@
 # OpenShift Cloud Credential Operator
 
+
 The cloud credential operator is a controller that will sync on
 CredentialsRequest custom resources. CredentialsRequests allow OpenShift
 components to request fine-grained credentials for a particular cloud provider
