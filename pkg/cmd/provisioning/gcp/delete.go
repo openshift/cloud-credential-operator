@@ -10,8 +10,10 @@ import (
 	"github.com/spf13/cobra"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 var (
@@ -50,33 +52,48 @@ func deleteOIDCBucket(ctx context.Context, client gcp.Client, bucketName, namePr
 }
 
 // deleteServiceAccounts deletes the IAM service accounts created by ccoctl
-func deleteServiceAccounts(ctx context.Context, client gcp.Client, namePrefix string) error {
+func deleteServiceAccounts(ctx context.Context, client gcp.Client, namePrefix, credReqDir string) error {
 	projectName := client.GetProjectName()
 	projectResourceName := fmt.Sprintf("projects/%s", projectName)
-	listServiceAccountsRequest := &iamadminpb.ListServiceAccountsRequest{
-		Name: projectResourceName,
-	}
-
-	svcAcctList, err := client.ListServiceAccounts(ctx, listServiceAccountsRequest)
+	// Process directory
+	// always tech-preview==true because we should do a full cleanup to be on the safe side
+	credReqs, err := provisioning.GetListOfCredentialsRequests(credReqDir, true)
 	if err != nil {
-		return errors.Wrapf(err, "Failed to fetch list of service accounts")
+		return errors.Wrap(err, "Failed to process files containing CredentialsRequests")
 	}
-	for _, svcAcct := range svcAcctList {
-		if isCreatedByCcoctl(svcAcct.Email, namePrefix) || isCreatedByCcoctl(svcAcct.DisplayName, namePrefix) {
-			svcAcctBindingName := actuator.ServiceAccountBindingName(svcAcct)
-			err := actuator.RemovePolicyBindingsForProject(client, svcAcctBindingName)
-			if err != nil {
-				return errors.Wrapf(err, "Failed to remove project policy bindings for service account")
-			}
 
-			if err := actuator.DeleteServiceAccount(client, svcAcct); err != nil {
-				return errors.Wrapf(err, "Failed to delete service account")
-			}
+	for _, cr := range credReqs {
+		// Generate service account name from credentials request to fetch service account if it exists
+		// The service account name field has a 100 char max, so generate a name consisting of the
+		// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
+		serviceAccountNameFromCredReq, err := utils.GenerateNameWithFieldLimits(namePrefix, 50, cr.Name, 49)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to generate service account name from credentils request %s", cr.Name)
+		}
 
-			log.Printf("IAM Service account %s deleted", svcAcct.DisplayName)
+		listServiceAccountsRequest := &iamadminpb.ListServiceAccountsRequest{
+			Name: projectResourceName,
+		}
+		svcAcctList, err := client.ListServiceAccounts(ctx, listServiceAccountsRequest)
+		if err != nil {
+			return errors.Wrapf(err, "Failed to fetch list of service accounts")
+		}
+		for _, svcAcct := range svcAcctList {
+			if svcAcct.DisplayName == serviceAccountNameFromCredReq {
+				svcAcctBindingName := actuator.ServiceAccountBindingName(svcAcct)
+				err := actuator.RemovePolicyBindingsForProject(client, svcAcctBindingName)
+				if err != nil {
+					return errors.Wrapf(err, "Failed to remove project policy bindings for service account")
+				}
+
+				if err := actuator.DeleteServiceAccount(client, svcAcct); err != nil {
+					return errors.Wrapf(err, "Failed to delete service account")
+				}
+
+				log.Printf("IAM service account %s deleted", svcAcct.DisplayName)
+			}
 		}
 	}
-
 	return nil
 }
 
@@ -121,7 +138,7 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Print(err)
 	}
 
-	if err := deleteServiceAccounts(ctx, gcpClient, DeleteOpts.Name); err != nil {
+	if err := deleteServiceAccounts(ctx, gcpClient, DeleteOpts.Name, DeleteOpts.CredRequestDir); err != nil {
 		log.Print(err)
 	}
 
@@ -143,6 +160,8 @@ func NewDeleteCmd() *cobra.Command {
 	deleteCmd.MarkPersistentFlagRequired("name")
 	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Project, "project", "", "ID of the google cloud project")
 	deleteCmd.MarkPersistentFlagRequired("project")
+	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to delete IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=gcp' against an OpenShift release image)")
+	deleteCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 
 	return deleteCmd
 }
