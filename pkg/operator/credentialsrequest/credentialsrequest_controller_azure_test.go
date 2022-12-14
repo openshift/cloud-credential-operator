@@ -26,8 +26,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
-	"github.com/Azure/go-autorest/autorest/to"
+	"github.com/microsoftgraph/msgraph-sdk-go/models"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -61,13 +60,16 @@ const (
 	testAzureAppRegObjectID = "some-unique-app-reg-obj-id"
 )
 
-var (
-	testAzureMintedAppRegistration = graphrbac.Application{
-		AppID:       to.StringPtr("some-unique-app-reg-id"),
-		DisplayName: to.StringPtr("MintedAppRegistration"),
-		ObjectID:    to.StringPtr(testAzureAppRegObjectID),
-	}
-)
+var testAzureMintedAppRegistration = func() models.Applicationable {
+	app := models.NewApplication()
+	appId := "some-unique-app-reg-id"
+	app.SetAppId(&appId)
+	displayName := "MintedAppRegistration"
+	app.SetDisplayName(&displayName)
+	objId := testAzureAppRegObjectID
+	app.SetId(&objId)
+	return app
+}()
 
 func init() {
 	log.SetLevel(log.DebugLevel)
@@ -132,7 +134,7 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 			mockAzureAppClient: func(mockCtrl *gomock.Controller) *mockazure.MockAppClient {
 				mockAzureAppClient := mockazure.NewMockAppClient(mockCtrl)
 				mockAzureAppClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-					[]graphrbac.Application{}, fmt.Errorf("Azure AD Graph API has been sunset"),
+					[]models.Applicationable{}, fmt.Errorf("Azure AD Graph API has been sunset"),
 				)
 				// No Delete() call b/c of List() error above
 				return mockAzureAppClient
@@ -170,7 +172,7 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 			mockAzureAppClient: func(mockCtrl *gomock.Controller) *mockazure.MockAppClient {
 				mockAzureAppClient := mockazure.NewMockAppClient(mockCtrl)
 				mockAzureAppClient.EXPECT().List(gomock.Any(), gomock.Any()).Return(
-					[]graphrbac.Application{testAzureMintedAppRegistration}, nil,
+					[]models.Applicationable{testAzureMintedAppRegistration}, nil,
 				)
 				mockAzureAppClient.EXPECT().Delete(gomock.Any(), testAzureAppRegObjectID)
 				return mockAzureAppClient

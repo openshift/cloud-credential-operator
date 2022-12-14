@@ -3,42 +3,46 @@ package azure
 import (
 	"context"
 
-	"github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
-	"github.com/Azure/go-autorest/autorest"
-	"github.com/Azure/go-autorest/autorest/azure"
+	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
+	"github.com/microsoftgraph/msgraph-sdk-go/applications"
+	"github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 
 //go:generate mockgen -source=./clients.go -destination=./mock/client_generated.go -package=mock
 
 // AppClient is a wrapper object for actual Azure SDK to allow for easier testing.
 type AppClient interface {
-	List(ctx context.Context, filter string) ([]graphrbac.Application, error)
+	List(ctx context.Context, filter string) ([]models.Applicationable, error)
 	Delete(ctx context.Context, applicationObjectID string) error
 }
 
 type appClient struct {
-	client graphrbac.ApplicationsClient
+	client *msgraphsdk.GraphServiceClient
 }
 
-func (appClient *appClient) List(ctx context.Context, filter string) ([]graphrbac.Application, error) {
-	appResp, err := appClient.client.List(ctx, filter)
+func (appClient *appClient) List(ctx context.Context, filter string) ([]models.Applicationable, error) {
+	listQuery := applications.ApplicationsRequestBuilderGetRequestConfiguration{
+		QueryParameters: &applications.ApplicationsRequestBuilderGetQueryParameters{
+			Filter: &filter,
+		},
+	}
+	appResp, err := appClient.client.Applications().Get(ctx, &listQuery)
 	if err != nil {
 		return nil, err
 	}
 
-	return appResp.Values(), nil
+	return appResp.GetValue(), nil
 }
 
 func (appClient *appClient) Delete(ctx context.Context, applicationObjectID string) error {
-	_, err := appClient.client.Delete(ctx, applicationObjectID)
-	return err
+	return appClient.client.ApplicationsById(applicationObjectID).Delete(ctx, nil)
 }
 
 var _ AppClient = &appClient{}
 
-func NewAppClient(env azure.Environment, tenantID string, authorizer autorest.Authorizer) *appClient {
-	client := graphrbac.NewApplicationsClientWithBaseURI(env.GraphEndpoint, tenantID)
-	client.Authorizer = authorizer
+func NewAppClient(authorizer *msgraphsdk.GraphRequestAdapter) *appClient {
+	client := msgraphsdk.NewGraphServiceClient(authorizer)
+
 	return &appClient{
 		client: client,
 	}
