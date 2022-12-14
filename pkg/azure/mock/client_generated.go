@@ -8,8 +8,8 @@ import (
 	context "context"
 	reflect "reflect"
 
-	graphrbac "github.com/Azure/azure-sdk-for-go/services/graphrbac/1.6/graphrbac"
 	gomock "github.com/golang/mock/gomock"
+	models "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 
 // MockAppClient is a mock of AppClient interface.
@@ -50,10 +50,10 @@ func (mr *MockAppClientMockRecorder) Delete(ctx, applicationObjectID interface{}
 }
 
 // List mocks base method.
-func (m *MockAppClient) List(ctx context.Context, filter string) ([]graphrbac.Application, error) {
+func (m *MockAppClient) List(ctx context.Context, filter string) ([]models.Applicationable, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "List", ctx, filter)
-	ret0, _ := ret[0].([]graphrbac.Application)
+	ret0, _ := ret[0].([]models.Applicationable)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
