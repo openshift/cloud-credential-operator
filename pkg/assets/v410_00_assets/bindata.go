@@ -4,6 +4,7 @@
 // bindata/v4.1.0/aws-pod-identity-webhook/clusterrolebinding.yaml
 // bindata/v4.1.0/aws-pod-identity-webhook/deployment.yaml
 // bindata/v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml
+// bindata/v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml
 // bindata/v4.1.0/aws-pod-identity-webhook/role.yaml
 // bindata/v4.1.0/aws-pod-identity-webhook/rolebinding.yaml
 // bindata/v4.1.0/aws-pod-identity-webhook/sa.yaml
@@ -126,7 +127,7 @@ metadata:
   name: pod-identity-webhook
   namespace: openshift-cloud-credential-operator
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: pod-identity-webhook
@@ -245,6 +246,33 @@ func v410AwsPodIdentityWebhookMutatingwebhookYaml() (*asset, error) {
 	}
 
 	info := bindataFileInfo{name: "v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _v410AwsPodIdentityWebhookPoddisruptionbudgetYaml = []byte(`apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pod-identity-webhook
+  namespace: openshift-cloud-credential-operator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pod-identity-webhook
+`)
+
+func v410AwsPodIdentityWebhookPoddisruptionbudgetYamlBytes() ([]byte, error) {
+	return _v410AwsPodIdentityWebhookPoddisruptionbudgetYaml, nil
+}
+
+func v410AwsPodIdentityWebhookPoddisruptionbudgetYaml() (*asset, error) {
+	bytes, err := v410AwsPodIdentityWebhookPoddisruptionbudgetYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -425,14 +453,15 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"v4.1.0/aws-pod-identity-webhook/clusterrole.yaml":        v410AwsPodIdentityWebhookClusterroleYaml,
-	"v4.1.0/aws-pod-identity-webhook/clusterrolebinding.yaml": v410AwsPodIdentityWebhookClusterrolebindingYaml,
-	"v4.1.0/aws-pod-identity-webhook/deployment.yaml":         v410AwsPodIdentityWebhookDeploymentYaml,
-	"v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml":    v410AwsPodIdentityWebhookMutatingwebhookYaml,
-	"v4.1.0/aws-pod-identity-webhook/role.yaml":               v410AwsPodIdentityWebhookRoleYaml,
-	"v4.1.0/aws-pod-identity-webhook/rolebinding.yaml":        v410AwsPodIdentityWebhookRolebindingYaml,
-	"v4.1.0/aws-pod-identity-webhook/sa.yaml":                 v410AwsPodIdentityWebhookSaYaml,
-	"v4.1.0/aws-pod-identity-webhook/svc.yaml":                v410AwsPodIdentityWebhookSvcYaml,
+	"v4.1.0/aws-pod-identity-webhook/clusterrole.yaml":         v410AwsPodIdentityWebhookClusterroleYaml,
+	"v4.1.0/aws-pod-identity-webhook/clusterrolebinding.yaml":  v410AwsPodIdentityWebhookClusterrolebindingYaml,
+	"v4.1.0/aws-pod-identity-webhook/deployment.yaml":          v410AwsPodIdentityWebhookDeploymentYaml,
+	"v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml":     v410AwsPodIdentityWebhookMutatingwebhookYaml,
+	"v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml": v410AwsPodIdentityWebhookPoddisruptionbudgetYaml,
+	"v4.1.0/aws-pod-identity-webhook/role.yaml":                v410AwsPodIdentityWebhookRoleYaml,
+	"v4.1.0/aws-pod-identity-webhook/rolebinding.yaml":         v410AwsPodIdentityWebhookRolebindingYaml,
+	"v4.1.0/aws-pod-identity-webhook/sa.yaml":                  v410AwsPodIdentityWebhookSaYaml,
+	"v4.1.0/aws-pod-identity-webhook/svc.yaml":                 v410AwsPodIdentityWebhookSvcYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -480,14 +509,15 @@ type bintree struct {
 var _bintree = &bintree{nil, map[string]*bintree{
 	"v4.1.0": {nil, map[string]*bintree{
 		"aws-pod-identity-webhook": {nil, map[string]*bintree{
-			"clusterrole.yaml":        {v410AwsPodIdentityWebhookClusterroleYaml, map[string]*bintree{}},
-			"clusterrolebinding.yaml": {v410AwsPodIdentityWebhookClusterrolebindingYaml, map[string]*bintree{}},
-			"deployment.yaml":         {v410AwsPodIdentityWebhookDeploymentYaml, map[string]*bintree{}},
-			"mutatingwebhook.yaml":    {v410AwsPodIdentityWebhookMutatingwebhookYaml, map[string]*bintree{}},
-			"role.yaml":               {v410AwsPodIdentityWebhookRoleYaml, map[string]*bintree{}},
-			"rolebinding.yaml":        {v410AwsPodIdentityWebhookRolebindingYaml, map[string]*bintree{}},
-			"sa.yaml":                 {v410AwsPodIdentityWebhookSaYaml, map[string]*bintree{}},
-			"svc.yaml":                {v410AwsPodIdentityWebhookSvcYaml, map[string]*bintree{}},
+			"clusterrole.yaml":         {v410AwsPodIdentityWebhookClusterroleYaml, map[string]*bintree{}},
+			"clusterrolebinding.yaml":  {v410AwsPodIdentityWebhookClusterrolebindingYaml, map[string]*bintree{}},
+			"deployment.yaml":          {v410AwsPodIdentityWebhookDeploymentYaml, map[string]*bintree{}},
+			"mutatingwebhook.yaml":     {v410AwsPodIdentityWebhookMutatingwebhookYaml, map[string]*bintree{}},
+			"poddisruptionbudget.yaml": {v410AwsPodIdentityWebhookPoddisruptionbudgetYaml, map[string]*bintree{}},
+			"role.yaml":                {v410AwsPodIdentityWebhookRoleYaml, map[string]*bintree{}},
+			"rolebinding.yaml":         {v410AwsPodIdentityWebhookRolebindingYaml, map[string]*bintree{}},
+			"sa.yaml":                  {v410AwsPodIdentityWebhookSaYaml, map[string]*bintree{}},
+			"svc.yaml":                 {v410AwsPodIdentityWebhookSvcYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

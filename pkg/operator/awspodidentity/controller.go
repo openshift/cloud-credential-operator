@@ -51,6 +51,7 @@ var (
 		"v4.1.0/aws-pod-identity-webhook/clusterrolebinding.yaml",
 		"v4.1.0/aws-pod-identity-webhook/rolebinding.yaml",
 		"v4.1.0/aws-pod-identity-webhook/svc.yaml",
+		"v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml",
 	}
 	templateFiles = []string{
 		"v4.1.0/aws-pod-identity-webhook/deployment.yaml",
@@ -300,6 +301,17 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 	}
 	if modified {
 		r.logger.Infof("MutatingWebhookConfiguration reconciled successfully")
+	}
+
+	// "v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"
+	requestedPDB := resourceread.ReadPodDisruptionBudgetV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"))
+	_, modified, err = resourceapply.ApplyPodDisruptionBudget(context.TODO(), r.clientset.PolicyV1(), r.eventRecorder, requestedPDB)
+	if err != nil {
+		r.logger.WithError(err).Error("error applying PodDisruptionBudget")
+		return err
+	}
+	if modified {
+		r.logger.Infof("PodDisruptionBudget reconciled successfully")
 	}
 	return nil
 }

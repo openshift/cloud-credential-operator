@@ -46,7 +46,10 @@ CRD_APIS :=./pkg/apis/cloudcredential/v1
 # Exclude e2e tests from unit testing
 GO_TEST_PACKAGES :=./pkg/... ./cmd/...
 
-IMAGE_REGISTRY :=registry.ci.openshift.org
+IMAGE_REGISTRY ?=registry.ci.openshift.org
+IMAGE_REPO ?=ocp/4.5
+IMAGE_TAG ?=cloud-credential-operator
+
 
 # This will call a macro called "add-bindata" which will generate bindata specific targets based on the parameters:
 # $0 - macro name
@@ -66,7 +69,7 @@ $(call add-bindata,v4.1.0,./bindata/v4.1.0/...,bindata,v410_00_assets,pkg/assets
 # $2 - image ref
 # $3 - Dockerfile path
 # $4 - context directory for image build
-$(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/ocp/4.5:cloud-credential-operator, ./Dockerfile,.)
+$(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/$(IMAGE_REPO):$(IMAGE_TAG), ./Dockerfile,.)
 
 # This will call a macro called "add-crd-gen" will will generate crd manifests based on the parameters:
 # $1 - target name

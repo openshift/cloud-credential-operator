@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: pod-identity-webhook
+  namespace: openshift-cloud-credential-operator
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: pod-identity-webhook
