@@ -68,7 +68,7 @@ func LoadInfrastructureTopology(c client.Client, logger log.FieldLogger) (config
 		logger.WithError(err).Error("error loading Infrastructure topology")
 		return "", err
 	}
-	logger.Debugf("Loading infrastructure topology: %s", infra.Status.InfrastructureTopology)
+	logger.WithField("infrastructureTopology", infra.Status.InfrastructureTopology).Debug("Loading infrastructure topology")
 	return infra.Status.InfrastructureTopology, nil
 }
 
