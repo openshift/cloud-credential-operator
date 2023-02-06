@@ -61,6 +61,17 @@ func LoadCredsFromSecret(kubeClient client.Client, namespace, secretName string)
 	return accessKeyID, secretAccessKey, nil
 }
 
+// LoadInfrastructureTopology loads the topology from the cluster Infrastructure config.
+func LoadInfrastructureTopology(c client.Client, logger log.FieldLogger) (configv1.TopologyMode, error) {
+	infra, err := GetInfrastructure(c)
+	if err != nil {
+		logger.WithError(err).Error("error loading Infrastructure topology")
+		return "", err
+	}
+	logger.Debugf("Loading infrastructure topology: %s", infra.Status.InfrastructureTopology)
+	return infra.Status.InfrastructureTopology, nil
+}
+
 // LoadInfrastructureName loads the cluster Infrastructure config and returns the infra name
 // used to identify this cluster, and tag some cloud objects.
 func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, error) {
