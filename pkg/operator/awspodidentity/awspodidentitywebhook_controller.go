@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
@@ -31,6 +32,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/assets/v410_00_assets"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 const (
@@ -51,11 +53,11 @@ var (
 		"v4.1.0/aws-pod-identity-webhook/clusterrolebinding.yaml",
 		"v4.1.0/aws-pod-identity-webhook/rolebinding.yaml",
 		"v4.1.0/aws-pod-identity-webhook/svc.yaml",
-		"v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml",
 	}
 	templateFiles = []string{
 		"v4.1.0/aws-pod-identity-webhook/deployment.yaml",
 		"v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml",
+		"v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml",
 	}
 	relatedObjects = []configv1.ObjectReference{
 		{
@@ -158,6 +160,7 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 	}
 
 	r := &staticResourceReconciler{
+		client:        mgr.GetClient(),
 		clientset:     clientset,
 		logger:        logger,
 		eventRecorder: eventRecorder,
@@ -229,7 +232,8 @@ func isManaged(meta metav1.Object) bool {
 }
 
 type staticResourceReconciler struct {
-	clientset            *kubernetes.Clientset
+	client               client.Client
+	clientset            kubernetes.Interface
 	logger               log.FieldLogger
 	eventRecorder        events.Recorder
 	deploymentGeneration int64
@@ -260,6 +264,11 @@ func (r *staticResourceReconciler) Reconcile(ctx context.Context, request reconc
 }
 
 func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error {
+	topology, err := utils.LoadInfrastructureTopology(r.client, r.logger)
+	if err != nil {
+		return err
+	}
+
 	applyResults := resourceapply.ApplyDirectly(
 		ctx,
 		(&resourceapply.ClientHolder{}).WithKubernetes(r.clientset),
@@ -281,6 +290,10 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 
 	// "v4.1.0/aws-pod-identity-webhook/deployment.yaml"
 	requestedDeployment := resourceread.ReadDeploymentV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/deployment.yaml"))
+	if topology == configv1.SingleReplicaTopologyMode {
+		// Set replicas=1 for deployment on single replica topology clusters
+		requestedDeployment.Spec.Replicas = pointer.Int32(1)
+	}
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
 	resultDeployment, modified, err := resourceapply.ApplyDeployment(ctx, r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration)
 	if err != nil {
@@ -303,15 +316,20 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 		r.logger.Infof("MutatingWebhookConfiguration reconciled successfully")
 	}
 
-	// "v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"
-	requestedPDB := resourceread.ReadPodDisruptionBudgetV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"))
-	_, modified, err = resourceapply.ApplyPodDisruptionBudget(context.TODO(), r.clientset.PolicyV1(), r.eventRecorder, requestedPDB)
-	if err != nil {
-		r.logger.WithError(err).Error("error applying PodDisruptionBudget")
-		return err
-	}
-	if modified {
-		r.logger.Infof("PodDisruptionBudget reconciled successfully")
+	if topology == configv1.SingleReplicaTopologyMode {
+		// Don't deploy the PDB to single replica topology clusters
+		r.logger.Debugf("not deploying PodDisruptionBudget to single replica topology")
+	} else {
+		// "v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"
+		requestedPDB := resourceread.ReadPodDisruptionBudgetV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"))
+		_, modified, err = resourceapply.ApplyPodDisruptionBudget(context.TODO(), r.clientset.PolicyV1(), r.eventRecorder, requestedPDB)
+		if err != nil {
+			r.logger.WithError(err).Error("error applying PodDisruptionBudget")
+			return err
+		}
+		if modified {
+			r.logger.Infof("PodDisruptionBudget reconciled successfully")
+		}
 	}
 	return nil
 }
