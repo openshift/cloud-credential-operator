@@ -4,5 +4,6 @@ approvers:
 - suhanime
 - dlom
 - jstuever
+- lleshchi
 
 component: "Cloud Credential Operator"
