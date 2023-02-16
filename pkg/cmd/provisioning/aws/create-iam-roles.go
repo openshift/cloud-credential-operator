@@ -222,6 +222,11 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		} else {
 			role = outRole.Role
 			log.Printf("Existing role %s found", *role.Arn)
+			// Write secret manifest when the role already exists
+			// https://issues.redhat.com/browse/CCO-335
+			if err := writeCredReqSecret(credReq, targetDir, *role.Arn); err != nil {
+				return "", errors.Wrap(err, "failed to save Secret for install manifests")
+			}
 		}
 
 		_, err = awsClient.PutRolePolicy(&iam.PutRolePolicyInput{
