@@ -79,12 +79,36 @@ $(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/$(IMAGE_REPO)
 $(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
 $(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
 
-update: update-vendored-crds update-codegen update-bindata generate
+update: update-codegen update-bindata generate
 .PHONY: update
 
 generate:
 	go generate ${GO_TEST_PACKAGES}
 .PHONY: generate
+
+# TODO: consider migrating to the openshift/api codegen tool
+# https://github.com/openshift/api/tree/master/tools/codegen
+#
+# update-codegen-crds-cloudcredential-manifests and
+# update-codegen-crds-cloudcredential-bindata make targets override
+# "update-codegen-crds-*" targets created by the above invocations of
+# "add-crd-gen".
+#
+# We copy the cloud credential operator config CRD from the
+# openshift/api repository (via the vendor dir) and since
+# openshift/api now utilizes a different codegen utility than
+# build-machinery-go, running the schemapatch code generator against
+# the copied manifest results in a different formatting. This results
+# in a diff which causes our verify target to fail so we ensure the
+# copied manifests remain unchanged by copying the CRDs once more
+# after generating CRDs as a workaround.
+update-codegen-crds-cloudcredential-manifests: ensure-controller-gen ensure-yq ensure-yaml-patch
+	$(run-crd-gen,./pkg/apis/cloudcredential/v1,./manifests)
+	$(MAKE) update-vendored-crds
+
+update-codegen-crds-cloudcredential-bindata: ensure-controller-gen ensure-yq ensure-yaml-patch
+	$(run-crd-gen,./pkg/apis/cloudcredential/v1,./bindata/bootstrap)
+	$(MAKE) update-vendored-crds
 
 update-vendored-crds:
 	# copy config CRD from openshift/api
