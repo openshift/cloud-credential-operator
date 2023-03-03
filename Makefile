@@ -157,3 +157,7 @@ build-no-gen: build
 coverage:
 	hack/codecov.sh
 .PHONY: coverage
+
+vulncheck:
+	hack/vulncheck.sh
+.PHONY: vulncheck
