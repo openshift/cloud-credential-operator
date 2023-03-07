@@ -26,7 +26,7 @@ require (
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/nutanix-cloud-native/prism-go-client v0.2.1-0.20220804130801-c8a253627c64
 	github.com/openshift/api v0.0.0-20230120195050-6ba31fa438f2
-	github.com/openshift/build-machinery-go v0.0.0-20220913142420-e25cf57ea46d
+	github.com/openshift/build-machinery-go v0.0.0-20230306181456-d321ffa04533
 	github.com/openshift/library-go v0.0.0-20230130232623-47904dd9ff5a
 	github.com/pkg/errors v0.9.1
 	github.com/prometheus/client_golang v1.14.0
