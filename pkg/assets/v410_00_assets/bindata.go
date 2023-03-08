@@ -133,6 +133,8 @@ spec:
       app: pod-identity-webhook
   template:
     metadata:
+      annotation:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
         app: pod-identity-webhook
     spec:
