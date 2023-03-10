@@ -62,36 +62,38 @@ aws s3 ls --region $CLUSTER_REGION s3://$OIDC_BUCKET_NAME
 
 ```JSON
 {
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Sid": "Stmt1678336730279",
-      "Action": [
-        "iam:CreateOpenIDConnectProvider",
-        "iam:DeleteOpenIDConnectProvider",
-        "iam:GetRole",
-        "iam:ListOpenIDConnectProviderTags",
-        "iam:ListOpenIDConnectProviders",
-        "iam:ListRoles",
-        "iam:UpdateAssumeRolePolicy",
-        "cloudfront:CreateDistribution",
-        "cloudfront:CreateCloudFrontOriginAccessIdentity"
-      ],
-      "Effect": "Allow",
-      "Resource": "*"
-    },
-    {
-      "Sid": "Stmt1678336953197",
-      "Action": [
-        "s3:GetObject",
-        "s3:ListBucket",
-        "s3:PutObject",
-        "s3:PutPublicAccessBlock"
-      ],
-      "Effect": "Allow",
-      "Resource": "*"
-    }
-  ]
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "Stmt1678336730279",
+            "Action": [
+                "iam:CreateOpenIDConnectProvider",
+                "iam:DeleteOpenIDConnectProvider",
+                "iam:GetRole",
+                "iam:ListOpenIDConnectProviderTags",
+                "iam:ListOpenIDConnectProviders",
+                "iam:ListRoles",
+                "iam:UpdateAssumeRolePolicy",
+                "cloudfront:CreateDistribution",
+                "cloudfront:CreateCloudFrontOriginAccessIdentity",
+                "cloudfront:TagResource"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        },
+        {
+            "Sid": "Stmt1678336953197",
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket",
+                "s3:PutObject",
+                "s3:PutBucketPublicAccessBlock",
+                "s3:PutBucketPolicy"
+            ],
+            "Effect": "Allow",
+            "Resource": "*"
+        }
+    ]
 }
 ```
 
