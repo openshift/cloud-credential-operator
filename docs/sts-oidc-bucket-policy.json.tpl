@@ -9,7 +9,7 @@
                 "AWS": "arn:aws:iam::cloudfront:user/CloudFront Origin Access Identity ${OAI_CLOUDFRONT_ID}"
             },
             "Action": "s3:GetObject",
-            "Resource": "arn:aws:s3:::${OIDC_BUCKET_NAME}/*"
+            "Resource": "arn:aws:s3:::${OIDC_BUCKET_NAME}${OIDC_BUCKET_PATH}/*"
         }
     ]
 }

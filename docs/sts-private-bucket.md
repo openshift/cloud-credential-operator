@@ -4,6 +4,8 @@
 ![aws-iam-oidc-flow](https://dev-to-uploads.s3.amazonaws.com/uploads/articles/t6j45d92bmgauvy9zket.png)
 -->
 
+> NOTE: The steps described in this document, create a private S3 Bucket using CloudFront Distribution, was introduced to `ccoctl` using the flag `--create-private-s3-bucket`. We are keeping this document to provide an overview of the steps used in this solution.
+
 To create an IAM OpenID Connect identity provider you should expose the OIDC config using a public HTTPS endpoint. The steps described here will guide you to create one CloudFront Distribution to expose the HTTPS endpoint, serving objects from a private S3 Bucket accessed by [Origin Access Identity](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-restricting-access-to-s3.html).
 
 Summary:
@@ -23,6 +25,7 @@ Summary:
 - oc
 - ccoctl
 - [aws-cli](https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-welcome.html)
+- You followed the Steps 1 to in the section ["Steps to install an OpenShift Cluster with STS"](./sts.md#steps-to-install-an-openshift-cluster-with-sts)
 
 ## Steps to Create<a name="steps-create"></a>
 
