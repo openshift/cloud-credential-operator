@@ -10,7 +10,7 @@
             {
                 "Id": "${OIDC_BUCKET_NAME}.s3.${CLUSTER_REGION}.amazonaws.com",
                 "DomainName": "${OIDC_BUCKET_NAME}.s3.${CLUSTER_REGION}.amazonaws.com",
-                "OriginPath": "",
+                "OriginPath": "${OIDC_BUCKET_PATH}",
                 "CustomHeaders": {
                     "Quantity": 0
                 },
