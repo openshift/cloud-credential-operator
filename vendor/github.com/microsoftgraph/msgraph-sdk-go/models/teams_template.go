@@ -13,8 +13,6 @@ func NewTeamsTemplate()(*TeamsTemplate) {
     m := &TeamsTemplate{
         Entity: *NewEntity(),
     }
-    odataTypeValue := "#microsoft.graph.teamsTemplate";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateTeamsTemplateFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *TeamsTemplate) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0
         return err
     }
     return nil
+}
+// TeamsTemplateable 
+type TeamsTemplateable interface {
+    Entityable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }
