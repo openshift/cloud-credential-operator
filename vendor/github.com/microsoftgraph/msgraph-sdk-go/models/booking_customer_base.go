@@ -13,8 +13,6 @@ func NewBookingCustomerBase()(*BookingCustomerBase) {
     m := &BookingCustomerBase{
         Entity: *NewEntity(),
     }
-    odataTypeValue := "#microsoft.graph.bookingCustomerBase";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateBookingCustomerBaseFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -51,4 +49,9 @@ func (m *BookingCustomerBase) Serialize(writer i878a80d2330e89d26896388a3f487eef
         return err
     }
     return nil
+}
+// BookingCustomerBaseable 
+type BookingCustomerBaseable interface {
+    Entityable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }

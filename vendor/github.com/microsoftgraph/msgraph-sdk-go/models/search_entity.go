@@ -13,8 +13,6 @@ func NewSearchEntity()(*SearchEntity) {
     m := &SearchEntity{
         Entity: *NewEntity(),
     }
-    odataTypeValue := "#microsoft.graph.searchEntity";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateSearchEntityFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *SearchEntity) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e
         return err
     }
     return nil
+}
+// SearchEntityable 
+type SearchEntityable interface {
+    Entityable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }

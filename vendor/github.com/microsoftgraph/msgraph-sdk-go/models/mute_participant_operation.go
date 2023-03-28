@@ -13,8 +13,6 @@ func NewMuteParticipantOperation()(*MuteParticipantOperation) {
     m := &MuteParticipantOperation{
         CommsOperation: *NewCommsOperation(),
     }
-    odataTypeValue := "#microsoft.graph.muteParticipantOperation";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateMuteParticipantOperationFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *MuteParticipantOperation) Serialize(writer i878a80d2330e89d26896388a3f4
         return err
     }
     return nil
+}
+// MuteParticipantOperationable 
+type MuteParticipantOperationable interface {
+    CommsOperationable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }

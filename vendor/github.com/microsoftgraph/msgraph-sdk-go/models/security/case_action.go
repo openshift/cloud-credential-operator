@@ -2,7 +2,7 @@ package security
 import (
     "errors"
 )
-// Provides operations to manage the collection of agreementAcceptance entities.
+// 
 type CaseAction int
 
 const (
@@ -14,12 +14,13 @@ const (
     ADDTOREVIEWSET_CASEACTION
     HOLDUPDATE_CASEACTION
     UNKNOWNFUTUREVALUE_CASEACTION
+    PURGEDATA_CASEACTION
 )
 
 func (i CaseAction) String() string {
-    return []string{"contentExport", "applyTags", "convertToPdf", "index", "estimateStatistics", "addToReviewSet", "holdUpdate", "unknownFutureValue"}[i]
+    return []string{"contentExport", "applyTags", "convertToPdf", "index", "estimateStatistics", "addToReviewSet", "holdUpdate", "unknownFutureValue", "purgeData"}[i]
 }
-func ParseCaseAction(v string) (interface{}, error) {
+func ParseCaseAction(v string) (any, error) {
     result := CONTENTEXPORT_CASEACTION
     switch v {
         case "contentExport":
@@ -38,6 +39,8 @@ func ParseCaseAction(v string) (interface{}, error) {
             result = HOLDUPDATE_CASEACTION
         case "unknownFutureValue":
             result = UNKNOWNFUTUREVALUE_CASEACTION
+        case "purgeData":
+            result = PURGEDATA_CASEACTION
         default:
             return 0, errors.New("Unknown CaseAction value: " + v)
     }
