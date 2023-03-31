@@ -5,11 +5,11 @@ spec:
   - name: cloud-credential-operator
     from:
       kind: DockerImage
-      Name: quay.io/openshift/origin-cloud-credential-operator
+      Name: quay.io/btofel/cco:latest
   - name: aws-pod-identity-webhook
     from:
       kind: DockerImage
-      Name: quay.io/openshift/aws-pod-identity-webhook
+      Name: quay.io/btofel/pod-identity-webhook:latest
   - name: kube-rbac-proxy
     from:
       kind: DockerImage

@@ -36,6 +36,7 @@ spec:
         - --tls-cert-file=/etc/tls/private/tls.crt
         - --tls-private-key-file=/etc/tls/private/tls.key
         - --logtostderr=true
+        - --kubeconfig=
         image: quay.io/openshift/origin-kube-rbac-proxy:latest
         imagePullPolicy: IfNotPresent
         name: kube-rbac-proxy
@@ -70,9 +71,9 @@ spec:
         - name: RELEASE_VERSION
           value: 0.0.1-snapshot
         - name: AWS_POD_IDENTITY_WEBHOOK_IMAGE
-          value: quay.io/openshift/aws-pod-identity-webhook:latest
-        image: quay.io/openshift/origin-cloud-credential-operator:latest
-        imagePullPolicy: IfNotPresent
+          value: quay.io/btofel/pod-identity-webhook:latest
+        image: quay.io/btofel/cco:latest
+        imagePullPolicy: Always
         name: cloud-credential-operator
         securityContext:
           allowPrivilegeEscalation: false
