@@ -34,6 +34,11 @@ const (
 	// OperatorDisabledDefault holds the default behavior of whether CCO is disabled
 	// in the absence of any setting in the ConfigMap
 	OperatorDisabledDefault = false
+
+	// CloudCredentialsModeToken tells cloud-credential-operator to reconcile all CredentialsRequests
+	// by looking to the operator's CredentialsRequest for token information (for instance: STS Enabled)
+	//TODO for demo only, this needs to be added in github.com/openshift/api/operator/v1
+	CloudCredentialsModeToken operatorv1.CloudCredentialsMode = "Token"
 )
 
 func LoadCredsFromSecret(kubeClient client.Client, namespace, secretName string) ([]byte, []byte, error) {
@@ -313,6 +318,8 @@ func ModeToAnnotation(operatorMode operatorv1.CloudCredentialsMode) (string, err
 		return constants.MintAnnotation, nil
 	case operatorv1.CloudCredentialsModePassthrough:
 		return constants.PassthroughAnnotation, nil
+	case CloudCredentialsModeToken:
+		return constants.TokenAnnotation, nil
 	default:
 		return "", fmt.Errorf("no annotation for operator mode: %s", operatorMode)
 	}
@@ -323,7 +330,8 @@ func IsValidMode(operatorMode operatorv1.CloudCredentialsMode) bool {
 	case operatorv1.CloudCredentialsModeDefault,
 		operatorv1.CloudCredentialsModeManual,
 		operatorv1.CloudCredentialsModeMint,
-		operatorv1.CloudCredentialsModePassthrough:
+		operatorv1.CloudCredentialsModePassthrough,
+		CloudCredentialsModeToken:
 		return true
 	default:
 		return false
