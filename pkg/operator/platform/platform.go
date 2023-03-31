@@ -36,10 +36,11 @@ func GetInfraStatus(kClient client.Client) (*configv1.InfrastructureStatus, erro
 // it will get the platform type from it, otherwise it will get it from InfraStatus.Platform which
 // is deprecated in 4.2
 func GetType(infraStatus *configv1.InfrastructureStatus) configv1.PlatformType {
-	if infraStatus.PlatformStatus != nil && len(infraStatus.PlatformStatus.Type) > 0 {
-		return infraStatus.PlatformStatus.Type
-	}
-	return infraStatus.Platform
+	//if infraStatus.PlatformStatus != nil && len(infraStatus.PlatformStatus.Type) > 0 {
+	//	return infraStatus.PlatformStatus.Type
+	//}
+	return configv1.AWSPlatformType
+	//return infraStatus.Platform
 }
 
 func getClient(explicitKubeconfig string) (client.Client, error) {
