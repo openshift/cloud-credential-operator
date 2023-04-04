@@ -521,94 +521,138 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	} else {
 		crSecretExists = true
 	}
+	if mode == utils.CloudCredentialsModeToken {
+		// create time-based tokens based on settings in CredentialsRequests
+		logger.Infof("mode is: %s, so not trying to provision with root secret", utils.CloudCredentialsModeToken)
+		credsExists, err := r.Actuator.Exists(context.TODO(), cr)
+		if err != nil {
+			logger.Errorf("error checking whether credentials already exists: %v", err)
+			return reconcile.Result{}, err
+		}
 
-	credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(context.TODO(), cr)
-	if err != nil {
-		log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
-	}
-	cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
-	isStale := cr.Generation != cr.Status.LastSyncGeneration
-	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
-	hasActiveFailureConditions := checkForFailureConditions(cr)
+		var syncErr error
+		if !credsExists {
+			syncErr = r.Actuator.Create(context.TODO(), cr)
+		} else {
+			syncErr = r.Actuator.Update(context.TODO(), cr)
+		}
+		var provisionErr bool
+		if syncErr != nil {
+			switch t := syncErr.(type) {
+			case actuator.ActuatorStatus:
+				if t.Reason() == minterv1.OrphanedCloudResource {
+					// not a critical error, just set the condition to communicate
+					// what happened
+					provisionErr = false
+				} else {
+					logger.Errorf("error syncing credentials: %v", syncErr)
+					provisionErr = true
+				}
 
-	if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
-		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
+				cr.Status.Provisioned = !provisionErr
+
+				logger.Errorf("errored with condition: %v", t.Reason())
+				r.updateActuatorConditions(cr, t.Reason(), syncErr)
+			default:
+				logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
+				return reconcile.Result{}, syncErr
+			}
+
+		} else {
+			// it worked so clear any actuator conditions if they exist
+			r.updateActuatorConditions(cr, "", nil)
+			cr.Status.Provisioned = true
+		}
+	} else {
+		credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(context.TODO(), cr)
+		if err != nil {
+			log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
+		}
+		cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
+		isStale := cr.Generation != cr.Status.LastSyncGeneration
+		hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
+		hasActiveFailureConditions := checkForFailureConditions(cr)
+
+		if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
+			logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
+			// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
+			// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
+			// users/permissions/tags/etc.
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+		}
+
+		credsExists, err := r.Actuator.Exists(context.TODO(), cr)
+		if err != nil {
+			logger.Errorf("error checking whether credentials already exists: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		var syncErr error
+		if !credsExists {
+			syncErr = r.Actuator.Create(context.TODO(), cr)
+		} else {
+			syncErr = r.Actuator.Update(context.TODO(), cr)
+		}
+
+		var provisionErr bool
+		if syncErr != nil {
+			switch t := syncErr.(type) {
+			case actuator.ActuatorStatus:
+				if t.Reason() == minterv1.OrphanedCloudResource {
+					// not a critical error, just set the condition to communicate
+					// what happened
+					provisionErr = false
+				} else {
+					logger.Errorf("error syncing credentials: %v", syncErr)
+					provisionErr = true
+				}
+
+				cr.Status.Provisioned = !provisionErr
+
+				logger.Errorf("errored with condition: %v", t.Reason())
+				r.updateActuatorConditions(cr, t.Reason(), syncErr)
+			default:
+				logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
+				return reconcile.Result{}, syncErr
+			}
+
+		} else {
+			// it worked so clear any actuator conditions if they exist
+			r.updateActuatorConditions(cr, "", nil)
+			cr.Status.Provisioned = true
+		}
+
+		// if provisionErr == false, it means we successfully provisioned even if there
+		// were non-critical errors encountered
+		if !provisionErr {
+			cr.Status.LastSyncTimestamp = &metav1.Time{
+				Time: time.Now(),
+			}
+			cr.Status.LastSyncGeneration = origCR.Generation
+			if credentialsRootSecret != nil {
+				cr.Status.LastSyncCloudCredsSecretResourceVersion = credentialsRootSecret.ResourceVersion
+			}
+		}
+
+		err = utils.UpdateStatus(r.Client, origCR, cr, logger)
+		if err != nil {
+			logger.Errorf("error updating status: %v", err)
+			return reconcile.Result{}, err
+		}
+
 		// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
 		// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
 		// users/permissions/tags/etc.
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
-	}
-
-	credsExists, err := r.Actuator.Exists(context.TODO(), cr)
-	if err != nil {
-		logger.Errorf("error checking whether credentials already exists: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	var syncErr error
-	if !credsExists {
-		syncErr = r.Actuator.Create(context.TODO(), cr)
-	} else {
-		syncErr = r.Actuator.Update(context.TODO(), cr)
-	}
-
-	var provisionErr bool
-	if syncErr != nil {
-		switch t := syncErr.(type) {
-		case actuator.ActuatorStatus:
-			if t.Reason() == minterv1.OrphanedCloudResource {
-				// not a critical error, just set the condition to communicate
-				// what happened
-				provisionErr = false
-			} else {
-				logger.Errorf("error syncing credentials: %v", syncErr)
-				provisionErr = true
-			}
-
-			cr.Status.Provisioned = !provisionErr
-
-			logger.Errorf("errored with condition: %v", t.Reason())
-			r.updateActuatorConditions(cr, t.Reason(), syncErr)
-		default:
-			logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
-			return reconcile.Result{}, syncErr
-		}
-
-	} else {
-		// it worked so clear any actuator conditions if they exist
-		r.updateActuatorConditions(cr, "", nil)
-		cr.Status.Provisioned = true
-	}
-
-	// if provisionErr == false, it means we successfully provisioned even if there
-	// were non-critical errors encountered
-	if !provisionErr {
-		cr.Status.LastSyncTimestamp = &metav1.Time{
-			Time: time.Now(),
-		}
-		cr.Status.LastSyncGeneration = origCR.Generation
-		if credentialsRootSecret != nil {
-			cr.Status.LastSyncCloudCredsSecretResourceVersion = credentialsRootSecret.ResourceVersion
+		if syncErr != nil && !provisionErr {
+			// We could have a non-critical error (eg OrphanedCloudResource) in the syncErr
+			// but we wouldn't want to treat that as an overal controller error while
+			// reconciling.
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+		} else {
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, syncErr
 		}
 	}
-
-	err = utils.UpdateStatus(r.Client, origCR, cr, logger)
-	if err != nil {
-		logger.Errorf("error updating status: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
-	// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
-	// users/permissions/tags/etc.
-	if syncErr != nil && !provisionErr {
-		// We could have a non-critical error (eg OrphanedCloudResource) in the syncErr
-		// but we wouldn't want to treat that as an overal controller error while
-		// reconciling.
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
-	} else {
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, syncErr
-	}
+	return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
