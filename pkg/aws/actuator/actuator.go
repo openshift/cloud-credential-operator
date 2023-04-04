@@ -326,47 +326,87 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
-
-	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
-	if err != nil {
-		logger.WithError(err).Error("issue with cloud credentials secret")
-		return err
-	}
-
-	switch credentialsRootSecret.Annotations[constants.AnnotationKey] {
-	case constants.InsufficientAnnotation:
-		msg := "cloud credentials insufficient to satisfy credentials request"
-		logger.Error(msg)
-		return &actuatoriface.ActuatorError{
-			ErrReason: minterv1.InsufficientCloudCredentials,
-			Message:   msg,
+	mode, _, err := utils.GetOperatorConfiguration(a.Client, logger)
+	if mode == utils.CloudCredentialsModeToken {
+		logger.Info("actuator Token mode making secret")
+		if cr.Spec.CloudTokenString != "" {
+			err = a.createSecret(cr.Spec.CloudTokenString, cr.Spec.CloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger)
 		}
-	case constants.PassthroughAnnotation:
-		logger.Debugf("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
 		if err != nil {
 			return err
 		}
-	case constants.MintAnnotation:
-		logger.Debugf("provisioning with cred minting")
-		err := a.syncMint(ctx, cr, logger)
+	} else {
+		credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 		if err != nil {
-			msg := "error syncing creds in mint-mode"
-			logger.WithError(err).Error(msg)
+			logger.WithError(err).Error("issue with cloud credentials secret")
+			return err
+		}
+		switch credentialsRootSecret.Annotations[constants.AnnotationKey] {
+		case constants.InsufficientAnnotation:
+			msg := "cloud credentials insufficient to satisfy credentials request"
+			logger.Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.InsufficientCloudCredentials,
+				Message:   msg,
+			}
+		case constants.PassthroughAnnotation:
+			logger.Debugf("provisioning with passthrough")
+			err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
+			if err != nil {
+				return err
+			}
+		case constants.MintAnnotation:
+			logger.Debugf("provisioning with cred minting")
+			err := a.syncMint(ctx, cr, logger)
+			if err != nil {
+				msg := "error syncing creds in mint-mode"
+				logger.WithError(err).Error(msg)
+				return &actuatoriface.ActuatorError{
+					ErrReason: minterv1.CredentialsProvisionFailure,
+					Message:   fmt.Sprintf("%v: %v", msg, err),
+				}
+			}
+		default:
+			msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
+			logger.Info(msg)
 			return &actuatoriface.ActuatorError{
 				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   fmt.Sprintf("%v: %v", msg, err),
+				Message:   msg,
 			}
 		}
-	default:
-		msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
-		logger.Info(msg)
-		return &actuatoriface.ActuatorError{
-			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   msg,
-		}
 	}
+	return nil
+}
 
+// createSecret makes a time-based token available in a Secret in the namespace of an operator that
+// has supplied the following in the CredentialsRequest:
+// a non-nil spec.CloudTokenString
+// a path to the JWT token: spec.cloudTokenPath
+// a spec.SecretRef.Name
+// a cr.Spec.SecretRef.Namespace
+func (a *AWSActuator) createSecret(cloudTokenString string, cloudTokenPath string, secretRef string,
+	secretRefNamespace string, log log.FieldLogger) error {
+	log.Infof("creating secret")
+	credsTemplate :=
+		`sts_regional_endpoints = regional
+    role_arn = %s
+    web_identity_token_file = %s`
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretRef,
+			Namespace: secretRefNamespace,
+		},
+		StringData: map[string]string{
+			"credentials": fmt.Sprintf(credsTemplate, cloudTokenString, cloudTokenPath),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+	err := a.Client.Create(context.TODO(), secret)
+	if err != nil {
+		log.Errorf("error creating secret")
+		return err
+	}
+	log.Info("secret created successfully")
 	return nil
 }
 
