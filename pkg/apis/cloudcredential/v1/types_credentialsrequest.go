@@ -60,6 +60,12 @@ type CredentialsRequestSpec struct {
 	// credentials flow.
 	// +optional
 	ServiceAccountNames []string `json:"serviceAccountNames,omitempty"`
+	// CloudTokenString (for instance for AWS a Role ARN)
+	// +optional
+	CloudTokenString string `json:"cloudTokenString,omitempty"`
+	// CloudTokenPath (JWT token)
+	// +optional
+	CloudTokenPath string `json:"cloudTokenPath,omitempty"`
 }
 
 // CredentialsRequestStatus defines the observed state of CredentialsRequest
