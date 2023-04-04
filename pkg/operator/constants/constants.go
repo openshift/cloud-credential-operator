@@ -75,6 +75,10 @@ const (
 	// found in this repo's manifests/ dir.
 	PassthroughAnnotation = "passthrough"
 
+	// TokenAnnotation is used when the cluster is in timed token mode (for instance: STS Enabled)
+	//TODO probably should eliminate ModeManualPodIdentity
+	TokenAnnotation = "token"
+
 	// InsufficientAnnotation is used to indicate that the creds do not have
 	// sufficient permissions for cluster runtime.
 	InsufficientAnnotation = "insufficient"

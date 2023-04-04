@@ -226,7 +226,8 @@ func isValidMode(mode operatorv1.CloudCredentialsMode) bool {
 	case operatorv1.CloudCredentialsModeDefault,
 		operatorv1.CloudCredentialsModeManual,
 		operatorv1.CloudCredentialsModeMint,
-		operatorv1.CloudCredentialsModePassthrough:
+		operatorv1.CloudCredentialsModePassthrough,
+		utils.CloudCredentialsModeToken:
 		return true
 	default:
 		return false
