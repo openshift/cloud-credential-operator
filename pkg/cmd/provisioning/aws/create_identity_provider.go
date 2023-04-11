@@ -197,6 +197,23 @@ var (
    }
 }`
 
+	readOnlyAnonUserPolicyTemplate = `{
+		"Version": "2012-10-17",
+		"Statement": [
+			{
+				"Sid": "AllowReadPublicAccess",
+				"Principal": "*",
+				"Effect": "Allow",
+				"Action": [
+					"s3:GetObject"
+				],
+				"Resource": [
+					"arn:aws:s3:::%s/*"
+				]
+			}
+		]
+}`
+
 	// ccoctlAWSResourceTagKeyPrefix is the prefix of the tag key applied to the AWS resources created/shared by ccoctl
 	ccoctlAWSResourceTagKeyPrefix = "openshift.io/cloud-credential-operator"
 	// ownedCcoctlAWSResourceTagValue is the value of the tag applied to the AWS resources created by ccoctl
@@ -373,12 +390,7 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 			return errors.Wrap(err, fmt.Sprintf("Failed to save JSON web key set (JWKS) locally at %s", oidcKeysFullPath))
 		}
 	} else {
-		acl := "public-read"
-		if createPrivateS3 {
-			acl = "private"
-		}
 		_, err = client.PutObject(&s3.PutObjectInput{
-			ACL:     awssdk.String(acl),
 			Body:    awssdk.ReadSeekCloser(bytes.NewReader(jwks)),
 			Bucket:  awssdk.String(bucketName),
 			Key:     awssdk.String(provisioning.KeysURI),
@@ -402,12 +414,7 @@ func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, tar
 			return errors.Wrap(err, fmt.Sprintf("Failed to save discovery document locally at %s", oidcConfigurationFullPath))
 		}
 	} else {
-		acl := "public-read"
-		if createPrivateS3 {
-			acl = "private"
-		}
 		_, err := client.PutObject(&s3.PutObjectInput{
-			ACL:     awssdk.String(acl),
 			Body:    awssdk.ReadSeekCloser(strings.NewReader(discoveryDocumentJSON)),
 			Bucket:  awssdk.String(bucketName),
 			Key:     awssdk.String(provisioning.DiscoveryDocumentURI),
@@ -634,7 +641,32 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 				}
 				cloudFrontURL := fmt.Sprintf("https://%s", *createCloudFrontDistributionOutput.Distribution.DomainName)
 				return cloudFrontURL, nil
+			} else {
+				// Allow policies to control public access to the bucket.
+				// Continue to disallow ACLs from controlling public access to the bucket.
+				_, err = client.PutPublicAccessBlock(&s3.PutPublicAccessBlockInput{
+					Bucket: awssdk.String(bucketName),
+					PublicAccessBlockConfiguration: &s3.PublicAccessBlockConfiguration{
+						BlockPublicAcls:       awssdk.Bool(true),
+						BlockPublicPolicy:     awssdk.Bool(false),
+						IgnorePublicAcls:      awssdk.Bool(true),
+						RestrictPublicBuckets: awssdk.Bool(false),
+					},
+				})
+				if err != nil {
+					return "", errors.Wrapf(err, "failed to allow public access for the bucket %s", bucketName)
+				}
+
+				_, err = client.PutBucketPolicy(&s3.PutBucketPolicyInput{
+					Bucket: awssdk.String(bucketName),
+					Policy: awssdk.String(fmt.Sprintf(readOnlyAnonUserPolicyTemplate, bucketName)),
+				})
+				if err != nil {
+					return "", errors.Wrapf(err, "failed to apply public access policy to the bucket %s", bucketName)
+				}
+
 			}
+
 		}
 	}
 	return s3BucketURL, nil
