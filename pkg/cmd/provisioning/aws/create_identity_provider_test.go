@@ -64,6 +64,8 @@ func TestCreateIdentityProvider(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockCreateBucketSuccess(mockAWSClient)
 				mockPutBucketTaggingSuccess(mockAWSClient)
+				mockPutPublicAccessBlock(mockAWSClient)
+				mockPutBucketPolicy(mockAWSClient)
 				mockPutObjectSuccess(mockAWSClient)
 				return mockAWSClient
 			},
@@ -80,6 +82,8 @@ func TestCreateIdentityProvider(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockCreateBucketSuccess(mockAWSClient)
 				mockPutBucketTaggingSuccess(mockAWSClient)
+				mockPutPublicAccessBlock(mockAWSClient)
+				mockPutBucketPolicy(mockAWSClient)
 				mockPutObjectSuccess(mockAWSClient)
 				mockListOpenIDConnectProviders(mockAWSClient)
 				mockCreateOpenIDConnectProvider(mockAWSClient)
