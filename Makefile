@@ -148,6 +148,10 @@ install: update-codegen
 test-no-gen: test
 .PHONY: test-no-gen
 
+test-e2e-sts:
+	go test -mod=vendor -race -tags e2e ./pkg/aws/actuator
+.PHONY: test-e2e-sts
+
 vet: verify-govet
 .PHONY: vet
 
