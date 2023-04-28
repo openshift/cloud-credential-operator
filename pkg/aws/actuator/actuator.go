@@ -326,9 +326,9 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
-	mode, _, err := utils.GetOperatorConfiguration(a.Client, logger)
-	if mode == utils.CloudCredentialsModeToken {
-		logger.Info("actuator Token mode making secret")
+	stsDetected, err := utils.IsTimedTokenCluster(a.Client, logger)
+	if stsDetected {
+		logger.Info("actuator detected STS enabled cluster making secret")
 		if cr.Spec.CloudTokenString != "" {
 			err = a.createSecret(cr.Spec.CloudTokenString, cr.Spec.CloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger)
 		}
