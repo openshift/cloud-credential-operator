@@ -15,6 +15,7 @@ import (
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -208,7 +209,7 @@ var (
 					"s3:GetObject"
 				],
 				"Resource": [
-					"arn:aws:s3:::%s/*"
+					"arn:%s:s3:::%s/*"
 				]
 			}
 		]
@@ -657,9 +658,13 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 					return "", errors.Wrapf(err, "failed to allow public access for the bucket %s", bucketName)
 				}
 
+				partition, found := endpoints.PartitionForRegion([]endpoints.Partition{endpoints.AwsPartition(), endpoints.AwsCnPartition(), endpoints.AwsUsGovPartition()}, region)
+				if !found {
+					return "", fmt.Errorf("could not find AWS partition for provided region %s", region)
+				}
 				_, err = client.PutBucketPolicy(&s3.PutBucketPolicyInput{
 					Bucket: awssdk.String(bucketName),
-					Policy: awssdk.String(fmt.Sprintf(readOnlyAnonUserPolicyTemplate, bucketName)),
+					Policy: awssdk.String(fmt.Sprintf(readOnlyAnonUserPolicyTemplate, partition.ID(), bucketName)),
 				})
 				if err != nil {
 					return "", errors.Wrapf(err, "failed to apply public access policy to the bucket %s", bucketName)
