@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	awssdk "github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/endpoints"
 	"github.com/aws/aws-sdk-go/service/cloudfront"
 	"github.com/aws/aws-sdk-go/service/iam"
 	"github.com/aws/aws-sdk-go/service/s3"
@@ -341,4 +342,35 @@ func mockGetCloudFrontDistribution(mockAWSClient *mockaws.MockClient) {
 func mockPutBucketPolicy(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().PutBucketPolicy(gomock.Any()).Return(
 		&s3.PutBucketPolicyOutput{}, nil).AnyTimes()
+}
+
+func TestDeterminePartitionForRegion(t *testing.T) {
+	tests := []struct {
+		region string
+	}{
+		{
+			region: "us-east-1",
+		},
+		{
+			region: "us-west-1",
+		},
+		{
+			region: "us-gov-east-1",
+		},
+		{
+			region: "us-gov-west-1",
+		},
+		{
+			region: "cn-north-1",
+		},
+		{
+			region: "cn-northwest-1",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.region, func(t *testing.T) {
+			_, found := endpoints.PartitionForRegion([]endpoints.Partition{endpoints.AwsPartition(), endpoints.AwsCnPartition(), endpoints.AwsUsGovPartition()}, test.region)
+			require.True(t, found, "expected to find partition for region")
+		})
+	}
 }
