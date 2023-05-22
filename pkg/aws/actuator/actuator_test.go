@@ -625,6 +625,23 @@ func TestDetectSTS(t *testing.T) {
 			issuer:  "non-empty",
 			wantErr: assert.NoError,
 		},
+		{
+			name: "STS mode and with a CloudTokenString and CloudTokenPath set in CredentialsRequest should create Secret & not error",
+			existing: []runtime.Object{
+				testInfrastructure(),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+			},
+			ctx: context.TODO(),
+			CredentialsRequest: func() *minterv1.CredentialsRequest {
+				cr := testCredentialsRequest()
+				cr.Spec.ProviderSpec = defaultAWSProviderConfig
+				cr.Spec.CloudTokenString = "cloud-token"
+				cr.Spec.CloudTokenPath = "/var/token"
+				return cr
+			}(),
+			issuer:  "non-empty",
+			wantErr: assert.NoError,
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
