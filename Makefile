@@ -149,7 +149,7 @@ test-no-gen: test
 .PHONY: test-no-gen
 
 test-e2e-sts:
-	go test -mod=vendor -race -tags e2e ./test/e2e/aws/sts/...
+	go test -race -tags e2e ./test/e2e/aws/sts/...
 .PHONY: test-e2e-sts
 
 vet: verify-govet
