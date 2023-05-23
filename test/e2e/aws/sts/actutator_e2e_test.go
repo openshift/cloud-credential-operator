@@ -1,11 +1,9 @@
-//go:build e2e
-// +build e2e
-
 package sts
 
 import (
 	"context"
 	log "github.com/sirupsen/logrus"
+	"k8s.io/apimachinery/pkg/types"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/stretchr/testify/assert"
@@ -25,8 +23,9 @@ func Test_CheckSTS(t *testing.T) {
 		t.Parallel()
 		log.Info("starting AWS STS Secret Created on CredentialsRequest creation test")
 		const (
-			name      = "mycredrequest"
-			namespace = "mynamespace"
+			name       = "test-sts-creds-req"
+			namespace  = "default"
+			secretName = "test-sts-secret"
 		)
 
 		var in = minterv1.AWSProviderSpec{
@@ -51,7 +50,7 @@ func Test_CheckSTS(t *testing.T) {
 			Spec: minterv1.CredentialsRequestSpec{
 				ProviderSpec: ProviderSpec,
 				SecretRef: corev1.ObjectReference{
-					Name:      "mysecret",
+					Name:      secretName,
 					Namespace: namespace,
 				},
 				ServiceAccountNames: []string{
@@ -63,6 +62,10 @@ func Test_CheckSTS(t *testing.T) {
 		}
 
 		scheme := runtime.NewScheme()
+		log.Info("trying to call AddToScheme method")
+		minterv1.AddToScheme(scheme)
+		corev1.AddToScheme(scheme)
+
 		// apply credentialsRequest on install
 		credReq := CredentialsRequestTemplate
 		credReq.Spec.CloudTokenPath = "/var/cloud-token"
@@ -77,7 +80,12 @@ func Test_CheckSTS(t *testing.T) {
 			log.Error(err, "unable to create controller manager", "aws.service", "aws-service")
 			os.Exit(1)
 		}
-		log.Info("getting client from ctrl-runtime manager")
+		err = mgr.Start(context.TODO())
+		if err != nil {
+			log.Error(err, "unable to start controller manager", "aws.service", "aws-service")
+			os.Exit(1)
+		}
+		log.Info("started ctrl-runtime manager")
 		c := mgr.GetClient()
 		log.Info("calling Create for CredentialsRequest")
 		if err := c.Create(context.TODO(), credReq); err != nil {
@@ -86,8 +94,12 @@ func Test_CheckSTS(t *testing.T) {
 				os.Exit(1)
 			}
 		}
+		log.Info("got client from ctrl-runtime manager")
 		// If CredentialsRequest was created, then Secret should have been too
-		//TODO actually check if Secret exists
+		err = c.Get(context.TODO(),
+			types.NamespacedName{Namespace: credReq.Spec.SecretRef.Namespace, Name: credReq.Spec.SecretRef.Name},
+			&corev1.Secret{})
+		//TODO actually check if Secret contains the right STS items
 		assert.NoError(t, err, "unable to create Secret from CredentialsRequest")
 	})
 }
