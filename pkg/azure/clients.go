@@ -339,18 +339,18 @@ type MockablePoller[T any] interface {
 
 type PollerWrapper[T any] struct {
 	*runtime.Poller[T]
-	mock    bool
-	generic *T
+	mock     bool
+	mockResp *T
 }
 
 // NewPollerWrapper wraps runtime.Poller such that the Poller's methods may be conditionally mocked
-// based on the provided mock bool. When mock is true, PollUntilDone() will return the provided "any"
+// based on the provided mock bool. When mock is true, PollUntilDone() will return the provided mockResp
 // generically typed object.
-func NewPollerWrapper[T any](poller *runtime.Poller[T], mock bool, any T) MockablePoller[T] {
+func NewPollerWrapper[T any](poller *runtime.Poller[T], mock bool, mockResp T) MockablePoller[T] {
 	return &PollerWrapper[T]{
-		Poller:  poller,
-		mock:    mock,
-		generic: &any,
+		Poller:   poller,
+		mock:     mock,
+		mockResp: &mockResp,
 	}
 }
 
@@ -371,22 +371,22 @@ func (p *PollerWrapper[T]) Poll(ctx context.Context) (*http.Response, error) {
 
 func (p *PollerWrapper[T]) PollUntilDone(ctx context.Context, options *runtime.PollUntilDoneOptions) (T, error) {
 	if p.mock {
-		if p.generic == nil {
+		if p.mockResp == nil {
 			var result T
 			return result, errors.New("mocked poller has no generically typed object to return")
 		}
-		return *p.generic, nil
+		return *p.mockResp, nil
 	}
 	return p.Poller.PollUntilDone(ctx, options)
 }
 
 func (p *PollerWrapper[T]) Result(ctx context.Context) (T, error) {
 	if p.mock {
-		if p.generic == nil {
+		if p.mockResp == nil {
 			var result T
 			return result, nil
 		}
-		return *p.generic, nil
+		return *p.mockResp, nil
 	}
 	return p.Poller.Result(ctx)
 }
