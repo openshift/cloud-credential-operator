@@ -182,21 +182,14 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Creating the storage account can take time, do we need to display progress in some way or is it
-	//       acceptable to output a log line when we have finished?
-	// PollUntilDone polls every 30 seconds by default.
 	pollerWrapper := azureclients.NewPollerWrapper[armstorage.AccountsClientCreateResponse](
 		pollerResp,
+		// When client.Mock = true the client.MockStorageClientBeginCreateResp will be returned
+		// from PollerWrapper.PollUntilDone(). These fields are set in tests.
 		client.Mock,
-		// When Mock = true this armstorage.AccountsClientCreateResponse will be returned
-		// from PollUntilDone() from the azureclients.PollerWrapper defined herein.
-		armstorage.AccountsClientCreateResponse{
-			Account: armstorage.Account{
-				Name: to.Ptr(storageAccountName),
-				ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", "123456789", resourceGroupName, storageAccountName)),
-			},
-		},
+		client.MockStorageClientBeginCreateResp,
 	)
+	// PollUntilDone with frequency of every 10 seconds.
 	resp, err := pollerWrapper.PollUntilDone(context.Background(), &runtime.PollUntilDoneOptions{Frequency: 10 * time.Second})
 	if err != nil {
 		return nil, err
@@ -310,7 +303,8 @@ func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccount
 		return blobContainerURL, err
 	}
 	// NOTE: It is not possible to instantiate an azureclients.AzureClientWrapper with this client
-	// because the storage key isn't known when we instantiate the other clients.
+	// because the storage key isn't known when we instantiate the other clients because the storage
+	// account doesn't or may not exist yet.
 	//
 	// client.BlobSharedKeyClient is previously set in tests for mocking so only create a real client
 	// if client.BlobSharedKeyClient is nil.
@@ -326,7 +320,8 @@ func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccount
 		"",
 		filepath.Join(".well-known", openidConfigurationFileName),
 		oidcDiscoveryDocumentData,
-		// Note: Blobs can be tagged in this options object but the container itself is tagged.
+		// Note: Blobs can be tagged in this options object but the storage account they reside in is tagged.
+		// Storage containers may not be tagged.
 		&azblob.UploadBufferOptions{},
 	)
 	if err != nil {
@@ -522,6 +517,7 @@ func NewCreateOIDCIssuerCmd() *cobra.Command {
 		&CreateOIDCIssuerOpts.OIDCResourceGroupName,
 		"oidc-resource-group-name",
 		"",
+		// FIXME: Say what the default is gonna be, ie -oidc appended to the --name.
 		"The Azure resource group in which to create OIDC infrastructure including a storage account, blob storage container and user-assigned managed identities. "+
 			"A resource group will be created with a name derived from the --name parameter if an --oidc-resource-group-name parameter was not provided.",
 	)
