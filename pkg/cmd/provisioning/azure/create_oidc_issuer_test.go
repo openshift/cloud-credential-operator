@@ -80,7 +80,12 @@ func TestCreateOIDCIssuer(t *testing.T) {
 		{
 			name: "OIDC issuer created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockStorageClientBeginCreateResp := armstorage.AccountsClientCreateResponse{
+					Account: armstorage.Account{
+						Name: to.Ptr(testStorageAccountName),
+						ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", testSubscriptionID, testOIDCResourceGroupName, testStorageAccountName)),
+					}}
+				wrapper := mockAzureClientWrapperWithStorageClientBeginCrateResp(mockCtrl, &mockStorageClientBeginCreateResp)
 				mockGetResourceGroupNotFound(wrapper, testOIDCResourceGroupName, testSubscriptionID)
 				mockCreateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testSubscriptionID)
 				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID)
@@ -207,7 +212,12 @@ func TestEnsureStorageAccount(t *testing.T) {
 		{
 			name: "Pre-existing storage account not found, storage account created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockStorageClientBeginCreateResp := armstorage.AccountsClientCreateResponse{
+					Account: armstorage.Account{
+						Name: to.Ptr(testStorageAccountName),
+						ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", testSubscriptionID, testOIDCResourceGroupName, testStorageAccountName)),
+					}}
+				wrapper := mockAzureClientWrapperWithStorageClientBeginCrateResp(mockCtrl, &mockStorageClientBeginCreateResp)
 				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID)
 				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, testUserTags)
 				return wrapper
@@ -215,64 +225,7 @@ func TestEnsureStorageAccount(t *testing.T) {
 			expectError: false,
 		},
 		{
-			name: "Pre-existing storage account found in correct region, resource group not created",
-			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, testRegionName, testSubscriptionID)
-				return wrapper
-			},
-			expectError: false,
-		},
-		{
-			// This shouldn't be possible since we're listing storage accounts by resource group
-			// and we ensureResourceGroup() of the resource group in which the storage account
-			// would be created / exists and we validate the region within ensureResourceGroup().
-			name: "Pre-existing storage account found in incorrect region",
-			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, "westus3", testSubscriptionID)
-				return wrapper
-			},
-			expectError: true,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-
-			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-
-			storageAccount, err := ensureStorageAccount(mockAzureClientWrapper, testStorageAccountName, testOIDCResourceGroupName, testRegionName, testUserTags)
-			if test.expectError {
-				require.Error(t, err, "expected error")
-			} else {
-				require.NoError(t, err, "unexpected error")
-				require.NotNil(t, storageAccount, "expected storageAccount to not be nil")
-			}
-		})
-	}
-}
-
-func TestEnsureBlobContainer(t *testing.T) {
-	tests := []struct {
-		name                   string
-		mockAzureClientWrapper func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper
-		generateOnly           bool
-		expectError            bool
-	}{
-		{
-			name: "Pre-existing storage account not found, storage account created",
-			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID)
-				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, testUserTags)
-				return wrapper
-			},
-			expectError: false,
-		},
-		{
-			name: "Pre-existing storage account found in correct region, resource group not created",
+			name: "Pre-existing storage account found in correct region, storage account not created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, testRegionName, testSubscriptionID)
@@ -328,6 +281,14 @@ func mockAzureClientWrapper(mockCtrl *gomock.Controller) *azureclients.AzureClie
 	// Mock = true so that runtime.Poller operations will be mocked by an azureclients.PollerWrapper
 	wrapper.Mock = true
 	return &wrapper
+}
+
+func mockAzureClientWrapperWithStorageClientBeginCrateResp(mockCtrl *gomock.Controller, mockStorageClientBeginCreateResp *armstorage.AccountsClientCreateResponse) *azureclients.AzureClientWrapper {
+	wrapper := mockAzureClientWrapper(mockCtrl)
+	if mockStorageClientBeginCreateResp != nil {
+		wrapper.MockStorageClientBeginCreateResp = *mockStorageClientBeginCreateResp
+	}
+	return wrapper
 }
 
 func mockCreateResourceGroupSuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, subscriptionID string) {
@@ -415,27 +376,14 @@ func mockStorageAccountBeginCreate(wrapper *azureclients.AzureClientWrapper, res
 		storageAccountParameters.Tags[userTagKey] = to.Ptr(userTagValue)
 	}
 
-	firstResponse := &http.Response{
-		StatusCode: http.StatusAccepted,
-		Header: http.Header{
-			"Location":    []string{"http://not-a-real-domain.fake"},
-			"Retry-After": []string{"1"},
-		},
-	}
-
-	firstResponse.Body = http.NoBody
-
+	// This poller is not returned from PollerWrapper.PollUntilDone().
+	// See AzureClientWrapper.MockStorageClientBeginCreateResp
 	poller, _ := runtime.NewPoller(
-		firstResponse,
-		runtime.NewPipeline("testmodule", "v0.1.0", runtime.PipelineOptions{}, nil),
-		&runtime.NewPollerOptions[armstorage.AccountsClientCreateResponse]{
-			Response: &armstorage.AccountsClientCreateResponse{
-				Account: armstorage.Account{
-					Location: to.Ptr(region),
-					ID:       to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", testSubscriptionID, resourceGroupName, storageAccountName)),
-				},
-			},
+		&http.Response{
+			Body: http.NoBody,
 		},
+		runtime.NewPipeline("testpipeline", "", runtime.PipelineOptions{}, nil),
+		&runtime.NewPollerOptions[armstorage.AccountsClientCreateResponse]{},
 	)
 
 	wrapper.StorageAccountClient.(*mockazure.MockAccountsClient).EXPECT().BeginCreate(gomock.Any(), resourceGroupName, storageAccountName, storageAccountParameters, gomock.Any()).Return(poller, nil)

@@ -271,6 +271,10 @@ type AzureClientWrapper struct {
 	// Mock field is used to create a PollerWrapper to facilitate testing
 	// Azure client operations that return a runtime.Poller
 	Mock bool
+	// MockStorageClientBeginCreateResp is the AccountsClientCreateResponse
+	// that will be returned from mocked StorageAccountClient.BeginCreate
+	// operations such as from a PollerWrapper implementing PollUntilDone.
+	MockStorageClientBeginCreateResp armstorage.AccountsClientCreateResponse
 }
 
 func NewAzureClientWrapper(subscriptionID string, cred azcore.TokenCredential, options *policy.ClientOptions, mock bool) (*AzureClientWrapper, error) {
