@@ -96,6 +96,7 @@ type AccountsClient interface {
 	BeginCreate(ctx context.Context, resourceGroupName string, accountName string, parameters armstorage.AccountCreateParameters, options *armstorage.AccountsClientBeginCreateOptions) (*runtime.Poller[armstorage.AccountsClientCreateResponse], error)
 	ListKeys(ctx context.Context, resourceGroupName string, accountName string, options *armstorage.AccountsClientListKeysOptions) (armstorage.AccountsClientListKeysResponse, error)
 	Delete(ctx context.Context, resourceGroupName string, accountName string, options *armstorage.AccountsClientDeleteOptions) (armstorage.AccountsClientDeleteResponse, error)
+	Update(ctx context.Context, resourceGroupName string, accountName string, parameters armstorage.AccountUpdateParameters, options *armstorage.AccountsClientUpdateOptions) (armstorage.AccountsClientUpdateResponse, error)
 }
 
 type accountsClient struct {
@@ -128,6 +129,10 @@ func (accountsClient *accountsClient) ListKeys(ctx context.Context, resourceGrou
 
 func (accountsClient *accountsClient) Delete(ctx context.Context, resourceGroupName string, accountName string, options *armstorage.AccountsClientDeleteOptions) (armstorage.AccountsClientDeleteResponse, error) {
 	return accountsClient.client.Delete(ctx, resourceGroupName, accountName, options)
+}
+
+func (accountsClient *accountsClient) Update(ctx context.Context, resourceGroupName string, accountName string, parameters armstorage.AccountUpdateParameters, options *armstorage.AccountsClientUpdateOptions) (armstorage.AccountsClientUpdateResponse, error) {
+	return accountsClient.client.Update(ctx, resourceGroupName, accountName, parameters, options)
 }
 
 type BlobContainersClient interface {

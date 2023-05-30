@@ -235,6 +235,21 @@ func (mr *MockAccountsClientMockRecorder) NewListPager(options interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewListPager", reflect.TypeOf((*MockAccountsClient)(nil).NewListPager), options)
 }
 
+// Update mocks base method.
+func (m *MockAccountsClient) Update(ctx context.Context, resourceGroupName, accountName string, parameters armstorage.AccountUpdateParameters, options *armstorage.AccountsClientUpdateOptions) (armstorage.AccountsClientUpdateResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Update", ctx, resourceGroupName, accountName, parameters, options)
+	ret0, _ := ret[0].(armstorage.AccountsClientUpdateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Update indicates an expected call of Update.
+func (mr *MockAccountsClientMockRecorder) Update(ctx, resourceGroupName, accountName, parameters, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Update", reflect.TypeOf((*MockAccountsClient)(nil).Update), ctx, resourceGroupName, accountName, parameters, options)
+}
+
 // MockBlobContainersClient is a mock of BlobContainersClient interface.
 type MockBlobContainersClient struct {
 	ctrl     *gomock.Controller
