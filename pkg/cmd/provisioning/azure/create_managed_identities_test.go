@@ -78,7 +78,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
-				mockCreateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				return wrapper
 			},
 			setup: func(t *testing.T) string {
@@ -110,7 +110,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
-				mockCreateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, testSubscriptionID, testOIDCResourceGroupName, []string{"Contributor"})
 				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "142287c2-414a-40c0-8ab3-4c77298346be")
@@ -187,7 +187,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
-				mockCreateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, testSubscriptionID, testOIDCResourceGroupName, []string{"Contributor"})
 				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "142287c2-414a-40c0-8ab3-4c77298346be")
@@ -229,7 +229,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
-				mockCreateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				return wrapper
 			},
 			enableTechPreview: false,

@@ -64,7 +64,6 @@ var (
 )
 
 // ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription
-// The resource group will only be tagged when created by ensureResourceGroup().
 func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupName, region string, resourceTags map[string]string) (*armresources.ResourceGroup, error) {
 	// Check if resource group already exists
 	needToCreateResourceGroup := false
@@ -97,34 +96,46 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 			region)
 	}
 
-	// Found and validated existing resource group, return
-	if !needToCreateResourceGroup {
-		log.Printf("Found existing resource group %s", *getResourceGroupResp.ResourceGroup.ID)
-		return &getResourceGroupResp.ResourceGroup, nil
+	mergedResourceTags := map[string]*string{}
+	if getResourceGroupResp.Tags != nil {
+		for key, value := range getResourceGroupResp.Tags {
+			mergedResourceTags[key] = value
+		}
 	}
 
-	// Add provided tags to resource group parameters
-	// NOTE: resourceTags will not be added to a resource group that ccoctl did not create. See return above.
-	resourceGroupParameters := armresources.ResourceGroup{
-		Location: to.Ptr(region),
-		Tags: map[string]*string{
-			nameTagKey: to.Ptr(resourceGroupName),
-		},
-	}
+	needToUpdateResourceGroup := false
 	for tagKey, tagValue := range resourceTags {
-		resourceGroupParameters.Tags[tagKey] = to.Ptr(tagValue)
+		val, ok := mergedResourceTags[tagKey]
+		// Current tags don't contain expected tag keys and values
+		if !ok || (ok && *val != tagValue) {
+			mergedResourceTags[tagKey] = &tagValue
+			needToUpdateResourceGroup = true
+		}
+	}
+
+	// Found and validated existing resource group, return
+	if !needToCreateResourceGroup && !needToUpdateResourceGroup {
+		log.Printf("Found existing resource group %s", *getResourceGroupResp.ResourceGroup.ID)
+		return &getResourceGroupResp.ResourceGroup, nil
 	}
 
 	// Create resource group
 	createResourceGroupResp, err := client.ResourceGroupsClient.CreateOrUpdate(
 		context.Background(),
 		resourceGroupName,
-		resourceGroupParameters,
+		armresources.ResourceGroup{
+			Location: to.Ptr(region),
+			Tags:     mergedResourceTags,
+		},
 		nil)
 	if err != nil {
 		return nil, err
 	}
-	log.Printf("Created resource group %s", *createResourceGroupResp.ResourceGroup.ID)
+	verb := "Updated"
+	if needToCreateResourceGroup {
+		verb = "Created"
+	}
+	log.Printf("%s resource group %s", verb, *createResourceGroupResp.ResourceGroup.ID)
 	return &createResourceGroupResp.ResourceGroup, nil
 }
 
@@ -140,8 +151,13 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 		}
 		list = append(list, pageResponse.AccountListResult.Value...)
 	}
+	needToCreateStorageAccount := true
+	needToUpdateStorageAccount := false
+	mergedResourceTags := map[string]*string{}
+	var existingStorageAccount *armstorage.Account
 	for _, storageAccount := range list {
 		if *storageAccount.Name == storageAccountName {
+			existingStorageAccount = storageAccount
 			// Validate that existing storage account is in requested region
 			if *storageAccount.Location != region {
 				return nil, fmt.Errorf("found existing storage account %s in unexpected region=%s, requested region=%s",
@@ -149,53 +165,77 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 					*storageAccount.Location,
 					region)
 			}
-			// Found and validated existing storage account, return
-			log.Printf("Found existing storage account %s", *storageAccount.ID)
-			return storageAccount, nil
+			needToCreateStorageAccount = false
+			if storageAccount.Tags != nil {
+				for key, value := range storageAccount.Tags {
+					mergedResourceTags[key] = value
+				}
+			}
+			for tagKey, tagValue := range resourceTags {
+				val, ok := mergedResourceTags[tagKey]
+				// Current tags don't contain expected tag keys and values
+				if !ok || (ok && *val != tagValue) {
+					mergedResourceTags[tagKey] = &tagValue
+					needToUpdateStorageAccount = true
+				}
+			}
 		}
 	}
 
-	storageAccountParameters := armstorage.AccountCreateParameters{
-		Kind: to.Ptr(armstorage.KindStorageV2),
-		SKU: &armstorage.SKU{
-			Name: to.Ptr(armstorage.SKUNameStandardLRS),
-		},
-		Location: to.Ptr(region),
-		Tags: map[string]*string{
-			nameTagKey: to.Ptr(storageAccountName),
-		},
-	}
-
-	// Add provided tags to storage account parameters
-	// NOTE: userTags will not be added to a storage account that ccoctl did not create. See return above.
-	for tagKey, tagValue := range resourceTags {
-		storageAccountParameters.Tags[tagKey] = to.Ptr(tagValue)
+	if !needToCreateStorageAccount && !needToUpdateStorageAccount {
+		// Found and validated existing storage account, return
+		log.Printf("Found existing storage account %s", *existingStorageAccount.ID)
+		return existingStorageAccount, nil
 	}
 
 	// Create storage account
-	pollerResp, err := client.StorageAccountClient.BeginCreate(
-		context.TODO(),
+	if needToCreateStorageAccount {
+		createStorageAccountTags := map[string]*string{}
+		for key, value := range resourceTags {
+			createStorageAccountTags[key] = to.Ptr(value)
+		}
+		pollerResp, err := client.StorageAccountClient.BeginCreate(
+			context.TODO(),
+			resourceGroupName,
+			storageAccountName,
+			armstorage.AccountCreateParameters{
+				Kind: to.Ptr(armstorage.KindStorageV2),
+				SKU: &armstorage.SKU{
+					Name: to.Ptr(armstorage.SKUNameStandardLRS),
+				},
+				Location: to.Ptr(region),
+				Tags:     createStorageAccountTags,
+			},
+			&armstorage.AccountsClientBeginCreateOptions{})
+		if err != nil {
+			return nil, err
+		}
+		pollerWrapper := azureclients.NewPollerWrapper[armstorage.AccountsClientCreateResponse](
+			pollerResp,
+			// When client.Mock = true the client.MockStorageClientBeginCreateResp will be returned
+			// from PollerWrapper.PollUntilDone(). These fields are set in tests.
+			client.Mock,
+			client.MockStorageClientBeginCreateResp,
+		)
+		// PollUntilDone with frequency of every 10 seconds.
+		resp, err := pollerWrapper.PollUntilDone(context.Background(), &runtime.PollUntilDoneOptions{Frequency: 10 * time.Second})
+		if err != nil {
+			return nil, err
+		}
+		log.Printf("Created storage account %s", *resp.Account.ID)
+		return &resp.Account, nil
+	}
+
+	updateResp, err := client.StorageAccountClient.Update(context.TODO(),
 		resourceGroupName,
 		storageAccountName,
-		storageAccountParameters,
-		&armstorage.AccountsClientBeginCreateOptions{})
-	if err != nil {
-		return nil, err
-	}
-	pollerWrapper := azureclients.NewPollerWrapper[armstorage.AccountsClientCreateResponse](
-		pollerResp,
-		// When client.Mock = true the client.MockStorageClientBeginCreateResp will be returned
-		// from PollerWrapper.PollUntilDone(). These fields are set in tests.
-		client.Mock,
-		client.MockStorageClientBeginCreateResp,
+		armstorage.AccountUpdateParameters{
+			Tags: mergedResourceTags,
+		},
+		&armstorage.AccountsClientUpdateOptions{},
 	)
-	// PollUntilDone with frequency of every 10 seconds.
-	resp, err := pollerWrapper.PollUntilDone(context.Background(), &runtime.PollUntilDoneOptions{Frequency: 10 * time.Second})
-	if err != nil {
-		return nil, err
-	}
-	log.Printf("Created storage account %s", *resp.Account.ID)
-	return &resp.Account, nil
+	log.Printf("Updated storage account %s", *updateResp.Account.ID)
+	return &updateResp.Account, err
 }
 
 // getStorageAccountKey lists storage account keys for the storage account identified by storageAccountName and
@@ -256,10 +296,10 @@ func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupN
 		armstorage.BlobContainer{
 			ContainerProperties: &armstorage.ContainerProperties{
 				PublicAccess: to.Ptr(armstorage.PublicAccessContainer),
-				// Note that blob containers cannot be tagged
+				// Note there is no Tags parameter within ContainerProperties.
 			},
 		},
-		nil,
+		&armstorage.BlobContainersClientCreateOptions{},
 	)
 	if err != nil {
 		return nil, err
