@@ -47,7 +47,6 @@ func deleteManagedIdentities(client *azureclients.AzureClientWrapper, name, reso
 				managedIdentities = append(managedIdentities, identity)
 			}
 		}
-		managedIdentities = append(managedIdentities, pageResponse.UserAssignedIdentitiesListResult.Value...)
 	}
 	if len(managedIdentities) == 0 {
 		log.Printf("Found no user-assigned managed identities with tag key=%s, value=%s", ownedTagKey, ownedAzureResourceTagValue)
