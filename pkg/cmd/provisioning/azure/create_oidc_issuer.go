@@ -64,6 +64,7 @@ var (
 )
 
 // ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription
+// resourceTags will be updated to match those provided to ensureResourceGroup if found to be different on an existing resource group.
 func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupName, region string, resourceTags map[string]string) (*armresources.ResourceGroup, error) {
 	// Check if resource group already exists
 	needToCreateResourceGroup := false
@@ -140,7 +141,7 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 }
 
 // ensureStorageAccount ensures that a storage account with storageAccountName exists within the provided resource group, region and subscription
-// The storage account will only be tagged when created by ensureStorageAccount().
+// resourceTags will be updated to match those provided to ensureStorageAccount if found to be different on an existing storage account.
 func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccountName, resourceGroupName, region string, resourceTags map[string]string) (*armstorage.Account, error) {
 	listAccounts := client.StorageAccountClient.NewListByResourceGroupPager(resourceGroupName, &armstorage.AccountsClientListByResourceGroupOptions{})
 	list := make([]*armstorage.Account, 0)
@@ -254,8 +255,7 @@ func getStorageAccountKey(client *azureclients.AzureClientWrapper, storageAccoun
 	return "", nil
 }
 
-// ensureBlobContainer ensures that a storage group with storageAccountName exists within the provided resource group, region and subscription
-// The storage group will only be tagged when created by ensureStorageAccount().
+// ensureBlobContainer ensures that a blob conttainer with containerName exists within the provided storage account, resource group, region and subscription
 func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupName, storageAccountName, containerName string) (*armstorage.BlobContainer, error) {
 	// Check if blob container already exists
 	needToCreateBlobContainer := false
