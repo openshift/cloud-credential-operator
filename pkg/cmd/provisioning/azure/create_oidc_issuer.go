@@ -108,7 +108,7 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 		val, ok := mergedResourceTags[tagKey]
 		// Current tags don't contain expected tag keys and values
 		if !ok || (ok && *val != tagValue) {
-			mergedResourceTags[tagKey] = &tagValue
+			mergedResourceTags[tagKey] = to.Ptr(tagValue)
 			needToUpdateResourceGroup = true
 		}
 	}
