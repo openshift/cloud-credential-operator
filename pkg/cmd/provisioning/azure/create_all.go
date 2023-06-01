@@ -16,9 +16,7 @@ import (
 var (
 	// CreateAllOpts captures the azureOptions that affect creation of the OIDC issuer
 	// and user-assigned managed identities
-	CreateAllOpts = azureOptions{
-		EnableTechPreview: false,
-	}
+	CreateAllOpts = azureOptions{}
 )
 
 func createAllCmd(cmd *cobra.Command, args []string) {
