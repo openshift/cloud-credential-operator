@@ -65,7 +65,7 @@ var (
 
 // ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription
 // resourceTags will be updated to match those provided to ensureResourceGroup if found to be different on an existing resource group.
-func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupName, region string, resourceTags map[string]string) (*armresources.ResourceGroup, error) {
+func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupName, region string, resourceTags map[string]string) error {
 	// Check if resource group already exists
 	needToCreateResourceGroup := false
 	var rawResponse *http.Response
@@ -82,16 +82,16 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 				// Resource group wasn't found so the resource group will need to be created
 				needToCreateResourceGroup = true
 			default:
-				return nil, errors.Wrapf(err, "unable to get resource group")
+				return errors.Wrapf(err, "unable to get resource group")
 			}
 		} else {
-			return nil, err
+			return err
 		}
 	}
 
 	// Validate that existing resource group is in requested region
 	if getResourceGroupResp.Location != nil && *getResourceGroupResp.Location != region {
-		return nil, fmt.Errorf("found existing resource group %s in unexpected region=%s, requested region=%s",
+		return fmt.Errorf("found existing resource group %s in unexpected region=%s, requested region=%s",
 			*getResourceGroupResp.ResourceGroup.ID,
 			*getResourceGroupResp.Location,
 			region)
@@ -117,7 +117,7 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 	// Found and validated existing resource group, return
 	if !needToCreateResourceGroup && !needToUpdateResourceGroup {
 		log.Printf("Found existing resource group %s", *getResourceGroupResp.ResourceGroup.ID)
-		return &getResourceGroupResp.ResourceGroup, nil
+		return nil
 	}
 
 	// Create resource group
@@ -130,25 +130,25 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 		},
 		nil)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	verb := "Updated"
 	if needToCreateResourceGroup {
 		verb = "Created"
 	}
 	log.Printf("%s resource group %s", verb, *createResourceGroupResp.ResourceGroup.ID)
-	return &createResourceGroupResp.ResourceGroup, nil
+	return nil
 }
 
 // ensureStorageAccount ensures that a storage account with storageAccountName exists within the provided resource group, region and subscription
 // resourceTags will be updated to match those provided to ensureStorageAccount if found to be different on an existing storage account.
-func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccountName, resourceGroupName, region string, resourceTags map[string]string) (*armstorage.Account, error) {
+func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccountName, resourceGroupName, region string, resourceTags map[string]string) error {
 	listAccounts := client.StorageAccountClient.NewListByResourceGroupPager(resourceGroupName, &armstorage.AccountsClientListByResourceGroupOptions{})
 	list := make([]*armstorage.Account, 0)
 	for listAccounts.More() {
 		pageResponse, err := listAccounts.NextPage(context.Background())
 		if err != nil {
-			return nil, err
+			return err
 		}
 		list = append(list, pageResponse.AccountListResult.Value...)
 	}
@@ -161,7 +161,7 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 			existingStorageAccount = storageAccount
 			// Validate that existing storage account is in requested region
 			if *storageAccount.Location != region {
-				return nil, fmt.Errorf("found existing storage account %s in unexpected region=%s, requested region=%s",
+				return fmt.Errorf("found existing storage account %s in unexpected region=%s, requested region=%s",
 					*storageAccount.ID,
 					*storageAccount.Location,
 					region)
@@ -186,7 +186,7 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 	if !needToCreateStorageAccount && !needToUpdateStorageAccount {
 		// Found and validated existing storage account, return
 		log.Printf("Found existing storage account %s", *existingStorageAccount.ID)
-		return existingStorageAccount, nil
+		return nil
 	}
 
 	// Create storage account
@@ -209,7 +209,7 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 			},
 			&armstorage.AccountsClientBeginCreateOptions{})
 		if err != nil {
-			return nil, err
+			return err
 		}
 		pollerWrapper := azureclients.NewPollerWrapper[armstorage.AccountsClientCreateResponse](
 			pollerResp,
@@ -221,10 +221,10 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 		// PollUntilDone with frequency of every 10 seconds.
 		resp, err := pollerWrapper.PollUntilDone(context.Background(), &runtime.PollUntilDoneOptions{Frequency: 10 * time.Second})
 		if err != nil {
-			return nil, err
+			return err
 		}
 		log.Printf("Created storage account %s", *resp.Account.ID)
-		return &resp.Account, nil
+		return nil
 	}
 
 	updateResp, err := client.StorageAccountClient.Update(context.TODO(),
@@ -236,7 +236,7 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 		&armstorage.AccountsClientUpdateOptions{},
 	)
 	log.Printf("Updated storage account %s", *updateResp.Account.ID)
-	return &updateResp.Account, err
+	return err
 }
 
 // getStorageAccountKey lists storage account keys for the storage account identified by storageAccountName and
@@ -256,7 +256,7 @@ func getStorageAccountKey(client *azureclients.AzureClientWrapper, storageAccoun
 }
 
 // ensureBlobContainer ensures that a blob conttainer with containerName exists within the provided storage account, resource group, region and subscription
-func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupName, storageAccountName, containerName string) (*armstorage.BlobContainer, error) {
+func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupName, storageAccountName, containerName string) error {
 	// Check if blob container already exists
 	needToCreateBlobContainer := false
 	var rawResponse *http.Response
@@ -275,17 +275,17 @@ func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupN
 				needToCreateBlobContainer = true
 			default:
 				log.Printf("Unable to get blob container: %v", respErr.ErrorCode)
-				return nil, err
+				return err
 			}
 		} else {
-			return nil, err
+			return err
 		}
 	}
 
 	// Found and validated existing blob container, return
 	if !needToCreateBlobContainer {
 		log.Printf("Found existing blob container %s", *getBlobContainerResp.BlobContainer.ID)
-		return &getBlobContainerResp.BlobContainer, nil
+		return nil
 	}
 
 	createBlobContainerResp, err := client.BlobContainerClient.Create(
@@ -302,10 +302,10 @@ func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupN
 		&armstorage.BlobContainersClientCreateOptions{},
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	log.Printf("Created blob container %s", *createBlobContainerResp.BlobContainer.ID)
-	return &createBlobContainerResp.BlobContainer, nil
+	return nil
 }
 
 // uploadOIDCDocuments generates and uploads the OIDC discovery document (.well-known/openid-configuration) and the JSON web key set (jwks.json)
@@ -402,13 +402,13 @@ func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oid
 		}
 
 		// Ensure the resource group exists
-		_, err = ensureResourceGroup(client, oidcResourceGroupName, region, resourceTags)
+		err = ensureResourceGroup(client, oidcResourceGroupName, region, resourceTags)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to ensure resource group")
 		}
 
 		// Ensure storage account exists
-		_, err = ensureStorageAccount(client, storageAccountName, oidcResourceGroupName, region, resourceTags)
+		err = ensureStorageAccount(client, storageAccountName, oidcResourceGroupName, region, resourceTags)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to ensure storage account")
 		}
@@ -419,7 +419,7 @@ func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oid
 		}
 
 		// Ensure blob container exists
-		_, err = ensureBlobContainer(client, oidcResourceGroupName, storageAccountName, blobContainerName)
+		err = ensureBlobContainer(client, oidcResourceGroupName, storageAccountName, blobContainerName)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to create blob container")
 		}

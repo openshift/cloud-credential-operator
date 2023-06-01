@@ -219,12 +219,11 @@ func TestEnsureResourceGroup(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-			resourceGroup, err := ensureResourceGroup(mockAzureClientWrapper, testOIDCResourceGroupName, testRegionName, testUserTags)
+			err := ensureResourceGroup(mockAzureClientWrapper, testOIDCResourceGroupName, testRegionName, testUserTags)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
 				require.NoError(t, err, "unexpected error")
-				require.NotNil(t, resourceGroup, "expected resourceGroup to not be nil")
 			}
 		})
 	}
@@ -320,12 +319,11 @@ func TestEnsureStorageAccount(t *testing.T) {
 				"testtagname0": "testtagvalue0",
 				"testtagname1": "testtagvalue1",
 			}
-			storageAccount, err := ensureStorageAccount(mockAzureClientWrapper, testStorageAccountName, testOIDCResourceGroupName, testRegionName, resourceTags)
+			err := ensureStorageAccount(mockAzureClientWrapper, testStorageAccountName, testOIDCResourceGroupName, testRegionName, resourceTags)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
 				require.NoError(t, err, "unexpected error")
-				require.NotNil(t, storageAccount, "expected storageAccount to not be nil")
 			}
 		})
 	}
