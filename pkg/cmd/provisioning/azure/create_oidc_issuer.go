@@ -142,7 +142,6 @@ func mergeResourceTags(one map[string]string, two map[string]*string) (map[strin
 			mergedResourceTags[key] = to.Ptr(value)
 			changed = true
 		}
-		mergedResourceTags[key] = to.Ptr(value)
 	}
 	return mergedResourceTags, changed
 }
@@ -301,7 +300,6 @@ func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupN
 // to the blob container
 func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccountName, storageAccountKey, publicKeyFilepath, blobContainerName, targetDir string, dryRun bool, resourceTags map[string]string) (string, error) {
 	blobContainerURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s", storageAccountName, blobContainerName)
-
 	oidcDiscoveryDocumentData := []byte(fmt.Sprintf(openidConfigurationTemplate, blobContainerURL, blobContainerURL))
 	oidcDiscoveryDocumentFullPath := filepath.Join(targetDir, openidConfigurationFileName)
 	err := os.WriteFile(oidcDiscoveryDocumentFullPath, oidcDiscoveryDocumentData, fs.FileMode(fileMode))
