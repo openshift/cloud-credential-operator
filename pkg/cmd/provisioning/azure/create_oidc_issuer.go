@@ -349,8 +349,6 @@ func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccount
 		"",
 		filepath.Join(".well-known", openidConfigurationFileName),
 		oidcDiscoveryDocumentData,
-		// Note: Blobs can be tagged in this options object but the storage account they reside in is tagged.
-		// Storage containers may not be tagged.
 		&azblob.UploadBufferOptions{
 			Tags: resourceTags,
 		},
