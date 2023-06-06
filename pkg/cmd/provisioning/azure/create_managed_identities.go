@@ -42,6 +42,8 @@ metadata:
   name: %s
   namespace: %s
 type: Opaque`
+
+	ingressCredentialRequestName = "openshift-ingress-azure"
 )
 
 // createManagedIdentity creates a user-assigned managed identity for the provided CredentialsRequest
@@ -300,8 +302,8 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, outputDir, clientID, t
 // managed identities and role assignment will be scoped to the resource group identified by installationResourceGroupName
 // by default.
 //
-// Role assignment for the specific CredentialsRequest named "openshift-ingress-azure" will be additionally scoped within
-// the resource group identified by dnsZoneResourceGroupName.
+// Role assignment for the specific CredentialsRequest named "openshift-ingress-azure" (ingressCredentialsRequestName) will be
+// additionally scoped within the resource group identified by dnsZoneResourceGroupName.
 //
 // Kubernetes secrets containing the user-assigned managed identity's clientID will be generated and written to the outputDir.
 func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, installationResourceGroupName, dnsZoneResourceGroupName string, resourceTags map[string]string, enableTechPreview, dryRun bool) error {
@@ -328,7 +330,7 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 		// Scope user-assigned managed identity within the installationResourceGroupName
 		scopingResourceGroupNames := []string{installationResourceGroupName}
 		// Additionally scope the ingress CredentialsRequest within the dnsZoneResourceGroupName
-		if credentialsRequest.Name == "openshift-ingress-azure" {
+		if credentialsRequest.Name == ingressCredentialRequestName {
 			scopingResourceGroupNames = append(scopingResourceGroupNames, dnsZoneResourceGroupName)
 		}
 		err := createManagedIdentity(client, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, scopingResourceGroupNames, resourceTags, credentialsRequest, dryRun)
