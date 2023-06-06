@@ -97,22 +97,7 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 			region)
 	}
 
-	mergedResourceTags := map[string]*string{}
-	if getResourceGroupResp.Tags != nil {
-		for key, value := range getResourceGroupResp.Tags {
-			mergedResourceTags[key] = value
-		}
-	}
-
-	needToUpdateResourceGroup := false
-	for tagKey, tagValue := range resourceTags {
-		val, ok := mergedResourceTags[tagKey]
-		// Current tags don't contain expected tag keys and values
-		if !ok || (ok && *val != tagValue) {
-			mergedResourceTags[tagKey] = to.Ptr(tagValue)
-			needToUpdateResourceGroup = true
-		}
-	}
+	mergedResourceTags, needToUpdateResourceGroup := mergeResourceTags(resourceTags, getResourceGroupResp.Tags)
 
 	// Found and validated existing resource group, return
 	if !needToCreateResourceGroup && !needToUpdateResourceGroup {
@@ -140,61 +125,64 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 	return nil
 }
 
-// ensureStorageAccount ensures that a storage account with storageAccountName exists within the provided resource group, region and subscription
-// resourceTags will be updated to match those provided to ensureStorageAccount if found to be different on an existing storage account.
+// Keys and values in "one" (user supplied) take precedence over those in "two" (existing objects).
+// If keys or values from "one" weren't already in "two" then the boolean return will be true.
+func mergeResourceTags(one map[string]string, two map[string]*string) (map[string]*string, bool) {
+	mergedResourceTags := map[string]*string{}
+	// "Copy" two into a new map.
+	for key, value := range two {
+		mergedResourceTags[key] = to.Ptr(*value)
+	}
+	changed := false
+	// Merge "one" into the new map, setting changed if we had to make a modification,
+	// this is for determining whether we needed to make an update to the existing tags.
+	for key, value := range one {
+		val, ok := mergedResourceTags[key]
+		if !ok || *val != value {
+			mergedResourceTags[key] = to.Ptr(value)
+			changed = true
+		}
+		mergedResourceTags[key] = to.Ptr(value)
+	}
+	return mergedResourceTags, changed
+}
+
+// ensureStorageAccount ensures that a storage account with storageAccountName exists within the provided resource group
+// resourceTags will be updated to match those provided if found to be different on an existing storage account.
 func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccountName, resourceGroupName, region string, resourceTags map[string]string) error {
+	var existingStorageAccount *armstorage.Account
 	listAccounts := client.StorageAccountClient.NewListByResourceGroupPager(resourceGroupName, &armstorage.AccountsClientListByResourceGroupOptions{})
-	list := make([]*armstorage.Account, 0)
 	for listAccounts.More() {
 		pageResponse, err := listAccounts.NextPage(context.Background())
 		if err != nil {
 			return err
 		}
-		list = append(list, pageResponse.AccountListResult.Value...)
-	}
-	needToCreateStorageAccount := true
-	needToUpdateStorageAccount := false
-	mergedResourceTags := map[string]*string{}
-	var existingStorageAccount *armstorage.Account
-	for _, storageAccount := range list {
-		if *storageAccount.Name == storageAccountName {
+		for _, storageAccount := range pageResponse.AccountListResult.Value {
+			if *storageAccount.Name != storageAccountName {
+				continue
+			}
 			existingStorageAccount = storageAccount
-			// Validate that existing storage account is in requested region
-			if *storageAccount.Location != region {
-				return fmt.Errorf("found existing storage account %s in unexpected region=%s, requested region=%s",
-					*storageAccount.ID,
-					*storageAccount.Location,
-					region)
-			}
-			needToCreateStorageAccount = false
-			if storageAccount.Tags != nil {
-				for key, value := range storageAccount.Tags {
-					mergedResourceTags[key] = value
-				}
-			}
-			for tagKey, tagValue := range resourceTags {
-				val, ok := mergedResourceTags[tagKey]
-				// Current tags don't contain expected tag keys and values
-				if !ok || (ok && *val != tagValue) {
-					mergedResourceTags[tagKey] = &tagValue
-					needToUpdateStorageAccount = true
-				}
-			}
+			break
+		}
+		if existingStorageAccount != nil {
+			break
 		}
 	}
 
+	needToCreateStorageAccount := existingStorageAccount == nil
+	mergedResourceTags := map[string]*string{}
+	if !needToCreateStorageAccount {
+		mergedResourceTags = existingStorageAccount.Tags
+	}
+	mergedResourceTags, needToUpdateStorageAccount := mergeResourceTags(resourceTags, mergedResourceTags)
+
 	if !needToCreateStorageAccount && !needToUpdateStorageAccount {
-		// Found and validated existing storage account, return
 		log.Printf("Found existing storage account %s", *existingStorageAccount.ID)
 		return nil
 	}
 
 	// Create storage account
 	if needToCreateStorageAccount {
-		createStorageAccountTags := map[string]*string{}
-		for key, value := range resourceTags {
-			createStorageAccountTags[key] = to.Ptr(value)
-		}
 		pollerResp, err := client.StorageAccountClient.BeginCreate(
 			context.TODO(),
 			resourceGroupName,
@@ -205,7 +193,7 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 					Name: to.Ptr(armstorage.SKUNameStandardLRS),
 				},
 				Location: to.Ptr(region),
-				Tags:     createStorageAccountTags,
+				Tags:     mergedResourceTags,
 			},
 			&armstorage.AccountsClientBeginCreateOptions{})
 		if err != nil {
@@ -227,6 +215,7 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 		return nil
 	}
 
+	// Update storage account
 	updateResp, err := client.StorageAccountClient.Update(context.TODO(),
 		resourceGroupName,
 		storageAccountName,
@@ -294,9 +283,9 @@ func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupN
 		storageAccountName,
 		containerName,
 		armstorage.BlobContainer{
+			// Note there is no Tags parameter within BlobContainer or ContainerProperties.
 			ContainerProperties: &armstorage.ContainerProperties{
 				PublicAccess: to.Ptr(armstorage.PublicAccessContainer),
-				// Note there is no Tags parameter within ContainerProperties.
 			},
 		},
 		&armstorage.BlobContainersClientCreateOptions{},
@@ -310,7 +299,7 @@ func ensureBlobContainer(client *azureclients.AzureClientWrapper, resourceGroupN
 
 // uploadOIDCDocuments generates and uploads the OIDC discovery document (.well-known/openid-configuration) and the JSON web key set (jwks.json)
 // to the blob container
-func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccountName, storageAccountKey, publicKeyFilepath, blobContainerName, targetDir string, dryRun bool) (string, error) {
+func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccountName, storageAccountKey, publicKeyFilepath, blobContainerName, targetDir string, dryRun bool, resourceTags map[string]string) (string, error) {
 	blobContainerURL := fmt.Sprintf("https://%s.blob.core.windows.net/%s", storageAccountName, blobContainerName)
 
 	oidcDiscoveryDocumentData := []byte(fmt.Sprintf(openidConfigurationTemplate, blobContainerURL, blobContainerURL))
@@ -362,7 +351,9 @@ func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccount
 		oidcDiscoveryDocumentData,
 		// Note: Blobs can be tagged in this options object but the storage account they reside in is tagged.
 		// Storage containers may not be tagged.
-		&azblob.UploadBufferOptions{},
+		&azblob.UploadBufferOptions{
+			Tags: resourceTags,
+		},
 	)
 	if err != nil {
 		return blobContainerURL, err
@@ -374,7 +365,9 @@ func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccount
 		"",
 		filepath.Join("openid/v1/", jwksFileName),
 		jwksData,
-		&azblob.UploadBufferOptions{},
+		&azblob.UploadBufferOptions{
+			Tags: resourceTags,
+		},
 	)
 	if err != nil {
 		return blobContainerURL, err
@@ -430,7 +423,7 @@ func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oid
 	if err != nil {
 		return "", err
 	}
-	issuerURL, err := uploadOIDCDocuments(client, storageAccountName, storageAccountKey, publicKeyPath, blobContainerName, outputDirAbsPath, dryRun)
+	issuerURL, err := uploadOIDCDocuments(client, storageAccountName, storageAccountKey, publicKeyPath, blobContainerName, outputDirAbsPath, dryRun, resourceTags)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to upload OIDC documents")
 	}

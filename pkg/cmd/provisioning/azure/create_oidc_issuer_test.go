@@ -80,22 +80,24 @@ func TestCreateOIDCIssuer(t *testing.T) {
 		{
 			name: "OIDC issuer created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				existingStorageAccountTags := map[string]*string{
+				// Calling infrastructure creation via createOIDCIssuer() adds CCO's owned tag
+				// to the resourceTags we set.
+				existingResourceTags := map[string]*string{
 					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname0": to.Ptr("testtagvalue0"),
-					"testtagname1": to.Ptr("testtagvalue1"),
 				}
+				// Merge CCO's owned tag with testUserTags.
+				existingResourceTags, _ = mergeResourceTags(testUserTags, existingResourceTags)
 				mockStorageClientBeginCreateResp := armstorage.AccountsClientCreateResponse{
 					Account: armstorage.Account{
 						Name: to.Ptr(testStorageAccountName),
 						ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", testSubscriptionID, testOIDCResourceGroupName, testStorageAccountName)),
-						Tags: existingStorageAccountTags,
+						Tags: existingResourceTags,
 					}}
 				wrapper := mockAzureClientWrapperWithStorageClientBeginCrateResp(mockCtrl, &mockStorageClientBeginCreateResp)
 				mockGetResourceGroupNotFound(wrapper, testOIDCResourceGroupName, testSubscriptionID)
-				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testSubscriptionID)
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingStorageAccountTags)
-				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, existingStorageAccountTags)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingResourceTags)
+				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingResourceTags)
+				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, existingResourceTags)
 				mockStorageAccountListKeys(wrapper, testOIDCResourceGroupName, testStorageAccountName)
 				mockGetBlobContainerNotFound(wrapper, testOIDCResourceGroupName, testStorageAccountName, testBlobContainerName)
 				mockCreateBlobContainerSuccess(wrapper, testOIDCResourceGroupName, testStorageAccountName, testBlobContainerName, testSubscriptionID)
@@ -164,9 +166,11 @@ func TestEnsureResourceGroup(t *testing.T) {
 		{
 			name: "Pre-existing resource group not found, resource group created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags := map[string]*string{}
+				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testOIDCResourceGroupName, testSubscriptionID)
-				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testSubscriptionID)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
 				return wrapper
 			},
 			expectError: false,
@@ -174,13 +178,10 @@ func TestEnsureResourceGroup(t *testing.T) {
 		{
 			name: "Pre-existing resource group found in correct region with expected tags, resource group not created or updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags := map[string]*string{}
+				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				existingTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname0": to.Ptr("testtagvalue0"),
-					"testtagname1": to.Ptr("testtagvalue1"),
-				}
-				mockGetResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingTags)
+				mockGetResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
 				return wrapper
 			},
 			expectError: false,
@@ -188,28 +189,29 @@ func TestEnsureResourceGroup(t *testing.T) {
 		{
 			name: "Pre-existing resource group found in incorrect region, error",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags := map[string]*string{}
+				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				existingTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname0": to.Ptr("testtagvalue0"),
-					"testtagname1": to.Ptr("testtagvalue1"),
-				}
-				mockGetResourceGroupSuccess(wrapper, testOIDCResourceGroupName, "westus3", testSubscriptionID, existingTags)
+				mockGetResourceGroupSuccess(wrapper, testOIDCResourceGroupName, "westus3", testSubscriptionID, resourceTags)
 				return wrapper
 			},
 			expectError: true,
 		},
 		{
-			name: "Pre-existing resource group found with missing tags, update",
+			name: "Pre-existing resource group found with missing and different tags, resource group updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				existingTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"wrongtag":     to.Ptr("wrongvalue"),
-					"testtagname1": to.Ptr("testtagvalue1"),
+				gotResourceTags := map[string]*string{
+					"existingtagname0": to.Ptr("existingtagvalue0"),
+					"testtagname1":     to.Ptr("differentvalue0"),
 				}
-				mockGetResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingTags)
-				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testSubscriptionID)
+				wantResourceTags := map[string]*string{
+					"testtagname0":     to.Ptr("testtagvalue0"),
+					"testtagname1":     to.Ptr("testtagvalue1"),
+					"existingtagname0": to.Ptr("existingtagvalue0"),
+				}
+				mockGetResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, gotResourceTags)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, wantResourceTags)
 				return wrapper
 			},
 			expectError: false,
@@ -239,70 +241,47 @@ func TestEnsureStorageAccount(t *testing.T) {
 		{
 			name: "Pre-existing storage account not found, storage account created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				existingTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname0": to.Ptr("testtagvalue0"),
-					"testtagname1": to.Ptr("testtagvalue1"),
-				}
+				resourceTags := map[string]*string{}
+				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
 				mockStorageClientBeginCreateResp := armstorage.AccountsClientCreateResponse{
 					Account: armstorage.Account{
 						Name: to.Ptr(testStorageAccountName),
 						ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", testSubscriptionID, testOIDCResourceGroupName, testStorageAccountName)),
-						Tags: existingTags,
+						Tags: resourceTags,
 					}}
 				wrapper := mockAzureClientWrapperWithStorageClientBeginCrateResp(mockCtrl, &mockStorageClientBeginCreateResp)
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingTags)
-				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, existingTags)
+				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
+				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, resourceTags)
 				return wrapper
 			},
 			expectError: false,
 		},
 		{
-			name: "Pre-existing storage account found in correct region, storage account not created",
+			name: "Pre-existing storage account found with correct tags, storage account not created or updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags := map[string]*string{}
+				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				existingTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname0": to.Ptr("testtagvalue0"),
-					"testtagname1": to.Ptr("testtagvalue1"),
-				}
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingTags)
+				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
 				return wrapper
 			},
 			expectError: false,
 		},
 		{
-			// This shouldn't be possible since we're listing storage accounts by resource group
-			// and we ensureResourceGroup() of the resource group in which the storage account
-			// would be created / exists and we validate the region within ensureResourceGroup().
-			name: "Pre-existing storage account found in incorrect region",
+			name: "Pre-existing storage account found with missing and different tags, storage account updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				existingTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname0": to.Ptr("testtagvalue0"),
-					"testtagname1": to.Ptr("testtagvalue1"),
+				gotTags := map[string]*string{
+					"testtagname1":     to.Ptr("differentvalue0"),
+					"existingtagname0": to.Ptr("existingtagvalue0"),
 				}
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, "westus3", testSubscriptionID, existingTags)
-				return wrapper
-			},
-			expectError: true,
-		},
-		{
-			name: "Pre-existing storage account found with missing tags, update",
-			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				wrapper := mockAzureClientWrapper(mockCtrl)
-				existingTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname1": to.Ptr("wrongvalue"),
+				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, gotTags)
+				wantTags := map[string]*string{
+					"testtagname1":     to.Ptr("testtagvalue1"),
+					"testtagname0":     to.Ptr("testtagvalue0"),
+					"existingtagname0": to.Ptr("existingtagvalue0"),
 				}
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{testStorageAccountName}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingTags)
-				expectedTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-					"testtagname1": to.Ptr("testtagvalue1"),
-					"testtagname0": to.Ptr("testtagvalue0"),
-				}
-				mockUpdateStorageAccountSuccess(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, expectedTags)
+				mockUpdateStorageAccountSuccess(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, wantTags)
 				return wrapper
 			},
 			expectError: false,
@@ -312,14 +291,8 @@ func TestEnsureStorageAccount(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
-
 			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-			resourceTags := map[string]string{
-				fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): ownedAzureResourceTagValue,
-				"testtagname0": "testtagvalue0",
-				"testtagname1": "testtagvalue1",
-			}
-			err := ensureStorageAccount(mockAzureClientWrapper, testStorageAccountName, testOIDCResourceGroupName, testRegionName, resourceTags)
+			err := ensureStorageAccount(mockAzureClientWrapper, testStorageAccountName, testOIDCResourceGroupName, testRegionName, testUserTags)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
@@ -356,12 +329,17 @@ func mockAzureClientWrapperWithStorageClientBeginCrateResp(mockCtrl *gomock.Cont
 	return wrapper
 }
 
-func mockCreateOrUpdateResourceGroupSuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, subscriptionID string) {
-	wrapper.ResourceGroupsClient.(*mockazure.MockResourceGroupsClient).EXPECT().CreateOrUpdate(gomock.Any(), resourceGroupName, gomock.Any(), gomock.Any()).Return(
+func mockCreateOrUpdateResourceGroupSuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, region, subscriptionID string, tags map[string]*string) {
+	parameters := armresources.ResourceGroup{
+		Location: to.Ptr(region),
+		Tags:     tags,
+	}
+	wrapper.ResourceGroupsClient.(*mockazure.MockResourceGroupsClient).EXPECT().CreateOrUpdate(gomock.Any(), resourceGroupName, parameters, gomock.Any()).Return(
 		armresources.ResourceGroupsClientCreateOrUpdateResponse{
 			ResourceGroup: armresources.ResourceGroup{
 				Name: to.Ptr(resourceGroupName),
 				ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s", subscriptionID, resourceGroupName)),
+				Tags: tags,
 			},
 		},
 		nil, // no error
@@ -451,6 +429,9 @@ func mockStorageAccountBeginCreate(wrapper *azureclients.AzureClientWrapper, res
 }
 
 func mockUpdateStorageAccountSuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, storageAccountName, regionName, subscriptionID string, tags map[string]*string) {
+	accountsClientUpdateParameters := armstorage.AccountUpdateParameters{
+		Tags: tags,
+	}
 	accountsClientUpdateResponse := armstorage.AccountsClientUpdateResponse{
 		Account: armstorage.Account{
 			Name:     to.Ptr(storageAccountName),
@@ -458,7 +439,7 @@ func mockUpdateStorageAccountSuccess(wrapper *azureclients.AzureClientWrapper, r
 			ID:       to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", subscriptionID, resourceGroupName, storageAccountName)),
 			Tags:     tags,
 		}}
-	wrapper.StorageAccountClient.(*mockazure.MockAccountsClient).EXPECT().Update(gomock.Any(), resourceGroupName, storageAccountName, gomock.Any(), gomock.Any()).Return(
+	wrapper.StorageAccountClient.(*mockazure.MockAccountsClient).EXPECT().Update(gomock.Any(), resourceGroupName, storageAccountName, accountsClientUpdateParameters, gomock.Any()).Return(
 		accountsClientUpdateResponse,
 		nil, // no error
 	)
