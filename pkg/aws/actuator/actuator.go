@@ -310,7 +310,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return err
 	}
 	logger := a.getLogger(cr)
-	logger.Debug("running sync")
+	logger.Info("running sync")
 
 	// Should we update anything
 	needsUpdate, err := a.needsUpdate(ctx, cr)
@@ -323,7 +323,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	}
 
 	if !needsUpdate {
-		logger.Debug("credentials already up to date")
+		logger.Info("credentials already up to date")
 		return nil
 	}
 	stsDetected, err := utils.IsTimedTokenCluster(a.Client, logger)

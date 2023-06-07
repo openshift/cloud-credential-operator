@@ -374,6 +374,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	}()
 
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
+	stsDetected, err := utils.IsTimedTokenCluster(r.Client, logger)
 	if err != nil {
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
@@ -382,7 +383,10 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		return reconcile.Result{}, fmt.Errorf("configuration conflict")
 	} else if mode == operatorv1.CloudCredentialsModeManual {
 		logger.Infof("operator set to disabled / manual mode")
-		return reconcile.Result{}, err
+		if !stsDetected {
+			logger.Infof("operator detects STS enabled cluster")
+			return reconcile.Result{}, err
+		}
 	}
 
 	logger.Info("syncing credentials request")
@@ -526,7 +530,6 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	} else {
 		crSecretExists = true
 	}
-	stsDetected, err := utils.IsTimedTokenCluster(r.Client, logger)
 	if stsDetected {
 		// create time-based tokens based on settings in CredentialsRequests
 		logger.Infof("timed token access cluster detected: %t, so not trying to provision with root secret",
