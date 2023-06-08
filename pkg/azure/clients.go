@@ -183,6 +183,7 @@ func (azBlobClient *azBlobClient) UploadBuffer(ctx context.Context, containerNam
 
 type UserAssignedIdentitiesClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, resourceName string, parameters armmsi.Identity, options *armmsi.UserAssignedIdentitiesClientCreateOrUpdateOptions) (armmsi.UserAssignedIdentitiesClientCreateOrUpdateResponse, error)
+	Get(ctx context.Context, resourceGroupName string, resourceName string, options *armmsi.UserAssignedIdentitiesClientGetOptions) (armmsi.UserAssignedIdentitiesClientGetResponse, error)
 	Delete(ctx context.Context, resourceGroupName string, resourceName string, options *armmsi.UserAssignedIdentitiesClientDeleteOptions) (armmsi.UserAssignedIdentitiesClientDeleteResponse, error)
 	NewListByResourceGroupPager(resourceGroupName string, options *armmsi.UserAssignedIdentitiesClientListByResourceGroupOptions) *runtime.Pager[armmsi.UserAssignedIdentitiesClientListByResourceGroupResponse]
 }
@@ -201,6 +202,10 @@ func NewUserAssignedIdentitiesClient(subscriptionID string, cred azcore.TokenCre
 
 func (userAssignedIdentitiesClient *userAssignedIdentitiesClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, resourceName string, parameters armmsi.Identity, options *armmsi.UserAssignedIdentitiesClientCreateOrUpdateOptions) (armmsi.UserAssignedIdentitiesClientCreateOrUpdateResponse, error) {
 	return userAssignedIdentitiesClient.client.CreateOrUpdate(ctx, resourceGroupName, resourceName, parameters, options)
+}
+
+func (userAssignedIdentitiesClient *userAssignedIdentitiesClient) Get(ctx context.Context, resourceGroupName string, resourceName string, options *armmsi.UserAssignedIdentitiesClientGetOptions) (armmsi.UserAssignedIdentitiesClientGetResponse, error) {
+	return userAssignedIdentitiesClient.client.Get(ctx, resourceGroupName, resourceName, options)
 }
 
 type RoleDefinitionsClient interface {

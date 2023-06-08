@@ -70,7 +70,7 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 	// Azure resources can't have a name longer than 128 characters
 	managedIdentityName := fmt.Sprintf("%s-%s-%s", name, credentialsRequest.Spec.SecretRef.Namespace, credentialsRequest.Spec.SecretRef.Name)
 	shortenedManagedIdentityName := provisioning.ShortenName(managedIdentityName, 128)
-	userAssignedManagedIdentity, err := createUserAssignedManagedIdentity(client, shortenedManagedIdentityName, resourceGroupName, region, resourceTags)
+	userAssignedManagedIdentity, err := ensureUserAssignedManagedIdentity(client, shortenedManagedIdentityName, resourceGroupName, region, resourceTags)
 	if err != nil {
 		return err
 	}
@@ -211,20 +211,46 @@ func assignRoleToManagedIdentity(client *azureclients.AzureClientWrapper, manage
 	return nil
 }
 
-// createUserAssignedManagedIdentity creates a user-assigned managed identity with managedIdentityName.
+// ensureUserAssignedManagedIdentity ensures that a user-assigned managed identity with managedIdentityName exists
+// within the provided resourceGroup
 //
-// The user-assigned managed identity will be tagged with "Name": <managedIdentityName> as well as
-// any provided resourceTags.
-func createUserAssignedManagedIdentity(client *azureclients.AzureClientWrapper, managedIdentityName, resourceGroupName, region string, resourceTags map[string]string) (*armmsi.Identity, error) {
+// resourceTags will be updated to match those provided to ensureUserAssignedManagedIdentity if found to be different on the existing user-assigned managed identity.
+func ensureUserAssignedManagedIdentity(client *azureclients.AzureClientWrapper, managedIdentityName, resourceGroupName, region string, resourceTags map[string]string) (*armmsi.Identity, error) {
+	// Check if user-assigned managed identity exists
+	needToCreateUserAssignedManagedIdentity := false
+	var rawResponse *http.Response
+	ctxWithResp := runtime.WithCaptureResponse(context.Background(), &rawResponse)
+	getUserAssignedManagedIdentityResp, err := client.UserAssignedIdentitiesClient.Get(
+		ctxWithResp,
+		resourceGroupName,
+		managedIdentityName,
+		&armmsi.UserAssignedIdentitiesClientGetOptions{})
+	if err != nil {
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) {
+			switch respErr.ErrorCode {
+			case "ResourceNotFound":
+				// User-assigned managed identity wasn't found and will need to be created
+				needToCreateUserAssignedManagedIdentity = true
+			default:
+				return nil, errors.Wrapf(err, "unable to get user-assigned managed identity")
+			}
+		} else {
+			return nil, err
+		}
+	}
+
+	mergedResourceTags, needToUpdateUserAssignedManagedIdentity := mergeResourceTags(resourceTags, getUserAssignedManagedIdentityResp.Tags)
+
+	// Found and validated existing user-assigned managed identity
+	if !needToCreateUserAssignedManagedIdentity && !needToUpdateUserAssignedManagedIdentity {
+		log.Printf("Found existing user-assigned managed identity %s", *getUserAssignedManagedIdentityResp.Identity.ID)
+		return &getUserAssignedManagedIdentityResp.Identity, nil
+	}
+
 	identityParameters := armmsi.Identity{
 		Location: to.Ptr(region),
-		Tags: map[string]*string{
-			nameTagKey: to.Ptr(managedIdentityName),
-		},
-	}
-	// Add provided tags to user-assigned managed identity parameters
-	for tagKey, tagValue := range resourceTags {
-		identityParameters.Tags[tagKey] = to.Ptr(tagValue)
+		Tags:     mergedResourceTags,
 	}
 
 	userAssignedManagedIdentity, err := client.UserAssignedIdentitiesClient.CreateOrUpdate(
@@ -237,7 +263,11 @@ func createUserAssignedManagedIdentity(client *azureclients.AzureClientWrapper, 
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create user-assigned managed identity")
 	}
-	log.Printf("Created user-assigned managed identity %s", *userAssignedManagedIdentity.ID)
+	verb := "Updated"
+	if needToCreateUserAssignedManagedIdentity {
+		verb = "Created"
+	}
+	log.Printf("%s user-assigned managed identity %s", verb, *userAssignedManagedIdentity.ID)
 	return &userAssignedManagedIdentity.Identity, nil
 }
 

@@ -394,6 +394,21 @@ func (mr *MockUserAssignedIdentitiesClientMockRecorder) Delete(ctx, resourceGrou
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockUserAssignedIdentitiesClient)(nil).Delete), ctx, resourceGroupName, resourceName, options)
 }
 
+// Get mocks base method.
+func (m *MockUserAssignedIdentitiesClient) Get(ctx context.Context, resourceGroupName, resourceName string, options *armmsi.UserAssignedIdentitiesClientGetOptions) (armmsi.UserAssignedIdentitiesClientGetResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Get", ctx, resourceGroupName, resourceName, options)
+	ret0, _ := ret[0].(armmsi.UserAssignedIdentitiesClientGetResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Get indicates an expected call of Get.
+func (mr *MockUserAssignedIdentitiesClientMockRecorder) Get(ctx, resourceGroupName, resourceName, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockUserAssignedIdentitiesClient)(nil).Get), ctx, resourceGroupName, resourceName, options)
+}
+
 // NewListByResourceGroupPager mocks base method.
 func (m *MockUserAssignedIdentitiesClient) NewListByResourceGroupPager(resourceGroupName string, options *armmsi.UserAssignedIdentitiesClientListByResourceGroupOptions) *runtime.Pager[armmsi.UserAssignedIdentitiesClientListByResourceGroupResponse] {
 	m.ctrl.T.Helper()
