@@ -58,13 +58,10 @@ var (
 
 	// ownedAzureResourceTagValue is the value of the tag applied to the Azure resources created by ccoctl
 	ownedAzureResourceTagValue = "owned"
-
-	// nameTagKey is the key of the "Name" tag applied to Azure resources created by ccoctl
-	nameTagKey = "Name"
 )
 
 // ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription
-// resourceTags will be updated to match those provided to ensureResourceGroup if found to be different on an existing resource group.
+// resourceTags will be updated to match those provided to ensureResourceGroup if found to be different on the existing resource group.
 func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupName, region string, resourceTags map[string]string) error {
 	// Check if resource group already exists
 	needToCreateResourceGroup := false
@@ -105,7 +102,7 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 		return nil
 	}
 
-	// Create resource group
+	// Create or update resource group
 	createResourceGroupResp, err := client.ResourceGroupsClient.CreateOrUpdate(
 		context.Background(),
 		resourceGroupName,

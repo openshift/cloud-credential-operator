@@ -83,24 +83,18 @@ func TestCreateOIDCIssuer(t *testing.T) {
 		{
 			name: "OIDC issuer created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				// Calling infrastructure creation via createOIDCIssuer() adds CCO's owned tag
-				// to the resourceTags we set.
-				existingResourceTags := map[string]*string{
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-				}
-				// Merge CCO's owned tag with testUserTags.
-				existingResourceTags, _ = mergeResourceTags(testUserTags, existingResourceTags)
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
 				mockStorageClientBeginCreateResp := armstorage.AccountsClientCreateResponse{
 					Account: armstorage.Account{
 						Name: to.Ptr(testStorageAccountName),
 						ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourceGroups/%s/providers/Microsoft.Storage/storageAccounts/%s", testSubscriptionID, testOIDCResourceGroupName, testStorageAccountName)),
-						Tags: existingResourceTags,
+						Tags: resourceTags,
 					}}
 				wrapper := mockAzureClientWrapperWithStorageClientBeginCrateResp(mockCtrl, &mockStorageClientBeginCreateResp)
 				mockGetResourceGroupNotFound(wrapper, testOIDCResourceGroupName, testSubscriptionID)
-				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingResourceTags)
-				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, existingResourceTags)
-				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, existingResourceTags)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testOIDCResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
+				mockStorageAccountListByResourceGroupPager(wrapper, []string{}, testOIDCResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
+				mockStorageAccountBeginCreate(wrapper, testOIDCResourceGroupName, testStorageAccountName, testRegionName, testSubscriptionID, resourceTags)
 				mockStorageAccountListKeys(wrapper, testOIDCResourceGroupName, testStorageAccountName)
 				mockGetBlobContainerNotFound(wrapper, testOIDCResourceGroupName, testStorageAccountName, testBlobContainerName)
 				mockCreateBlobContainerSuccess(wrapper, testOIDCResourceGroupName, testStorageAccountName, testBlobContainerName, testSubscriptionID)

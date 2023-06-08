@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"path/filepath"
 	"testing"
@@ -76,12 +77,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 		{
 			name: "Create managed identities for zero (0) CredentialsRequests",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				resourceTags := map[string]*string{
-					// Calling infrastructure creation via createManagedIdentities() adds CCO's owned tag
-					// to the resourceTags we set.
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-				}
-				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
@@ -114,16 +110,12 @@ func TestCreateManagedIdentities(t *testing.T) {
 		{
 			name: "Create managed identities for one (1) CredentialsRequest",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				resourceTags := map[string]*string{
-					// Calling infrastructure creation via createManagedIdentities() adds CCO's owned tag
-					// to the resourceTags we set.
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-				}
-				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
-				mockCreateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, testSubscriptionID, testOIDCResourceGroupName, []string{"Contributor"})
 				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "142287c2-414a-40c0-8ab3-4c77298346be")
 				mockCreateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
@@ -197,16 +189,12 @@ func TestCreateManagedIdentities(t *testing.T) {
 		{
 			name: "Create managed identities for one (1) CredentialsRequest with a TechPreviewNoUpgrade annotation, --enable-tech-preview set",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				resourceTags := map[string]*string{
-					// Calling infrastructure creation via createManagedIdentities() adds CCO's owned tag
-					// to the resourceTags we set.
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-				}
-				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
-				mockCreateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, testSubscriptionID, testOIDCResourceGroupName, []string{"Contributor"})
 				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "142287c2-414a-40c0-8ab3-4c77298346be")
 				mockCreateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
@@ -245,12 +233,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 		{
 			name: "Create zero (0) managed identities for one (1) CredentialsRequest with a TechPreviewNoUpgrade annotation, --enable-tech-preview not set",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
-				resourceTags := map[string]*string{
-					// Calling infrastructure creation via createManagedIdentities() adds CCO's owned tag
-					// to the resourceTags we set.
-					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
-				}
-				resourceTags, _ = mergeResourceTags(testUserTags, resourceTags)
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
@@ -319,6 +302,66 @@ func TestCreateManagedIdentities(t *testing.T) {
 	}
 }
 
+func TestEnsureUserAssignedManagedIdentity(t *testing.T) {
+	tests := []struct {
+		name                   string
+		mockAzureClientWrapper func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper
+		expectError            bool
+	}{
+		{
+			name: "Pre-existing user-assigned managed identity not found, identity created",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
+				return wrapper
+			},
+		},
+		{
+			name: "Pre-existing user-assigned managed identity found with correct tags, identity not created or updated",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetUserAssignedManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID, resourceTags)
+				return wrapper
+			},
+		},
+		{
+			name: "Pre-existing user-assigned managed identity found with incorrect tags, identity updated",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				gotResourceTags := map[string]*string{
+					"existingtagname0": to.Ptr("existingtagvalue0"),
+					"testtagname1":     to.Ptr("differentvalue0"),
+				}
+				wantResourceTags := map[string]*string{
+					"testtagname0":     to.Ptr("testtagvalue0"),
+					"testtagname1":     to.Ptr("testtagvalue1"),
+					"existingtagname0": to.Ptr("existingtagvalue0"),
+					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
+				}
+				mockGetUserAssignedManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID, gotResourceTags)
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, wantResourceTags)
+				return wrapper
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
+			_, err := ensureUserAssignedManagedIdentity(mockAzureClientWrapper, "testinfraname-secretName1-namespace1", testOIDCResourceGroupName, testRegionName, testUserTags)
+			if test.expectError {
+				require.Error(t, err, "expected error")
+			} else {
+				require.NoError(t, err, "unexpected error")
+			}
+		})
+	}
+}
+
 func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string, isTechPreview bool) error {
 	var credReq string
 	if isTechPreview {
@@ -337,7 +380,51 @@ func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetS
 	return nil
 }
 
-func mockCreateManagedIdentitySuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName, subscriptionID string) {
+func mockGetUserAssignedManagedIdentitySuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName, subscriptionID string, tags map[string]*string) {
+	wrapper.UserAssignedIdentitiesClient.(*mockazure.MockUserAssignedIdentitiesClient).EXPECT().Get(
+		gomock.Any(), // context
+		resourceGroupName,
+		managedIdentityName,
+		gomock.Any(), // options
+	).Return(
+		armmsi.UserAssignedIdentitiesClientGetResponse{
+			Identity: armmsi.Identity{
+				ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s", subscriptionID, resourceGroupName, managedIdentityName)),
+				Name: to.Ptr(managedIdentityName),
+				Properties: &armmsi.UserAssignedIdentityProperties{
+					PrincipalID: to.Ptr("c0ffeeba-be9f-4e32-bb21-42564b35285f"),
+					ClientID:    to.Ptr("testClientID"),
+					TenantID:    to.Ptr("testTenantID"),
+				},
+				Tags: tags,
+			},
+		},
+		nil, // no error
+	)
+}
+
+func mockGetUserAssignedManagedIdentityNotFound(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName string) {
+	respHeader := http.Header{}
+	respHeader.Set("x-ms-error-code", "ResourceNotFound")
+	resp := &http.Response{
+		Header: respHeader,
+	}
+	wrapper.UserAssignedIdentitiesClient.(*mockazure.MockUserAssignedIdentitiesClient).EXPECT().Get(
+		gomock.Any(), // context
+		resourceGroupName,
+		managedIdentityName,
+		gomock.Any(), // options
+	).Return(
+		armmsi.UserAssignedIdentitiesClientGetResponse{},
+		NewResponseError(resp),
+	)
+}
+
+func mockCreateOrUpdateManagedIdentitySuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName, region, subscriptionID string, tags map[string]*string) {
+	parameters := armmsi.Identity{
+		Location: to.Ptr(region),
+		Tags:     tags,
+	}
 	userAssignedIdentitiesClientCreateOrUpdateResponse := armmsi.UserAssignedIdentitiesClientCreateOrUpdateResponse{
 		Identity: armmsi.Identity{
 			ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s", subscriptionID, resourceGroupName, managedIdentityName)),
@@ -347,13 +434,14 @@ func mockCreateManagedIdentitySuccess(wrapper *azureclients.AzureClientWrapper, 
 				ClientID:    to.Ptr("testClientID"),
 				TenantID:    to.Ptr("testTenantID"),
 			},
+			Tags: tags,
 		},
 	}
 	wrapper.UserAssignedIdentitiesClient.(*mockazure.MockUserAssignedIdentitiesClient).EXPECT().CreateOrUpdate(
 		gomock.Any(), // context
 		resourceGroupName,
 		managedIdentityName,
-		gomock.Any(), // parameters
+		parameters,
 		gomock.Any(), // options
 	).Return(
 		userAssignedIdentitiesClientCreateOrUpdateResponse,
