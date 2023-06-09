@@ -446,6 +446,21 @@ func (m *MockRoleDefinitionsClient) EXPECT() *MockRoleDefinitionsClientMockRecor
 	return m.recorder
 }
 
+// GetByID mocks base method.
+func (m *MockRoleDefinitionsClient) GetByID(ctx context.Context, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientGetByIDOptions) (armauthorization.RoleDefinitionsClientGetByIDResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetByID", ctx, roleDefinitionID, options)
+	ret0, _ := ret[0].(armauthorization.RoleDefinitionsClientGetByIDResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetByID indicates an expected call of GetByID.
+func (mr *MockRoleDefinitionsClientMockRecorder) GetByID(ctx, roleDefinitionID, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockRoleDefinitionsClient)(nil).GetByID), ctx, roleDefinitionID, options)
+}
+
 // NewListPager mocks base method.
 func (m *MockRoleDefinitionsClient) NewListPager(scope string, options *armauthorization.RoleDefinitionsClientListOptions) *runtime.Pager[armauthorization.RoleDefinitionsClientListResponse] {
 	m.ctrl.T.Helper()
@@ -498,6 +513,35 @@ func (mr *MockRoleAssignmentsClientMockRecorder) Create(ctx, scope, roleAssignme
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Create", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).Create), ctx, scope, roleAssignmentName, parameters, options)
 }
 
+// Delete mocks base method.
+func (m *MockRoleAssignmentsClient) Delete(ctx context.Context, scope, roleAssignmentName string, options *armauthorization.RoleAssignmentsClientDeleteOptions) (armauthorization.RoleAssignmentsClientDeleteResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, scope, roleAssignmentName, options)
+	ret0, _ := ret[0].(armauthorization.RoleAssignmentsClientDeleteResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockRoleAssignmentsClientMockRecorder) Delete(ctx, scope, roleAssignmentName, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).Delete), ctx, scope, roleAssignmentName, options)
+}
+
+// NewListPager mocks base method.
+func (m *MockRoleAssignmentsClient) NewListPager(options *armauthorization.RoleAssignmentsClientListOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListResponse] {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewListPager", options)
+	ret0, _ := ret[0].(*runtime.Pager[armauthorization.RoleAssignmentsClientListResponse])
+	return ret0
+}
+
+// NewListPager indicates an expected call of NewListPager.
+func (mr *MockRoleAssignmentsClientMockRecorder) NewListPager(options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewListPager", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).NewListPager), options)
+}
+
 // MockFederatedIdentityCredentialsClient is a mock of FederatedIdentityCredentialsClient interface.
 type MockFederatedIdentityCredentialsClient struct {
 	ctrl     *gomock.Controller
@@ -534,6 +578,21 @@ func (m *MockFederatedIdentityCredentialsClient) CreateOrUpdate(ctx context.Cont
 func (mr *MockFederatedIdentityCredentialsClientMockRecorder) CreateOrUpdate(ctx, resourceGroupName, resourceName, federatedIdentityCredentialResourceName, parameters, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockFederatedIdentityCredentialsClient)(nil).CreateOrUpdate), ctx, resourceGroupName, resourceName, federatedIdentityCredentialResourceName, parameters, options)
+}
+
+// Get mocks base method.
+func (m *MockFederatedIdentityCredentialsClient) Get(ctx context.Context, resourceGroupName, resourceName, federatedIdentityCredentialResourceName string, options *armmsi.FederatedIdentityCredentialsClientGetOptions) (armmsi.FederatedIdentityCredentialsClientGetResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Get", ctx, resourceGroupName, resourceName, federatedIdentityCredentialResourceName, options)
+	ret0, _ := ret[0].(armmsi.FederatedIdentityCredentialsClientGetResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Get indicates an expected call of Get.
+func (mr *MockFederatedIdentityCredentialsClientMockRecorder) Get(ctx, resourceGroupName, resourceName, federatedIdentityCredentialResourceName, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockFederatedIdentityCredentialsClient)(nil).Get), ctx, resourceGroupName, resourceName, federatedIdentityCredentialResourceName, options)
 }
 
 // MockMockablePoller is a mock of MockablePoller interface.

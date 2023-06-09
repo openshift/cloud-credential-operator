@@ -166,7 +166,6 @@ type AZBlobClient interface {
 
 type azBlobClient struct {
 	client *azblob.Client
-	mock   bool
 }
 
 func NewAZBlobClientWithSharedKeyCredential(blobContainerURL string, sharedKeyCredential *azblob.SharedKeyCredential, options *azblob.ClientOptions) (AZBlobClient, error) {
@@ -209,6 +208,7 @@ func (userAssignedIdentitiesClient *userAssignedIdentitiesClient) Get(ctx contex
 }
 
 type RoleDefinitionsClient interface {
+	GetByID(ctx context.Context, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientGetByIDOptions) (armauthorization.RoleDefinitionsClientGetByIDResponse, error)
 	NewListPager(scope string, options *armauthorization.RoleDefinitionsClientListOptions) *runtime.Pager[armauthorization.RoleDefinitionsClientListResponse]
 }
 
@@ -228,8 +228,14 @@ func (roleDefinitionsClient *roleDefinitionsClient) NewListPager(scope string, o
 	return roleDefinitionsClient.client.NewListPager(scope, options)
 }
 
+func (roleDefinitionsClient *roleDefinitionsClient) GetByID(ctx context.Context, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientGetByIDOptions) (armauthorization.RoleDefinitionsClientGetByIDResponse, error) {
+	return roleDefinitionsClient.client.GetByID(ctx, roleDefinitionID, options)
+}
+
 type RoleAssignmentsClient interface {
 	Create(ctx context.Context, scope string, roleAssignmentName string, parameters armauthorization.RoleAssignmentCreateParameters, options *armauthorization.RoleAssignmentsClientCreateOptions) (armauthorization.RoleAssignmentsClientCreateResponse, error)
+	NewListPager(options *armauthorization.RoleAssignmentsClientListOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListResponse]
+	Delete(ctx context.Context, scope string, roleAssignmentName string, options *armauthorization.RoleAssignmentsClientDeleteOptions) (armauthorization.RoleAssignmentsClientDeleteResponse, error)
 }
 
 type roleAssignmentsClient struct {
@@ -248,8 +254,17 @@ func (roleAssignmentsClient *roleAssignmentsClient) Create(ctx context.Context, 
 	return roleAssignmentsClient.client.Create(ctx, scope, roleAssignmentName, parameters, options)
 }
 
+func (roleAssignmentsClient *roleAssignmentsClient) NewListPager(options *armauthorization.RoleAssignmentsClientListOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListResponse] {
+	return roleAssignmentsClient.client.NewListPager(options)
+}
+
+func (roleAssignmentsClient *roleAssignmentsClient) Delete(ctx context.Context, scope string, roleAssignmentName string, options *armauthorization.RoleAssignmentsClientDeleteOptions) (armauthorization.RoleAssignmentsClientDeleteResponse, error) {
+	return roleAssignmentsClient.client.Delete(ctx, scope, roleAssignmentName, options)
+}
+
 type FederatedIdentityCredentialsClient interface {
 	CreateOrUpdate(ctx context.Context, resourceGroupName string, resourceName string, federatedIdentityCredentialResourceName string, parameters armmsi.FederatedIdentityCredential, options *armmsi.FederatedIdentityCredentialsClientCreateOrUpdateOptions) (armmsi.FederatedIdentityCredentialsClientCreateOrUpdateResponse, error)
+	Get(ctx context.Context, resourceGroupName string, resourceName string, federatedIdentityCredentialResourceName string, options *armmsi.FederatedIdentityCredentialsClientGetOptions) (armmsi.FederatedIdentityCredentialsClientGetResponse, error)
 }
 
 type federatedIdentityCredentialsClient struct {
@@ -266,6 +281,10 @@ func NewFederatedIdentityCredentialsClient(subscriptionID string, cred azcore.To
 
 func (federatedIdentityCredentialsClient *federatedIdentityCredentialsClient) CreateOrUpdate(ctx context.Context, resourceGroupName string, resourceName string, federatedIdentityCredentialResourceName string, parameters armmsi.FederatedIdentityCredential, options *armmsi.FederatedIdentityCredentialsClientCreateOrUpdateOptions) (armmsi.FederatedIdentityCredentialsClientCreateOrUpdateResponse, error) {
 	return federatedIdentityCredentialsClient.client.CreateOrUpdate(ctx, resourceGroupName, resourceName, federatedIdentityCredentialResourceName, parameters, options)
+}
+
+func (federatedIdentityCredentialsClient *federatedIdentityCredentialsClient) Get(ctx context.Context, resourceGroupName string, resourceName string, federatedIdentityCredentialResourceName string, options *armmsi.FederatedIdentityCredentialsClientGetOptions) (armmsi.FederatedIdentityCredentialsClientGetResponse, error) {
+	return federatedIdentityCredentialsClient.client.Get(ctx, resourceGroupName, resourceName, federatedIdentityCredentialResourceName, options)
 }
 
 type AzureClientWrapper struct {
