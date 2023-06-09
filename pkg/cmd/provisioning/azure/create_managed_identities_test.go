@@ -477,6 +477,19 @@ func mockRoleDefinitionsListPager(wrapper *azureclients.AzureClientWrapper, scop
 	)
 }
 
+func mockRoleAssignmentsListerPager(wrapper *azureclients.AzureClientWrapper, existingRoleAssignmentNames []string) {
+	roleAssignmentsListResult := armauthorization.RoleAssignmentsClientListResponse{
+		RoleAssignmentListResult: armauthorization.RoleAssignmentListResult{
+			Value: []*armauthorization.RoleAssignment{},
+		},
+	}
+	for _, roleAssignmentName := range existingRoleAssignmentNames {
+		roleAssignmentsListResult.Value = append(roleAssignmentsListResult.Value, &armauthorization.RoleAssignment{
+			Name: to.Ptr(roleAssignmentName),
+		})
+	}
+}
+
 func mockCreateRoleAssignmentSuccess(wrapper *azureclients.AzureClientWrapper, scope, roleAssignmentName string) {
 	roleAssignmentsClientCreateResponse := armauthorization.RoleAssignmentsClientCreateResponse{
 		// This response is currently unused (read: stomped) in ccoctl's implementation and as such,

@@ -60,8 +60,8 @@ var (
 	ownedAzureResourceTagValue = "owned"
 )
 
-// ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription
-// resourceTags will be updated to match those provided to ensureResourceGroup if found to be different on the existing resource group.
+// ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription.
+// Resource group tags will be updated to include provided resourceTags if found to be missing from existing resource group tags.
 func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupName, region string, resourceTags map[string]string) error {
 	// Check if resource group already exists
 	needToCreateResourceGroup := false
@@ -143,8 +143,8 @@ func mergeResourceTags(one map[string]string, two map[string]*string) (map[strin
 	return mergedResourceTags, changed
 }
 
-// ensureStorageAccount ensures that a storage account with storageAccountName exists within the provided resource group
-// resourceTags will be updated to match those provided if found to be different on an existing storage account.
+// ensureStorageAccount ensures that a storage account with storageAccountName exists within the provided resource group.
+// Storage account tags will be updated to include provided resourceTags if found to be missing from existing storage account tags.
 func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccountName, resourceGroupName, region string, resourceTags map[string]string) error {
 	var existingStorageAccount *armstorage.Account
 	listAccounts := client.StorageAccountClient.NewListByResourceGroupPager(resourceGroupName, &armstorage.AccountsClientListByResourceGroupOptions{})

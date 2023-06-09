@@ -54,6 +54,10 @@ type: Opaque`
 // CredentialsRequest.Spec.ProviderSpec.RoleBindings. Role assignment will be scoped within the resource
 // groups provided as scopingResourceGroupNames.
 //
+// Roles which are assigned to pre-existing user-assigned managed identities found to exist for
+// processed CredentialsRequests will be removed if not enumerated within the CredentialsRequest
+// to idempotently align with the desired state.
+//
 // A federated identity credential will be created for each service account enumerated within
 // CredentialsRequest.Spec.ServiceAccountNames.
 //
@@ -88,14 +92,93 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		}
 	}
 
+	// List role assignments by the user-assigned managed identity principal ID
+	// This list of role assignments are roles which are assigned to the user-assigned managed identity
+	existingRoleAssignments := []*armauthorization.RoleAssignment{}
+	listRoleAssignments := client.RoleAssignmentClient.NewListPager(
+		&armauthorization.RoleAssignmentsClientListOptions{
+			Filter: to.Ptr(fmt.Sprintf("principalId eq '%s'", *userAssignedManagedIdentity.Properties.PrincipalID)),
+		},
+	)
+	for listRoleAssignments.More() {
+		pageResponse, err := listRoleAssignments.NextPage(context.Background())
+		if err != nil {
+			return err
+		}
+		existingRoleAssignments = append(existingRoleAssignments, pageResponse.RoleAssignmentListResult.Value...)
+	}
+
+	// shouldExistRoleAssignments are role assignments we validated should exist or were created.
+	// shouldExistRoleAssignments are used to determine which role assignments need to be deleted as
+	// compared to the roleAssignments listed above.
+	shouldExistRoleAssignments := []*armauthorization.RoleAssignment{}
+
 	// Assign requested roles to the user-assigned managed identity
 	// Role assignment will be scoped to the resource group identified by scopingResourceGroupName
 	for _, roleBinding := range crProviderSpec.RoleBindings {
+		//log.Printf("processing role %v", roleBinding.Role)
 		for _, scopingResourceGroupName := range scopingResourceGroupNames {
 			scope := "/subscriptions/" + subscriptionID + "/resourceGroups/" + scopingResourceGroupName
-			err := assignRoleToManagedIdentity(client, *userAssignedManagedIdentity.Properties.PrincipalID, roleBinding.Role, scope, subscriptionID)
+			// Get Azure role definition for the role name (roleBinding.Role)
+			roleDefinition, err := getRoleDefinitionByRoleName(client, roleBinding.Role, subscriptionID)
 			if err != nil {
-				return errors.Wrapf(err, "failed to assign role %s to user-assigned managed identity", roleBinding.Role)
+				return errors.Wrap(err, fmt.Sprintf("failed to get role definition for role %s", roleBinding.Role))
+			}
+
+			// Determine if the role definition's ID is already assigned to the user-assigned managed identity
+			// at the specified scope
+			roleAssignmentExists := false
+			for _, roleAssignment := range existingRoleAssignments {
+				if *roleDefinition.Properties.RoleName == roleBinding.Role && *roleAssignment.Properties.RoleDefinitionID == *roleDefinition.ID && *roleAssignment.Properties.Scope == scope {
+					roleAssignmentExists = true
+					log.Printf("Found existing role assignment %s for user-assigned managed identity with principal ID %s at scope %s", roleBinding.Role, *userAssignedManagedIdentity.Properties.PrincipalID, scope)
+					shouldExistRoleAssignments = append(shouldExistRoleAssignments, roleAssignment)
+					break
+				}
+			}
+
+			if !roleAssignmentExists {
+				// Assign role to identity at scope
+				roleAssignment, err := createRoleAssignment(
+					client,
+					*userAssignedManagedIdentity.Properties.PrincipalID,
+					*roleDefinition.ID,
+					roleBinding.Role,
+					scope,
+					subscriptionID,
+				)
+				if err != nil {
+					return errors.Wrapf(err, "failed to assign role %s to user-assigned managed identity", roleBinding.Role)
+				}
+				shouldExistRoleAssignments = append(shouldExistRoleAssignments, roleAssignment)
+			}
+		}
+	}
+
+	//log.Printf("there are %v existing role assignments", len(existingRoleAssignments))
+	//log.Printf("there are %v role assignments that should exist", len(shouldExistRoleAssignments))
+
+	for _, existingRoleAssignment := range existingRoleAssignments {
+		found := false
+		for _, shouldExistRoleAssignment := range shouldExistRoleAssignments {
+			if shouldExistRoleAssignment.Name == existingRoleAssignment.Name {
+				found = true
+			}
+		}
+		if !found {
+			roleDefinition, err := getRoleDefinitionByID(client, *existingRoleAssignment.Properties.RoleDefinitionID)
+			if err != nil {
+				return errors.Wrapf(err, "failed to get role definition with role definition ID %s", *existingRoleAssignment.Properties.RoleDefinitionID)
+			}
+			err = deleteRoleAssignment(client,
+				*userAssignedManagedIdentity.Properties.PrincipalID,
+				*existingRoleAssignment.Name,
+				*roleDefinition.Properties.RoleName,
+				*existingRoleAssignment.Properties.Scope,
+				subscriptionID,
+			)
+			if err != nil {
+				return errors.Wrapf(err, "failed to unassign role with ID %s from user-assigned managed identity", *roleDefinition.Properties.RoleName)
 			}
 		}
 	}
@@ -112,11 +195,11 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 	return nil
 }
 
-// getRoleDefinition lists role definitions within the scope of the Azure subscription identified by subscriptionID
+// getRoleDefinitionByRoleName lists role definitions within the scope of the Azure subscription identified by subscriptionID
 // and returns the armauthorization.RoleDefinition with a name matching the provided roleName.
 //
 // If multiple roles are found matching the roleName this will result in an error.
-func getRoleDefinition(client *azureclients.AzureClientWrapper, roleName, subscriptionID string) (*armauthorization.RoleDefinition, error) {
+func getRoleDefinitionByRoleName(client *azureclients.AzureClientWrapper, roleName, subscriptionID string) (*armauthorization.RoleDefinition, error) {
 	listRoles := client.RoleDefinitionsClient.NewListPager(
 		"/subscriptions/"+subscriptionID,
 		&armauthorization.RoleDefinitionsClientListOptions{
@@ -141,39 +224,45 @@ func getRoleDefinition(client *azureclients.AzureClientWrapper, roleName, subscr
 	}
 }
 
-// assignRoleToManagedIdentity assigns the Azure role with roleName within the provided subscriptionID to the
-// managed identity identified by managedIdentityPrincipalID within the provided scope.
+// getRoleDefinitionByID gets the role definition identified by roleDefinitionID.
+func getRoleDefinitionByID(client *azureclients.AzureClientWrapper, roleDefinitionID string) (*armauthorization.RoleDefinition, error) {
+	roleDefinitionGetResp, err := client.RoleDefinitionsClient.GetByID(
+		context.Background(),
+		roleDefinitionID,
+		&armauthorization.RoleDefinitionsClientGetByIDOptions{},
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &roleDefinitionGetResp.RoleDefinition, nil
+}
+
+// createRoleAssignment assigns the Azure role with roleName/roleID to the managed identity identified by
+// managedIdentityPrincipalID within the provided scope.
 //
 // Scope is a string such as /subscriptions/<subscriptionID> which represents anything within the subscription.
 // This scope can be restricted within a resourceGroup such as /subscriptions/<subscriptionID>/resourceGroups/<resourceGroupName>.
-func assignRoleToManagedIdentity(client *azureclients.AzureClientWrapper, managedIdentityPrincipalID, roleName, scope, subscriptionID string) error {
-	targetRole, err := getRoleDefinition(client, roleName, subscriptionID)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to get role definition for role %s", roleName))
-	}
-
+func createRoleAssignment(client *azureclients.AzureClientWrapper, managedIdentityPrincipalID, roleID, roleName, scope, subscriptionID string) (*armauthorization.RoleAssignment, error) {
+	// Create a unique name for the role assignment
 	uuid, err := uuid.NewV4()
 	if err != nil {
-		return fmt.Errorf("failed to generate UUID for user-assigned identity role assignment: %v", err)
+		return nil, fmt.Errorf("failed to generate UUID for user-assigned identity role assignment: %v", err)
 	}
-	// Create a unique name for the role assignment
 	roleAssignmentName := uuid.String()
+
 	var rawResponse *http.Response
 	// Role assignment can fail due to a replication delay after creating the user-assigned managed identity
-	// Try up to 20 times with a 10 second delay each attempt
-	for i := 0; i < 20; i++ {
+	// Try up to 6 times with a 10 second delay between each attempt, up to 1 minute.
+	for i := 0; i < 6; i++ {
 		ctxWithResp := runtime.WithCaptureResponse(context.Background(), &rawResponse)
-		// armauthorization.RoleAssignmentsClientCreateResponse stomped because we don't need any information from
-		// the response however, ccoctl could potentially output the role assignment's ID similarly to other info
-		// which is log.Print'd
-		_, err = client.RoleAssignmentClient.Create(
+		roleAssignmentCreateResponse, err := client.RoleAssignmentClient.Create(
 			ctxWithResp,
 			scope,
 			roleAssignmentName,
 			armauthorization.RoleAssignmentCreateParameters{
 				Properties: &armauthorization.RoleAssignmentProperties{
 					PrincipalID:      to.Ptr(managedIdentityPrincipalID),
-					RoleDefinitionID: targetRole.ID,
+					RoleDefinitionID: to.Ptr(roleID),
 				},
 			},
 			&armauthorization.RoleAssignmentsClientCreateOptions{},
@@ -181,12 +270,9 @@ func assignRoleToManagedIdentity(client *azureclients.AzureClientWrapper, manage
 		if err != nil {
 			var respErr *azcore.ResponseError
 			if errors.As(err, &respErr) {
-				switch respErr.ErrorCode {
-				case "PrincipalNotFound":
-					// Replication delay. The identity we just created can't be found yet so we need to retry.
-					// TODO: Would it be better to display a message like this while we retry or would it be
-					//       acceptable to output a log line only once we've finished assigning the role?
-					if i == 19 {
+				if respErr.ErrorCode == "PrincipalNotFound" {
+					// The identity ccoctl just created can't be found yet due to a replication delay so we need to retry.
+					if i == 5 {
 						log.Fatal("Timed out assigning role to user-assigned managed identity, this is most likely due to a replication delay following creation of the user-assigned managed identity, please retry")
 						break
 					} else {
@@ -194,20 +280,39 @@ func assignRoleToManagedIdentity(client *azureclients.AzureClientWrapper, manage
 						time.Sleep(10 * time.Second)
 						continue
 					}
-				case "RoleAssignmentExists":
-					// Role assignment already present, continue
+				} else if respErr.ErrorCode == "RoleAssignmentExists" {
+					log.Printf("Found existing role assignment %s for user-assigned managed identity with principal ID %s at scope %s", roleName, managedIdentityPrincipalID, scope)
 					break
-				default:
-					return err
+				} else {
+					return nil, err
 				}
 			} else {
-				return err
+				return nil, err
 			}
 		} else {
-			break
+			log.Printf("Created role assignment for role %s with user-assigned managed identity principal ID %s at scope %s", roleName, managedIdentityPrincipalID, scope)
+			return &roleAssignmentCreateResponse.RoleAssignment, nil
 		}
 	}
-	log.Printf("Assigned %s role to user-assigned managed identity with principal ID %s with scope %s", roleName, managedIdentityPrincipalID, scope)
+	return nil, nil
+}
+
+// deleteRoleAssignment deletes the Azure role assignment with roleID and scope from the managed identity
+// identified by managedIdentityPrincipalID
+//
+// Scope is a string such as /subscriptions/<subscriptionID> which represents anything within the subscription.
+// This scope can be restricted within a resourceGroup such as /subscriptions/<subscriptionID>/resourceGroups/<resourceGroupName>.
+func deleteRoleAssignment(client *azureclients.AzureClientWrapper, managedIdentityPrincipalID, roleID, roleName, scope, subscriptionID string) error {
+	_, err := client.RoleAssignmentClient.Delete(
+		context.Background(),
+		scope,
+		roleID,
+		&armauthorization.RoleAssignmentsClientDeleteOptions{},
+	)
+	if err != nil {
+		return err
+	}
+	log.Printf("Deleted role assignment for role %s with user-assigned managed identity with principal ID %s at scope %s", roleName, managedIdentityPrincipalID, scope)
 	return nil
 }
 
@@ -287,6 +392,39 @@ func createFederatedIdentityCredential(client *azureclients.AzureClientWrapper, 
 			Subject: to.Ptr(fmt.Sprintf("system:serviceaccount:%s:%s", serviceAccountNamespace, serviceAccountName)),
 		},
 	}
+
+	var (
+		rawResponse                             *http.Response
+		needToCreateFederatedIdentityCredential bool
+	)
+	ctxWithResp := runtime.WithCaptureResponse(context.Background(), &rawResponse)
+	federatedIdentityCredentialGetResp, err := client.FederatedIdentityCredentialsClient.Get(
+		ctxWithResp,
+		resourceGroupName,
+		managedIdentityName,
+		serviceAccountName,
+		&armmsi.FederatedIdentityCredentialsClientGetOptions{},
+	)
+	if err != nil {
+		var respErr *azcore.ResponseError
+		if errors.As(err, &respErr) {
+			switch respErr.ErrorCode {
+			case "ResourceNotFound":
+				// Federated identity credential wasn't found and will need to be created
+				needToCreateFederatedIdentityCredential = true
+			default:
+				return errors.Wrapf(err, "unable to get federated identity credential")
+			}
+		} else {
+			return err
+		}
+	}
+
+	if !needToCreateFederatedIdentityCredential {
+		log.Printf("Found existing federated identity credential %s", *federatedIdentityCredentialGetResp.FederatedIdentityCredential.ID)
+		return nil
+	}
+
 	federatedIdentityCredential, err := client.FederatedIdentityCredentialsClient.CreateOrUpdate(
 		context.Background(),
 		resourceGroupName,
