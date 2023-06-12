@@ -62,6 +62,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.5.1
 	github.com/microsoft/kiota-authentication-azure-go v0.6.0
 	github.com/microsoftgraph/msgraph-sdk-go v0.59.0
+	k8s.io/klog/v2 v2.90.1
 	sigs.k8s.io/e2e-framework v0.2.0
 )
 
@@ -148,7 +149,6 @@ require (
 	k8s.io/apiextensions-apiserver v0.26.1 // indirect
 	k8s.io/component-base v0.26.1 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
-	k8s.io/klog/v2 v2.90.1 // indirect
 	k8s.io/kube-aggregator v0.26.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20221012153701-172d655c2280 // indirect
 	sigs.k8s.io/json v0.0.0-20220713155537-f223a00ba0e2 // indirect
