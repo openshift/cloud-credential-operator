@@ -326,7 +326,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
-	stsDetected, err := utils.IsTimedTokenCluster(a.Client, logger)
+	stsDetected := utils.IsTimedTokenCluster(a.Client, logger)
 	if stsDetected {
 		logger.Info("actuator detected STS enabled cluster making secret")
 		if cr.Spec.CloudTokenString != "" {
