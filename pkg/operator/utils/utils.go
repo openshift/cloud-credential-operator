@@ -77,30 +77,30 @@ func LoadInfrastructureTopology(c client.Client, logger log.FieldLogger) (config
 // 1) Is Infra AWS?; 2) Is credential mode Manual; 3) Is serviceAccountIssuer non-empty
 // 1, 2 and 3 must all be true for an AWS-based STS-enabled cluster for instance
 // TODO other infra will have slightly different tests for TAT enablement that can be integrated into this function
-func IsTimedTokenCluster(c client.Client, logger log.FieldLogger) (bool, error) {
+func IsTimedTokenCluster(c client.Client, logger log.FieldLogger) bool {
 	config, err := GetAuth(c)
 	if err != nil {
 		logger.WithError(err).Error("error loading authentication config")
-		return false, err
+		return false
 	}
 	infra, err := GetInfrastructure(c)
 	if err != nil {
 		logger.WithError(err).Error("error loading Infrastructure topology")
-		return false, err
+		return false
 	}
 	if infra.Status.PlatformStatus.AWS != nil {
 		mode, _, err := GetOperatorConfiguration(c, logger)
 		if err != nil {
 			logger.WithError(err).Error("error loading CCO configuration to determine mode")
-			return false, err
+			return false
 		}
 		if mode == "Manual" {
 			if config.Spec.ServiceAccountIssuer != "" {
-				return true, nil
+				return true
 			}
 		}
 	}
-	return false, nil
+	return false
 }
 
 // LoadInfrastructureName loads the cluster Infrastructure config and returns the infra name
