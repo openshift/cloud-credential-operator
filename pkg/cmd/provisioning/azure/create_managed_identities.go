@@ -409,7 +409,7 @@ func createFederatedIdentityCredential(client *azureclients.AzureClientWrapper, 
 		var respErr *azcore.ResponseError
 		if errors.As(err, &respErr) {
 			switch respErr.ErrorCode {
-			case "ResourceNotFound":
+			case "NotFound":
 				// Federated identity credential wasn't found and will need to be created
 				needToCreateFederatedIdentityCredential = true
 			default:
