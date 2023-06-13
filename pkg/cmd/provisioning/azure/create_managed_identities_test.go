@@ -65,7 +65,6 @@ spec:
   - testServiceAccount2`
 
 	testManagedIdentityPrincipalID = "prinicpal-be9f-4e32-bb21-42564b35285f"
-	testRoleDefinitionID           = "roledef-be9f-4e32-bb21-42564b35285f"
 	testScopingResourceGroupNames  = []string{testInfraName}
 )
 
