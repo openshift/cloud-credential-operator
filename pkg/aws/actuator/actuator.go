@@ -57,6 +57,10 @@ const (
 
 	secretDataAccessKey = "aws_access_key_id"
 	secretDataSecretKey = "aws_secret_access_key"
+
+	awsSTSCredsTemplate = `sts_regional_endpoints = regional
+role_arn = %s
+web_identity_token_file = %s`
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
@@ -326,11 +330,18 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
-	stsDetected := utils.IsTimedTokenCluster(a.Client, logger)
+	stsDetected, _ := utils.IsTimedTokenCluster(a.Client, logger)
 	if stsDetected {
-		logger.Info("actuator detected STS enabled cluster making secret")
-		if cr.Spec.CloudTokenString != "" {
-			err = a.createSecret(cr.Spec.CloudTokenString, cr.Spec.CloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger)
+		if a.Codec == nil {
+			return fmt.Errorf("invalid codec, nil value")
+		}
+		logger.Info("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
+		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(a.Codec, cr)
+		if err != nil {
+			return err
+		}
+		if awsSTSIAMRoleARN != "" {
+			err = a.createSecret(awsSTSIAMRoleARN, cr.Spec.CloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger)
 		}
 		if err != nil {
 			return err
@@ -384,20 +395,16 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 // a path to the JWT token: spec.cloudTokenPath
 // a spec.SecretRef.Name
 // a cr.Spec.SecretRef.Namespace
-func (a *AWSActuator) createSecret(cloudTokenString string, cloudTokenPath string, secretRef string,
+func (a *AWSActuator) createSecret(awsSTSIAMRoleARN string, cloudTokenPath string, secretRef string,
 	secretRefNamespace string, log log.FieldLogger) error {
 	log.Infof("creating secret")
-	credsTemplate :=
-		`sts_regional_endpoints = regional
-    role_arn = %s
-    web_identity_token_file = %s`
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretRef,
 			Namespace: secretRefNamespace,
 		},
 		StringData: map[string]string{
-			"credentials": fmt.Sprintf(credsTemplate, cloudTokenString, cloudTokenPath),
+			"credentials": fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath),
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
@@ -406,7 +413,6 @@ func (a *AWSActuator) createSecret(cloudTokenString string, cloudTokenPath strin
 		log.Errorf("error creating secret")
 		return err
 	}
-	log.Info("secret created successfully")
 	return nil
 }
 
@@ -1352,6 +1358,14 @@ func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 			Info("actuator handles only aws credentials")
 	}
 	return isAWS, nil
+}
+
+func awsSTSIAMRoleARN(codec *minterv1.ProviderCodec, credentialsRequest *minterv1.CredentialsRequest) (string, error) {
+	awsSpec, err := DecodeProviderSpec(codec, credentialsRequest)
+	if err != nil {
+		return "", err
+	}
+	return awsSpec.STSIAMRoleARN, nil
 }
 
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type
