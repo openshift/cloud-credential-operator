@@ -13,6 +13,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
+	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	azureclients "github.com/openshift/cloud-credential-operator/pkg/azure"
 	mockazure "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -62,6 +63,10 @@ spec:
   serviceAccountNames:
   - testServiceAccount1
   - testServiceAccount2`
+
+	testManagedIdentityPrincipalID = "prinicpal-be9f-4e32-bb21-42564b35285f"
+	testRoleDefinitionID           = "roledef-be9f-4e32-bb21-42564b35285f"
+	testScopingResourceGroupNames  = []string{testInfraName}
 )
 
 func TestCreateManagedIdentities(t *testing.T) {
@@ -116,10 +121,25 @@ func TestCreateManagedIdentities(t *testing.T) {
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
 				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
 				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
-				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, testSubscriptionID, testOIDCResourceGroupName, []string{"Contributor"})
-				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "142287c2-414a-40c0-8ab3-4c77298346be")
-				mockCreateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
-				mockCreateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2", testSubscriptionID)
+				mockRoleAssignmentsListPager(wrapper,
+					[]*armauthorization.RoleAssignment{},
+					testManagedIdentityPrincipalID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("ContibutorRoleDefinitionID"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "ContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Contributor"),
+							},
+						},
+					})
+				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "RandomContributorRoleAssignmentNameGUID")
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2", testSubscriptionID)
 				return wrapper
 			},
 			setup: func(t *testing.T) string {
@@ -195,10 +215,25 @@ func TestCreateManagedIdentities(t *testing.T) {
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
 				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
 				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
-				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, testSubscriptionID, testOIDCResourceGroupName, []string{"Contributor"})
-				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "142287c2-414a-40c0-8ab3-4c77298346be")
-				mockCreateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
-				mockCreateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2", testSubscriptionID)
+				mockRoleAssignmentsListPager(wrapper,
+					[]*armauthorization.RoleAssignment{},
+					testManagedIdentityPrincipalID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("ContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "ContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Contributor"),
+							},
+						},
+					})
+				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "RandomContributorRoleAssignmentNameGUID")
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2", testSubscriptionID)
 				return wrapper
 			},
 			enableTechPreview: true,
@@ -362,6 +397,249 @@ func TestEnsureUserAssignedManagedIdentity(t *testing.T) {
 	}
 }
 
+func TestEnsureFederatedIdentityCredential(t *testing.T) {
+	tests := []struct {
+		name                   string
+		mockAzureClientWrapper func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper
+		expectError            bool
+	}{
+		{
+			name: "Pre-existing federated identity credential not found, credential created",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				return wrapper
+			},
+		},
+		{
+			name: "Pre-existing federated identity credential found with correct audience, subject and issuer URL, credential not created or updated",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "openshift", testIssuerURL, "system:serviceaccount:namespace1:testServiceAccount1")
+				return wrapper
+			},
+		},
+		{
+			name: "Pre-existing federated identity credential found with incorrect audience, credential updated",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "wrongaudience", testIssuerURL, "system:serviceaccount:namespace1:testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				return wrapper
+			},
+		},
+		{
+			name: "Pre-existing federated identity credential found with incorrect subject, credential updated",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "openshift", testIssuerURL, "system:serviceaccount:wrongnamespace:testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				return wrapper
+			},
+		},
+		{
+			name: "Pre-existing federated identity credential found with incorrect issuer URL, credential updated",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "openshift", "http://hue.hae", "system:serviceaccount:namespace1:testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				return wrapper
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
+			err := ensureFederatedIdentityCredential(mockAzureClientWrapper, "testinfraname-secretName1-namespace1", testIssuerURL, "namespace1", "testServiceAccount1", testOIDCResourceGroupName)
+			if test.expectError {
+				require.Error(t, err, "expected error")
+			} else {
+				require.NoError(t, err, "unexpected error")
+			}
+		})
+	}
+}
+
+func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
+	tests := []struct {
+		name                        string
+		mockAzureClientWrapper      func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper
+		existingRoleAssignmentNames []string
+		roleBindings                []credreqv1.RoleBinding
+		expectError                 bool
+	}{
+		{
+			name: "Managed identity has expected role assignments, no role assignments created, no role assignments deleted",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+				{
+					Role: "DNS Zone Contributor",
+				},
+			},
+			existingRoleAssignmentNames: []string{},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListPager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						{
+							Name: to.Ptr("DNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionID"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("DNSZoneContributorRoleDefinitionID"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
+			name: "Managed identity has extra role assignments not enumerated in RoleBindings, extra role assignments deleted",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListPager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						// This existing role assignment isn't enumerated in the credreqv1.RoleBindings
+						{
+							Name: to.Ptr("DNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				mockGetRoleDefinitionByIDSuccess(wrapper, fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID"), "DNS Zone Contributor")
+				mockDeleteRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "DNSZoneContibutorRoleAssignmentName")
+				return wrapper
+			},
+		},
+		{
+			name: "Managed identity has missing role assignments, missing role assignments created",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+				// This RoleBinding won't be found in the RoleAssignments listed for the managed identity
+				{
+					Role: "DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListPager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("DNSZoneContributorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("DNS Zone Contributor"),
+							},
+						},
+					})
+				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "RandomRoleAssignmentNameGUID")
+				return wrapper
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
+			err := ensureRolesAssignedToManagedIdentity(mockAzureClientWrapper, testManagedIdentityPrincipalID, testSubscriptionID, test.roleBindings, testScopingResourceGroupNames)
+			if test.expectError {
+				require.Error(t, err, "expected error")
+			} else {
+				require.NoError(t, err, "unexpected error")
+			}
+		})
+	}
+}
+
 func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string, isTechPreview bool) error {
 	var credReq string
 	if isTechPreview {
@@ -392,7 +670,7 @@ func mockGetUserAssignedManagedIdentitySuccess(wrapper *azureclients.AzureClient
 				ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s", subscriptionID, resourceGroupName, managedIdentityName)),
 				Name: to.Ptr(managedIdentityName),
 				Properties: &armmsi.UserAssignedIdentityProperties{
-					PrincipalID: to.Ptr("c0ffeeba-be9f-4e32-bb21-42564b35285f"),
+					PrincipalID: to.Ptr(testManagedIdentityPrincipalID),
 					ClientID:    to.Ptr("testClientID"),
 					TenantID:    to.Ptr("testTenantID"),
 				},
@@ -430,7 +708,7 @@ func mockCreateOrUpdateManagedIdentitySuccess(wrapper *azureclients.AzureClientW
 			ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s", subscriptionID, resourceGroupName, managedIdentityName)),
 			Name: to.Ptr(managedIdentityName),
 			Properties: &armmsi.UserAssignedIdentityProperties{
-				PrincipalID: to.Ptr("c0ffeeba-be9f-4e32-bb21-42564b35285f"),
+				PrincipalID: to.Ptr(testManagedIdentityPrincipalID),
 				ClientID:    to.Ptr("testClientID"),
 				TenantID:    to.Ptr("testTenantID"),
 			},
@@ -449,17 +727,11 @@ func mockCreateOrUpdateManagedIdentitySuccess(wrapper *azureclients.AzureClientW
 	)
 }
 
-func mockRoleDefinitionsListPager(wrapper *azureclients.AzureClientWrapper, scope, subscriptionID, resourceGroupName string, existingRoleDefinitionNames []string) {
+func mockRoleDefinitionsListPager(wrapper *azureclients.AzureClientWrapper, scope string, existingRoleDefinitions []*armauthorization.RoleDefinition) {
 	roleDefinitionsListResult := armauthorization.RoleDefinitionsClientListResponse{
 		RoleDefinitionListResult: armauthorization.RoleDefinitionListResult{
-			Value: []*armauthorization.RoleDefinition{},
+			Value: existingRoleDefinitions,
 		},
-	}
-	for _, roleDefinitionName := range existingRoleDefinitionNames {
-		roleDefinitionsListResult.Value = append(roleDefinitionsListResult.Value, &armauthorization.RoleDefinition{
-			Name: to.Ptr(roleDefinitionName),
-			ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/c0ffeeba-be80-42a0-ab88-20f7382dd24c", subscriptionID)),
-		})
 	}
 
 	wrapper.RoleDefinitionsClient.(*mockazure.MockRoleDefinitionsClient).EXPECT().NewListPager(
@@ -477,23 +749,47 @@ func mockRoleDefinitionsListPager(wrapper *azureclients.AzureClientWrapper, scop
 	)
 }
 
-func mockRoleAssignmentsListerPager(wrapper *azureclients.AzureClientWrapper, existingRoleAssignmentNames []string) {
+func mockRoleAssignmentsListPager(wrapper *azureclients.AzureClientWrapper, existingRoleAssignments []*armauthorization.RoleAssignment, managedIdentityPrincipalID string) {
 	roleAssignmentsListResult := armauthorization.RoleAssignmentsClientListResponse{
 		RoleAssignmentListResult: armauthorization.RoleAssignmentListResult{
-			Value: []*armauthorization.RoleAssignment{},
+			Value: existingRoleAssignments,
 		},
 	}
-	for _, roleAssignmentName := range existingRoleAssignmentNames {
-		roleAssignmentsListResult.Value = append(roleAssignmentsListResult.Value, &armauthorization.RoleAssignment{
-			Name: to.Ptr(roleAssignmentName),
-		})
+	options := armauthorization.RoleAssignmentsClientListOptions{
+		Filter: to.Ptr(fmt.Sprintf("principalId eq '%s'", managedIdentityPrincipalID)),
 	}
+	wrapper.RoleAssignmentClient.(*mockazure.MockRoleAssignmentsClient).EXPECT().NewListPager(&options).Return(
+		runtime.NewPager(runtime.PagingHandler[armauthorization.RoleAssignmentsClientListResponse]{
+			More: func(current armauthorization.RoleAssignmentsClientListResponse) bool {
+				return current.NextLink != nil
+			},
+			Fetcher: func(ctx context.Context, current *armauthorization.RoleAssignmentsClientListResponse) (armauthorization.RoleAssignmentsClientListResponse, error) {
+				return roleAssignmentsListResult, nil
+			},
+		}),
+	)
+}
+
+func mockRoleDefinitionGetByIDSuccess(wrapper *azureclients.AzureClientWrapper, roleDefinitionID, roleName string) {
+	roleDefinitionGetByIDResponse := armauthorization.RoleDefinitionsClientGetByIDResponse{
+		RoleDefinition: armauthorization.RoleDefinition{
+			Properties: &armauthorization.RoleDefinitionProperties{
+				RoleName: to.Ptr(roleName),
+			},
+		},
+	}
+	wrapper.RoleDefinitionsClient.(*mockazure.MockRoleDefinitionsClient).EXPECT().GetByID(
+		gomock.Any(), // context
+		roleDefinitionID,
+		gomock.Any(), // options
+	).Return(
+		roleDefinitionGetByIDResponse,
+		nil, // no error
+	)
 }
 
 func mockCreateRoleAssignmentSuccess(wrapper *azureclients.AzureClientWrapper, scope, roleAssignmentName string) {
 	roleAssignmentsClientCreateResponse := armauthorization.RoleAssignmentsClientCreateResponse{
-		// This response is currently unused (read: stomped) in ccoctl's implementation and as such,
-		// the values are unimportant.
 		RoleAssignment: armauthorization.RoleAssignment{
 			ID:   to.Ptr("/role/assignment/ID/path"),
 			Name: to.Ptr(roleAssignmentName),
@@ -502,7 +798,7 @@ func mockCreateRoleAssignmentSuccess(wrapper *azureclients.AzureClientWrapper, s
 	wrapper.RoleAssignmentClient.(*mockazure.MockRoleAssignmentsClient).EXPECT().Create(
 		gomock.Any(), // context
 		scope,
-		gomock.Any(), // roleAssignmentName is a uuid generated by assignRoleToManagedIdentity()
+		gomock.Any(), // roleAssignmentName, GUID generated by createRoleAssignment()
 		gomock.Any(), // parameters
 		gomock.Any(), // options
 	).Return(
@@ -511,7 +807,7 @@ func mockCreateRoleAssignmentSuccess(wrapper *azureclients.AzureClientWrapper, s
 	)
 }
 
-func mockCreateFederatedIdentityCredentialSuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName, federatedIdentityCredentialName, subscriptionID string) {
+func mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName, federatedIdentityCredentialName, subscriptionID string) {
 	federatedIdentityCredentialsClientCreateOrUpdateResponse := armmsi.FederatedIdentityCredentialsClientCreateOrUpdateResponse{
 		FederatedIdentityCredential: armmsi.FederatedIdentityCredential{
 			ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/resourcegroups/abutcherdemo-oidc/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s/federatedIdentityCredentials/%s", subscriptionID, managedIdentityName, federatedIdentityCredentialName)),
@@ -528,5 +824,74 @@ func mockCreateFederatedIdentityCredentialSuccess(wrapper *azureclients.AzureCli
 	).Return(
 		federatedIdentityCredentialsClientCreateOrUpdateResponse,
 		nil, // no error
+	)
+}
+
+func mockGetFederatedIdentityCredentialNotFound(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName, federatedIdentityCredentialName string) {
+	respHeader := http.Header{}
+	respHeader.Set("x-ms-error-code", "NotFound")
+	resp := &http.Response{
+		Header: respHeader,
+	}
+	wrapper.FederatedIdentityCredentialsClient.(*mockazure.MockFederatedIdentityCredentialsClient).EXPECT().Get(
+		gomock.Any(), // context
+		resourceGroupName,
+		managedIdentityName,
+		federatedIdentityCredentialName,
+		gomock.Any(), // options
+	).Return(
+		armmsi.FederatedIdentityCredentialsClientGetResponse{},
+		NewResponseError(resp),
+	)
+}
+
+func mockGetFederatedIdentityCredentialSuccess(wrapper *azureclients.AzureClientWrapper, resourceGroupName, managedIdentityName, federatedIdentityCredentialName, subscriptionID, audience, issuerURL, subject string) {
+	wrapper.FederatedIdentityCredentialsClient.(*mockazure.MockFederatedIdentityCredentialsClient).EXPECT().Get(
+		gomock.Any(), // context
+		resourceGroupName,
+		managedIdentityName,
+		federatedIdentityCredentialName,
+		gomock.Any(), // options
+	).Return(
+		armmsi.FederatedIdentityCredentialsClientGetResponse{
+			FederatedIdentityCredential: armmsi.FederatedIdentityCredential{
+				ID: to.Ptr(fmt.Sprintf("/subscriptions/%s/resourcegroups/%s/providers/Microsoft.ManagedIdentity/userAssignedIdentities/%s/federatedIdentityCredentials/%s", subscriptionID, resourceGroupName, managedIdentityName, federatedIdentityCredentialName)),
+				Properties: &armmsi.FederatedIdentityCredentialProperties{
+					Audiences: []*string{to.Ptr(audience)},
+					Issuer:    to.Ptr(issuerURL),
+					Subject:   to.Ptr(subject),
+				},
+			},
+		},
+		nil, // no error
+	)
+}
+
+func mockGetRoleDefinitionByIDSuccess(wrapper *azureclients.AzureClientWrapper, roleDefinitionID, roleName string) {
+	wrapper.RoleDefinitionsClient.(*mockazure.MockRoleDefinitionsClient).EXPECT().GetByID(
+		gomock.Any(), // context
+		roleDefinitionID,
+		gomock.Any(), // options
+	).Return(
+		armauthorization.RoleDefinitionsClientGetByIDResponse{
+			RoleDefinition: armauthorization.RoleDefinition{
+				Properties: &armauthorization.RoleDefinitionProperties{
+					RoleName: to.Ptr(roleName),
+				},
+			},
+		},
+		nil, // no error
+	)
+}
+
+func mockDeleteRoleAssignmentSuccess(wrapper *azureclients.AzureClientWrapper, scope, roleAssignmentName string) {
+	wrapper.RoleAssignmentClient.(*mockazure.MockRoleAssignmentsClient).EXPECT().Delete(
+		gomock.Any(), // context
+		scope,
+		roleAssignmentName,
+		gomock.Any(), // options
+	).Return(
+		armauthorization.RoleAssignmentsClientDeleteResponse{},
+		nil,
 	)
 }
