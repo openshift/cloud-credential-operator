@@ -106,6 +106,7 @@ func newCredentialsRequest() *minterv1.CredentialsRequest {
 				Resource: "arn:aws:s3:*:*:*",
 			},
 		},
+		STSIAMRoleARN: "arn:aws:iam::269733383069:oidc-provider/newstscluster-oidc.s3.us-east-1.amazonaws.com",
 	}
 
 	var codec, _ = minterv1.NewCodec()
@@ -124,12 +125,11 @@ func newCredentialsRequest() *minterv1.CredentialsRequest {
 			ServiceAccountNames: []string{
 				"serviceaccountname",
 			},
-			CloudTokenString: "",
-			CloudTokenPath:   "",
+			CloudTokenPath: "",
 		},
 	}
+
 	credReq := CredentialsRequestTemplate
 	credReq.Spec.CloudTokenPath = "/var/cloud-token"
-	credReq.Spec.CloudTokenString = "arn:aws:iam::269733383069:oidc-provider/newstscluster-oidc.s3.us-east-1.amazonaws.com"
 	return credReq
 }
