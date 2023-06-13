@@ -465,11 +465,10 @@ func TestEnsureFederatedIdentityCredential(t *testing.T) {
 
 func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 	tests := []struct {
-		name                        string
-		mockAzureClientWrapper      func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper
-		existingRoleAssignmentNames []string
-		roleBindings                []credreqv1.RoleBinding
-		expectError                 bool
+		name                   string
+		mockAzureClientWrapper func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper
+		roleBindings           []credreqv1.RoleBinding
+		expectError            bool
 	}{
 		{
 			name: "Managed identity has expected role assignments, no role assignments created, no role assignments deleted",
@@ -481,7 +480,6 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 					Role: "DNS Zone Contributor",
 				},
 			},
-			existingRoleAssignmentNames: []string{},
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockRoleAssignmentsListPager(wrapper,
