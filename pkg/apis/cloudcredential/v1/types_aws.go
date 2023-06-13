@@ -28,6 +28,13 @@ type AWSProviderSpec struct {
 	metav1.TypeMeta `json:",inline"`
 	// StatementEntries contains a list of policy statements that should be associated with this credentials access key.
 	StatementEntries []StatementEntry `json:"statementEntries"`
+	// STSRoleARN is the Amazon Resource Name (ARN) of an IAM Role which was created manually for the associated
+	// CredentialsRequest.
+	// The presence of an STSRoleARN within the AWSProviderSpec initiates creation of a secret containing IAM
+	// Role details necessary for assuming the IAM Role via Amazon's Secure Token Service.
+	// +optional
+	// +kubebuilder:validation:Pattern:="^arn:(?P<Partition>[^:\n]*):(?P<Service>[^:\n]*):(?P<Region>[^:\n]*):(?P<AccountID>[^:\n]*):(?P<Ignore>(?P<ResourceType>[^:\/\n]*)[:\/])?(?P<Resource>.*)$"
+	STSIAMRoleARN string `json:"stsIAMRoleARN,omitempty"`
 }
 
 // StatementEntry models an AWS policy statement entry.

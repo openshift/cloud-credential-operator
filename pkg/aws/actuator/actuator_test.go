@@ -581,11 +581,6 @@ func TestDetectSTS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to set up codec for tests: %v", err)
 	}
-	defaultAWSProviderConfig, err := testAWSProviderConfig(codec)
-	if err != nil {
-		t.Logf("error creating test AWS ProviderConfig: %v", err)
-		t.FailNow()
-	}
 
 	tests := []struct {
 		name               string
@@ -604,7 +599,11 @@ func TestDetectSTS(t *testing.T) {
 			ctx: context.TODO(),
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
-				cr.Spec.ProviderSpec = defaultAWSProviderConfig
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
+				if err != nil {
+					t.Log(err)
+					t.FailNow()
+				}
 				return cr
 			}(),
 			issuer:  "",
@@ -619,7 +618,11 @@ func TestDetectSTS(t *testing.T) {
 			ctx: context.TODO(),
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
-				cr.Spec.ProviderSpec = defaultAWSProviderConfig
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
+				if err != nil {
+					t.Log(err)
+					t.FailNow()
+				}
 				return cr
 			}(),
 			issuer:  "non-empty",
@@ -634,8 +637,10 @@ func TestDetectSTS(t *testing.T) {
 			ctx: context.TODO(),
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
-				cr.Spec.ProviderSpec = defaultAWSProviderConfig
-				cr.Spec.CloudTokenString = "cloud-token"
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "cloud-token")
+				if err != nil {
+					t.FailNow()
+				}
 				cr.Spec.CloudTokenPath = "/var/token"
 				return cr
 			}(),
@@ -649,31 +654,34 @@ func TestDetectSTS(t *testing.T) {
 			fakeClient.Create(context.TODO(), testAuthentication(test.issuer))
 			a := &AWSActuator{
 				Client: fakeClient,
+				Codec:  codec,
 			}
 			test.wantErr(t, a.sync(test.ctx, test.CredentialsRequest), fmt.Sprintf("sync(%v, %v)", test.ctx, test.CredentialsRequest))
 		})
 	}
 }
 
-func testAWSProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
-	awsProvSpec, err := codec.EncodeProviderSpec(
-		&minterv1.AWSProviderSpec{
-			TypeMeta: metav1.TypeMeta{
-				Kind: "AWSProviderSpec",
-			},
-			StatementEntries: []minterv1.StatementEntry{
-				{
-					Effect: "Allow",
-					Action: []string{
-						"iam:GetUser",
-						"iam:GetUserPolicy",
-						"iam:ListAccessKeys",
-					},
-					Resource: "*",
+func testAWSProviderConfig(codec *minterv1.ProviderCodec, awsSTSIAMRoleARN string) (*runtime.RawExtension, error) {
+	providerSpec := minterv1.AWSProviderSpec{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "AWSProviderSpec",
+		},
+		StatementEntries: []minterv1.StatementEntry{
+			{
+				Effect: "Allow",
+				Action: []string{
+					"iam:GetUser",
+					"iam:GetUserPolicy",
+					"iam:ListAccessKeys",
 				},
+				Resource: "*",
 			},
-		})
-
+		},
+	}
+	if awsSTSIAMRoleARN != "" {
+		providerSpec.STSIAMRoleARN = awsSTSIAMRoleARN
+	}
+	awsProvSpec, err := codec.EncodeProviderSpec(&providerSpec)
 	return awsProvSpec, err
 }
 
