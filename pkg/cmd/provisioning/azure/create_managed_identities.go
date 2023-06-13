@@ -92,12 +92,38 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		}
 	}
 
+	// Ensure roles from CredentialsRequest are assigned to the user-assigned managed identity
+	err = ensureRolesAssignedToManagedIdentity(client, *userAssignedManagedIdentity.Properties.PrincipalID, subscriptionID, crProviderSpec.RoleBindings, scopingResourceGroupNames)
+	if err != nil {
+		return err
+	}
+
+	// Ensure a federated identity credential exists for every service account enumerated in the CredentialsRequest
+	for _, serviceAccountName := range credentialsRequest.Spec.ServiceAccountNames {
+		err := ensureFederatedIdentityCredential(client, shortenedManagedIdentityName, issuerURL, credentialsRequest.Spec.SecretRef.Namespace, serviceAccountName, resourceGroupName)
+		if err != nil {
+			return err
+		}
+	}
+
+	writeCredReqSecret(credentialsRequest, outputDir, *userAssignedManagedIdentity.Properties.ClientID, *userAssignedManagedIdentity.Properties.TenantID, subscriptionID, region)
+	return nil
+}
+
+// ensureRolesAssignedToManagedIdentity ensures that the provided roleBindings are assigned to the user-assigned
+// managed identity identified by managedIdentityPrincipalID.
+//
+// Role assignment will be scoped within the resource groups provided as scopingResourceGroupNames.
+//
+// Roles which are assigned to pre-existing user-assigned managed identities will be removed if
+// not enumerated within roleBindings.
+func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrapper, managedIdentityPrincipalID, subscriptionID string, roleBindings []credreqv1.RoleBinding, scopingResourceGroupNames []string) error {
 	// List role assignments by the user-assigned managed identity principal ID
 	// This list of role assignments are roles which are assigned to the user-assigned managed identity
 	existingRoleAssignments := []*armauthorization.RoleAssignment{}
 	listRoleAssignments := client.RoleAssignmentClient.NewListPager(
 		&armauthorization.RoleAssignmentsClientListOptions{
-			Filter: to.Ptr(fmt.Sprintf("principalId eq '%s'", *userAssignedManagedIdentity.Properties.PrincipalID)),
+			Filter: to.Ptr(fmt.Sprintf("principalId eq '%s'", managedIdentityPrincipalID)),
 		},
 	)
 	for listRoleAssignments.More() {
@@ -115,8 +141,7 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 
 	// Assign requested roles to the user-assigned managed identity
 	// Role assignment will be scoped to the resource group identified by scopingResourceGroupName
-	for _, roleBinding := range crProviderSpec.RoleBindings {
-		//log.Printf("processing role %v", roleBinding.Role)
+	for _, roleBinding := range roleBindings {
 		for _, scopingResourceGroupName := range scopingResourceGroupNames {
 			scope := "/subscriptions/" + subscriptionID + "/resourceGroups/" + scopingResourceGroupName
 			// Get Azure role definition for the role name (roleBinding.Role)
@@ -131,7 +156,7 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 			for _, roleAssignment := range existingRoleAssignments {
 				if *roleDefinition.Properties.RoleName == roleBinding.Role && *roleAssignment.Properties.RoleDefinitionID == *roleDefinition.ID && *roleAssignment.Properties.Scope == scope {
 					roleAssignmentExists = true
-					log.Printf("Found existing role assignment %s for user-assigned managed identity with principal ID %s at scope %s", roleBinding.Role, *userAssignedManagedIdentity.Properties.PrincipalID, scope)
+					log.Printf("Found existing role assignment %s for user-assigned managed identity with principal ID %s at scope %s", roleBinding.Role, managedIdentityPrincipalID, scope)
 					shouldExistRoleAssignments = append(shouldExistRoleAssignments, roleAssignment)
 					break
 				}
@@ -141,7 +166,7 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 				// Assign role to identity at scope
 				roleAssignment, err := createRoleAssignment(
 					client,
-					*userAssignedManagedIdentity.Properties.PrincipalID,
+					managedIdentityPrincipalID,
 					*roleDefinition.ID,
 					roleBinding.Role,
 					scope,
@@ -155,23 +180,21 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		}
 	}
 
-	//log.Printf("there are %v existing role assignments", len(existingRoleAssignments))
-	//log.Printf("there are %v role assignments that should exist", len(shouldExistRoleAssignments))
-
 	for _, existingRoleAssignment := range existingRoleAssignments {
 		found := false
 		for _, shouldExistRoleAssignment := range shouldExistRoleAssignments {
-			if shouldExistRoleAssignment.Name == existingRoleAssignment.Name {
+			if *shouldExistRoleAssignment.Name == *existingRoleAssignment.Name {
 				found = true
 			}
 		}
 		if !found {
+			log.Printf("found role assignment that shouldn't exist %v", *existingRoleAssignment.Name)
 			roleDefinition, err := getRoleDefinitionByID(client, *existingRoleAssignment.Properties.RoleDefinitionID)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get role definition with role definition ID %s", *existingRoleAssignment.Properties.RoleDefinitionID)
 			}
 			err = deleteRoleAssignment(client,
-				*userAssignedManagedIdentity.Properties.PrincipalID,
+				managedIdentityPrincipalID,
 				*existingRoleAssignment.Name,
 				*roleDefinition.Properties.RoleName,
 				*existingRoleAssignment.Properties.Scope,
@@ -183,15 +206,6 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		}
 	}
 
-	// Create a federated identity credential for every service account enumerated in the CredentialsRequest
-	for _, serviceAccountName := range credentialsRequest.Spec.ServiceAccountNames {
-		err := createFederatedIdentityCredential(client, shortenedManagedIdentityName, issuerURL, credentialsRequest.Spec.SecretRef.Namespace, serviceAccountName, resourceGroupName)
-		if err != nil {
-			return err
-		}
-	}
-
-	writeCredReqSecret(credentialsRequest, outputDir, *userAssignedManagedIdentity.Properties.ClientID, *userAssignedManagedIdentity.Properties.TenantID, subscriptionID, region)
 	return nil
 }
 
@@ -216,11 +230,11 @@ func getRoleDefinitionByRoleName(client *azureclients.AzureClientWrapper, roleNa
 	}
 	switch len(roleDefinitions) {
 	case 0:
-		return nil, fmt.Errorf("no role found for name %q", roleName)
+		return nil, fmt.Errorf("no role found for name %s", roleName)
 	case 1:
 		return roleDefinitions[0], nil
 	default:
-		return nil, fmt.Errorf("found %q role definitions for %q, expected one", len(roleDefinitions), roleName)
+		return nil, fmt.Errorf("found %d role definitions for %s, expected one", len(roleDefinitions), roleName)
 	}
 }
 
@@ -376,26 +390,17 @@ func ensureUserAssignedManagedIdentity(client *azureclients.AzureClientWrapper, 
 	return &userAssignedManagedIdentity.Identity, nil
 }
 
-// createFederatedIdentityCredential creates an Azure federated identity credential within the user-assigned managed
+// ensureFederatedIdentityCredential creates an Azure federated identity credential within the user-assigned managed
 // identity identified by managedIdentityName.
 //
 // Federated identity credentials are limited to a specific kubernetes service account by providing the service account's
 // name and namespace. The issuerURL of the OIDC endpoint hosting OIDC discovery and JWKS (public key information) documents
 // must also be known to establish trust from a token signed by the OIDC endpoint's matching private key.
-func createFederatedIdentityCredential(client *azureclients.AzureClientWrapper, managedIdentityName, issuerURL, serviceAccountNamespace, serviceAccountName, resourceGroupName string) error {
-	federatedIdentityCredentialParameters := armmsi.FederatedIdentityCredential{
-		Properties: &armmsi.FederatedIdentityCredentialProperties{
-			Audiences: []*string{
-				to.Ptr("openshift"),
-			},
-			Issuer:  to.Ptr(issuerURL),
-			Subject: to.Ptr(fmt.Sprintf("system:serviceaccount:%s:%s", serviceAccountNamespace, serviceAccountName)),
-		},
-	}
-
+func ensureFederatedIdentityCredential(client *azureclients.AzureClientWrapper, managedIdentityName, issuerURL, serviceAccountNamespace, serviceAccountName, resourceGroupName string) error {
 	var (
 		rawResponse                             *http.Response
 		needToCreateFederatedIdentityCredential bool
+		needToUpdateFederatedIdentityCredential bool
 	)
 	ctxWithResp := runtime.WithCaptureResponse(context.Background(), &rawResponse)
 	federatedIdentityCredentialGetResp, err := client.FederatedIdentityCredentialsClient.Get(
@@ -420,7 +425,36 @@ func createFederatedIdentityCredential(client *azureclients.AzureClientWrapper, 
 		}
 	}
 
+	federatedIdentityCredentialParameters := armmsi.FederatedIdentityCredential{
+		Properties: &armmsi.FederatedIdentityCredentialProperties{
+			Audiences: []*string{
+				to.Ptr("openshift"),
+			},
+			Issuer:  to.Ptr(issuerURL),
+			Subject: to.Ptr(fmt.Sprintf("system:serviceaccount:%s:%s", serviceAccountNamespace, serviceAccountName)),
+		},
+	}
+
 	if !needToCreateFederatedIdentityCredential {
+		existingCredential := federatedIdentityCredentialGetResp.FederatedIdentityCredential
+		if len(existingCredential.Properties.Audiences) != len(federatedIdentityCredentialParameters.Properties.Audiences) ||
+			*existingCredential.Properties.Issuer != *federatedIdentityCredentialParameters.Properties.Issuer ||
+			*existingCredential.Properties.Subject != *federatedIdentityCredentialParameters.Properties.Subject {
+			needToUpdateFederatedIdentityCredential = true
+		}
+		for _, expectedAudience := range federatedIdentityCredentialParameters.Properties.Audiences {
+			found := false
+			for _, existingAudience := range existingCredential.Properties.Audiences {
+				if *expectedAudience == *existingAudience {
+					found = true
+				}
+			}
+			if !found {
+				needToUpdateFederatedIdentityCredential = true
+			}
+		}
+	}
+	if !needToCreateFederatedIdentityCredential && !needToUpdateFederatedIdentityCredential {
 		log.Printf("Found existing federated identity credential %s", *federatedIdentityCredentialGetResp.FederatedIdentityCredential.ID)
 		return nil
 	}
@@ -433,9 +467,13 @@ func createFederatedIdentityCredential(client *azureclients.AzureClientWrapper, 
 		federatedIdentityCredentialParameters,
 		&armmsi.FederatedIdentityCredentialsClientCreateOrUpdateOptions{})
 	if err != nil {
-		return errors.Wrap(err, "failed to create federated identity credential")
+		return errors.Wrap(err, "failed to create or update federated identity credential")
 	}
-	log.Printf("Created federated identity credential %s", *federatedIdentityCredential.ID)
+	verb := "Updated"
+	if needToCreateFederatedIdentityCredential {
+		verb = "Created"
+	}
+	log.Printf("%s federated identity credential %s", verb, *federatedIdentityCredential.ID)
 	return nil
 }
 
