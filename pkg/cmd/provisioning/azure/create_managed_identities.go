@@ -21,7 +21,7 @@ import (
 	azureclients "github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 
-	uuid "github.com/gofrs/uuid"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
@@ -258,11 +258,7 @@ func getRoleDefinitionByID(client *azureclients.AzureClientWrapper, roleDefiniti
 // This scope can be restricted within a resourceGroup such as /subscriptions/<subscriptionID>/resourceGroups/<resourceGroupName>.
 func createRoleAssignment(client *azureclients.AzureClientWrapper, managedIdentityPrincipalID, roleID, roleName, scope, subscriptionID string) (*armauthorization.RoleAssignment, error) {
 	// Create a unique name for the role assignment
-	uuid, err := uuid.NewV4()
-	if err != nil {
-		return nil, fmt.Errorf("failed to generate UUID for user-assigned identity role assignment: %v", err)
-	}
-	roleAssignmentName := uuid.String()
+	roleAssignmentName := uuid.New().String()
 
 	var rawResponse *http.Response
 	// Role assignment can fail due to a replication delay after creating the user-assigned managed identity
