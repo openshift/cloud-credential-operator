@@ -767,24 +767,6 @@ func mockRoleAssignmentsListPager(wrapper *azureclients.AzureClientWrapper, exis
 	)
 }
 
-func mockRoleDefinitionGetByIDSuccess(wrapper *azureclients.AzureClientWrapper, roleDefinitionID, roleName string) {
-	roleDefinitionGetByIDResponse := armauthorization.RoleDefinitionsClientGetByIDResponse{
-		RoleDefinition: armauthorization.RoleDefinition{
-			Properties: &armauthorization.RoleDefinitionProperties{
-				RoleName: to.Ptr(roleName),
-			},
-		},
-	}
-	wrapper.RoleDefinitionsClient.(*mockazure.MockRoleDefinitionsClient).EXPECT().GetByID(
-		gomock.Any(), // context
-		roleDefinitionID,
-		gomock.Any(), // options
-	).Return(
-		roleDefinitionGetByIDResponse,
-		nil, // no error
-	)
-}
-
 func mockCreateRoleAssignmentSuccess(wrapper *azureclients.AzureClientWrapper, scope, roleAssignmentName string) {
 	roleAssignmentsClientCreateResponse := armauthorization.RoleAssignmentsClientCreateResponse{
 		RoleAssignment: armauthorization.RoleAssignment{
