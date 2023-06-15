@@ -136,7 +136,7 @@ func initEnvForCreateAllCmd(cmd *cobra.Command, args []string) {
 // NewCreateAllCmd combines create-identity-provider and create-managed-identities commands
 func NewCreateAllCmd() *cobra.Command {
 	createAllCmd := &cobra.Command{
-		Use:              "create-all --name NAME --region REGION --subscription-id SUBSCRIPTION_ID --credentials-request-dir CRED_REQ_DIR --dnszone-resource-group-name DNSZONE_RESOURCE_GROUP_NAME",
+		Use:              "create-all --name NAME --region REGION --subscription-id SUBSCRIPTION_ID --credentials-requests-dir CRED_REQ_DIR --dnszone-resource-group-name DNSZONE_RESOURCE_GROUP_NAME",
 		Short:            "Create OIDC issuer and managed identities",
 		Run:              createAllCmd,
 		PersistentPreRun: initEnvForCreateAllCmd,
