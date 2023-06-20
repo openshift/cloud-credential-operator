@@ -10,7 +10,7 @@ import (
 	reflect "reflect"
 
 	runtime "github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
-	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
+	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	armmsi "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 	armresources "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	armstorage "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
@@ -528,18 +528,18 @@ func (mr *MockRoleAssignmentsClientMockRecorder) Delete(ctx, scope, roleAssignme
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).Delete), ctx, scope, roleAssignmentName, options)
 }
 
-// NewListPager mocks base method.
-func (m *MockRoleAssignmentsClient) NewListPager(options *armauthorization.RoleAssignmentsClientListOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListResponse] {
+// NewListForScopePager mocks base method.
+func (m *MockRoleAssignmentsClient) NewListForScopePager(scope string, options *armauthorization.RoleAssignmentsClientListForScopeOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListForScopeResponse] {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewListPager", options)
-	ret0, _ := ret[0].(*runtime.Pager[armauthorization.RoleAssignmentsClientListResponse])
+	ret := m.ctrl.Call(m, "NewListForScopePager", scope, options)
+	ret0, _ := ret[0].(*runtime.Pager[armauthorization.RoleAssignmentsClientListForScopeResponse])
 	return ret0
 }
 
-// NewListPager indicates an expected call of NewListPager.
-func (mr *MockRoleAssignmentsClientMockRecorder) NewListPager(options interface{}) *gomock.Call {
+// NewListForScopePager indicates an expected call of NewListForScopePager.
+func (mr *MockRoleAssignmentsClientMockRecorder) NewListForScopePager(scope, options interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewListPager", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).NewListPager), options)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewListForScopePager", reflect.TypeOf((*MockRoleAssignmentsClient)(nil).NewListForScopePager), scope, options)
 }
 
 // MockFederatedIdentityCredentialsClient is a mock of FederatedIdentityCredentialsClient interface.

@@ -120,9 +120,10 @@ func TestCreateManagedIdentities(t *testing.T) {
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
 				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
 				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
-				mockRoleAssignmentsListPager(wrapper,
+				mockRoleAssignmentsListForScopePager(wrapper,
 					[]*armauthorization.RoleAssignment{},
 					testManagedIdentityPrincipalID,
+					testSubscriptionID,
 				)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
 					[]*armauthorization.RoleDefinition{
@@ -214,9 +215,10 @@ func TestCreateManagedIdentities(t *testing.T) {
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
 				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
 				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
-				mockRoleAssignmentsListPager(wrapper,
+				mockRoleAssignmentsListForScopePager(wrapper,
 					[]*armauthorization.RoleAssignment{},
 					testManagedIdentityPrincipalID,
+					testSubscriptionID,
 				)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
 					[]*armauthorization.RoleDefinition{
@@ -481,7 +483,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 			},
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockRoleAssignmentsListPager(wrapper,
+				mockRoleAssignmentsListForScopePager(wrapper,
 					[]*armauthorization.RoleAssignment{
 						{
 							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
@@ -501,6 +503,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 						},
 					},
 					testManagedIdentityPrincipalID,
+					testSubscriptionID,
 				)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
 					[]*armauthorization.RoleDefinition{
@@ -534,7 +537,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 			},
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockRoleAssignmentsListPager(wrapper,
+				mockRoleAssignmentsListForScopePager(wrapper,
 					[]*armauthorization.RoleAssignment{
 						{
 							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
@@ -555,6 +558,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 						},
 					},
 					testManagedIdentityPrincipalID,
+					testSubscriptionID,
 				)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
 					[]*armauthorization.RoleDefinition{
@@ -584,7 +588,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 			},
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockRoleAssignmentsListPager(wrapper,
+				mockRoleAssignmentsListForScopePager(wrapper,
 					[]*armauthorization.RoleAssignment{
 						{
 							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
@@ -596,6 +600,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 						},
 					},
 					testManagedIdentityPrincipalID,
+					testSubscriptionID,
 				)
 				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
 					[]*armauthorization.RoleDefinition{
@@ -746,7 +751,7 @@ func mockRoleDefinitionsListPager(wrapper *azureclients.AzureClientWrapper, scop
 	)
 }
 
-func mockRoleAssignmentsListPager(wrapper *azureclients.AzureClientWrapper, existingRoleAssignments []*armauthorization.RoleAssignment, managedIdentityPrincipalID string) {
+func mockRoleAssignmentsListForScopePager(wrapper *azureclients.AzureClientWrapper, existingRoleAssignments []*armauthorization.RoleAssignment, managedIdentityPrincipalID, subscriptionID string) {
 	roleAssignmentsListResult := armauthorization.RoleAssignmentsClientListResponse{
 		RoleAssignmentListResult: armauthorization.RoleAssignmentListResult{
 			Value: existingRoleAssignments,
@@ -755,7 +760,10 @@ func mockRoleAssignmentsListPager(wrapper *azureclients.AzureClientWrapper, exis
 	options := armauthorization.RoleAssignmentsClientListOptions{
 		Filter: to.Ptr(fmt.Sprintf("principalId eq '%s'", managedIdentityPrincipalID)),
 	}
-	wrapper.RoleAssignmentClient.(*mockazure.MockRoleAssignmentsClient).EXPECT().NewListPager(&options).Return(
+	wrapper.RoleAssignmentClient.(*mockazure.MockRoleAssignmentsClient).EXPECT().NewListForScopePager(
+		"/subscriptions/"+subscriptionID,
+		&options,
+	).Return(
 		runtime.NewPager(runtime.PagingHandler[armauthorization.RoleAssignmentsClientListResponse]{
 			More: func(current armauthorization.RoleAssignmentsClientListResponse) bool {
 				return current.NextLink != nil

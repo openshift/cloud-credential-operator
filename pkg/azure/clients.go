@@ -8,7 +8,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
+	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
@@ -234,7 +234,7 @@ func (roleDefinitionsClient *roleDefinitionsClient) GetByID(ctx context.Context,
 
 type RoleAssignmentsClient interface {
 	Create(ctx context.Context, scope string, roleAssignmentName string, parameters armauthorization.RoleAssignmentCreateParameters, options *armauthorization.RoleAssignmentsClientCreateOptions) (armauthorization.RoleAssignmentsClientCreateResponse, error)
-	NewListPager(options *armauthorization.RoleAssignmentsClientListOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListResponse]
+	NewListForScopePager(scope string, options *armauthorization.RoleAssignmentsClientListForScopeOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListForScopeResponse]
 	Delete(ctx context.Context, scope string, roleAssignmentName string, options *armauthorization.RoleAssignmentsClientDeleteOptions) (armauthorization.RoleAssignmentsClientDeleteResponse, error)
 }
 
@@ -254,8 +254,8 @@ func (roleAssignmentsClient *roleAssignmentsClient) Create(ctx context.Context, 
 	return roleAssignmentsClient.client.Create(ctx, scope, roleAssignmentName, parameters, options)
 }
 
-func (roleAssignmentsClient *roleAssignmentsClient) NewListPager(options *armauthorization.RoleAssignmentsClientListOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListResponse] {
-	return roleAssignmentsClient.client.NewListPager(options)
+func (roleAssignmentsClient *roleAssignmentsClient) NewListForScopePager(scope string, options *armauthorization.RoleAssignmentsClientListForScopeOptions) *runtime.Pager[armauthorization.RoleAssignmentsClientListForScopeResponse] {
+	return roleAssignmentsClient.client.NewListForScopePager(scope, options)
 }
 
 func (roleAssignmentsClient *roleAssignmentsClient) Delete(ctx context.Context, scope string, roleAssignmentName string, options *armauthorization.RoleAssignmentsClientDeleteOptions) (armauthorization.RoleAssignmentsClientDeleteResponse, error) {
