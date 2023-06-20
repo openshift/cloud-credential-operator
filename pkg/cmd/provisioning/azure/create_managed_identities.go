@@ -189,7 +189,6 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 			}
 		}
 		if !found {
-			log.Printf("found role assignment that shouldn't exist %v", *existingRoleAssignment.Name)
 			roleDefinition, err := getRoleDefinitionByID(client, *existingRoleAssignment.Properties.RoleDefinitionID)
 			if err != nil {
 				return errors.Wrapf(err, "failed to get role definition with role definition ID %s", *existingRoleAssignment.Properties.RoleDefinitionID)
