@@ -11,7 +11,7 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
+	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	azureclients "github.com/openshift/cloud-credential-operator/pkg/azure"
@@ -487,7 +487,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 					[]*armauthorization.RoleAssignment{
 						{
 							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
-							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+							Properties: &armauthorization.RoleAssignmentProperties{
 								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
 								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
 								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
@@ -495,7 +495,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 						},
 						{
 							Name: to.Ptr("DNSZoneContibutorRoleAssignmentName"),
-							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+							Properties: &armauthorization.RoleAssignmentProperties{
 								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
 								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
 								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID")),
@@ -541,7 +541,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 					[]*armauthorization.RoleAssignment{
 						{
 							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
-							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+							Properties: &armauthorization.RoleAssignmentProperties{
 								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
 								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
 								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
@@ -550,7 +550,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 						// This existing role assignment isn't enumerated in the credreqv1.RoleBindings
 						{
 							Name: to.Ptr("DNSZoneContibutorRoleAssignmentName"),
-							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+							Properties: &armauthorization.RoleAssignmentProperties{
 								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
 								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
 								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID")),
@@ -592,7 +592,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 					[]*armauthorization.RoleAssignment{
 						{
 							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
-							Properties: &armauthorization.RoleAssignmentPropertiesWithScope{
+							Properties: &armauthorization.RoleAssignmentProperties{
 								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
 								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
 								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
@@ -752,23 +752,23 @@ func mockRoleDefinitionsListPager(wrapper *azureclients.AzureClientWrapper, scop
 }
 
 func mockRoleAssignmentsListForScopePager(wrapper *azureclients.AzureClientWrapper, existingRoleAssignments []*armauthorization.RoleAssignment, managedIdentityPrincipalID, subscriptionID string) {
-	roleAssignmentsListResult := armauthorization.RoleAssignmentsClientListResponse{
+	roleAssignmentsListResult := armauthorization.RoleAssignmentsClientListForScopeResponse{
 		RoleAssignmentListResult: armauthorization.RoleAssignmentListResult{
 			Value: existingRoleAssignments,
 		},
 	}
-	options := armauthorization.RoleAssignmentsClientListOptions{
-		Filter: to.Ptr(fmt.Sprintf("principalId eq '%s'", managedIdentityPrincipalID)),
+	options := armauthorization.RoleAssignmentsClientListForScopeOptions{
+		Filter: to.Ptr(fmt.Sprintf("assignedTo('%s')", managedIdentityPrincipalID)),
 	}
 	wrapper.RoleAssignmentClient.(*mockazure.MockRoleAssignmentsClient).EXPECT().NewListForScopePager(
 		"/subscriptions/"+subscriptionID,
 		&options,
 	).Return(
-		runtime.NewPager(runtime.PagingHandler[armauthorization.RoleAssignmentsClientListResponse]{
-			More: func(current armauthorization.RoleAssignmentsClientListResponse) bool {
+		runtime.NewPager(runtime.PagingHandler[armauthorization.RoleAssignmentsClientListForScopeResponse]{
+			More: func(current armauthorization.RoleAssignmentsClientListForScopeResponse) bool {
 				return current.NextLink != nil
 			},
-			Fetcher: func(ctx context.Context, current *armauthorization.RoleAssignmentsClientListResponse) (armauthorization.RoleAssignmentsClientListResponse, error) {
+			Fetcher: func(ctx context.Context, current *armauthorization.RoleAssignmentsClientListForScopeResponse) (armauthorization.RoleAssignmentsClientListForScopeResponse, error) {
 				return roleAssignmentsListResult, nil
 			},
 		}),
