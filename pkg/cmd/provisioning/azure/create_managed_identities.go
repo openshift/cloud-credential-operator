@@ -14,7 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization"
+	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -121,9 +121,10 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 	// List role assignments by the user-assigned managed identity principal ID
 	// This list of role assignments are roles which are assigned to the user-assigned managed identity
 	existingRoleAssignments := []*armauthorization.RoleAssignment{}
-	listRoleAssignments := client.RoleAssignmentClient.NewListPager(
-		&armauthorization.RoleAssignmentsClientListOptions{
-			Filter: to.Ptr(fmt.Sprintf("principalId eq '%s'", managedIdentityPrincipalID)),
+	listRoleAssignments := client.RoleAssignmentClient.NewListForScopePager(
+		"/subscriptions/"+subscriptionID,
+		&armauthorization.RoleAssignmentsClientListForScopeOptions{
+			Filter: to.Ptr(fmt.Sprintf("assignedTo('%s')", managedIdentityPrincipalID)),
 		},
 	)
 	for listRoleAssignments.More() {
