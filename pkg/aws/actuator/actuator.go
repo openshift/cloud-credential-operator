@@ -71,10 +71,11 @@ type AWSActuator struct {
 	Codec            *minterv1.ProviderCodec
 	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 	Scheme           *runtime.Scheme
+	STSEnabled       bool
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator, error) {
+func NewAWSActuator(client client.Client, scheme *runtime.Scheme, STSEnabled bool) (*AWSActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -86,6 +87,7 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator,
 		Client:           client,
 		AWSClientBuilder: awsutils.ClientBuilder,
 		Scheme:           scheme,
+		STSEnabled:       STSEnabled,
 	}, nil
 }
 
@@ -330,8 +332,11 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
-	stsDetected, _ := utils.IsTimedTokenCluster(a.Client, logger)
-	if stsDetected {
+	stsDetected := false
+	if a.STSEnabled {
+		stsDetected, _ = utils.IsTimedTokenCluster(a.Client, logger)
+	}
+	if a.STSEnabled && stsDetected {
 		if a.Codec == nil {
 			return fmt.Errorf("invalid codec, nil value")
 		}
