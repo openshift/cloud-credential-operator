@@ -185,10 +185,11 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 			return isManaged(e.Object)
 		},
 	}
+	var namespaces = []string{operatorNamespace}
 
 	// Create a namespace local cache separate from the Manager cache
 	// A namespace scoped cache can still handle cluster scoped resources
-	cache, err := cache.New(config, cache.Options{Namespace: operatorNamespace})
+	cache, err := cache.New(config, cache.Options{Namespaces: namespaces})
 	if err != nil {
 		return err
 	}

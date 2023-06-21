@@ -102,11 +102,7 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Inject dependencies into Reconciler
-	if err := mgr.SetFields(r); err != nil {
-		return err
-	}
-
+	operatorCache := mgr.GetCache()
 	name := "credentialsrequest_controller"
 
 	// Custom rateLimiter that sets minimum backoff to 2 seconds
@@ -126,7 +122,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to CredentialsRequest
 	// TODO: we should limit the namespaces where we watch, we want all requests in one namespace so anyone with admin on a namespace cannot create
 	// a request for any credentials they want.
-	err = c.Watch(&source.Kind{Type: &minterv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(operatorCache, &minterv1.CredentialsRequest{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -135,7 +131,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// We use an annotation on secrets that refers back to their owning credentials request because
 	// the normal owner reference is not namespaced, and we want to support credentials requests being
 	// in a centralized namespace, but writing secrets into component namespaces.
-	targetCredSecretMapFunc := handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+	targetCredSecretMapFunc := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 		namespace, name, err := cache.SplitMetaNamespaceKey(a.GetAnnotations()[minterv1.AnnotationCredentialsRequest])
 		if err != nil {
 			log.WithField("labels", a.GetAnnotations()).WithError(err).Error("error splitting namespace key for label")
@@ -179,7 +175,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch Secrets and reconcile if we see one with our label.
 	err = c.Watch(
-		&source.Kind{Type: &corev1.Secret{}},
+		source.Kind(mgr.GetCache(), &corev1.Secret{}),
 		targetCredSecretMapFunc,
 		p)
 	if err != nil {
@@ -187,7 +183,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
-	allCredRequestsMapFn := handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+	allCredRequestsMapFn := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 		log.Info("requeueing all CredentialsRequests")
 		crs := &minterv1.CredentialsRequestList{}
 		err := mgr.GetClient().List(context.TODO(), crs)
@@ -220,7 +216,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
 	err = c.Watch(
-		&source.Kind{Type: &corev1.Secret{}},
+		source.Kind(operatorCache, &corev1.Secret{}),
 		allCredRequestsMapFn,
 		adminCredSecretPredicate)
 	if err != nil {
@@ -231,7 +227,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// for that new namespace. This allows us to be up and running for other components that don't
 	// yet exist, but will.
 
-	namespaceMapFn := handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+	namespaceMapFn := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 		// Iterate all CredentailsRequests to determine if we have any that target
 		// this new namespace. We are not anticipating huge numbers of CredentialsRequests,
 		// nor namespace creations.
@@ -273,12 +269,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(
-		&source.Kind{Type: &metav1.PartialObjectMetadata{
+		source.Kind(operatorCache, &metav1.PartialObjectMetadata{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Namespace",
 				APIVersion: "v1",
 			},
-		}},
+		}),
 		namespaceMapFn,
 		namespacePred)
 	if err != nil {
@@ -301,7 +297,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 	}
 	err = c.Watch(
-		&source.Kind{Type: &corev1.ConfigMap{}},
+		source.Kind(operatorCache, &corev1.ConfigMap{}),
 		allCredRequestsMapFn,
 		configMapPredicate)
 	if err != nil {
@@ -310,7 +306,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch the CloudCredential config object and reconcile everything on changes.
 	err = c.Watch(
-		&source.Kind{Type: &operatorv1.CloudCredential{}},
+		source.Kind(operatorCache, &operatorv1.CloudCredential{}),
 		allCredRequestsMapFn,
 	)
 	if err != nil {

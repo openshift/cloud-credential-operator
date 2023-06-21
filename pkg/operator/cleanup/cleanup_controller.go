@@ -68,7 +68,7 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 
 	// Watch for changes to CredentialsRequest and reconcile only the stale one
 	err = c.Watch(
-		&source.Kind{Type: &minterv1.CredentialsRequest{}},
+		source.Kind(mgr.GetCache(), &minterv1.CredentialsRequest{}),
 		&handler.EnqueueRequestForObject{},
 		stateCredentialRequestPredicate)
 	if err != nil {
