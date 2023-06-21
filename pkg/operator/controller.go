@@ -81,11 +81,14 @@ func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 		if err != nil {
 			log.Fatal(err)
 		}
+		featureGates, err := platform.GetFeatureGates()
+		STSEnabled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
+
 		platformType := platform.GetType(infraStatus)
 		switch platformType {
 		case configv1.AWSPlatformType:
 			log.Info("initializing AWS actuator")
-			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme())
+			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme(), STSEnabled)
 			if err != nil {
 				return err
 			}

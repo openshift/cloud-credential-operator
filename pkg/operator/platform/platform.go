@@ -2,11 +2,19 @@ package platform
 
 import (
 	"context"
+	"fmt"
+	log "github.com/sirupsen/logrus"
+	"os"
+	"time"
 
 	configv1 "github.com/openshift/api/config/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	crtconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
@@ -58,4 +66,56 @@ func getClient(explicitKubeconfig string) (client.Client, error) {
 	}
 
 	return dynamicClient, nil
+}
+
+func GetFeatureGates() (featuregates.FeatureGate, error) {
+	stop := make(chan struct{})
+	ctx := context.Background()
+	ctx, cancelFn := context.WithCancel(ctx)
+	go func() {
+		defer cancelFn()
+		<-stop
+	}()
+
+	config, err := crtconfig.GetConfig()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get kube config: %v", err)
+	}
+	clientSet, err := configclient.NewForConfig(config)
+	if err != nil {
+		return nil, err
+	}
+	configInformers := configinformers.NewSharedInformerFactory(clientSet, 10*time.Minute)
+	desiredVersion := computeClusterOperatorVersions()
+	missingVersion := desiredVersion
+
+	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
+	// Notice the nil EventRecorder passed, is this okay?
+	featureGateAccessor := featuregates.NewFeatureGateAccess(
+		desiredVersion, missingVersion,
+		configInformers.Config().V1().ClusterVersions(), configInformers.Config().V1().FeatureGates(),
+		nil,
+	)
+	go featureGateAccessor.Run(ctx)
+	go configInformers.Start(stop)
+
+	select {
+	case <-featureGateAccessor.InitialFeatureGatesObserved():
+		featureGates, _ := featureGateAccessor.CurrentFeatureGates()
+		log.Info("FeatureGates initialized", "knownFeatures", featureGates.KnownFeatures())
+	case <-time.After(1 * time.Minute):
+		log.Error(nil, "timed out waiting for FeatureGate detection")
+		return nil, fmt.Errorf("timed out waiting for FeatureGate detection")
+	}
+
+	featureGates, err := featureGateAccessor.CurrentFeatureGates()
+	if err != nil {
+		return nil, err
+	}
+	return featureGates, nil
+}
+
+func computeClusterOperatorVersions() string {
+	currentVersion := os.Getenv("RELEASE_VERSION")
+	return currentVersion
 }
