@@ -29,9 +29,15 @@ import (
 
 	"github.com/golang/glog"
 	"github.com/google/uuid"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/client-go/rest"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
@@ -88,6 +94,18 @@ func NewOperator() *cobra.Command {
 				log.Info("setting up manager")
 				mgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: ":2112",
+					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+						if opts.SelectorsByObject == nil {
+							opts.SelectorsByObject = map[client.Object]cache.ObjectSelector{}
+						}
+						opts.SelectorsByObject[&corev1.ConfigMap{}] = cache.ObjectSelector{
+							Field: fields.SelectorFromSet(fields.Set{
+								"metadata.namespace": minterv1.CloudCredOperatorNamespace,
+								"metadata.name":      constants.CloudCredOperatorConfigMap,
+							}),
+						}
+						return cache.New(config, opts)
+					},
 				})
 				if err != nil {
 					log.WithError(err).Fatal("unable to set up overall controller manager")
