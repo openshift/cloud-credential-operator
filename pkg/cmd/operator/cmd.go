@@ -39,8 +39,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	v1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/util"
 
 	"github.com/openshift/library-go/pkg/controller/fileobserver"
@@ -89,6 +91,9 @@ func NewOperator() *cobra.Command {
 				log.WithError(err).Fatal("unable to set up client config")
 			}
 
+			featureGates, err := platform.GetFeatureGates()
+			awsSecurityTokenServiveGateEnaled := featureGates.Enabled(v1.FeatureGateAWSSecurityTokenService)
+
 			run := func(ctx context.Context) {
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up manager")
@@ -119,7 +124,7 @@ func NewOperator() *cobra.Command {
 				// Setup all Controllers
 				log.Info("setting up controller")
 				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
-				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath); err != nil {
+				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath, awsSecurityTokenServiveGateEnaled); err != nil {
 					log.WithError(err).Fatal("unable to register controllers to the manager")
 				}
 

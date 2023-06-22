@@ -18,8 +18,6 @@ package actuator
 import (
 	"context"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -49,12 +47,8 @@ type VSphereActuator struct {
 	Client client.Client
 }
 
-func (a *VSphereActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
-	featureGates, err := platform.GetFeatureGates()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return featureGates, err
+func (a *VSphereActuator) STSFeatureGateEnabled() bool {
+	return false
 }
 
 // NewVSphereActuator creates a new VSphereActuator.

@@ -17,8 +17,6 @@ package actuator
 
 import (
 	"context"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -48,8 +46,8 @@ type Actuator interface {
 	Upgradeable(operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition
 	// GetCredentialsRootSecret returns the credentials root secret.
 	GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error)
-	// Pass along any FeatureGates
-	GetFeatureGates() (featuregates.FeatureGate, error)
+	// Query STSFeatureGateEnabled.
+	STSFeatureGateEnabled() bool
 }
 
 type DummyActuator struct {
@@ -88,8 +86,8 @@ func (a *DummyActuator) GetCredentialsRootSecret(ctx context.Context, cr *minter
 	return nil, nil
 }
 
-func (a *DummyActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
-	return platform.GetFeatureGates()
+func (a *DummyActuator) STSFeatureGateEnabled() bool {
+	return false
 }
 
 type ActuatorError struct {

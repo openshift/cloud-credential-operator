@@ -20,8 +20,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -51,12 +49,8 @@ type Actuator struct {
 	credentialMinterBuilder credentialMinterBuilder
 }
 
-func (a *Actuator) GetFeatureGates() (featuregates.FeatureGate, error) {
-	featureGates, err := platform.GetFeatureGates()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return featureGates, err
+func (a *Actuator) STSFeatureGateEnabled() bool {
+	return false
 }
 
 func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {

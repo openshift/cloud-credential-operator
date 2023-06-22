@@ -370,14 +370,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	}()
 
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
-	featureGates, err := r.Actuator.GetFeatureGates()
-	if err != nil {
-		logger.WithError(err)
-	}
-	STSEnabled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
 
 	stsDetected := false
-	if STSEnabled {
+	stsFeatureGateEnabled := r.Actuator.STSFeatureGateEnabled()
+
+	if stsFeatureGateEnabled {
 		stsDetected, _ = utils.IsTimedTokenCluster(r.Client, logger)
 	}
 	if err != nil {
@@ -535,7 +532,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	} else {
 		crSecretExists = true
 	}
-	if STSEnabled && stsDetected {
+	if stsFeatureGateEnabled && stsDetected {
 		// create time-based tokens based on settings in CredentialsRequests
 		logger.Infof("timed token access cluster detected: %t, so not trying to provision with root secret",
 			stsDetected)
