@@ -18,6 +18,8 @@ package openstack
 import (
 	"context"
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"reflect"
 
 	corev1 "k8s.io/api/core/v1"
@@ -40,6 +42,14 @@ import (
 type OpenStackActuator struct {
 	Client client.Client
 	Codec  *minterv1.ProviderCodec
+}
+
+func (a *OpenStackActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
+	featureGates, err := platform.GetFeatureGates()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return featureGates, err
 }
 
 // NewOpenStackActuator creates a new OpenStack actuator.

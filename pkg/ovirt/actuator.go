@@ -18,6 +18,8 @@ package ovirt
 import (
 	"context"
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"reflect"
 	"strconv"
 
@@ -48,6 +50,14 @@ const (
 type OvirtActuator struct {
 	Client client.Client
 	Codec  *minterv1.ProviderCodec
+}
+
+func (a *OvirtActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
+	featureGates, err := platform.GetFeatureGates()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return featureGates, err
 }
 
 type OvirtCreds struct {

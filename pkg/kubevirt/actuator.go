@@ -18,6 +18,8 @@ package kubevirt
 import (
 	"context"
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -38,6 +40,14 @@ import (
 
 type KubevirtActuator struct {
 	Client client.Client
+}
+
+func (a *KubevirtActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
+	featureGates, err := platform.GetFeatureGates()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return featureGates, err
 }
 
 const (

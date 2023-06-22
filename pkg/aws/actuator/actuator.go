@@ -19,6 +19,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"net/url"
 	"reflect"
 
@@ -309,6 +311,14 @@ func (a *AWSActuator) Create(ctx context.Context, cr *minterv1.CredentialsReques
 // Update the credentials to the provided definition.
 func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	return a.sync(ctx, cr)
+}
+
+func (a *AWSActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
+	featureGates, err := platform.GetFeatureGates()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return featureGates, err
 }
 
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
