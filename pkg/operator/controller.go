@@ -81,7 +81,10 @@ func AddToManager(m manager.Manager, explicitKubeconfig string) error {
 		if err != nil {
 			log.Fatal(err)
 		}
-		featureGates, err := platform.GetFeatureGates()
+		featureGates, errFG := a.GetFeatureGates()
+		if errFG != nil {
+			log.Fatal(errFG)
+		}
 		STSEnabled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
 
 		platformType := platform.GetType(infraStatus)

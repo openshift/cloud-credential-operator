@@ -19,6 +19,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
@@ -62,6 +64,14 @@ type Actuator struct {
 	Client           client.Client
 	Codec            *minterv1.ProviderCodec
 	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
+}
+
+func (a *Actuator) GetFeatureGates() (featuregates.FeatureGate, error) {
+	featureGates, err := platform.GetFeatureGates()
+	if err != nil {
+		log.Fatal(err)
+	}
+	return featureGates, err
 }
 
 // NewActuator initializes and returns a new Actuator for GCP.
