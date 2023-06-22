@@ -273,7 +273,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(
-		&source.Kind{Type: &corev1.Namespace{}},
+		&source.Kind{Type: &metav1.PartialObjectMetadata{
+			TypeMeta: metav1.TypeMeta{
+				Kind:       "Namespace",
+				APIVersion: "v1",
+			},
+		}},
 		namespaceMapFn,
 		namespacePred)
 	if err != nil {
