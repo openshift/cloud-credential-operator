@@ -19,8 +19,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"net/url"
 	"reflect"
 
@@ -69,15 +67,15 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
-	Client           client.Client
-	Codec            *minterv1.ProviderCodec
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
-	Scheme           *runtime.Scheme
-	STSEnabled       bool
+	Client                            client.Client
+	Codec                             *minterv1.ProviderCodec
+	AWSClientBuilder                  func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
+	Scheme                            *runtime.Scheme
+	AWSSecurityTokenServiveGateEnaled bool
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client client.Client, scheme *runtime.Scheme, STSEnabled bool) (*AWSActuator, error) {
+func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTokenServiveGateEnaled bool) (*AWSActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -85,11 +83,11 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme, STSEnabled boo
 	}
 
 	return &AWSActuator{
-		Codec:            codec,
-		Client:           client,
-		AWSClientBuilder: awsutils.ClientBuilder,
-		Scheme:           scheme,
-		STSEnabled:       STSEnabled,
+		Codec:                             codec,
+		Client:                            client,
+		AWSClientBuilder:                  awsutils.ClientBuilder,
+		Scheme:                            scheme,
+		AWSSecurityTokenServiveGateEnaled: awsSecurityTokenServiveGateEnaled,
 	}, nil
 }
 
@@ -118,6 +116,10 @@ func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 	}
 
 	return nil, fmt.Errorf("no providerSpec defined")
+}
+
+func (a *AWSActuator) STSFeatureGateEnabled() bool {
+	return a.AWSSecurityTokenServiveGateEnaled
 }
 
 // Checks if the credentials currently exist.
@@ -313,14 +315,6 @@ func (a *AWSActuator) Update(ctx context.Context, cr *minterv1.CredentialsReques
 	return a.sync(ctx, cr)
 }
 
-func (a *AWSActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
-	featureGates, err := platform.GetFeatureGates()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return featureGates, err
-}
-
 func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	if isAWS, err := isAWSCredentials(cr.Spec.ProviderSpec); !isAWS {
 		return err
@@ -343,10 +337,14 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return nil
 	}
 	stsDetected := false
-	if a.STSEnabled {
-		stsDetected, _ = utils.IsTimedTokenCluster(a.Client, logger)
+	stsFeatureGateEnabled := a.STSFeatureGateEnabled()
+	if stsFeatureGateEnabled {
+		stsDetected, err = utils.IsTimedTokenCluster(a.Client, logger)
+		if err != nil {
+			return err
+		}
 	}
-	if a.STSEnabled && stsDetected {
+	if stsFeatureGateEnabled && stsDetected {
 		if a.Codec == nil {
 			return fmt.Errorf("invalid codec, nil value")
 		}

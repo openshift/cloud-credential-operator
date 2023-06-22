@@ -18,10 +18,11 @@ package ovirt
 import (
 	"context"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"reflect"
 	"strconv"
+
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 
 	log "github.com/sirupsen/logrus"
 
@@ -80,6 +81,10 @@ func NewActuator(client client.Client) (*OvirtActuator, error) {
 		Codec:  codec,
 		Client: client,
 	}, nil
+}
+
+func (a *OvirtActuator) STSFeatureGateEnabled() bool {
+	return false
 }
 
 // Exists checks if the credentials currently exist.
