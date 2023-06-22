@@ -35,8 +35,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -99,6 +104,70 @@ func NewOperator() *cobra.Command {
 				// logger to do nothing.
 				ctrlruntimelog.SetLogger(logr.New(ctrlruntimelog.NullLogSink{}))
 
+				log.Info("checking prerequisites")
+				featureGates, err := platform.GetFeatureGates(ctx)
+				if err != nil {
+					log.WithError(err).Fatal("unable to read feature gates")
+				}
+				awsSecurityTokenServiceGateEnabled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
+
+				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
+				rules := clientcmd.NewDefaultClientConfigLoadingRules()
+				rules.ExplicitPath = kubeconfigCommandLinePath
+				kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
+				cfg, err := kubeconfig.ClientConfig()
+				if err != nil {
+					log.WithError(err).Fatal("failed to parse kubeconfig")
+				}
+				coreClient, err := corev1client.NewForConfig(cfg)
+				if err != nil {
+					log.WithError(err).Fatal("failed to set up client")
+				}
+
+				// The status quo for this controller is to LIST + WATCH all Secrets on the cluster. This consumes
+				// more resources than necessary on clusters where users put other data in Secrets themselves, as we
+				// hold that data in our cache and never do anything with it. The reconcilers mainly need to react to
+				// changes in Secrets created for CredentialRequests, which they control and can label, allowing us
+				// to filter the LIST + WATCH down and hold the minimal set of data in memory. However, two caveats:
+				// - in passthrough and mint mode, admin credentials are also provided by the user through Secrets,
+				//   and we need to watch those, but we can't label them
+				// - on existing clusters, secrets exist from previous work these reconcilers did that will not have
+				//   Secrets labelled
+				// We could solve the second issue with an interim release of this controller that labels all previous
+				// Secrets, but does not restrict the watch stream.
+				// Due to the way that controller-runtime closes over the client/cache concepts, it's difficult to
+				// solve the first issue, though, since we'd need two sets of clients and caches, both for Secrets,
+				// and ensure that we use one for client access to Secrets we're creating or mutating and the other
+				// when we're interacting with admin credentials. Not impossible to do, but tricky to implement and
+				// complex.
+				// Until we undertake that effort, we apply a simplification to the space: only when AWS STS mode is
+				// enabled, we will try to filter the LIST + WATCH. This mode is brand new, so we can be reasonably
+				// sure that there are no previous secrets on the cluster, and, we make the filtering best-effort
+				// in order to check if that assumption held. Second, AWS STS mode only runs in clusters without
+				// admin credentials, so if we apply the filter, we should not see failures downstream from clients
+				// that hope to see those objects but can't.
+				var filteredWatchPossible bool
+				if awsSecurityTokenServiceGateEnabled {
+					secrets, err := coreClient.Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+					if err != nil {
+						log.WithError(err).Fatal("failed to list secrets")
+					}
+					var missing []types.NamespacedName
+					for _, secret := range secrets.Items {
+						if isMissingSecretLabel(secret) {
+							missing = append(missing, types.NamespacedName{
+								Namespace: secret.Namespace,
+								Name:      secret.Name,
+							})
+						}
+					}
+					if len(missing) != 0 {
+						log.WithField("missing", missing).Warnf("%s feature gate enabled but not all secrets labelled, falling back to caching all secrets on cluster", configv1.FeatureGateAWSSecurityTokenService)
+					} else {
+						filteredWatchPossible = true
+					}
+				}
+
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up manager")
 				mgr, err := manager.New(cfg, manager.Options{
@@ -113,6 +182,13 @@ func NewOperator() *cobra.Command {
 								"metadata.name":      constants.CloudCredOperatorConfigMap,
 							}),
 						}
+						if filteredWatchPossible {
+							opts.ByObject[&corev1.Secret{}] = cache.ByObject{
+								Label: labels.SelectorFromSet(labels.Set{
+									minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+								}),
+							}
+						}
 						return cache.New(config, opts)
 					},
 				})
@@ -125,16 +201,9 @@ func NewOperator() *cobra.Command {
 				// Setup Scheme for all resources
 				util.SetupScheme(mgr.GetScheme())
 
-				featureGates, err := platform.GetFeatureGates(ctx)
-				if err != nil {
-					log.WithError(err).Fatal("unable to read feature gates")
-				}
-				awsSecurityTokenServiveGateEnaled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
-
 				// Setup all Controllers
 				log.Info("setting up controller")
-				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
-				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath, awsSecurityTokenServiveGateEnaled); err != nil {
+				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath, coreClient, awsSecurityTokenServiceGateEnabled); err != nil {
 					log.WithError(err).Fatal("unable to register controllers to the manager")
 				}
 
@@ -228,6 +297,15 @@ func NewOperator() *cobra.Command {
 	flag.CommandLine.Parse([]string{})
 
 	return cmd
+}
+
+// isMissingSecretLabel determines if the secret was created by the CCO but has not been labelled yet
+func isMissingSecretLabel(secret corev1.Secret) bool {
+	_, hasAnnotation := secret.GetAnnotations()[minterv1.AnnotationCredentialsRequest]
+	value, hasLabel := secret.GetLabels()[minterv1.LabelCredentialsRequest]
+	hasValue := hasLabel && value == minterv1.LabelCredentialsRequestValue
+
+	return hasAnnotation && (!hasLabel || !hasValue)
 }
 
 func initializeGlog(flags *pflag.FlagSet) {

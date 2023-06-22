@@ -3,9 +3,10 @@ package platform
 import (
 	"context"
 	"fmt"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"os"
 	"time"
+
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 
 	log "github.com/sirupsen/logrus"
 

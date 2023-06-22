@@ -289,7 +289,7 @@ func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.Credentials
 		}
 	}
 
-	err = a.syncSecret(cr, rootAuthJSONByes, logger)
+	err = a.syncSecret(ctx, cr, rootAuthJSONByes, logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -466,7 +466,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 	// Save key into secret
 	if key != nil {
-		err = a.syncSecret(cr, key.PrivateKeyData, logger)
+		err = a.syncSecret(ctx, cr, key.PrivateKeyData, logger)
 	}
 
 	return err
@@ -775,14 +775,14 @@ func (a *Actuator) secretAlreadySynced(cr *minterv1.CredentialsRequest) (bool, e
 	return true, nil
 }
 
-func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, privateKeyData []byte, logger log.FieldLogger) error {
+func (a *Actuator) syncSecret(ctx context.Context, cr *minterv1.CredentialsRequest, privateKeyData []byte, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
 
 	existingSecret := &corev1.Secret{}
-	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
+	err := a.Client.Get(ctx, types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Info("no existing secret found, will create one")
@@ -791,6 +791,9 @@ func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, privateKeyData []
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      cr.Spec.SecretRef.Name,
 					Namespace: cr.Spec.SecretRef.Namespace,
+					Labels: map[string]string{
+						minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+					},
 					Annotations: map[string]string{
 						minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 					},
@@ -800,7 +803,7 @@ func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, privateKeyData []
 				},
 			}
 
-			err := a.Client.Create(context.TODO(), secret)
+			err := a.Client.Create(ctx, secret)
 			if err != nil {
 				sLog.WithError(err).Error("error creating secret")
 				return err
@@ -816,6 +819,11 @@ func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, privateKeyData []
 	sLog.Info("updating existing secret")
 
 	origSecret := existingSecret.DeepCopy()
+	if existingSecret.Labels == nil {
+		existingSecret.Labels = map[string]string{}
+	}
+	existingSecret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
 	}
@@ -824,7 +832,7 @@ func (a *Actuator) syncSecret(cr *minterv1.CredentialsRequest, privateKeyData []
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
 		sLog.Info("secret changed, updating")
-		err := a.Client.Update(context.TODO(), existingSecret)
+		err := a.Client.Update(ctx, existingSecret)
 		if err != nil {
 			return fmt.Errorf("error updating existing secret: %v", err)
 		}

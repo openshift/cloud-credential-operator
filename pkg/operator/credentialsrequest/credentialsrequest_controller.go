@@ -24,6 +24,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -54,7 +55,8 @@ import (
 )
 
 const (
-	controllerName = "credreq"
+	controllerName      = "credreq"
+	labelControllerName = controllerName + "_labeller"
 
 	namespaceMissing = "NamespaceMissing"
 	namespaceExists  = "NamespaceExists"
@@ -84,8 +86,8 @@ var (
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
 // default RBAC. The Manager will set fields on the Controller and Start it when
 // the Manager is Started.
-func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) error {
-	return add(mgr, newReconciler(mgr, actuator, platType))
+func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType, mutatingClient corev1client.CoreV1Interface) error {
+	return add(mgr, newReconciler(mgr, actuator, platType), mutatingClient)
 }
 
 // newReconciler returns a new reconcile.Reconciler
@@ -101,7 +103,7 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr manager.Manager, r reconcile.Reconciler, mutatingClient corev1client.CoreV1Interface) error {
 	operatorCache := mgr.GetCache()
 	name := "credentialsrequest_controller"
 
