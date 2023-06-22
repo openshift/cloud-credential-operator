@@ -144,7 +144,7 @@ func (a *OvirtActuator) sync(ctx context.Context, cr *minterv1.CredentialsReques
 		return err
 	}
 
-	err = a.syncCredentialSecret(cr, &ovirtCreds, existingSecret, logger)
+	err = a.syncCredentialSecret(ctx, cr, &ovirtCreds, existingSecret, logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -157,7 +157,7 @@ func (a *OvirtActuator) sync(ctx context.Context, cr *minterv1.CredentialsReques
 	return nil
 }
 
-func (a *OvirtActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, ovirtCreds *OvirtCreds, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+func (a *OvirtActuator) syncCredentialSecret(ctx context.Context, cr *minterv1.CredentialsRequest, ovirtCreds *OvirtCreds, existingSecret *corev1.Secret, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -177,6 +177,9 @@ func (a *OvirtActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, ov
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.SecretRef.Name,
 				Namespace: cr.Spec.SecretRef.Namespace,
+				Labels: map[string]string{
+					minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+				},
 				Annotations: map[string]string{
 					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 				},
@@ -184,7 +187,7 @@ func (a *OvirtActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, ov
 			Data: secretDataFrom(ovirtCreds),
 		}
 
-		err := a.Client.Create(context.TODO(), secret)
+		err := a.Client.Create(ctx, secret)
 		if err != nil {
 			sLog.WithError(err).Error("error creating secret")
 			return err
@@ -196,6 +199,11 @@ func (a *OvirtActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, ov
 	// Update the existing secret:
 	sLog.Debug("updating secret")
 	origSecret := existingSecret.DeepCopy()
+	if existingSecret.Labels == nil {
+		existingSecret.Labels = map[string]string{}
+	}
+	existingSecret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
 	}
@@ -206,7 +214,7 @@ func (a *OvirtActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, ov
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
 		sLog.Info("target secret has changed, updating")
-		err := a.Client.Update(context.TODO(), existingSecret)
+		err := a.Client.Update(ctx, existingSecret)
 		if err != nil {
 			msg := "error updating secret"
 			sLog.WithError(err).Error(msg)

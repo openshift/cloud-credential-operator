@@ -458,7 +458,7 @@ func TestSecretFormat(t *testing.T) {
 
 			cr := testCredentialsRequest()
 			logger := a.getLogger(cr)
-			err := a.syncAccessKeySecret(cr, test.accessKeyID, test.secretAccessKey, test.existingSecret, "exampleAWSPolicy", logger)
+			err := a.syncAccessKeySecret(context.Background(), cr, test.accessKeyID, test.secretAccessKey, test.existingSecret, "exampleAWSPolicy", logger)
 
 			require.NoError(t, err, "unexpected error creating/updating Secret")
 

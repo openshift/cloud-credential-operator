@@ -191,6 +191,11 @@ func (a *KubevirtActuator) updateExistingSecret(logger log.FieldLogger, existing
 	// Update the existing secret:
 	logger.Debug("updating secret")
 	origSecret := existingSecret.DeepCopy()
+	if existingSecret.Labels == nil {
+		existingSecret.Labels = map[string]string{}
+	}
+	existingSecret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
 	}
@@ -224,6 +229,9 @@ func (a *KubevirtActuator) createNewSecret(logger log.FieldLogger, cr *minterv1.
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.SecretRef.Name,
 			Namespace: cr.Spec.SecretRef.Namespace,
+			Labels: map[string]string{
+				minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+			},
 			Annotations: map[string]string{
 				minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 			},

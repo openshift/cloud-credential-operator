@@ -17,6 +17,7 @@ limitations under the License.
 package controller
 
 import (
+	configv1 "github.com/openshift/api/config/v1"
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	gcpactuator "github.com/openshift/cloud-credential-operator/pkg/gcp/actuator"
@@ -34,8 +35,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/ovirt"
 	"github.com/openshift/cloud-credential-operator/pkg/util"
 	vsphereactuator "github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
-
-	configv1 "github.com/openshift/api/config/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
@@ -62,10 +62,10 @@ func init() {
 var AddToManagerFuncs []func(manager.Manager, string) error
 
 // AddToManagerWithActuatorFuncs is a list of functions to add all Controllers with Actuators to the Manager
-var AddToManagerWithActuatorFuncs []func(manager.Manager, actuator.Actuator, configv1.PlatformType) error
+var AddToManagerWithActuatorFuncs []func(manager.Manager, actuator.Actuator, configv1.PlatformType, corev1client.CoreV1Interface) error
 
 // AddToManager adds all Controllers to the Manager
-func AddToManager(m manager.Manager, explicitKubeconfig string, awsSecurityTokenServiveGateEnaled bool) error {
+func AddToManager(m manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface, awsSecurityTokenServiceGateEnabled bool) error {
 	for _, f := range AddToManagerFuncs {
 		if err := f(m, explicitKubeconfig); err != nil {
 			return err
@@ -85,7 +85,7 @@ func AddToManager(m manager.Manager, explicitKubeconfig string, awsSecurityToken
 		switch platformType {
 		case configv1.AWSPlatformType:
 			log.Info("initializing AWS actuator")
-			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme(), awsSecurityTokenServiveGateEnaled)
+			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme(), awsSecurityTokenServiceGateEnabled)
 			if err != nil {
 				return err
 			}
@@ -135,7 +135,7 @@ func AddToManager(m manager.Manager, explicitKubeconfig string, awsSecurityToken
 			log.Info("initializing no-op actuator (unsupported platform)")
 			a = &actuator.DummyActuator{}
 		}
-		if err := f(m, a, platformType); err != nil {
+		if err := f(m, a, platformType, coreClient); err != nil {
 			return err
 		}
 	}

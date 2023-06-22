@@ -329,6 +329,9 @@ func copyCredentialsSecret(cr *minterv1.CredentialsRequest, src, dest *corev1.Se
 	dest.ObjectMeta = metav1.ObjectMeta{
 		Name:      cr.Spec.SecretRef.Name,
 		Namespace: cr.Spec.SecretRef.Namespace,
+		Labels: map[string]string{
+			minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+		},
 		Annotations: map[string]string{
 			minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 		},

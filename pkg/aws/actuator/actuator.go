@@ -507,7 +507,7 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 	}
 
 	// userPolicy param empty because in passthrough mode this doesn't really have any meaning
-	err = a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
+	err = a.syncAccessKeySecret(ctx, cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -692,7 +692,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		accessKeyString = *accessKey.AccessKeyId
 		secretAccessKeyString = *accessKey.SecretAccessKey
 	}
-	err = a.syncAccessKeySecret(cr, accessKeyString, secretAccessKeyString, existingSecret, desiredUserPolicy, logger)
+	err = a.syncAccessKeySecret(ctx, cr, accessKeyString, secretAccessKeyString, existingSecret, desiredUserPolicy, logger)
 	if err != nil {
 		log.WithError(err).Error("error saving access key to secret")
 		return err
@@ -995,7 +995,7 @@ func (a *AWSActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger
 	})
 }
 
-func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKeyID, secretAccessKey string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
+func (a *AWSActuator) syncAccessKeySecret(ctx context.Context, cr *minterv1.CredentialsRequest, accessKeyID, secretAccessKey string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -1015,6 +1015,9 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.SecretRef.Name,
 				Namespace: cr.Spec.SecretRef.Namespace,
+				Labels: map[string]string{
+					minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+				},
 				Annotations: map[string]string{
 					minterv1.AnnotationCredentialsRequest:   fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 					minterv1.AnnotationAWSPolicyLastApplied: userPolicy,
@@ -1027,7 +1030,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 			},
 		}
 
-		err := a.Client.Create(context.TODO(), secret)
+		err := a.Client.Create(ctx, secret)
 		if err != nil {
 			sLog.WithError(err).Error("error creating secret")
 			return err
@@ -1039,6 +1042,11 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 	// Update the existing secret:
 	sLog.Debug("updating secret")
 	origSecret := existingSecret.DeepCopy()
+	if existingSecret.Labels == nil {
+		existingSecret.Labels = map[string]string{}
+	}
+	existingSecret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
 	}
@@ -1054,7 +1062,7 @@ func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, acces
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
 		sLog.Info("target secret has changed, updating")
-		err := a.Client.Update(context.TODO(), existingSecret)
+		err := a.Client.Update(ctx, existingSecret)
 		if err != nil {
 			msg := "error updating secret"
 			sLog.WithError(err).Error(msg)

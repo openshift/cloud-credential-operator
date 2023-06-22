@@ -27,6 +27,10 @@ const (
 	// credentials in AWS before allowing the CredentialsRequest to be deleted in etcd.
 	FinalizerDeprovision string = "cloudcredential.openshift.io/deprovision"
 
+	// LabelCredentialsRequest is to mark Secrets created as a target of CredentailsRequests.
+	LabelCredentialsRequest      string = "cloudcredential.openshift.io/credentials-request"
+	LabelCredentialsRequestValue string = "true"
+
 	// AnnotationCredentialsRequest is used on Secrets created as a target of CredentailsRequests.
 	// The annotation value will map back to the namespace/name of the CredentialsRequest that created
 	// or adopted the secret.

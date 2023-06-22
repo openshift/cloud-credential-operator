@@ -220,7 +220,7 @@ func (a *VSphereActuator) syncPassthrough(ctx context.Context, cr *minterv1.Cred
 		return err
 	}
 
-	err = a.syncTargetSecret(cr, cloudCredsSecret.Data, existingSecret, logger)
+	err = a.syncTargetSecret(ctx, cr, cloudCredsSecret.Data, existingSecret, logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -286,7 +286,7 @@ func (a *VSphereActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLo
 	})
 }
 
-func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secretData map[string][]byte, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+func (a *VSphereActuator) syncTargetSecret(ctx context.Context, cr *minterv1.CredentialsRequest, secretData map[string][]byte, existingSecret *corev1.Secret, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -298,6 +298,9 @@ func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secr
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      cr.Spec.SecretRef.Name,
 				Namespace: cr.Spec.SecretRef.Namespace,
+				Labels: map[string]string{
+					minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+				},
 				Annotations: map[string]string{
 					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 				},
@@ -305,7 +308,7 @@ func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secr
 			Data: secretData,
 		}
 
-		err := a.Client.Create(context.TODO(), secret)
+		err := a.Client.Create(ctx, secret)
 		if err != nil {
 			sLog.WithError(err).Error("error creating secret")
 			return err
@@ -317,6 +320,11 @@ func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secr
 	// Update the existing secret:
 	sLog.Debug("updating secret")
 	origSecret := existingSecret.DeepCopy()
+	if existingSecret.Labels == nil {
+		existingSecret.Labels = map[string]string{}
+	}
+	existingSecret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+
 	if existingSecret.Annotations == nil {
 		existingSecret.Annotations = map[string]string{}
 	}
@@ -326,7 +334,7 @@ func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secr
 
 	if !reflect.DeepEqual(existingSecret, origSecret) {
 		sLog.Info("target secret has changed, updating")
-		err := a.Client.Update(context.TODO(), existingSecret)
+		err := a.Client.Update(ctx, existingSecret)
 		if err != nil {
 			msg := "error updating secret"
 			sLog.WithError(err).Error(msg)
