@@ -1374,7 +1374,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockSecretAWSClient = test.mockSecretAWSClient(mockCtrl)
 			}
 
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithStatusSubresource(&minterv1.CredentialsRequest{}).
+				WithRuntimeObjects(test.existing...).Build()
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
 				Actuator: &actuator.AWSActuator{

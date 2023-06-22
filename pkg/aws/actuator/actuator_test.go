@@ -589,6 +589,7 @@ func TestDetectSTS(t *testing.T) {
 		ctx                context.Context
 		CredentialsRequest *minterv1.CredentialsRequest
 		issuer             string
+		stsEnabled         bool
 	}{
 		{
 			name: "empty ServiceAccountIssuer on AWS STS-enabled CCO in Manual mode should error",
@@ -625,8 +626,9 @@ func TestDetectSTS(t *testing.T) {
 				}
 				return cr
 			}(),
-			issuer:  "non-empty",
-			wantErr: assert.NoError,
+			issuer:     "non-empty",
+			stsEnabled: true,
+			wantErr:    assert.NoError,
 		},
 		{
 			name: "STS mode and with a CloudTokenString and CloudTokenPath set in CredentialsRequest should create Secret & not error",
@@ -644,18 +646,26 @@ func TestDetectSTS(t *testing.T) {
 				cr.Spec.CloudTokenPath = "/var/token"
 				return cr
 			}(),
-			issuer:  "non-empty",
-			wantErr: assert.NoError,
+			issuer:     "non-empty",
+			stsEnabled: true,
+			wantErr:    assert.NoError,
 		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
-			fakeClient.Create(context.TODO(), testAuthentication(test.issuer))
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithStatusSubresource(&minterv1.CredentialsRequest{}).
+				WithRuntimeObjects(test.existing...).Build()
+			err := fakeClient.Create(context.TODO(), testAuthentication(test.issuer))
+			if err != nil {
+				panic(err)
+			}
 			a := &AWSActuator{
 				Client: fakeClient,
 				Codec:  codec,
 			}
+			a.STSEnabled = test.stsEnabled
 			test.wantErr(t, a.sync(test.ctx, test.CredentialsRequest), fmt.Sprintf("sync(%v, %v)", test.ctx, test.CredentialsRequest))
 		})
 	}
