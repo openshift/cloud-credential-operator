@@ -91,9 +91,6 @@ func NewOperator() *cobra.Command {
 				log.WithError(err).Fatal("unable to set up client config")
 			}
 
-			featureGates, err := platform.GetFeatureGates()
-			awsSecurityTokenServiveGateEnaled := featureGates.Enabled(v1.FeatureGateAWSSecurityTokenService)
-
 			run := func(ctx context.Context) {
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up manager")
@@ -120,6 +117,9 @@ func NewOperator() *cobra.Command {
 
 				// Setup Scheme for all resources
 				util.SetupScheme(mgr.GetScheme())
+
+				featureGates, err := platform.GetFeatureGates()
+				awsSecurityTokenServiveGateEnaled := featureGates.Enabled(v1.FeatureGateAWSSecurityTokenService)
 
 				// Setup all Controllers
 				log.Info("setting up controller")
