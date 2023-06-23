@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -53,8 +54,8 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
@@ -92,6 +93,12 @@ func NewOperator() *cobra.Command {
 			}
 
 			run := func(ctx context.Context) {
+				// This is required because controller-runtime expects its consumers to
+				// set a logger through log.SetLogger within 30 seconds of the program's
+				// initalization. We have our own logger and can configure controller-runtime's
+				// logger to do nothing.
+				ctrlruntimelog.SetLogger(logr.New(ctrlruntimelog.NullLogSink{}))
+
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up manager")
 				mgr, err := manager.New(cfg, manager.Options{
