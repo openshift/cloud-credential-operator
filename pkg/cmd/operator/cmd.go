@@ -119,6 +119,9 @@ func NewOperator() *cobra.Command {
 				util.SetupScheme(mgr.GetScheme())
 
 				featureGates, err := platform.GetFeatureGates()
+				if err != nil {
+					log.WithError(err).Fatal("unable to read feature gates")
+				}
 				awsSecurityTokenServiveGateEnaled := featureGates.Enabled(v1.FeatureGateAWSSecurityTokenService)
 
 				// Setup all Controllers
