@@ -3,15 +3,19 @@ package platform
 import (
 	"context"
 	"fmt"
-	log "github.com/sirupsen/logrus"
 	"os"
 	"time"
+
+	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/operator/events"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crtconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
@@ -89,12 +93,22 @@ func GetFeatureGates() (featuregates.FeatureGate, error) {
 	desiredVersion := computeClusterOperatorVersions()
 	missingVersion := desiredVersion
 
+	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create kube client: %w", err)
+	}
+	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events("openshift-cloud-credential-operator"), "cloud-credential-operator", &corev1.ObjectReference{
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Namespace:  "openshift-cloud-credential-operator",
+		Name:       "cloud-credential-operator",
+	})
+
 	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
-	// Notice the nil EventRecorder passed, is this okay?
 	featureGateAccessor := featuregates.NewFeatureGateAccess(
 		desiredVersion, missingVersion,
 		configInformers.Config().V1().ClusterVersions(), configInformers.Config().V1().FeatureGates(),
-		nil,
+		eventRecorder,
 	)
 	go featureGateAccessor.Run(ctx)
 	go configInformers.Start(stop)
