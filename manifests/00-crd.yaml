@@ -41,6 +41,9 @@ spec:
             required:
             - secretRef
             properties:
+              cloudTokenPath:
+                description: CloudTokenPath (JWT token)
+                type: string
               providerSpec:
                 description: ProviderSpec contains the cloud provider specific credentials
                   specification.
@@ -92,12 +95,6 @@ spec:
                 type: array
                 items:
                   type: string
-              cloudTokenString:
-                description: 'Like an AWS ARN String for instance'
-                type: string
-              cloudTokenPath:
-                description: 'Path to the cloud token'
-                type: string
           status:
             description: CredentialsRequestStatus defines the observed state of CredentialsRequest
             type: object

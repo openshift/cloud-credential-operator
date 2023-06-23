@@ -72,48 +72,51 @@ spec:
     singular: credentialsrequest
   scope: Namespaced
   versions:
-    - name: v1
-      schema:
-        openAPIV3Schema:
-          description: CredentialsRequest is the Schema for the credentialsrequests
-            API
-          type: object
-          required:
-            - spec
-          properties:
-            apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: CredentialsRequest is the Schema for the credentialsrequests
+          API
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
               of an object. Servers should convert recognized schemas to the latest
               internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-              type: string
-            kind:
-              description: 'Kind is a string value representing the REST resource this
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
               object represents. Servers may infer this from the endpoint the client
               submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-              type: string
-            metadata:
-              type: object
-            spec:
-              description: CredentialsRequestSpec defines the desired state of CredentialsRequest
-              type: object
-              required:
-                - secretRef
-              properties:
-                providerSpec:
-                  description: ProviderSpec contains the cloud provider specific credentials
-                    specification.
-                  type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                secretRef:
-                  description: SecretRef points to the secret where the credentials
-                    should be stored once generated.
-                  type: object
-                  properties:
-                    apiVersion:
-                      description: API version of the referent.
-                      type: string
-                    fieldPath:
-                      description: 'If referring to a piece of an object instead of
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CredentialsRequestSpec defines the desired state of CredentialsRequest
+            type: object
+            required:
+            - secretRef
+            properties:
+              cloudTokenPath:
+                description: CloudTokenPath (JWT token)
+                type: string
+              providerSpec:
+                description: ProviderSpec contains the cloud provider specific credentials
+                  specification.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              secretRef:
+                description: SecretRef points to the secret where the credentials
+                  should be stored once generated.
+                type: object
+                properties:
+                  apiVersion:
+                    description: API version of the referent.
+                    type: string
+                  fieldPath:
+                    description: 'If referring to a piece of an object instead of
                       an entire object, this string should contain a valid JSON/Go
                       field access statement, such as desiredState.manifest.containers[2].
                       For example, if the object reference is to a container within
@@ -124,114 +127,108 @@ spec:
                       only to have some well-defined way of referencing a part of
                       an object. TODO: this design is not final and this field is
                       subject to change in the future.'
-                      type: string
-                    kind:
-                      description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-                      type: string
-                    name:
-                      description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
-                      type: string
-                    namespace:
-                      description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
-                      type: string
-                    resourceVersion:
-                      description: 'Specific resourceVersion to which this reference
-                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
-                      type: string
-                    uid:
-                      description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
-                      type: string
-                serviceAccountNames:
-                  description: ServiceAccountNames contains a list of ServiceAccounts
-                    that will use permissions associated with this CredentialsRequest.
-                    This is not used by CCO, but the information is needed for being
-                    able to properly set up access control in the cloud provider when
-                    the ServiceAccounts are used as part of the cloud credentials flow.
-                  type: array
-                  items:
                     type: string
-                cloudTokenString:
-                  description: 'Like an AWS ARN String for instance'
+                  kind:
+                    description: 'Kind of the referent. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+                    type: string
+                  name:
+                    description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
+                    type: string
+                  namespace:
+                    description: 'Namespace of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/namespaces/'
+                    type: string
+                  resourceVersion:
+                    description: 'Specific resourceVersion to which this reference
+                      is made, if any. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#concurrency-control-and-consistency'
+                    type: string
+                  uid:
+                    description: 'UID of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#uids'
+                    type: string
+              serviceAccountNames:
+                description: ServiceAccountNames contains a list of ServiceAccounts
+                  that will use permissions associated with this CredentialsRequest.
+                  This is not used by CCO, but the information is needed for being
+                  able to properly set up access control in the cloud provider when
+                  the ServiceAccounts are used as part of the cloud credentials flow.
+                type: array
+                items:
                   type: string
-                cloudTokenPath:
-                  description: 'Path to the cloud token'
-                  type: string
-            status:
-              description: CredentialsRequestStatus defines the observed state of CredentialsRequest
-              type: object
-              required:
-                - lastSyncGeneration
-                - provisioned
-              properties:
-                conditions:
-                  description: Conditions includes detailed status for the CredentialsRequest
-                  type: array
-                  items:
-                    description: CredentialsRequestCondition contains details for any
-                      of the conditions on a CredentialsRequest object
-                    type: object
-                    required:
-                      - status
-                      - type
-                    properties:
-                      lastProbeTime:
-                        description: LastProbeTime is the last time we probed the condition
-                        type: string
-                        format: date-time
-                      lastTransitionTime:
-                        description: LastTransitionTime is the last time the condition
-                          transitioned from one status to another.
-                        type: string
-                        format: date-time
-                      message:
-                        description: Message is a human-readable message indicating
-                          details about the last transition
-                        type: string
-                      reason:
-                        description: Reason is a unique, one-word, CamelCase reason
-                          for the condition's last transition
-                        type: string
-                      status:
-                        description: Status is the status of the condition
-                        type: string
-                      type:
-                        description: Type is the specific type of the condition
-                        type: string
-                lastSyncCloudCredsSecretResourceVersion:
-                  description: LastSyncCloudCredsSecretResourceVersion is the resource
-                    version of the cloud credentials secret resource when the credentials
-                    request resource was last synced. Used to determine if the the cloud
-                    credentials have been updated since the last sync.
-                  type: string
-                lastSyncGeneration:
-                  description: LastSyncGeneration is the generation of the credentials
-                    request resource that was last synced. Used to determine if the
-                    object has changed and requires a sync.
-                  type: integer
-                  format: int64
-                lastSyncTimestamp:
-                  description: LastSyncTimestamp is the time that the credentials were
-                    last synced.
-                  type: string
-                  format: date-time
-                providerStatus:
-                  description: ProviderStatus contains cloud provider specific status.
+          status:
+            description: CredentialsRequestStatus defines the observed state of CredentialsRequest
+            type: object
+            required:
+            - lastSyncGeneration
+            - provisioned
+            properties:
+              conditions:
+                description: Conditions includes detailed status for the CredentialsRequest
+                type: array
+                items:
+                  description: CredentialsRequestCondition contains details for any
+                    of the conditions on a CredentialsRequest object
                   type: object
-                  x-kubernetes-preserve-unknown-fields: true
-                provisioned:
-                  description: Provisioned is true once the credentials have been initially
-                    provisioned.
-                  type: boolean
-      served: true
-      storage: true
-      subresources:
-        status: { }
+                  required:
+                  - status
+                  - type
+                  properties:
+                    lastProbeTime:
+                      description: LastProbeTime is the last time we probed the condition
+                      type: string
+                      format: date-time
+                    lastTransitionTime:
+                      description: LastTransitionTime is the last time the condition
+                        transitioned from one status to another.
+                      type: string
+                      format: date-time
+                    message:
+                      description: Message is a human-readable message indicating
+                        details about the last transition
+                      type: string
+                    reason:
+                      description: Reason is a unique, one-word, CamelCase reason
+                        for the condition's last transition
+                      type: string
+                    status:
+                      description: Status is the status of the condition
+                      type: string
+                    type:
+                      description: Type is the specific type of the condition
+                      type: string
+              lastSyncCloudCredsSecretResourceVersion:
+                description: LastSyncCloudCredsSecretResourceVersion is the resource
+                  version of the cloud credentials secret resource when the credentials
+                  request resource was last synced. Used to determine if the the cloud
+                  credentials have been updated since the last sync.
+                type: string
+              lastSyncGeneration:
+                description: LastSyncGeneration is the generation of the credentials
+                  request resource that was last synced. Used to determine if the
+                  object has changed and requires a sync.
+                type: integer
+                format: int64
+              lastSyncTimestamp:
+                description: LastSyncTimestamp is the time that the credentials were
+                  last synced.
+                type: string
+                format: date-time
+              providerStatus:
+                description: ProviderStatus contains cloud provider specific status.
+                type: object
+                x-kubernetes-preserve-unknown-fields: true
+              provisioned:
+                description: Provisioned is true once the credentials have been initially
+                  provisioned.
+                type: boolean
+    served: true
+    storage: true
+    subresources:
+      status: {}
 status:
   acceptedNames:
     kind: ""
     plural: ""
-  conditions: [ ]
-  storedVersions: [ ]
+  conditions: []
+  storedVersions: []
 `)
 
 func bootstrapCloudcredential_v1_credentialsrequest_crdYamlBytes() ([]byte, error) {
@@ -266,131 +263,172 @@ spec:
     singular: cloudcredential
   scope: Cluster
   versions:
-    - name: v1
-      schema:
-        openAPIV3Schema:
-          description: "CloudCredential provides a means to configure an operator to manage CredentialsRequests. \n Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer)."
-          type: object
-          required:
-            - spec
-          properties:
-            apiVersion:
-              description: 'APIVersion defines the versioned schema of this representation of an object. Servers should convert recognized schemas to the latest internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
-              type: string
-            kind:
-              description: 'Kind is a string value representing the REST resource this object represents. Servers may infer this from the endpoint the client submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
-              type: string
-            metadata:
-              type: object
-            spec:
-              description: CloudCredentialSpec is the specification of the desired behavior of the cloud-credential-operator.
-              type: object
-              properties:
-                credentialsMode:
-                  description: 'CredentialsMode allows informing CCO that it should not attempt to dynamically determine the root cloud credentials capabilities, and it should just run in the specified mode. It also allows putting the operator into "manual" mode if desired. Leaving the field in default mode runs CCO so that the cluster''s cloud credentials will be dynamically probed for capabilities (on supported clouds/platforms). Supported modes: AWS/Azure/GCP: "" (Default), "Mint", "Passthrough", "Manual" Others: Do not set value as other platforms only support running in "Passthrough"'
-                  type: string
-                  enum:
-                    - ""
-                    - Manual
-                    - Mint
-                    - Passthrough
-                logLevel:
-                  description: "logLevel is an intent based logging for an overall component.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for their operands. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
-                  type: string
-                  default: Normal
-                  enum:
-                    - ""
-                    - Normal
-                    - Debug
-                    - Trace
-                    - TraceAll
-                managementState:
-                  description: managementState indicates whether and how the operator should manage the component
-                  type: string
-                  pattern: ^(Managed|Unmanaged|Force|Removed)$
-                observedConfig:
-                  description: observedConfig holds a sparse config that controller has observed from the cluster state.  It exists in spec because it is an input to the level for the operator
+  - name: v1
+    schema:
+      openAPIV3Schema:
+        description: "CloudCredential provides a means to configure an operator to
+          manage CredentialsRequests. \n Compatibility level 1: Stable within a major
+          release for a minimum of 12 months or 3 minor releases (whichever is longer)."
+        type: object
+        required:
+        - spec
+        properties:
+          apiVersion:
+            description: 'APIVersion defines the versioned schema of this representation
+              of an object. Servers should convert recognized schemas to the latest
+              internal value, and may reject unrecognized values. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#resources'
+            type: string
+          kind:
+            description: 'Kind is a string value representing the REST resource this
+              object represents. Servers may infer this from the endpoint the client
+              submits requests to. Cannot be updated. In CamelCase. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#types-kinds'
+            type: string
+          metadata:
+            type: object
+          spec:
+            description: CloudCredentialSpec is the specification of the desired behavior
+              of the cloud-credential-operator.
+            type: object
+            properties:
+              credentialsMode:
+                description: 'CredentialsMode allows informing CCO that it should
+                  not attempt to dynamically determine the root cloud credentials
+                  capabilities, and it should just run in the specified mode. It also
+                  allows putting the operator into "manual" mode if desired. Leaving
+                  the field in default mode runs CCO so that the cluster''s cloud
+                  credentials will be dynamically probed for capabilities (on supported
+                  clouds/platforms). Supported modes: AWS/Azure/GCP: "" (Default),
+                  "Mint", "Passthrough", "Manual" Others: Do not set value as other
+                  platforms only support running in "Passthrough"'
+                type: string
+                enum:
+                - ""
+                - Manual
+                - Mint
+                - Passthrough
+              logLevel:
+                description: "logLevel is an intent based logging for an overall component.
+                  \ It does not give fine grained control, but it is a simple way
+                  to manage coarse grained logging choices that operators have to
+                  interpret for their operands. \n Valid values are: \"Normal\", \"Debug\",
+                  \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                type: string
+                default: Normal
+                enum:
+                - ""
+                - Normal
+                - Debug
+                - Trace
+                - TraceAll
+              managementState:
+                description: managementState indicates whether and how the operator
+                  should manage the component
+                type: string
+                pattern: ^(Managed|Unmanaged|Force|Removed)$
+              observedConfig:
+                description: observedConfig holds a sparse config that controller
+                  has observed from the cluster state.  It exists in spec because
+                  it is an input to the level for the operator
+                type: object
+                nullable: true
+                x-kubernetes-preserve-unknown-fields: true
+              operatorLogLevel:
+                description: "operatorLogLevel is an intent based logging for the
+                  operator itself.  It does not give fine grained control, but it
+                  is a simple way to manage coarse grained logging choices that operators
+                  have to interpret for themselves. \n Valid values are: \"Normal\",
+                  \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
+                type: string
+                default: Normal
+                enum:
+                - ""
+                - Normal
+                - Debug
+                - Trace
+                - TraceAll
+              unsupportedConfigOverrides:
+                description: unsupportedConfigOverrides overrides the final configuration
+                  that was computed by the operator. Red Hat does not support the
+                  use of this field. Misuse of this field could lead to unexpected
+                  behavior or conflict with other configuration options. Seek guidance
+                  from the Red Hat support before using this field. Use of this property
+                  blocks cluster upgrades, it must be removed before upgrading your
+                  cluster.
+                type: object
+                nullable: true
+                x-kubernetes-preserve-unknown-fields: true
+          status:
+            description: CloudCredentialStatus defines the observed status of the
+              cloud-credential-operator.
+            type: object
+            properties:
+              conditions:
+                description: conditions is a list of conditions and their status
+                type: array
+                items:
+                  description: OperatorCondition is just the standard condition fields.
                   type: object
-                  nullable: true
-                  x-kubernetes-preserve-unknown-fields: true
-                operatorLogLevel:
-                  description: "operatorLogLevel is an intent based logging for the operator itself.  It does not give fine grained control, but it is a simple way to manage coarse grained logging choices that operators have to interpret for themselves. \n Valid values are: \"Normal\", \"Debug\", \"Trace\", \"TraceAll\". Defaults to \"Normal\"."
-                  type: string
-                  default: Normal
-                  enum:
-                    - ""
-                    - Normal
-                    - Debug
-                    - Trace
-                    - TraceAll
-                unsupportedConfigOverrides:
-                  description: unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
+                  properties:
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+                    message:
+                      type: string
+                    reason:
+                      type: string
+                    status:
+                      type: string
+                    type:
+                      type: string
+              generations:
+                description: generations are used to determine when an item needs
+                  to be reconciled or has changed in a way that needs a reaction.
+                type: array
+                items:
+                  description: GenerationStatus keeps track of the generation for
+                    a given resource so that decisions about forced updates can be
+                    made.
                   type: object
-                  nullable: true
-                  x-kubernetes-preserve-unknown-fields: true
-            status:
-              description: CloudCredentialStatus defines the observed status of the cloud-credential-operator.
-              type: object
-              properties:
-                conditions:
-                  description: conditions is a list of conditions and their status
-                  type: array
-                  items:
-                    description: OperatorCondition is just the standard condition fields.
-                    type: object
-                    properties:
-                      lastTransitionTime:
-                        type: string
-                        format: date-time
-                      message:
-                        type: string
-                      reason:
-                        type: string
-                      status:
-                        type: string
-                      type:
-                        type: string
-                generations:
-                  description: generations are used to determine when an item needs to be reconciled or has changed in a way that needs a reaction.
-                  type: array
-                  items:
-                    description: GenerationStatus keeps track of the generation for a given resource so that decisions about forced updates can be made.
-                    type: object
-                    properties:
-                      group:
-                        description: group is the group of the thing you're tracking
-                        type: string
-                      hash:
-                        description: hash is an optional field set for resources without generation that are content sensitive like secrets and configmaps
-                        type: string
-                      lastGeneration:
-                        description: lastGeneration is the last generation of the workload controller involved
-                        type: integer
-                        format: int64
-                      name:
-                        description: name is the name of the thing you're tracking
-                        type: string
-                      namespace:
-                        description: namespace is where the thing you're tracking is
-                        type: string
-                      resource:
-                        description: resource is the resource type of the thing you're tracking
-                        type: string
-                observedGeneration:
-                  description: observedGeneration is the last generation change you've dealt with
-                  type: integer
-                  format: int64
-                readyReplicas:
-                  description: readyReplicas indicates how many replicas are ready and at the desired state
-                  type: integer
-                  format: int32
-                version:
-                  description: version is the level this availability applies to
-                  type: string
-      served: true
-      storage: true
-      subresources:
-        status: {}
+                  properties:
+                    group:
+                      description: group is the group of the thing you're tracking
+                      type: string
+                    hash:
+                      description: hash is an optional field set for resources without
+                        generation that are content sensitive like secrets and configmaps
+                      type: string
+                    lastGeneration:
+                      description: lastGeneration is the last generation of the workload
+                        controller involved
+                      type: integer
+                      format: int64
+                    name:
+                      description: name is the name of the thing you're tracking
+                      type: string
+                    namespace:
+                      description: namespace is where the thing you're tracking is
+                      type: string
+                    resource:
+                      description: resource is the resource type of the thing you're
+                        tracking
+                      type: string
+              observedGeneration:
+                description: observedGeneration is the last generation change you've
+                  dealt with
+                type: integer
+                format: int64
+              readyReplicas:
+                description: readyReplicas indicates how many replicas are ready and
+                  at the desired state
+                type: integer
+                format: int32
+              version:
+                description: version is the level this availability applies to
+                type: string
+    served: true
+    storage: true
+    subresources:
+      status: {}
 `)
 
 func bootstrapCloudcredential_v1_operator_config_custresdefYamlBytes() ([]byte, error) {

@@ -344,6 +344,8 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 			return err
 		}
 	}
+	logger.Infof("stsFeatureGateEnabled: %v", stsFeatureGateEnabled)
+	logger.Infof("stsDetected: %v", stsDetected)
 	if stsFeatureGateEnabled && stsDetected {
 		if a.Codec == nil {
 			return fmt.Errorf("invalid codec, nil value")
@@ -353,11 +355,20 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		if err != nil {
 			return err
 		}
-		if awsSTSIAMRoleARN != "" {
-			err = a.createSecret(awsSTSIAMRoleARN, cr.Spec.CloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger)
+		if awsSTSIAMRoleARN == "" {
+			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
+			return nil
 		}
-		if err != nil {
-			return err
+		cloudTokenPath := cr.Spec.CloudTokenPath
+		if cr.Spec.CloudTokenPath == "" {
+			logger.Debug("CredentialsRequest has no cloudTokenPath, defaulting cloudTokenPath to /var/run/secrets/kubernetes.io/serviceaccount/token")
+			cloudTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		}
+		if awsSTSIAMRoleARN != "" {
+			err = a.createSecret(awsSTSIAMRoleARN, cloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger)
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
