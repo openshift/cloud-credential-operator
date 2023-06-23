@@ -33,7 +33,6 @@ type AWSProviderSpec struct {
 	// The presence of an stsIAMRoleARN within the AWSProviderSpec initiates creation of a secret containing IAM
 	// Role details necessary for assuming the IAM Role via Amazon's Secure Token Service.
 	// +optional
-	// +kubebuilder:validation:Pattern:="^arn:(?P<Partition>[^:\n]*):(?P<Service>[^:\n]*):(?P<Region>[^:\n]*):(?P<AccountID>[^:\n]*):(?P<Ignore>(?P<ResourceType>[^:\/\n]*)[:\/])?(?P<Resource>.*)$"
 	STSIAMRoleARN string `json:"stsIAMRoleARN,omitempty"`
 }
 

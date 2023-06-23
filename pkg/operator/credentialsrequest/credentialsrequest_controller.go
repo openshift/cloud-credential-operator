@@ -384,10 +384,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		logger.Error("configuration conflict betwen legacy configmap and operator config")
 		return reconcile.Result{}, fmt.Errorf("configuration conflict")
 	} else if mode == operatorv1.CloudCredentialsModeManual {
-		logger.Infof("operator set to disabled / manual mode")
-		if stsDetected {
-			logger.Debug("operator detects STS enabled cluster")
+		if !stsDetected {
+			logger.Infof("operator set to disabled / manual mode")
 			return reconcile.Result{}, err
+		} else {
+			logger.Infof("operator detects STS enabled cluster")
 		}
 	}
 
