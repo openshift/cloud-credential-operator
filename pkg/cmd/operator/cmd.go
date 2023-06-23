@@ -100,10 +100,10 @@ func NewOperator() *cobra.Command {
 				mgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: ":2112",
 					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-						if opts.SelectorsByObject == nil {
-							opts.SelectorsByObject = map[client.Object]cache.ObjectSelector{}
+						if opts.ByObject == nil {
+							opts.ByObject = map[client.Object]cache.ByObject{}
 						}
-						opts.SelectorsByObject[&corev1.ConfigMap{}] = cache.ObjectSelector{
+						opts.ByObject[&corev1.ConfigMap{}] = cache.ByObject{
 							Field: fields.SelectorFromSet(fields.Set{
 								"metadata.namespace": minterv1.CloudCredOperatorNamespace,
 								"metadata.name":      constants.CloudCredOperatorConfigMap,
