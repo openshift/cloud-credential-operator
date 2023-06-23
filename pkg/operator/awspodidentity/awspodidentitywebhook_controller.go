@@ -133,11 +133,15 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 	if err != nil {
 		return err
 	}
+	// Only add controller when PlatformType is AWS
 	platformType := platform.GetType(infraStatus)
 	if platformType != configv1.AWSPlatformType {
 		return nil
 	}
-
+	// Do not add controller when ControlPlaneTopology is External
+	if infraStatus.ControlPlaneTopology == configv1.ExternalTopologyMode {
+		return nil
+	}
 	log.Info("setting up AWS pod identity controller")
 
 	config := mgr.GetConfig()
