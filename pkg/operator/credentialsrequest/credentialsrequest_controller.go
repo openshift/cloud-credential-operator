@@ -386,7 +386,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	} else if mode == operatorv1.CloudCredentialsModeManual {
 		logger.Infof("operator set to disabled / manual mode")
 		if stsDetected {
-			logger.Infof("operator detects STS enabled cluster")
+			logger.Debug("operator detects STS enabled cluster")
 			return reconcile.Result{}, err
 		}
 	}
@@ -534,7 +534,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	}
 	if stsFeatureGateEnabled && stsDetected {
 		// create time-based tokens based on settings in CredentialsRequests
-		logger.Infof("timed token access cluster detected: %t, so not trying to provision with root secret",
+		logger.Debugf("timed token access cluster detected: %t, so not trying to provision with root secret",
 			stsDetected)
 		credsExists, err := r.Actuator.Exists(context.TODO(), cr)
 		if err != nil {
