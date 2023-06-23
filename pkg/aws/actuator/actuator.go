@@ -348,7 +348,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		if a.Codec == nil {
 			return fmt.Errorf("invalid codec, nil value")
 		}
-		logger.Info("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
+		logger.Debug("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
 		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(a.Codec, cr)
 		if err != nil {
 			return err
