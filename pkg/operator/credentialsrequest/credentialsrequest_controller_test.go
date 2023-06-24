@@ -1041,15 +1041,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testCredentialsRequest(t),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
-				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
-				mockGetUserPolicy(mockAWSClient, testPolicy1)
-				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
-				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
-				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
 				return mockAWSClient
 			},
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -1066,15 +1060,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testCredentialsRequest(t),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
-				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
-				mockGetUserPolicy(mockAWSClient, testPolicy1)
-				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
-				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
-				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
 				return mockAWSClient
 			},
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -1092,15 +1080,9 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testCredentialsRequest(t),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
-				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
 			},
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
-				mockGetUser(mockAWSClient)
-				mockGetUserPolicy(mockAWSClient, testPolicy1)
-				mockListAccessKeys(mockAWSClient, testAWSAccessKeyID)
-				mockDeleteAccessKey(mockAWSClient, testAWSAccessKeyID)
-				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID2, testAWSSecretAccessKey2)
 				return mockAWSClient
 			},
 			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
@@ -1394,7 +1376,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 
 			fakeClient := fake.NewClientBuilder().
 				WithStatusSubresource(&minterv1.CredentialsRequest{}).
-				WithStatusSubresource(&corev1.Secret{}).
 				WithRuntimeObjects(test.existing...).Build()
 			rcr := &ReconcileCredentialsRequest{
 				Client: fakeClient,
