@@ -40,7 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	v1 "github.com/openshift/api/config/v1"
+	configv1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
@@ -125,11 +125,11 @@ func NewOperator() *cobra.Command {
 				// Setup Scheme for all resources
 				util.SetupScheme(mgr.GetScheme())
 
-				featureGates, err := platform.GetFeatureGates()
+				featureGates, err := platform.GetFeatureGates(ctx)
 				if err != nil {
 					log.WithError(err).Fatal("unable to read feature gates")
 				}
-				awsSecurityTokenServiveGateEnaled := featureGates.Enabled(v1.FeatureGateAWSSecurityTokenService)
+				awsSecurityTokenServiveGateEnaled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
 
 				// Setup all Controllers
 				log.Info("setting up controller")

@@ -586,7 +586,6 @@ func TestDetectSTS(t *testing.T) {
 		name               string
 		existing           []runtime.Object
 		wantErr            assert.ErrorAssertionFunc
-		ctx                context.Context
 		CredentialsRequest *minterv1.CredentialsRequest
 		issuer             string
 		stsEnabled         bool
@@ -597,7 +596,6 @@ func TestDetectSTS(t *testing.T) {
 				testInfrastructure(),
 				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
 			},
-			ctx: context.TODO(),
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
 				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
@@ -616,7 +614,6 @@ func TestDetectSTS(t *testing.T) {
 				testInfrastructure(),
 				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
 			},
-			ctx: context.TODO(),
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
 				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
@@ -636,7 +633,6 @@ func TestDetectSTS(t *testing.T) {
 				testInfrastructure(),
 				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
 			},
-			ctx: context.TODO(),
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
 				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "cloud-token")
@@ -666,7 +662,7 @@ func TestDetectSTS(t *testing.T) {
 				Codec:                             codec,
 				AWSSecurityTokenServiveGateEnaled: test.stsEnabled,
 			}
-			test.wantErr(t, a.sync(test.ctx, test.CredentialsRequest), fmt.Sprintf("sync(%v, %v)", test.ctx, test.CredentialsRequest))
+			test.wantErr(t, a.sync(context.Background(), test.CredentialsRequest), fmt.Sprintf("sync(%v)", test.CredentialsRequest))
 		})
 	}
 }
