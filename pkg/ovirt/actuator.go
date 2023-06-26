@@ -53,8 +53,8 @@ type OvirtActuator struct {
 	Codec  *minterv1.ProviderCodec
 }
 
-func (a *OvirtActuator) GetFeatureGates() (featuregates.FeatureGate, error) {
-	featureGates, err := platform.GetFeatureGates()
+func (a *OvirtActuator) GetFeatureGates(ctx context.Context) (featuregates.FeatureGate, error) {
+	featureGates, err := platform.GetFeatureGates(nil)
 	if err != nil {
 		log.Fatal(err)
 	}

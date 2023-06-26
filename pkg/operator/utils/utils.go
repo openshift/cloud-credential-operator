@@ -78,7 +78,7 @@ func LoadInfrastructureTopology(c client.Client, logger log.FieldLogger) (config
 //  2. Is serviceAccountIssuer non-empty
 //
 // Both of these conditions must be true for any timed access token enabled clusters for the implementations mentioned above.
-func IsTimedTokenCluster(c client.Client, logger log.FieldLogger) (bool, error) {
+func IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
 	credentialsMode, _, err := GetOperatorConfiguration(c, logger)
 	if err != nil {
 		logger.WithError(err).Error("error loading CCO configuration to determine mode")
@@ -87,15 +87,12 @@ func IsTimedTokenCluster(c client.Client, logger log.FieldLogger) (bool, error) 
 	if credentialsMode != "Manual" {
 		return false, nil
 	}
-	authConfig, err := GetAuth(c)
+	authConfig, err := GetAuth(ctx, c)
 	if err != nil {
 		logger.WithError(err).Error("error loading authentication config")
 		return false, err
 	}
-	if authConfig.Spec.ServiceAccountIssuer == "" {
-		return false, nil
-	}
-	return true, nil
+	return authConfig.Spec.ServiceAccountIssuer != "", nil
 }
 
 // LoadInfrastructureName loads the cluster Infrastructure config and returns the infra name
@@ -138,9 +135,9 @@ func GetInfrastructure(c client.Client) (*configv1.Infrastructure, error) {
 	return infra, nil
 }
 
-func GetAuth(c client.Client) (*configv1.Authentication, error) {
+func GetAuth(ctx context.Context, c client.Client) (*configv1.Authentication, error) {
 	auth := &configv1.Authentication{}
-	if err := c.Get(context.TODO(), types.NamespacedName{Name: "cluster"}, auth); err != nil {
+	if err := c.Get(ctx, types.NamespacedName{Name: "cluster"}, auth); err != nil {
 		return nil, err
 	}
 	return auth, nil

@@ -186,7 +186,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	allCredRequestsMapFn := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 		log.Info("requeueing all CredentialsRequests")
 		crs := &minterv1.CredentialsRequestList{}
-		err := mgr.GetClient().List(context.TODO(), crs)
+		err := mgr.GetClient().List(ctx, crs)
 		var requests []reconcile.Request
 		if err != nil {
 			log.WithError(err).Error("error listing all cred requests for requeue")
@@ -235,7 +235,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		log.WithField("namespace", newNamespace).Debug("checking for credentails requests targeting namespace")
 		crs := &minterv1.CredentialsRequestList{}
 		// Fixme: check for errors
-		mgr.GetClient().List(context.TODO(), crs)
+		mgr.GetClient().List(ctx, crs)
 		requests := []reconcile.Request{}
 		for _, cr := range crs.Items {
 			if !cr.Status.Provisioned && cr.Spec.SecretRef.Namespace == newNamespace {
@@ -375,7 +375,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	stsFeatureGateEnabled := r.Actuator.STSFeatureGateEnabled()
 
 	if stsFeatureGateEnabled {
-		stsDetected, _ = utils.IsTimedTokenCluster(r.Client, logger)
+		stsDetected, _ = utils.IsTimedTokenCluster(r.Client, ctx, logger)
 	}
 	if err != nil {
 		logger.WithError(err).Error("error checking if operator is disabled")
@@ -394,7 +394,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 
 	logger.Info("syncing credentials request")
 	cr := &minterv1.CredentialsRequest{}
-	err = r.Get(context.TODO(), request.NamespacedName, cr)
+	err = r.Get(ctx, request.NamespacedName, cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debug("credentials request no longer exists")
@@ -429,7 +429,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	// Handle deletion and the deprovision finalizer:
 	if cr.DeletionTimestamp != nil {
 		if HasFinalizer(cr, minterv1.FinalizerDeprovision) {
-			err = r.Actuator.Delete(context.TODO(), cr)
+			err = r.Actuator.Delete(ctx, cr)
 			if err != nil {
 				logger.WithError(err).Error("actuator error deleting credentials exist")
 
@@ -450,7 +450,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 
 			// Delete the target secret if it exists:
 			targetSecret := &corev1.Secret{}
-			err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, targetSecret)
+			err := r.Client.Get(ctx, types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, targetSecret)
 			sLog := logger.WithFields(log.Fields{
 				"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 			})
@@ -462,7 +462,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 					return reconcile.Result{}, err
 				}
 			} else {
-				err := r.Client.Delete(context.TODO(), targetSecret)
+				err := r.Client.Delete(ctx, targetSecret)
 				if err != nil {
 					sLog.WithError(err).Error("error deleting target secret")
 					return reconcile.Result{}, err
@@ -472,7 +472,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			}
 
 			logger.Info("actuator deletion complete, removing finalizer")
-			err = r.removeDeprovisionFinalizer(cr)
+			err = r.removeDeprovisionFinalizer(ctx, cr)
 			if err != nil {
 				logger.WithError(err).Error("error removing deprovision finalizer")
 				return reconcile.Result{}, err
@@ -486,7 +486,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		if !HasFinalizer(cr, minterv1.FinalizerDeprovision) {
 			// Ensure the finalizer is set on any not-deleted requests:
 			logger.Infof("adding finalizer: %s", minterv1.FinalizerDeprovision)
-			err = r.addDeprovisionFinalizer(cr)
+			err = r.addDeprovisionFinalizer(ctx, cr)
 			if err != nil {
 				logger.WithError(err).Error("error adding finalizer")
 			}
@@ -497,7 +497,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	// Ensure the target namespace exists for the secret, if not, there's no point
 	// continuing:
 	targetNS := &corev1.Namespace{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: cr.Spec.SecretRef.Namespace}, targetNS)
+	err = r.Get(ctx, types.NamespacedName{Name: cr.Spec.SecretRef.Namespace}, targetNS)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// TODO: technically we should deprovision if a credential was in this ns, but it
@@ -523,7 +523,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	var crSecretExists bool
 	crSecret := &corev1.Secret{}
 	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
-	if err := r.Get(context.TODO(), secretKey, crSecret); err != nil {
+	if err := r.Get(ctx, secretKey, crSecret); err != nil {
 		if errors.IsNotFound(err) {
 			crSecretExists = false
 		} else {
@@ -537,18 +537,14 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		// create time-based tokens based on settings in CredentialsRequests
 		logger.Debugf("timed token access cluster detected: %t, so not trying to provision with root secret",
 			stsDetected)
-		credsExists, err := r.Actuator.Exists(context.TODO(), cr)
+		credsExists, err := r.Actuator.Exists(ctx, cr)
 		if err != nil {
 			logger.Errorf("error checking whether credentials already exists: %v", err)
 			return reconcile.Result{}, err
 		}
 
 		var syncErr error
-		if !credsExists {
-			syncErr = r.Actuator.Create(context.TODO(), cr)
-		} else {
-			syncErr = r.Actuator.Update(context.TODO(), cr)
-		}
+		syncErr = r.CreateOrUpdateOnCredsExist(ctx, credsExists, syncErr, cr)
 		var provisionErr bool
 		if syncErr != nil {
 			switch t := syncErr.(type) {
@@ -577,7 +573,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			cr.Status.Provisioned = true
 		}
 	} else {
-		credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(context.TODO(), cr)
+		credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(ctx, cr)
 		if err != nil {
 			log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
 		}
@@ -586,6 +582,14 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
 		hasActiveFailureConditions := checkForFailureConditions(cr)
 
+		log.WithFields(log.Fields{
+			"cloudCredsSecretUpdated":        cloudCredsSecretUpdated,
+			"NOT isStale":                    isStale,
+			"hasRecentlySynced":              hasRecentlySynced,
+			"crSecretExists":                 crSecretExists,
+			"NOT hasActiveFailureConditions": hasActiveFailureConditions,
+			"cr.Status.Provisioned":          cr.Status.Provisioned,
+		}).Debug("The above are ANDed together to determine: lastsyncgeneration is current and lastsynctimestamp < an hour ago")
 		if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
 			logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
 			// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
@@ -594,18 +598,14 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 		}
 
-		credsExists, err := r.Actuator.Exists(context.TODO(), cr)
+		credsExists, err := r.Actuator.Exists(ctx, cr)
 		if err != nil {
 			logger.Errorf("error checking whether credentials already exists: %v", err)
 			return reconcile.Result{}, err
 		}
 
 		var syncErr error
-		if !credsExists {
-			syncErr = r.Actuator.Create(context.TODO(), cr)
-		} else {
-			syncErr = r.Actuator.Update(context.TODO(), cr)
-		}
+		syncErr = r.CreateOrUpdateOnCredsExist(ctx, credsExists, syncErr, cr)
 
 		var provisionErr bool
 		if syncErr != nil {
@@ -666,6 +666,15 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		}
 	}
 	return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+}
+
+func (r *ReconcileCredentialsRequest) CreateOrUpdateOnCredsExist(ctx context.Context, credsExists bool, syncErr error, cr *minterv1.CredentialsRequest) error {
+	if !credsExists {
+		syncErr = r.Actuator.Create(ctx, cr)
+	} else {
+		syncErr = r.Actuator.Update(ctx, cr)
+	}
+	return syncErr
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
@@ -817,14 +826,14 @@ func setIgnoredCondition(cr *minterv1.CredentialsRequest, clusterPlatform config
 	}
 }
 
-func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
+func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	AddFinalizer(cr, minterv1.FinalizerDeprovision)
-	return r.Update(context.TODO(), cr)
+	return r.Update(ctx, cr)
 }
 
-func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
+func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	DeleteFinalizer(cr, minterv1.FinalizerDeprovision)
-	return r.Update(context.TODO(), cr)
+	return r.Update(ctx, cr)
 }
 
 // HasFinalizer returns true if the given object has the given finalizer

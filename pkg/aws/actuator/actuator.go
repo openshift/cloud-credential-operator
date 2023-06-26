@@ -339,7 +339,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	stsDetected := false
 	stsFeatureGateEnabled := a.STSFeatureGateEnabled()
 	if stsFeatureGateEnabled {
-		stsDetected, err = utils.IsTimedTokenCluster(a.Client, logger)
+		stsDetected, err = utils.IsTimedTokenCluster(a.Client, ctx, logger)
 		if err != nil {
 			return err
 		}
@@ -347,9 +347,6 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	logger.Infof("stsFeatureGateEnabled: %v", stsFeatureGateEnabled)
 	logger.Infof("stsDetected: %v", stsDetected)
 	if stsFeatureGateEnabled && stsDetected {
-		if a.Codec == nil {
-			return fmt.Errorf("invalid codec, nil value")
-		}
 		logger.Debug("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
 		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(a.Codec, cr)
 		if err != nil {
@@ -365,7 +362,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 			cloudTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 		}
 		if awsSTSIAMRoleARN != "" {
-			err = a.createSecret(awsSTSIAMRoleARN, cloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger)
+			err = a.createSTSSecret(awsSTSIAMRoleARN, cloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger, ctx)
 			if err != nil {
 				return err
 			}
@@ -413,14 +410,13 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	return nil
 }
 
-// createSecret makes a time-based token available in a Secret in the namespace of an operator that
+// createSTSSecret makes a time-based token available in a Secret in the namespace of an operator that
 // has supplied the following in the CredentialsRequest:
 // a non-nil spec.CloudTokenString
 // a path to the JWT token: spec.cloudTokenPath
 // a spec.SecretRef.Name
 // a cr.Spec.SecretRef.Namespace
-func (a *AWSActuator) createSecret(awsSTSIAMRoleARN string, cloudTokenPath string, secretRef string,
-	secretRefNamespace string, log log.FieldLogger) error {
+func (a *AWSActuator) createSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath string, secretRef string, secretRefNamespace string, log log.FieldLogger, ctx context.Context) error {
 	log.Infof("creating secret")
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -432,7 +428,7 @@ func (a *AWSActuator) createSecret(awsSTSIAMRoleARN string, cloudTokenPath strin
 		},
 		Type: corev1.SecretTypeOpaque,
 	}
-	err := a.Client.Create(context.TODO(), secret)
+	err := a.Client.Create(ctx, secret)
 	if err != nil {
 		log.Errorf("error creating secret")
 		return err

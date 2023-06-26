@@ -72,9 +72,8 @@ func getClient(explicitKubeconfig string) (client.Client, error) {
 	return dynamicClient, nil
 }
 
-func GetFeatureGates() (featuregates.FeatureGate, error) {
+func GetFeatureGates(ctx context.Context) (featuregates.FeatureGate, error) {
 	stop := make(chan struct{})
-	ctx := context.Background()
 	ctx, cancelFn := context.WithCancel(ctx)
 	go func() {
 		defer cancelFn()
