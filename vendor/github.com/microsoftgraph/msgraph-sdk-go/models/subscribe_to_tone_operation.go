@@ -13,8 +13,6 @@ func NewSubscribeToToneOperation()(*SubscribeToToneOperation) {
     m := &SubscribeToToneOperation{
         CommsOperation: *NewCommsOperation(),
     }
-    odataTypeValue := "#microsoft.graph.subscribeToToneOperation";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateSubscribeToToneOperationFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *SubscribeToToneOperation) Serialize(writer i878a80d2330e89d26896388a3f4
         return err
     }
     return nil
+}
+// SubscribeToToneOperationable 
+type SubscribeToToneOperationable interface {
+    CommsOperationable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }

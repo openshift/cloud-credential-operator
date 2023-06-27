@@ -26,7 +26,7 @@ func (v *AllowedHostsValidator) GetAllowedHosts() map[string]bool {
 	return hosts
 }
 
-//SetAllowedHosts sets the list of valid hosts.
+// SetAllowedHosts sets the list of valid hosts.
 func (v *AllowedHostsValidator) SetAllowedHosts(hosts []string) {
 	v.validHosts = make(map[string]bool, len(hosts))
 	if len(hosts) > 0 {
@@ -45,5 +45,5 @@ func (v *AllowedHostsValidator) IsUrlHostValid(uri *u.URL) bool {
 	if host == "" {
 		return false
 	}
-	return v.validHosts[strings.ToLower(host)]
+	return len(v.validHosts) == 0 || v.validHosts[strings.ToLower(host)]
 }

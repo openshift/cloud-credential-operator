@@ -13,8 +13,6 @@ func NewCancelMediaProcessingOperation()(*CancelMediaProcessingOperation) {
     m := &CancelMediaProcessingOperation{
         CommsOperation: *NewCommsOperation(),
     }
-    odataTypeValue := "#microsoft.graph.cancelMediaProcessingOperation";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateCancelMediaProcessingOperationFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *CancelMediaProcessingOperation) Serialize(writer i878a80d2330e89d268963
         return err
     }
     return nil
+}
+// CancelMediaProcessingOperationable 
+type CancelMediaProcessingOperationable interface {
+    CommsOperationable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }
