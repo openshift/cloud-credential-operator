@@ -658,9 +658,9 @@ func TestDetectSTS(t *testing.T) {
 				panic(err)
 			}
 			a := &AWSActuator{
-				Client:                            fakeClient,
-				Codec:                             codec,
-				AWSSecurityTokenServiveGateEnaled: test.stsEnabled,
+				Client:                             fakeClient,
+				Codec:                              codec,
+				AWSSecurityTokenServiceGateEnabled: test.stsEnabled,
 			}
 			test.wantErr(t, a.sync(context.Background(), test.CredentialsRequest), fmt.Sprintf("sync(%v)", test.CredentialsRequest))
 		})
