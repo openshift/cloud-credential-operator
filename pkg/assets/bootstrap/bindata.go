@@ -100,7 +100,13 @@ spec:
             - secretRef
             properties:
               cloudTokenPath:
-                description: CloudTokenPath (JWT token)
+                description: cloudTokenPath is the path where the Kubernetes ServiceAccount
+                  token (JSON Web Token) is mounted on the deployment for the workload
+                  requesting a credentials secret. The presence of this field in combination
+                  with fields such as spec.providerSpec.stsIAMRoleARN indicate that
+                  CCO should broker creation of a credentials secret containing fields
+                  necessary for token based authentication methods such as with the
+                  AWS Secure Token Service (STS).
                 type: string
               providerSpec:
                 description: ProviderSpec contains the cloud provider specific credentials
