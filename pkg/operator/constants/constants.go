@@ -130,6 +130,12 @@ const (
 	// UpgradeableAnnotation is the annotation CCO will check for on the cloudcredential.operator.openshift.io
 	// CR when determining upgradeability.
 	UpgradeableAnnotation = "cloudcredential.openshift.io/upgradeable-to"
+
+	// CCONameSpace Namespace defined for CCO to use
+	CCONameSpace = "openshift-cloud-credential-operator"
+
+	// DeploymentName name of the CCO deployment
+	DeploymentName = "cloud-credential-operator"
 )
 
 var (
