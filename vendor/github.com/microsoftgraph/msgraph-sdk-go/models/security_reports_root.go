@@ -8,13 +8,11 @@ import (
 type SecurityReportsRoot struct {
     Entity
 }
-// NewSecurityReportsRoot instantiates a new securityReportsRoot and sets the default values.
+// NewSecurityReportsRoot instantiates a new SecurityReportsRoot and sets the default values.
 func NewSecurityReportsRoot()(*SecurityReportsRoot) {
     m := &SecurityReportsRoot{
         Entity: *NewEntity(),
     }
-    odataTypeValue := "#microsoft.graph.securityReportsRoot";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateSecurityReportsRootFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *SecurityReportsRoot) Serialize(writer i878a80d2330e89d26896388a3f487eef
         return err
     }
     return nil
+}
+// SecurityReportsRootable 
+type SecurityReportsRootable interface {
+    Entityable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }

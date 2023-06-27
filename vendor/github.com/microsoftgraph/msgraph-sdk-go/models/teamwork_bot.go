@@ -13,8 +13,6 @@ func NewTeamworkBot()(*TeamworkBot) {
     m := &TeamworkBot{
         Entity: *NewEntity(),
     }
-    odataTypeValue := "#microsoft.graph.teamworkBot";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateTeamworkBotFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *TeamworkBot) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6
         return err
     }
     return nil
+}
+// TeamworkBotable 
+type TeamworkBotable interface {
+    Entityable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }

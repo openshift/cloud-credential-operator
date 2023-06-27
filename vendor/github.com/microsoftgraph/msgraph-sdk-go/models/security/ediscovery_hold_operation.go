@@ -13,8 +13,6 @@ func NewEdiscoveryHoldOperation()(*EdiscoveryHoldOperation) {
     m := &EdiscoveryHoldOperation{
         CaseOperation: *NewCaseOperation(),
     }
-    odataTypeValue := "#microsoft.graph.security.ediscoveryHoldOperation";
-    m.SetOdataType(&odataTypeValue);
     return m
 }
 // CreateEdiscoveryHoldOperationFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
@@ -33,4 +31,9 @@ func (m *EdiscoveryHoldOperation) Serialize(writer i878a80d2330e89d26896388a3f48
         return err
     }
     return nil
+}
+// EdiscoveryHoldOperationable 
+type EdiscoveryHoldOperationable interface {
+    CaseOperationable
+    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
 }

@@ -25,7 +25,7 @@ type RequestInformation struct {
 	Method HttpMethod
 	uri    *u.URL
 	// The Request Headers.
-	Headers map[string]string
+	Headers *RequestHeaders
 	// The Query Parameters of the request.
 	QueryParameters map[string]string
 	// The Request Body.
@@ -42,7 +42,7 @@ const raw_url_key = "request-raw-url"
 // NewRequestInformation creates a new RequestInformation object with default values.
 func NewRequestInformation() *RequestInformation {
 	return &RequestInformation{
-		Headers:         make(map[string]string),
+		Headers:         NewRequestHeaders(),
 		QueryParameters: make(map[string]string),
 		options:         make(map[string]RequestOption),
 		PathParameters:  make(map[string]string),
@@ -151,7 +151,9 @@ const binaryContentType = "application/octet-steam"
 // SetStreamContent sets the request body to a binary stream.
 func (request *RequestInformation) SetStreamContent(content []byte) {
 	request.Content = content
-	request.Headers[contentTypeHeader] = binaryContentType
+	if request.Headers != nil {
+		request.Headers.Add(contentTypeHeader, binaryContentType)
+	}
 }
 
 func (request *RequestInformation) setContentAndContentType(writer s.SerializationWriter, contentType string) error {
@@ -162,7 +164,9 @@ func (request *RequestInformation) setContentAndContentType(writer s.Serializati
 		return errors.New("content cannot be nil")
 	}
 	request.Content = content
-	request.Headers[contentTypeHeader] = contentType
+	if request.Headers != nil {
+		request.Headers.Add(contentTypeHeader, contentType)
+	}
 	return nil
 }
 
@@ -197,8 +201,33 @@ func (r *RequestInformation) setRequestType(result interface{}, span trace.Span)
 const observabilityTracerName = "github.com/microsoft/kiota-abstractions-go"
 
 // SetContentFromParsable sets the request body from a model with the specified content type.
-func (request *RequestInformation) SetContentFromParsable(ctx context.Context, requestAdapter RequestAdapter, contentType string, items ...s.Parsable) error {
+func (request *RequestInformation) SetContentFromParsable(ctx context.Context, requestAdapter RequestAdapter, contentType string, item s.Parsable) error {
 	_, span := otel.GetTracerProvider().Tracer(observabilityTracerName).Start(ctx, "SetContentFromParsable")
+	defer span.End()
+
+	writer, err := request.getSerializationWriter(requestAdapter, contentType, item)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	defer writer.Close()
+	request.setRequestType(item, span)
+	err = writer.WriteObjectValue("", item)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	err = request.setContentAndContentType(writer, contentType)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	return nil
+}
+
+// SetContentFromParsableCollection sets the request body from a model with the specified content type.
+func (request *RequestInformation) SetContentFromParsableCollection(ctx context.Context, requestAdapter RequestAdapter, contentType string, items []s.Parsable) error {
+	_, span := otel.GetTracerProvider().Tracer(observabilityTracerName).Start(ctx, "SetContentFromParsableCollection")
 	defer span.End()
 
 	writer, err := request.getSerializationWriter(requestAdapter, contentType, items)
@@ -207,16 +236,10 @@ func (request *RequestInformation) SetContentFromParsable(ctx context.Context, r
 		return err
 	}
 	defer writer.Close()
-	itemsLen := len(items)
-	if itemsLen == 1 {
+	if len(items) > 0 {
 		request.setRequestType(items[0], span)
-		err = writer.WriteObjectValue("", items[0])
-	} else {
-		if itemsLen > 0 {
-			request.setRequestType(items[0], span)
-		}
-		err = writer.WriteCollectionOfObjectValues("", items)
 	}
+	err = writer.WriteCollectionOfObjectValues("", items)
 	if err != nil {
 		span.RecordError(err)
 		return err
@@ -230,8 +253,59 @@ func (request *RequestInformation) SetContentFromParsable(ctx context.Context, r
 }
 
 // SetContentFromScalar sets the request body from a scalar value with the specified content type.
-func (request *RequestInformation) SetContentFromScalar(ctx context.Context, requestAdapter RequestAdapter, contentType string, items ...interface{}) error {
+func (request *RequestInformation) SetContentFromScalar(ctx context.Context, requestAdapter RequestAdapter, contentType string, item interface{}) error {
 	_, span := otel.GetTracerProvider().Tracer(observabilityTracerName).Start(ctx, "SetContentFromScalar")
+	defer span.End()
+	writer, err := request.getSerializationWriter(requestAdapter, contentType, item)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	defer writer.Close()
+	request.setRequestType(item, span)
+
+	if sv, ok := item.(*string); ok {
+		err = writer.WriteStringValue("", sv)
+	} else if bv, ok := item.(*bool); ok {
+		err = writer.WriteBoolValue("", bv)
+	} else if byv, ok := item.(*byte); ok {
+		err = writer.WriteByteValue("", byv)
+	} else if i8v, ok := item.(*int8); ok {
+		err = writer.WriteInt8Value("", i8v)
+	} else if i32v, ok := item.(*int32); ok {
+		err = writer.WriteInt32Value("", i32v)
+	} else if i64v, ok := item.(*int64); ok {
+		err = writer.WriteInt64Value("", i64v)
+	} else if f32v, ok := item.(*float32); ok {
+		err = writer.WriteFloat32Value("", f32v)
+	} else if f64v, ok := item.(*float64); ok {
+		err = writer.WriteFloat64Value("", f64v)
+	} else if uv, ok := item.(*uuid.UUID); ok {
+		err = writer.WriteUUIDValue("", uv)
+	} else if tv, ok := item.(*time.Time); ok {
+		err = writer.WriteTimeValue("", tv)
+	} else if dv, ok := item.(*s.ISODuration); ok {
+		err = writer.WriteISODurationValue("", dv)
+	} else if tov, ok := item.(*s.TimeOnly); ok {
+		err = writer.WriteTimeOnlyValue("", tov)
+	} else if dov, ok := item.(*s.DateOnly); ok {
+		err = writer.WriteDateOnlyValue("", dov)
+	}
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	err = request.setContentAndContentType(writer, contentType)
+	if err != nil {
+		span.RecordError(err)
+		return err
+	}
+	return nil
+}
+
+// SetContentFromScalarCollection sets the request body from a scalar value with the specified content type.
+func (request *RequestInformation) SetContentFromScalarCollection(ctx context.Context, requestAdapter RequestAdapter, contentType string, items []interface{}) error {
+	_, span := otel.GetTracerProvider().Tracer(observabilityTracerName).Start(ctx, "SetContentFromScalarCollection")
 	defer span.End()
 	writer, err := request.getSerializationWriter(requestAdapter, contentType, items...)
 	if err != nil {
@@ -239,41 +313,10 @@ func (request *RequestInformation) SetContentFromScalar(ctx context.Context, req
 		return err
 	}
 	defer writer.Close()
-	if len(items) == 1 {
+	if len(items) > 0 {
 		value := items[0]
 		request.setRequestType(value, span)
-
-		if sv, ok := value.(*string); ok {
-			err = writer.WriteStringValue("", sv)
-		} else if bv, ok := value.(*bool); ok {
-			err = writer.WriteBoolValue("", bv)
-		} else if byv, ok := value.(*byte); ok {
-			err = writer.WriteByteValue("", byv)
-		} else if i8v, ok := value.(*int8); ok {
-			err = writer.WriteInt8Value("", i8v)
-		} else if i32v, ok := value.(*int32); ok {
-			err = writer.WriteInt32Value("", i32v)
-		} else if i64v, ok := value.(*int64); ok {
-			err = writer.WriteInt64Value("", i64v)
-		} else if f32v, ok := value.(*float32); ok {
-			err = writer.WriteFloat32Value("", f32v)
-		} else if f64v, ok := value.(*float64); ok {
-			err = writer.WriteFloat64Value("", f64v)
-		} else if uv, ok := value.(*uuid.UUID); ok {
-			err = writer.WriteUUIDValue("", uv)
-		} else if tv, ok := value.(*time.Time); ok {
-			err = writer.WriteTimeValue("", tv)
-		} else if dv, ok := value.(*s.ISODuration); ok {
-			err = writer.WriteISODurationValue("", dv)
-		} else if tov, ok := value.(*s.TimeOnly); ok {
-			err = writer.WriteTimeOnlyValue("", tov)
-		} else if dov, ok := value.(*s.DateOnly); ok {
-			err = writer.WriteDateOnlyValue("", dov)
-		}
-	} else if len(items) > 1 {
-		value := items[0]
-		request.setRequestType(value, span)
-		if _, ok := value.(*string); ok {
+		if _, ok := value.(string); ok {
 			sc := make([]string, len(items))
 			for i, v := range items {
 				if sv, ok := v.(string); ok {
@@ -420,7 +463,7 @@ func (request *RequestInformation) AddQueryParameters(source interface{}) {
 			continue
 		}
 		str, ok := value.(*string)
-		if ok && str != nil {
+		if ok && str != nil && *str != "" {
 			request.QueryParameters[fieldName] = *str
 		}
 		bl, ok := value.(*bool)
@@ -435,18 +478,5 @@ func (request *RequestInformation) AddQueryParameters(source interface{}) {
 		if ok && len(arr) > 0 {
 			request.QueryParameters[fieldName] = strings.Join(arr, ",")
 		}
-	}
-}
-
-// AddRequestHeaders adds request headers to the request.
-func (request *RequestInformation) AddRequestHeaders(headersToAdd map[string]string) {
-	if len(headersToAdd) == 0 {
-		return
-	}
-	if len(request.Headers) == 0 {
-		request.Headers = make(map[string]string, len(headersToAdd))
-	}
-	for key, value := range headersToAdd {
-		request.Headers[key] = value
 	}
 }

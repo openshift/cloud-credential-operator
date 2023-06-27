@@ -12,7 +12,6 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/AzureAD/microsoft-authentication-library-for-go/apps/public"
 )
 
@@ -56,17 +55,7 @@ func NewInteractiveBrowserCredential(options *InteractiveBrowserCredentialOption
 		cp = *options
 	}
 	cp.init()
-	if !validTenantID(cp.TenantID) {
-		return nil, errors.New(tenantIDValidationErr)
-	}
-	authorityHost, err := setAuthorityHost(cp.Cloud)
-	if err != nil {
-		return nil, err
-	}
-	c, err := public.New(cp.ClientID,
-		public.WithAuthority(runtime.JoinPaths(authorityHost, cp.TenantID)),
-		public.WithHTTPClient(newPipelineAdapter(&cp.ClientOptions)),
-	)
+	c, err := getPublicClient(cp.ClientID, cp.TenantID, &cp.ClientOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -84,11 +73,7 @@ func (c *InteractiveBrowserCredential) GetToken(ctx context.Context, opts policy
 		return azcore.AccessToken{Token: ar.AccessToken, ExpiresOn: ar.ExpiresOn.UTC()}, err
 	}
 
-	o := []public.InteractiveAuthOption{}
-	if c.options.RedirectURL != "" {
-		o = append(o, public.WithRedirectURI(c.options.RedirectURL))
-	}
-	ar, err = c.client.AcquireTokenInteractive(ctx, opts.Scopes, o...)
+	ar, err = c.client.AcquireTokenInteractive(ctx, opts.Scopes, public.WithRedirectURI(c.options.RedirectURL))
 	if err != nil {
 		return azcore.AccessToken{}, newAuthenticationFailedErrorFromMSALError(credNameBrowser, err)
 	}
