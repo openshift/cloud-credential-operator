@@ -84,7 +84,7 @@ func IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldL
 		logger.WithError(err).Error("error loading CCO configuration to determine mode")
 		return false, err
 	}
-	if credentialsMode != "Manual" {
+	if credentialsMode != operatorv1.CloudCredentialsModeManual {
 		return false, nil
 	}
 	authConfig, err := GetAuth(ctx, c)
