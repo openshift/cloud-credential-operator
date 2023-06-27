@@ -99,6 +99,9 @@ update-codegen: update-codegen-crds
 
 verify: verify-vendored-crds verify-codegen verify-bindata
 
+verify-codegen-crds: update-codegen-crds update-vendored-crds
+	git diff --exit-code
+
 verify-codegen: verify-codegen-crds
 	./hack/verify-codegen.sh
 .PHONY: verify-codegen
