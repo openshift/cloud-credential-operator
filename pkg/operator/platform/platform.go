@@ -3,6 +3,7 @@ package platform
 import (
 	"context"
 	"fmt"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"os"
 	"time"
 
@@ -99,8 +100,8 @@ func GetFeatureGates(ctx context.Context) (featuregates.FeatureGate, error) {
 	eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events("openshift-cloud-credential-operator"), "cloud-credential-operator", &corev1.ObjectReference{
 		APIVersion: "apps/v1",
 		Kind:       "Deployment",
-		Namespace:  "openshift-cloud-credential-operator",
-		Name:       "cloud-credential-operator",
+		Namespace:  constants.CCONameSpace,
+		Name:       constants.DeploymentName,
 	})
 
 	// By default, this will exit(0) the process if the featuregates ever change to a different set of values.
