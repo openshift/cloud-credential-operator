@@ -90,8 +90,8 @@ spec:
   credentialsMode: "{{ .CredentialsMode }}"`))
 
 	renderAssets = []string{
-		"bootstrap/cloudcredential_v1_operator_config_custresdef.yaml",
-		"bootstrap/cloudcredential_v1_credentialsrequest_crd.yaml",
+		"bootstrap/imported/cloudcredential_v1_operator_config_custresdef.yaml",
+		"bootstrap/generated/cloudcredential_v1_credentialsrequest_crd.yaml",
 		"bootstrap/namespace.yaml",
 	}
 

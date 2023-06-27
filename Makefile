@@ -1,6 +1,15 @@
 all: build
 .PHONY: all
 
+# IMPORTANT: Awkward though it is to read, this dependency chain needs to be
+# defined *before* we include the build-machinery-go rules. That's because
+# we need to install vendored CRDs and generate our own CRDs *before* we
+# update bindata to include them. (Dependencies seem to run in the order they
+# are defined, with subsequent definitions appended iff not already in the
+# chain.)
+update: update-vendored-crds update-codegen-crds update-bindata generate
+.PHONY: update
+
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
@@ -76,45 +85,18 @@ $(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/$(IMAGE_REPO)
 # $2 - apis
 # $3 - manifests
 # $4 - output
-$(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
-$(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
-
-update: update-codegen update-bindata generate
-.PHONY: update
+$(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests/generated,./manifests/generated)
+$(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap/generated,./bindata/bootstrap/generated)
 
 generate:
 	go generate ${GO_TEST_PACKAGES}
 .PHONY: generate
 
-# TODO: consider migrating to the openshift/api codegen tool
-# https://github.com/openshift/api/tree/master/tools/codegen
-#
-# update-codegen-crds-cloudcredential-manifests and
-# update-codegen-crds-cloudcredential-bindata make targets override
-# "update-codegen-crds-*" targets created by the above invocations of
-# "add-crd-gen".
-#
-# We copy the cloud credential operator config CRD from the
-# openshift/api repository (via the vendor dir) and since
-# openshift/api now utilizes a different codegen utility than
-# build-machinery-go, running the schemapatch code generator against
-# the copied manifest results in a different formatting. This results
-# in a diff which causes our verify target to fail so we ensure the
-# copied manifests remain unchanged by copying the CRDs once more
-# after generating CRDs as a workaround.
-update-codegen-crds-cloudcredential-manifests: ensure-controller-gen ensure-yq ensure-yaml-patch
-	$(run-crd-gen,./pkg/apis/cloudcredential/v1,./manifests)
-	$(MAKE) update-vendored-crds
-
-update-codegen-crds-cloudcredential-bindata: ensure-controller-gen ensure-yq ensure-yaml-patch
-	$(run-crd-gen,./pkg/apis/cloudcredential/v1,./bindata/bootstrap)
-	$(MAKE) update-vendored-crds
-
 update-vendored-crds:
 	# copy config CRD from openshift/api
-	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/00-config-custresdef.yaml
+	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/imported/00-config-custresdef.yaml
 	# ...and into where we generate bindata from
-	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/cloudcredential_v1_operator_config_custresdef.yaml
+	cp vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/imported/cloudcredential_v1_operator_config_custresdef.yaml
 .PHONY: update-vendored-crds
 
 update-codegen: update-codegen-crds
@@ -128,8 +110,8 @@ verify-codegen: verify-codegen-crds
 .PHONY: verify-codegen
 
 verify-vendored-crds:
-	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/00-config-custresdef.yaml
-	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/cloudcredential_v1_operator_config_custresdef.yaml
+	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./manifests/imported/00-config-custresdef.yaml
+	diff vendor/github.com/openshift/api/operator/v1/0000_40_cloud-credential-operator_00_config.crd.yaml ./bindata/bootstrap/imported/cloudcredential_v1_operator_config_custresdef.yaml
 .PHONY: verify-vendored-crds
 
 clean:
@@ -142,7 +124,7 @@ run: build
 
 # Install CRDs into a cluster
 install: update-codegen
-	kubectl apply -f manifests/00-crd.yaml
+	kubectl apply -f manifests/generated/00-crd.yaml
 
 # TODO targets for backward compatibility while we make the shift in CI
 test-no-gen: test

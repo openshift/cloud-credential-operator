@@ -1,7 +1,7 @@
 // Code generated for package bootstrap by go-bindata DO NOT EDIT. (@generated)
 // sources:
-// bindata/bootstrap/cloudcredential_v1_credentialsrequest_crd.yaml
-// bindata/bootstrap/cloudcredential_v1_operator_config_custresdef.yaml
+// bindata/bootstrap/generated/cloudcredential_v1_credentialsrequest_crd.yaml
+// bindata/bootstrap/imported/cloudcredential_v1_operator_config_custresdef.yaml
 // bindata/bootstrap/namespace.yaml
 package bootstrap
 
@@ -56,7 +56,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _bootstrapCloudcredential_v1_credentialsrequest_crdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
+var _bootstrapGeneratedCloudcredential_v1_credentialsrequest_crdYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
@@ -228,22 +228,22 @@ status:
   storedVersions: []
 `)
 
-func bootstrapCloudcredential_v1_credentialsrequest_crdYamlBytes() ([]byte, error) {
-	return _bootstrapCloudcredential_v1_credentialsrequest_crdYaml, nil
+func bootstrapGeneratedCloudcredential_v1_credentialsrequest_crdYamlBytes() ([]byte, error) {
+	return _bootstrapGeneratedCloudcredential_v1_credentialsrequest_crdYaml, nil
 }
 
-func bootstrapCloudcredential_v1_credentialsrequest_crdYaml() (*asset, error) {
-	bytes, err := bootstrapCloudcredential_v1_credentialsrequest_crdYamlBytes()
+func bootstrapGeneratedCloudcredential_v1_credentialsrequest_crdYaml() (*asset, error) {
+	bytes, err := bootstrapGeneratedCloudcredential_v1_credentialsrequest_crdYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootstrap/cloudcredential_v1_credentialsrequest_crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "bootstrap/generated/cloudcredential_v1_credentialsrequest_crd.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
 
-var _bootstrapCloudcredential_v1_operator_config_custresdefYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
+var _bootstrapImportedCloudcredential_v1_operator_config_custresdefYaml = []byte(`apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
   annotations:
@@ -387,17 +387,17 @@ spec:
         status: {}
 `)
 
-func bootstrapCloudcredential_v1_operator_config_custresdefYamlBytes() ([]byte, error) {
-	return _bootstrapCloudcredential_v1_operator_config_custresdefYaml, nil
+func bootstrapImportedCloudcredential_v1_operator_config_custresdefYamlBytes() ([]byte, error) {
+	return _bootstrapImportedCloudcredential_v1_operator_config_custresdefYaml, nil
 }
 
-func bootstrapCloudcredential_v1_operator_config_custresdefYaml() (*asset, error) {
-	bytes, err := bootstrapCloudcredential_v1_operator_config_custresdefYamlBytes()
+func bootstrapImportedCloudcredential_v1_operator_config_custresdefYaml() (*asset, error) {
+	bytes, err := bootstrapImportedCloudcredential_v1_operator_config_custresdefYamlBytes()
 	if err != nil {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "bootstrap/cloudcredential_v1_operator_config_custresdef.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	info := bindataFileInfo{name: "bootstrap/imported/cloudcredential_v1_operator_config_custresdef.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -480,9 +480,9 @@ func AssetNames() []string {
 
 // _bindata is a table, holding each asset generator, mapped to its name.
 var _bindata = map[string]func() (*asset, error){
-	"bootstrap/cloudcredential_v1_credentialsrequest_crd.yaml":     bootstrapCloudcredential_v1_credentialsrequest_crdYaml,
-	"bootstrap/cloudcredential_v1_operator_config_custresdef.yaml": bootstrapCloudcredential_v1_operator_config_custresdefYaml,
-	"bootstrap/namespace.yaml":                                     bootstrapNamespaceYaml,
+	"bootstrap/generated/cloudcredential_v1_credentialsrequest_crd.yaml":    bootstrapGeneratedCloudcredential_v1_credentialsrequest_crdYaml,
+	"bootstrap/imported/cloudcredential_v1_operator_config_custresdef.yaml": bootstrapImportedCloudcredential_v1_operator_config_custresdefYaml,
+	"bootstrap/namespace.yaml": bootstrapNamespaceYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -529,8 +529,12 @@ type bintree struct {
 
 var _bintree = &bintree{nil, map[string]*bintree{
 	"bootstrap": {nil, map[string]*bintree{
-		"cloudcredential_v1_credentialsrequest_crd.yaml":     {bootstrapCloudcredential_v1_credentialsrequest_crdYaml, map[string]*bintree{}},
-		"cloudcredential_v1_operator_config_custresdef.yaml": {bootstrapCloudcredential_v1_operator_config_custresdefYaml, map[string]*bintree{}},
+		"generated": {nil, map[string]*bintree{
+			"cloudcredential_v1_credentialsrequest_crd.yaml": {bootstrapGeneratedCloudcredential_v1_credentialsrequest_crdYaml, map[string]*bintree{}},
+		}},
+		"imported": {nil, map[string]*bintree{
+			"cloudcredential_v1_operator_config_custresdef.yaml": {bootstrapImportedCloudcredential_v1_operator_config_custresdefYaml, map[string]*bintree{}},
+		}},
 		"namespace.yaml": {bootstrapNamespaceYaml, map[string]*bintree{}},
 	}},
 }}
