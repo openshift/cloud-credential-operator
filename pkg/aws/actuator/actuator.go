@@ -67,15 +67,15 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
-	Client                            client.Client
-	Codec                             *minterv1.ProviderCodec
-	AWSClientBuilder                  func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
-	Scheme                            *runtime.Scheme
-	AWSSecurityTokenServiveGateEnaled bool
+	Client                             client.Client
+	Codec                              *minterv1.ProviderCodec
+	AWSClientBuilder                   func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
+	Scheme                             *runtime.Scheme
+	AWSSecurityTokenServiceGateEnabled bool
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTokenServiveGateEnaled bool) (*AWSActuator, error) {
+func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -83,11 +83,11 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTok
 	}
 
 	return &AWSActuator{
-		Codec:                             codec,
-		Client:                            client,
-		AWSClientBuilder:                  awsutils.ClientBuilder,
-		Scheme:                            scheme,
-		AWSSecurityTokenServiveGateEnaled: awsSecurityTokenServiveGateEnaled,
+		Codec:                              codec,
+		Client:                             client,
+		AWSClientBuilder:                   awsutils.ClientBuilder,
+		Scheme:                             scheme,
+		AWSSecurityTokenServiceGateEnabled: awsSecurityTokenServiceGateEnabled,
 	}, nil
 }
 
@@ -119,7 +119,7 @@ func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 }
 
 func (a *AWSActuator) STSFeatureGateEnabled() bool {
-	return a.AWSSecurityTokenServiveGateEnaled
+	return a.AWSSecurityTokenServiceGateEnabled
 }
 
 // Checks if the credentials currently exist.
