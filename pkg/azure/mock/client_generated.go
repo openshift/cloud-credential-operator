@@ -446,6 +446,36 @@ func (m *MockRoleDefinitionsClient) EXPECT() *MockRoleDefinitionsClientMockRecor
 	return m.recorder
 }
 
+// CreateOrUpdate mocks base method.
+func (m *MockRoleDefinitionsClient) CreateOrUpdate(ctx context.Context, scope, roleDefinitionID string, roleDefinition armauthorization.RoleDefinition, options *armauthorization.RoleDefinitionsClientCreateOrUpdateOptions) (armauthorization.RoleDefinitionsClientCreateOrUpdateResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateOrUpdate", ctx, scope, roleDefinitionID, roleDefinition, options)
+	ret0, _ := ret[0].(armauthorization.RoleDefinitionsClientCreateOrUpdateResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateOrUpdate indicates an expected call of CreateOrUpdate.
+func (mr *MockRoleDefinitionsClientMockRecorder) CreateOrUpdate(ctx, scope, roleDefinitionID, roleDefinition, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrUpdate", reflect.TypeOf((*MockRoleDefinitionsClient)(nil).CreateOrUpdate), ctx, scope, roleDefinitionID, roleDefinition, options)
+}
+
+// Delete mocks base method.
+func (m *MockRoleDefinitionsClient) Delete(ctx context.Context, scope, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientDeleteOptions) (armauthorization.RoleDefinitionsClientDeleteResponse, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Delete", ctx, scope, roleDefinitionID, options)
+	ret0, _ := ret[0].(armauthorization.RoleDefinitionsClientDeleteResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Delete indicates an expected call of Delete.
+func (mr *MockRoleDefinitionsClientMockRecorder) Delete(ctx, scope, roleDefinitionID, options interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Delete", reflect.TypeOf((*MockRoleDefinitionsClient)(nil).Delete), ctx, scope, roleDefinitionID, options)
+}
+
 // GetByID mocks base method.
 func (m *MockRoleDefinitionsClient) GetByID(ctx context.Context, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientGetByIDOptions) (armauthorization.RoleDefinitionsClientGetByIDResponse, error) {
 	m.ctrl.T.Helper()
