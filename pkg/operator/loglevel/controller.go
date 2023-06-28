@@ -52,7 +52,7 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 
 	// Watch for changes to CloudCredential object and reconcile the loglevel changes
 	err = c.Watch(
-		&source.Kind{Type: &operatorv1.CloudCredential{}},
+		source.Kind(mgr.GetCache(), &operatorv1.CloudCredential{}),
 		&handler.EnqueueRequestForObject{})
 
 	if err != nil {

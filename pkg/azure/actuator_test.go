@@ -530,8 +530,9 @@ func TestActuator(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(allObjects...).Build()
-
+			fakeClient := fake.NewClientBuilder().
+				WithStatusSubresource(&minterv1.CredentialsRequest{}).
+				WithRuntimeObjects(allObjects...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 

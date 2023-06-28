@@ -78,7 +78,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return cloudCredSecretObjectCheck(e.Object)
 		},
 	}
-	err = c.Watch(&source.Kind{Type: &corev1.Secret{}}, &handler.EnqueueRequestForObject{}, p)
+	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
 	if err != nil {
 		return err
 	}
@@ -86,7 +86,7 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 	err = secretutils.WatchCCOConfig(c, types.NamespacedName{
 		Namespace: constants.CloudCredSecretNamespace,
 		Name:      constants.GCPCloudCredSecretName,
-	})
+	}, mgr)
 	if err != nil {
 		return err
 	}

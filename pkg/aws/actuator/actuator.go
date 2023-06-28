@@ -57,20 +57,25 @@ const (
 
 	secretDataAccessKey = "aws_access_key_id"
 	secretDataSecretKey = "aws_secret_access_key"
+
+	awsSTSCredsTemplate = `sts_regional_endpoints = regional
+role_arn = %s
+web_identity_token_file = %s`
 )
 
 var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
-	Client           client.Client
-	Codec            *minterv1.ProviderCodec
-	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
-	Scheme           *runtime.Scheme
+	Client                             client.Client
+	Codec                              *minterv1.ProviderCodec
+	AWSClientBuilder                   func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
+	Scheme                             *runtime.Scheme
+	AWSSecurityTokenServiceGateEnabled bool
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator, error) {
+func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -78,10 +83,11 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme) (*AWSActuator,
 	}
 
 	return &AWSActuator{
-		Codec:            codec,
-		Client:           client,
-		AWSClientBuilder: awsutils.ClientBuilder,
-		Scheme:           scheme,
+		Codec:                              codec,
+		Client:                             client,
+		AWSClientBuilder:                   awsutils.ClientBuilder,
+		Scheme:                             scheme,
+		AWSSecurityTokenServiceGateEnabled: awsSecurityTokenServiceGateEnabled,
 	}, nil
 }
 
@@ -110,6 +116,10 @@ func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 	}
 
 	return nil, fmt.Errorf("no providerSpec defined")
+}
+
+func (a *AWSActuator) STSFeatureGateEnabled() bool {
+	return a.AWSSecurityTokenServiceGateEnabled
 }
 
 // Checks if the credentials currently exist.
@@ -326,47 +336,103 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
-
-	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
-	if err != nil {
-		logger.WithError(err).Error("issue with cloud credentials secret")
-		return err
-	}
-
-	switch credentialsRootSecret.Annotations[constants.AnnotationKey] {
-	case constants.InsufficientAnnotation:
-		msg := "cloud credentials insufficient to satisfy credentials request"
-		logger.Error(msg)
-		return &actuatoriface.ActuatorError{
-			ErrReason: minterv1.InsufficientCloudCredentials,
-			Message:   msg,
-		}
-	case constants.PassthroughAnnotation:
-		logger.Debugf("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
+	stsDetected := false
+	stsFeatureGateEnabled := a.STSFeatureGateEnabled()
+	if stsFeatureGateEnabled {
+		stsDetected, err = utils.IsTimedTokenCluster(a.Client, ctx, logger)
 		if err != nil {
 			return err
 		}
-	case constants.MintAnnotation:
-		logger.Debugf("provisioning with cred minting")
-		err := a.syncMint(ctx, cr, logger)
+	}
+	logger.Infof("stsFeatureGateEnabled: %v", stsFeatureGateEnabled)
+	logger.Infof("stsDetected: %v", stsDetected)
+	if stsFeatureGateEnabled && stsDetected {
+		logger.Debug("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
+		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(a.Codec, cr)
 		if err != nil {
-			msg := "error syncing creds in mint-mode"
-			logger.WithError(err).Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   fmt.Sprintf("%v: %v", msg, err),
+			return err
+		}
+		if awsSTSIAMRoleARN == "" {
+			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
+			return nil
+		}
+		cloudTokenPath := cr.Spec.CloudTokenPath
+		if cr.Spec.CloudTokenPath == "" {
+			logger.Debug("CredentialsRequest has no cloudTokenPath, defaulting cloudTokenPath to /var/run/secrets/kubernetes.io/serviceaccount/token")
+			cloudTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		}
+		if awsSTSIAMRoleARN != "" {
+			err = a.createSTSSecret(awsSTSIAMRoleARN, cloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger, ctx)
+			if err != nil {
+				return err
 			}
 		}
-	default:
-		msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
-		logger.Info(msg)
-		return &actuatoriface.ActuatorError{
-			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   msg,
+	} else {
+		credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
+		if err != nil {
+			logger.WithError(err).Error("issue with cloud credentials secret")
+			return err
+		}
+		switch credentialsRootSecret.Annotations[constants.AnnotationKey] {
+		case constants.InsufficientAnnotation:
+			msg := "cloud credentials insufficient to satisfy credentials request"
+			logger.Error(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.InsufficientCloudCredentials,
+				Message:   msg,
+			}
+		case constants.PassthroughAnnotation:
+			logger.Debugf("provisioning with passthrough")
+			err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
+			if err != nil {
+				return err
+			}
+		case constants.MintAnnotation:
+			logger.Debugf("provisioning with cred minting")
+			err := a.syncMint(ctx, cr, logger)
+			if err != nil {
+				msg := "error syncing creds in mint-mode"
+				logger.WithError(err).Error(msg)
+				return &actuatoriface.ActuatorError{
+					ErrReason: minterv1.CredentialsProvisionFailure,
+					Message:   fmt.Sprintf("%v: %v", msg, err),
+				}
+			}
+		default:
+			msg := fmt.Sprintf("unexpected value or missing %s annotation on admin credentials Secret", constants.AnnotationKey)
+			logger.Info(msg)
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   msg,
+			}
 		}
 	}
+	return nil
+}
 
+// createSTSSecret makes a time-based token available in a Secret in the namespace of an operator that
+// has supplied the following in the CredentialsRequest:
+// a non-nil spec.CloudTokenString
+// a path to the JWT token: spec.cloudTokenPath
+// a spec.SecretRef.Name
+// a cr.Spec.SecretRef.Namespace
+func (a *AWSActuator) createSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath string, secretRef string, secretRefNamespace string, log log.FieldLogger, ctx context.Context) error {
+	log.Infof("creating secret")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretRef,
+			Namespace: secretRefNamespace,
+		},
+		StringData: map[string]string{
+			"credentials": fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath),
+		},
+		Type: corev1.SecretTypeOpaque,
+	}
+	err := a.Client.Create(ctx, secret)
+	if err != nil {
+		log.Errorf("error creating secret")
+		return err
+	}
 	return nil
 }
 
@@ -1312,6 +1378,14 @@ func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 			Info("actuator handles only aws credentials")
 	}
 	return isAWS, nil
+}
+
+func awsSTSIAMRoleARN(codec *minterv1.ProviderCodec, credentialsRequest *minterv1.CredentialsRequest) (string, error) {
+	awsSpec, err := DecodeProviderSpec(codec, credentialsRequest)
+	if err != nil {
+		return "", err
+	}
+	return awsSpec.STSIAMRoleARN, nil
 }
 
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type

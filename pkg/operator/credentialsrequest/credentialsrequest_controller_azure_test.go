@@ -209,7 +209,9 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 				mockAzureAppClient = test.mockAzureAppClient(mockCtrl)
 			}
 
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			fakeClient := fake.NewClientBuilder().
+				WithStatusSubresource(&minterv1.CredentialsRequest{}).
+				WithRuntimeObjects(test.existing...).Build()
 
 			azureActuator := azureactuator.NewFakeActuator(
 				fakeClient,

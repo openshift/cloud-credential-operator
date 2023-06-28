@@ -47,6 +47,10 @@ type VSphereActuator struct {
 	Client client.Client
 }
 
+func (a *VSphereActuator) STSFeatureGateEnabled() bool {
+	return false
+}
+
 // NewVSphereActuator creates a new VSphereActuator.
 func NewVSphereActuator(client client.Client) (*VSphereActuator, error) {
 	codec, err := minterv1.NewCodec()

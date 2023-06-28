@@ -64,6 +64,10 @@ type Actuator struct {
 	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
 }
 
+func (a *Actuator) STSFeatureGateEnabled() bool {
+	return false
+}
+
 // NewActuator initializes and returns a new Actuator for GCP.
 func NewActuator(c client.Client, projectName string) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()

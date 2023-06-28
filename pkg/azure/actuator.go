@@ -49,6 +49,10 @@ type Actuator struct {
 	credentialMinterBuilder credentialMinterBuilder
 }
 
+func (a *Actuator) STSFeatureGateEnabled() bool {
+	return false
+}
+
 func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {

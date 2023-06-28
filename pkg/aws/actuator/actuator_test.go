@@ -28,6 +28,7 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
+	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -571,4 +572,162 @@ func (a *testAWSError) OrigErr() error {
 
 func (a *testAWSError) Error() string {
 	panic("not implemented")
+}
+
+func TestDetectSTS(t *testing.T) {
+	schemeutils.SetupScheme(scheme.Scheme)
+
+	codec, err := minterv1.NewCodec()
+	if err != nil {
+		t.Fatalf("failed to set up codec for tests: %v", err)
+	}
+
+	tests := []struct {
+		name               string
+		existing           []runtime.Object
+		wantErr            assert.ErrorAssertionFunc
+		CredentialsRequest *minterv1.CredentialsRequest
+		issuer             string
+		stsEnabled         bool
+	}{
+		{
+			name: "empty ServiceAccountIssuer on AWS STS-enabled CCO in Manual mode should error",
+			existing: []runtime.Object{
+				testInfrastructure(),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+			},
+			CredentialsRequest: func() *minterv1.CredentialsRequest {
+				cr := testCredentialsRequest()
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
+				if err != nil {
+					t.Log(err)
+					t.FailNow()
+				}
+				return cr
+			}(),
+			issuer:  "",
+			wantErr: assert.Error,
+		},
+		{
+			name: "non-empty ServiceAccountIssuer on AWS STS-enabled CCO in Manual mode should note STS detected",
+			existing: []runtime.Object{
+				testInfrastructure(),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+			},
+			CredentialsRequest: func() *minterv1.CredentialsRequest {
+				cr := testCredentialsRequest()
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
+				if err != nil {
+					t.Log(err)
+					t.FailNow()
+				}
+				return cr
+			}(),
+			issuer:     "non-empty",
+			stsEnabled: true,
+			wantErr:    assert.NoError,
+		},
+		{
+			name: "STS mode and with a CloudTokenString and CloudTokenPath set in CredentialsRequest should create Secret & not error",
+			existing: []runtime.Object{
+				testInfrastructure(),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+			},
+			CredentialsRequest: func() *minterv1.CredentialsRequest {
+				cr := testCredentialsRequest()
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "cloud-token")
+				if err != nil {
+					t.FailNow()
+				}
+				cr.Spec.CloudTokenPath = "/var/token"
+				return cr
+			}(),
+			issuer:     "non-empty",
+			stsEnabled: true,
+			wantErr:    assert.NoError,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			fakeClient := fake.NewClientBuilder().
+				WithScheme(scheme.Scheme).
+				WithStatusSubresource(&minterv1.CredentialsRequest{}).
+				WithRuntimeObjects(test.existing...).Build()
+			err := fakeClient.Create(context.TODO(), testAuthentication(test.issuer))
+			if err != nil {
+				panic(err)
+			}
+			a := &AWSActuator{
+				Client:                             fakeClient,
+				Codec:                              codec,
+				AWSSecurityTokenServiceGateEnabled: test.stsEnabled,
+			}
+			test.wantErr(t, a.sync(context.Background(), test.CredentialsRequest), fmt.Sprintf("sync(%v)", test.CredentialsRequest))
+		})
+	}
+}
+
+func testAWSProviderConfig(codec *minterv1.ProviderCodec, awsSTSIAMRoleARN string) (*runtime.RawExtension, error) {
+	providerSpec := minterv1.AWSProviderSpec{
+		TypeMeta: metav1.TypeMeta{
+			Kind: "AWSProviderSpec",
+		},
+		StatementEntries: []minterv1.StatementEntry{
+			{
+				Effect: "Allow",
+				Action: []string{
+					"iam:GetUser",
+					"iam:GetUserPolicy",
+					"iam:ListAccessKeys",
+				},
+				Resource: "*",
+			},
+		},
+	}
+	if awsSTSIAMRoleARN != "" {
+		providerSpec.STSIAMRoleARN = awsSTSIAMRoleARN
+	}
+	awsProvSpec, err := codec.EncodeProviderSpec(&providerSpec)
+	return awsProvSpec, err
+}
+
+func testInfrastructure() *configv1.Infrastructure {
+	return &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Status: configv1.InfrastructureStatus{
+			Platform:           configv1.AWSPlatformType,
+			InfrastructureName: "test-infra",
+			PlatformStatus: &configv1.PlatformStatus{
+				AWS: &configv1.AWSPlatformStatus{
+					Region: "test-region-2",
+				},
+			},
+		},
+	}
+}
+
+func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudCredential {
+	conf := &operatorv1.CloudCredential{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: constants.CloudCredOperatorConfig,
+		},
+		Spec: operatorv1.CloudCredentialSpec{
+			CredentialsMode: mode,
+		},
+	}
+	return conf
+}
+
+func testAuthentication(issuer string) *configv1.Authentication {
+	conf := &configv1.Authentication{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Spec: configv1.AuthenticationSpec{
+			ServiceAccountIssuer: issuer,
+		},
+	}
+	return conf
 }
