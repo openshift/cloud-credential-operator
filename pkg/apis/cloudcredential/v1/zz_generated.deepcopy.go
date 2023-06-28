@@ -179,6 +179,11 @@ func (in *AzureProviderSpec) DeepCopyInto(out *AzureProviderSpec) {
 		*out = make([]RoleBinding, len(*in))
 		copy(*out, *in)
 	}
+	if in.Permissions != nil {
+		in, out := &in.Permissions, &out.Permissions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
