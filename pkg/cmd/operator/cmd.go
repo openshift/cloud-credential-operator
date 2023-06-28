@@ -27,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -39,8 +40,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configv1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/util"
 
 	"github.com/openshift/library-go/pkg/controller/fileobserver"
@@ -51,8 +54,8 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
-
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
 )
 
@@ -90,15 +93,21 @@ func NewOperator() *cobra.Command {
 			}
 
 			run := func(ctx context.Context) {
+				// This is required because controller-runtime expects its consumers to
+				// set a logger through log.SetLogger within 30 seconds of the program's
+				// initalization. We have our own logger and can configure controller-runtime's
+				// logger to do nothing.
+				ctrlruntimelog.SetLogger(logr.New(ctrlruntimelog.NullLogSink{}))
+
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up manager")
 				mgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: ":2112",
 					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-						if opts.SelectorsByObject == nil {
-							opts.SelectorsByObject = map[client.Object]cache.ObjectSelector{}
+						if opts.ByObject == nil {
+							opts.ByObject = map[client.Object]cache.ByObject{}
 						}
-						opts.SelectorsByObject[&corev1.ConfigMap{}] = cache.ObjectSelector{
+						opts.ByObject[&corev1.ConfigMap{}] = cache.ByObject{
 							Field: fields.SelectorFromSet(fields.Set{
 								"metadata.namespace": minterv1.CloudCredOperatorNamespace,
 								"metadata.name":      constants.CloudCredOperatorConfigMap,
@@ -116,10 +125,16 @@ func NewOperator() *cobra.Command {
 				// Setup Scheme for all resources
 				util.SetupScheme(mgr.GetScheme())
 
+				featureGates, err := platform.GetFeatureGates(ctx)
+				if err != nil {
+					log.WithError(err).Fatal("unable to read feature gates")
+				}
+				awsSecurityTokenServiveGateEnaled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
+
 				// Setup all Controllers
 				log.Info("setting up controller")
 				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
-				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath); err != nil {
+				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath, awsSecurityTokenServiveGateEnaled); err != nil {
 					log.WithError(err).Fatal("unable to register controllers to the manager")
 				}
 

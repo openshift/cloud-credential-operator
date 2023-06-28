@@ -72,6 +72,29 @@ func LoadInfrastructureTopology(c client.Client, logger log.FieldLogger) (config
 	return infra.Status.InfrastructureTopology, nil
 }
 
+// IsTimedTokenCluster answers a two part test to determine if we're running on a cluster enabled for timed access tokens (TAT)
+// like STS enabled cluster on AWS, GCP Workload Identity Federation or Azure AAD Pod Identity.
+//  1. Is credential mode Manual
+//  2. Is serviceAccountIssuer non-empty
+//
+// Both of these conditions must be true for any timed access token enabled clusters for the implementations mentioned above.
+func IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
+	credentialsMode, _, err := GetOperatorConfiguration(c, logger)
+	if err != nil {
+		logger.WithError(err).Error("error loading CCO configuration to determine mode")
+		return false, err
+	}
+	if credentialsMode != operatorv1.CloudCredentialsModeManual {
+		return false, nil
+	}
+	authConfig, err := GetAuth(ctx, c)
+	if err != nil {
+		logger.WithError(err).Error("error loading authentication config")
+		return false, err
+	}
+	return authConfig.Spec.ServiceAccountIssuer != "", nil
+}
+
 // LoadInfrastructureName loads the cluster Infrastructure config and returns the infra name
 // used to identify this cluster, and tag some cloud objects.
 func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, error) {
@@ -110,6 +133,14 @@ func GetInfrastructure(c client.Client) (*configv1.Infrastructure, error) {
 		return nil, err
 	}
 	return infra, nil
+}
+
+func GetAuth(ctx context.Context, c client.Client) (*configv1.Authentication, error) {
+	auth := &configv1.Authentication{}
+	if err := c.Get(ctx, types.NamespacedName{Name: "cluster"}, auth); err != nil {
+		return nil, err
+	}
+	return auth, nil
 }
 
 // GetCredentialsRequestCloudType decodes a Spec.ProviderSpec and returns the kind

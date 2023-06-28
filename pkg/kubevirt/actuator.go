@@ -40,6 +40,10 @@ type KubevirtActuator struct {
 	Client client.Client
 }
 
+func (a *KubevirtActuator) STSFeatureGateEnabled() bool {
+	return false
+}
+
 const (
 	KubevirtCredentialsSecretKey = "kubeconfig"
 )

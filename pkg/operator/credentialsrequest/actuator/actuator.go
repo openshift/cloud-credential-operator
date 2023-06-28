@@ -46,6 +46,8 @@ type Actuator interface {
 	Upgradeable(operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition
 	// GetCredentialsRootSecret returns the credentials root secret.
 	GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error)
+	// Query STSFeatureGateEnabled.
+	STSFeatureGateEnabled() bool
 }
 
 type DummyActuator struct {
@@ -82,6 +84,10 @@ func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *confi
 
 func (a *DummyActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	return nil, nil
+}
+
+func (a *DummyActuator) STSFeatureGateEnabled() bool {
+	return false
 }
 
 type ActuatorError struct {

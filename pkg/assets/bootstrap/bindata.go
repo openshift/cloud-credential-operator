@@ -99,6 +99,15 @@ spec:
             required:
             - secretRef
             properties:
+              cloudTokenPath:
+                description: cloudTokenPath is the path where the Kubernetes ServiceAccount
+                  token (JSON Web Token) is mounted on the deployment for the workload
+                  requesting a credentials secret. The presence of this field in combination
+                  with fields such as spec.providerSpec.stsIAMRoleARN indicate that
+                  CCO should broker creation of a credentials secret containing fields
+                  necessary for token based authentication methods such as with the
+                  AWS Secure Token Service (STS).
+                type: string
               providerSpec:
                 description: ProviderSpec contains the cloud provider specific credentials
                   specification.
@@ -318,7 +327,7 @@ spec:
                     - Trace
                     - TraceAll
                 unsupportedConfigOverrides:
-                  description: 'unsupportedConfigOverrides holds a sparse config that will override any previously set options.  It only needs to be the fields to override it will end up overlaying in the following order: 1. hardcoded defaults 2. observedConfig 3. unsupportedConfigOverrides'
+                  description: unsupportedConfigOverrides overrides the final configuration that was computed by the operator. Red Hat does not support the use of this field. Misuse of this field could lead to unexpected behavior or conflict with other configuration options. Seek guidance from the Red Hat support before using this field. Use of this property blocks cluster upgrades, it must be removed before upgrading your cluster.
                   type: object
                   nullable: true
                   x-kubernetes-preserve-unknown-fields: true

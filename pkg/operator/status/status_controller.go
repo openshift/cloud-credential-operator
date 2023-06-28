@@ -77,7 +77,7 @@ func newReconciler(mgr manager.Manager, platformType configv1.PlatformType) reco
 	return r
 }
 
-func alwaysReconcileCCOConfigObject(client.Object) []reconcile.Request {
+func alwaysReconcileCCOConfigObject(ctx context.Context, c client.Object) []reconcile.Request {
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
@@ -103,13 +103,14 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 	if err != nil {
 		return err
 	}
+	operatorCache := mgr.GetCache()
 
-	if err := c.Watch(&source.Kind{Type: &operatorv1.CloudCredential{}}, &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(operatorCache, &operatorv1.CloudCredential{}), &handler.EnqueueRequestForObject{}); err != nil {
 		return err
 	}
 
 	// Whenever a CredentialsRequest is modified, recalculate status
-	err = c.Watch(&source.Kind{Type: &credreqv1.CredentialsRequest{}}, handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject))
+	err = c.Watch(source.Kind(operatorCache, &credreqv1.CredentialsRequest{}), handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject))
 	if err != nil {
 		return err
 	}
@@ -132,7 +133,7 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 	}
 
 	// Whenever one of our watched Secrets is updated, recalculate status
-	err = c.Watch(&source.Kind{Type: &corev1.Secret{}},
+	err = c.Watch(source.Kind(operatorCache, &corev1.Secret{}),
 		handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject),
 		p,
 	)

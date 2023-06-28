@@ -102,11 +102,7 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
 func add(mgr manager.Manager, r reconcile.Reconciler) error {
-	// Inject dependencies into Reconciler
-	if err := mgr.SetFields(r); err != nil {
-		return err
-	}
-
+	operatorCache := mgr.GetCache()
 	name := "credentialsrequest_controller"
 
 	// Custom rateLimiter that sets minimum backoff to 2 seconds
@@ -126,7 +122,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to CredentialsRequest
 	// TODO: we should limit the namespaces where we watch, we want all requests in one namespace so anyone with admin on a namespace cannot create
 	// a request for any credentials they want.
-	err = c.Watch(&source.Kind{Type: &minterv1.CredentialsRequest{}}, &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(operatorCache, &minterv1.CredentialsRequest{}), &handler.EnqueueRequestForObject{})
 	if err != nil {
 		return err
 	}
@@ -135,7 +131,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// We use an annotation on secrets that refers back to their owning credentials request because
 	// the normal owner reference is not namespaced, and we want to support credentials requests being
 	// in a centralized namespace, but writing secrets into component namespaces.
-	targetCredSecretMapFunc := handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+	targetCredSecretMapFunc := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 		namespace, name, err := cache.SplitMetaNamespaceKey(a.GetAnnotations()[minterv1.AnnotationCredentialsRequest])
 		if err != nil {
 			log.WithField("labels", a.GetAnnotations()).WithError(err).Error("error splitting namespace key for label")
@@ -179,7 +175,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch Secrets and reconcile if we see one with our label.
 	err = c.Watch(
-		&source.Kind{Type: &corev1.Secret{}},
+		source.Kind(mgr.GetCache(), &corev1.Secret{}),
 		targetCredSecretMapFunc,
 		p)
 	if err != nil {
@@ -187,10 +183,10 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
-	allCredRequestsMapFn := handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+	allCredRequestsMapFn := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 		log.Info("requeueing all CredentialsRequests")
 		crs := &minterv1.CredentialsRequestList{}
-		err := mgr.GetClient().List(context.TODO(), crs)
+		err := mgr.GetClient().List(ctx, crs)
 		var requests []reconcile.Request
 		if err != nil {
 			log.WithError(err).Error("error listing all cred requests for requeue")
@@ -220,7 +216,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
 	err = c.Watch(
-		&source.Kind{Type: &corev1.Secret{}},
+		source.Kind(operatorCache, &corev1.Secret{}),
 		allCredRequestsMapFn,
 		adminCredSecretPredicate)
 	if err != nil {
@@ -231,7 +227,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// for that new namespace. This allows us to be up and running for other components that don't
 	// yet exist, but will.
 
-	namespaceMapFn := handler.EnqueueRequestsFromMapFunc(func(a client.Object) []reconcile.Request {
+	namespaceMapFn := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
 		// Iterate all CredentailsRequests to determine if we have any that target
 		// this new namespace. We are not anticipating huge numbers of CredentialsRequests,
 		// nor namespace creations.
@@ -239,7 +235,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		log.WithField("namespace", newNamespace).Debug("checking for credentails requests targeting namespace")
 		crs := &minterv1.CredentialsRequestList{}
 		// Fixme: check for errors
-		mgr.GetClient().List(context.TODO(), crs)
+		mgr.GetClient().List(ctx, crs)
 		requests := []reconcile.Request{}
 		for _, cr := range crs.Items {
 			if !cr.Status.Provisioned && cr.Spec.SecretRef.Namespace == newNamespace {
@@ -273,12 +269,12 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	err = c.Watch(
-		&source.Kind{Type: &metav1.PartialObjectMetadata{
+		source.Kind(operatorCache, &metav1.PartialObjectMetadata{
 			TypeMeta: metav1.TypeMeta{
 				Kind:       "Namespace",
 				APIVersion: "v1",
 			},
-		}},
+		}),
 		namespaceMapFn,
 		namespacePred)
 	if err != nil {
@@ -301,7 +297,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 		},
 	}
 	err = c.Watch(
-		&source.Kind{Type: &corev1.ConfigMap{}},
+		source.Kind(operatorCache, &corev1.ConfigMap{}),
 		allCredRequestsMapFn,
 		configMapPredicate)
 	if err != nil {
@@ -310,7 +306,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch the CloudCredential config object and reconcile everything on changes.
 	err = c.Watch(
-		&source.Kind{Type: &operatorv1.CloudCredential{}},
+		source.Kind(operatorCache, &operatorv1.CloudCredential{}),
 		allCredRequestsMapFn,
 	)
 	if err != nil {
@@ -374,6 +370,13 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	}()
 
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
+
+	stsDetected := false
+	stsFeatureGateEnabled := r.Actuator.STSFeatureGateEnabled()
+
+	if stsFeatureGateEnabled {
+		stsDetected, _ = utils.IsTimedTokenCluster(r.Client, ctx, logger)
+	}
 	if err != nil {
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
@@ -381,13 +384,17 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		logger.Error("configuration conflict betwen legacy configmap and operator config")
 		return reconcile.Result{}, fmt.Errorf("configuration conflict")
 	} else if mode == operatorv1.CloudCredentialsModeManual {
-		logger.Infof("operator set to disabled / manual mode")
-		return reconcile.Result{}, err
+		if !stsDetected {
+			logger.Infof("operator set to disabled / manual mode")
+			return reconcile.Result{}, err
+		} else {
+			logger.Infof("operator detects STS enabled cluster")
+		}
 	}
 
 	logger.Info("syncing credentials request")
 	cr := &minterv1.CredentialsRequest{}
-	err = r.Get(context.TODO(), request.NamespacedName, cr)
+	err = r.Get(ctx, request.NamespacedName, cr)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			logger.Debug("credentials request no longer exists")
@@ -422,7 +429,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	// Handle deletion and the deprovision finalizer:
 	if cr.DeletionTimestamp != nil {
 		if HasFinalizer(cr, minterv1.FinalizerDeprovision) {
-			err = r.Actuator.Delete(context.TODO(), cr)
+			err = r.Actuator.Delete(ctx, cr)
 			if err != nil {
 				logger.WithError(err).Error("actuator error deleting credentials exist")
 
@@ -443,7 +450,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 
 			// Delete the target secret if it exists:
 			targetSecret := &corev1.Secret{}
-			err := r.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, targetSecret)
+			err := r.Client.Get(ctx, types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, targetSecret)
 			sLog := logger.WithFields(log.Fields{
 				"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 			})
@@ -455,7 +462,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 					return reconcile.Result{}, err
 				}
 			} else {
-				err := r.Client.Delete(context.TODO(), targetSecret)
+				err := r.Client.Delete(ctx, targetSecret)
 				if err != nil {
 					sLog.WithError(err).Error("error deleting target secret")
 					return reconcile.Result{}, err
@@ -465,7 +472,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			}
 
 			logger.Info("actuator deletion complete, removing finalizer")
-			err = r.removeDeprovisionFinalizer(cr)
+			err = r.removeDeprovisionFinalizer(ctx, cr)
 			if err != nil {
 				logger.WithError(err).Error("error removing deprovision finalizer")
 				return reconcile.Result{}, err
@@ -479,7 +486,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		if !HasFinalizer(cr, minterv1.FinalizerDeprovision) {
 			// Ensure the finalizer is set on any not-deleted requests:
 			logger.Infof("adding finalizer: %s", minterv1.FinalizerDeprovision)
-			err = r.addDeprovisionFinalizer(cr)
+			err = r.addDeprovisionFinalizer(ctx, cr)
 			if err != nil {
 				logger.WithError(err).Error("error adding finalizer")
 			}
@@ -490,7 +497,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	// Ensure the target namespace exists for the secret, if not, there's no point
 	// continuing:
 	targetNS := &corev1.Namespace{}
-	err = r.Get(context.TODO(), types.NamespacedName{Name: cr.Spec.SecretRef.Namespace}, targetNS)
+	err = r.Get(ctx, types.NamespacedName{Name: cr.Spec.SecretRef.Namespace}, targetNS)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// TODO: technically we should deprovision if a credential was in this ns, but it
@@ -516,7 +523,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	var crSecretExists bool
 	crSecret := &corev1.Secret{}
 	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
-	if err := r.Get(context.TODO(), secretKey, crSecret); err != nil {
+	if err := r.Get(ctx, secretKey, crSecret); err != nil {
 		if errors.IsNotFound(err) {
 			crSecretExists = false
 		} else {
@@ -526,94 +533,148 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	} else {
 		crSecretExists = true
 	}
+	if stsFeatureGateEnabled && stsDetected {
+		// create time-based tokens based on settings in CredentialsRequests
+		logger.Debugf("timed token access cluster detected: %t, so not trying to provision with root secret",
+			stsDetected)
+		credsExists, err := r.Actuator.Exists(ctx, cr)
+		if err != nil {
+			logger.Errorf("error checking whether credentials already exists: %v", err)
+			return reconcile.Result{}, err
+		}
 
-	credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(context.TODO(), cr)
-	if err != nil {
-		log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
-	}
-	cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
-	isStale := cr.Generation != cr.Status.LastSyncGeneration
-	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
-	hasActiveFailureConditions := checkForFailureConditions(cr)
+		var syncErr error
+		syncErr = r.CreateOrUpdateOnCredsExist(ctx, credsExists, syncErr, cr)
+		var provisionErr bool
+		if syncErr != nil {
+			switch t := syncErr.(type) {
+			case actuator.ActuatorStatus:
+				if t.Reason() == minterv1.OrphanedCloudResource {
+					// not a critical error, just set the condition to communicate
+					// what happened
+					provisionErr = false
+				} else {
+					logger.Errorf("error syncing credentials: %v", syncErr)
+					provisionErr = true
+				}
 
-	if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
-		logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
+				cr.Status.Provisioned = !provisionErr
+
+				logger.Errorf("errored with condition: %v", t.Reason())
+				r.updateActuatorConditions(cr, t.Reason(), syncErr)
+			default:
+				logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
+				return reconcile.Result{}, syncErr
+			}
+
+		} else {
+			// it worked so clear any actuator conditions if they exist
+			r.updateActuatorConditions(cr, "", nil)
+			cr.Status.Provisioned = true
+		}
+	} else {
+		credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(ctx, cr)
+		if err != nil {
+			log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
+		}
+		cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
+		isStale := cr.Generation != cr.Status.LastSyncGeneration
+		hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
+		hasActiveFailureConditions := checkForFailureConditions(cr)
+
+		log.WithFields(log.Fields{
+			"cloudCredsSecretUpdated":        cloudCredsSecretUpdated,
+			"NOT isStale":                    isStale,
+			"hasRecentlySynced":              hasRecentlySynced,
+			"crSecretExists":                 crSecretExists,
+			"NOT hasActiveFailureConditions": hasActiveFailureConditions,
+			"cr.Status.Provisioned":          cr.Status.Provisioned,
+		}).Debug("The above are ANDed together to determine: lastsyncgeneration is current and lastsynctimestamp < an hour ago")
+		if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
+			logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
+			// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
+			// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
+			// users/permissions/tags/etc.
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+		}
+
+		credsExists, err := r.Actuator.Exists(ctx, cr)
+		if err != nil {
+			logger.Errorf("error checking whether credentials already exists: %v", err)
+			return reconcile.Result{}, err
+		}
+
+		var syncErr error
+		syncErr = r.CreateOrUpdateOnCredsExist(ctx, credsExists, syncErr, cr)
+
+		var provisionErr bool
+		if syncErr != nil {
+			switch t := syncErr.(type) {
+			case actuator.ActuatorStatus:
+				if t.Reason() == minterv1.OrphanedCloudResource {
+					// not a critical error, just set the condition to communicate
+					// what happened
+					provisionErr = false
+				} else {
+					logger.Errorf("error syncing credentials: %v", syncErr)
+					provisionErr = true
+				}
+
+				cr.Status.Provisioned = !provisionErr
+
+				logger.Errorf("errored with condition: %v", t.Reason())
+				r.updateActuatorConditions(cr, t.Reason(), syncErr)
+			default:
+				logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
+				return reconcile.Result{}, syncErr
+			}
+
+		} else {
+			// it worked so clear any actuator conditions if they exist
+			r.updateActuatorConditions(cr, "", nil)
+			cr.Status.Provisioned = true
+		}
+
+		// if provisionErr == false, it means we successfully provisioned even if there
+		// were non-critical errors encountered
+		if !provisionErr {
+			cr.Status.LastSyncTimestamp = &metav1.Time{
+				Time: time.Now(),
+			}
+			cr.Status.LastSyncGeneration = origCR.Generation
+			if credentialsRootSecret != nil {
+				cr.Status.LastSyncCloudCredsSecretResourceVersion = credentialsRootSecret.ResourceVersion
+			}
+		}
+
+		err = utils.UpdateStatus(r.Client, origCR, cr, logger)
+		if err != nil {
+			logger.Errorf("error updating status: %v", err)
+			return reconcile.Result{}, err
+		}
+
 		// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
 		// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
 		// users/permissions/tags/etc.
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+		if syncErr != nil && !provisionErr {
+			// We could have a non-critical error (eg OrphanedCloudResource) in the syncErr
+			// but we wouldn't want to treat that as an overal controller error while
+			// reconciling.
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+		} else {
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, syncErr
+		}
 	}
+	return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+}
 
-	credsExists, err := r.Actuator.Exists(context.TODO(), cr)
-	if err != nil {
-		logger.Errorf("error checking whether credentials already exists: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	var syncErr error
+func (r *ReconcileCredentialsRequest) CreateOrUpdateOnCredsExist(ctx context.Context, credsExists bool, syncErr error, cr *minterv1.CredentialsRequest) error {
 	if !credsExists {
-		syncErr = r.Actuator.Create(context.TODO(), cr)
+		syncErr = r.Actuator.Create(ctx, cr)
 	} else {
-		syncErr = r.Actuator.Update(context.TODO(), cr)
+		syncErr = r.Actuator.Update(ctx, cr)
 	}
-
-	var provisionErr bool
-	if syncErr != nil {
-		switch t := syncErr.(type) {
-		case actuator.ActuatorStatus:
-			if t.Reason() == minterv1.OrphanedCloudResource {
-				// not a critical error, just set the condition to communicate
-				// what happened
-				provisionErr = false
-			} else {
-				logger.Errorf("error syncing credentials: %v", syncErr)
-				provisionErr = true
-			}
-
-			cr.Status.Provisioned = !provisionErr
-
-			logger.Errorf("errored with condition: %v", t.Reason())
-			r.updateActuatorConditions(cr, t.Reason(), syncErr)
-		default:
-			logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
-			return reconcile.Result{}, syncErr
-		}
-
-	} else {
-		// it worked so clear any actuator conditions if they exist
-		r.updateActuatorConditions(cr, "", nil)
-		cr.Status.Provisioned = true
-	}
-
-	// if provisionErr == false, it means we successfully provisioned even if there
-	// were non-critical errors encountered
-	if !provisionErr {
-		cr.Status.LastSyncTimestamp = &metav1.Time{
-			Time: time.Now(),
-		}
-		cr.Status.LastSyncGeneration = origCR.Generation
-		if credentialsRootSecret != nil {
-			cr.Status.LastSyncCloudCredsSecretResourceVersion = credentialsRootSecret.ResourceVersion
-		}
-	}
-
-	err = utils.UpdateStatus(r.Client, origCR, cr, logger)
-	if err != nil {
-		logger.Errorf("error updating status: %v", err)
-		return reconcile.Result{}, err
-	}
-
-	// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
-	// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
-	// users/permissions/tags/etc.
-	if syncErr != nil && !provisionErr {
-		// We could have a non-critical error (eg OrphanedCloudResource) in the syncErr
-		// but we wouldn't want to treat that as an overal controller error while
-		// reconciling.
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
-	} else {
-		return reconcile.Result{RequeueAfter: defaultRequeueTime}, syncErr
-	}
+	return syncErr
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
@@ -765,14 +826,14 @@ func setIgnoredCondition(cr *minterv1.CredentialsRequest, clusterPlatform config
 	}
 }
 
-func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
+func (r *ReconcileCredentialsRequest) addDeprovisionFinalizer(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	AddFinalizer(cr, minterv1.FinalizerDeprovision)
-	return r.Update(context.TODO(), cr)
+	return r.Update(ctx, cr)
 }
 
-func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(cr *minterv1.CredentialsRequest) error {
+func (r *ReconcileCredentialsRequest) removeDeprovisionFinalizer(ctx context.Context, cr *minterv1.CredentialsRequest) error {
 	DeleteFinalizer(cr, minterv1.FinalizerDeprovision)
-	return r.Update(context.TODO(), cr)
+	return r.Update(ctx, cr)
 }
 
 // HasFinalizer returns true if the given object has the given finalizer

@@ -42,6 +42,10 @@ type OpenStackActuator struct {
 	Codec  *minterv1.ProviderCodec
 }
 
+func (a *OpenStackActuator) STSFeatureGateEnabled() bool {
+	return false
+}
+
 // NewOpenStackActuator creates a new OpenStack actuator.
 func NewOpenStackActuator(client client.Client) (*OpenStackActuator, error) {
 	codec, err := minterv1.NewCodec()
