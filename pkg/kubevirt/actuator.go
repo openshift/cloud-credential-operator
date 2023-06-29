@@ -18,9 +18,9 @@ package kubevirt
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -142,13 +142,8 @@ func (a *KubevirtActuator) sync(ctx context.Context, cr *minterv1.CredentialsReq
 
 	// get the existing secret in order to check if need to update or create a new
 	logger.Debug("provisioning secret")
-	existingSecret, err := a.getSecret(ctx, cr, logger)
-	if err != nil {
-		return err
-	}
-
 	// check if need to update or create a new one
-	if err = a.syncCredentialSecret(ctx, cr, &kubevirtCredentialData, existingSecret, logger); err != nil {
+	if err = a.syncCredentialSecret(ctx, cr, &kubevirtCredentialData, logger); err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
 		return &actuatoriface.ActuatorError{
@@ -170,87 +165,44 @@ func (a *KubevirtActuator) getCredentialsSecretData(cloudCredSecret *corev1.Secr
 	return infraClusterKubeconfig, nil
 }
 
-func (a *KubevirtActuator) syncCredentialSecret(ctx context.Context, cr *minterv1.CredentialsRequest, kubevirtCredentialData *[]byte, existingSecret *corev1.Secret, logger log.FieldLogger) error {
-	if existingSecret == nil {
-		if kubevirtCredentialData == nil {
-			msg := "new access key secret needed but no key data provided"
-			logger.Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   msg,
-			}
-		}
-
-		return a.createNewSecret(logger, cr, kubevirtCredentialData, ctx)
-	}
-
-	return a.updateExistingSecret(logger, existingSecret, cr, kubevirtCredentialData)
-}
-
-func (a *KubevirtActuator) updateExistingSecret(logger log.FieldLogger, existingSecret *corev1.Secret, cr *minterv1.CredentialsRequest, kubevirtCredentialData *[]byte) error {
-	// Update the existing secret:
-	logger.Debug("updating secret")
-	origSecret := existingSecret.DeepCopy()
-	if existingSecret.Labels == nil {
-		existingSecret.Labels = map[string]string{}
-	}
-	existingSecret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
-
-	if existingSecret.Annotations == nil {
-		existingSecret.Annotations = map[string]string{}
-	}
-	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-	if kubevirtCredentialData != nil {
-		existingSecret.Data = map[string][]byte{
-			KubevirtCredentialsSecretKey: *kubevirtCredentialData,
-		}
-	}
-
-	if !reflect.DeepEqual(existingSecret, origSecret) {
-		logger.Info("target secret has changed, updating")
-		if err := a.Client.Update(context.TODO(), existingSecret); err != nil {
-			msg := "error updating secret"
-			logger.WithError(err).Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   msg,
-			}
-		}
-	} else {
-		logger.Debug("target secret unchanged")
-	}
-
-	return nil
-}
-
-func (a *KubevirtActuator) createNewSecret(logger log.FieldLogger, cr *minterv1.CredentialsRequest, kubevirtCredentialData *[]byte, ctx context.Context) error {
-	logger.Info("creating secret")
+func (a *KubevirtActuator) syncCredentialSecret(ctx context.Context, cr *minterv1.CredentialsRequest, kubevirtCredentialData *[]byte, logger log.FieldLogger) error {
+	sLog := logger.WithFields(log.Fields{
+		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+	})
+	sLog.Infof("processing secret")
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.SecretRef.Name,
 			Namespace: cr.Spec.SecretRef.Namespace,
-			Labels: map[string]string{
-				minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
-			},
-			Annotations: map[string]string{
-				minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
-			},
-		},
-		Data: map[string][]byte{
-			KubevirtCredentialsSecretKey: *kubevirtCredentialData,
 		},
 	}
-
-	if err := a.Client.Create(ctx, secret); err != nil {
-		msg := "error in creating a secret"
-		logger.WithError(err).Error(msg)
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if kubevirtCredentialData != nil {
+			if secret.Data == nil {
+				secret.Data = map[string][]byte{}
+			}
+			secret.Data = map[string][]byte{
+				KubevirtCredentialsSecretKey: *kubevirtCredentialData,
+			}
+		}
+		return nil
+	})
+	sLog.WithField("operation", op).Info("processed secret")
+	if err != nil {
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   msg,
+			Message:   "error processing secret",
 		}
 	}
-
-	logger.Info("secret created successfully")
 	return nil
 }
 

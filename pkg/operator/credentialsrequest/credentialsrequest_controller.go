@@ -357,7 +357,6 @@ func addLabelController(mgr manager.Manager, mutatingClient corev1client.CoreV1I
 			return IsMissingSecretLabel(e.Object)
 		},
 	}
-	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
 	err = labelController.Watch(
 		source.Kind(mgr.GetCache(), &corev1.Secret{}),
 		missingLabelSecretsMapFn,
@@ -370,14 +369,13 @@ func addLabelController(mgr manager.Manager, mutatingClient corev1client.CoreV1I
 	return nil
 }
 
-// IsMissingSecretLabel determines if the secret was createded by the CCO but has not been labelled yet
+// IsMissingSecretLabel determines if the secret was created by the CCO but has not been labelled yet
 func IsMissingSecretLabel(secret metav1.Object) bool {
-	isAdmin := isAdminCredSecret(secret.GetNamespace(), secret.GetName())
 	_, hasAnnotation := secret.GetAnnotations()[minterv1.AnnotationCredentialsRequest]
 	value, hasLabel := secret.GetLabels()[minterv1.LabelCredentialsRequest]
 	hasValue := hasLabel && value == minterv1.LabelCredentialsRequestValue
 
-	return (isAdmin || hasAnnotation) && (!hasLabel || !hasValue)
+	return hasAnnotation && (!hasLabel || !hasValue)
 }
 
 type ReconcileSecretMissingLabel struct {
@@ -440,7 +438,7 @@ func (r *ReconcileSecretMissingLabel) Reconcile(ctx context.Context, request rec
 			logger.Debug("secret no longer exists")
 			return reconcile.Result{}, nil
 		}
-		logger.WithError(err).Error("error getting secret, requeuing")
+		logger.WithError(err).Error("error getting secret, re-queuing")
 		return reconcile.Result{}, err
 	}
 

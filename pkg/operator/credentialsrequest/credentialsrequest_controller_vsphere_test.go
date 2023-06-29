@@ -160,7 +160,7 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
 				testVSphereCredsSecretPassthrough(),
-				testSecret(testSecretNamespace, testSecretName, map[string][]byte{"oldkey": []byte("olddata")}),
+				testSecret(testSecretNamespace, testSecretName, map[string][]byte{"key1": []byte("olddata")}),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
