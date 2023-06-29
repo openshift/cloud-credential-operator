@@ -88,7 +88,10 @@ var (
 // default RBAC. The Manager will set fields on the Controller and Start it when
 // the Manager is Started.
 func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType, mutatingClient corev1client.CoreV1Interface) error {
-	return add(mgr, newReconciler(mgr, actuator, platType), mutatingClient)
+	if err := add(mgr, newReconciler(mgr, actuator, platType)); err != nil {
+		return err
+	}
+	return addLabelController(mgr, mutatingClient)
 }
 
 // newReconciler returns a new reconcile.Reconciler
@@ -104,7 +107,7 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler, mutatingClient corev1client.CoreV1Interface) error {
+func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	operatorCache := mgr.GetCache()
 	name := "credentialsrequest_controller"
 
@@ -316,12 +319,17 @@ func add(mgr manager.Manager, r reconcile.Reconciler, mutatingClient corev1clien
 		return err
 	}
 
-	labelControllerName := "credentialsrequest_labeller_controller"
+	return nil
+}
+
+// addLabelController adds a new Controller managing labels to mgr
+func addLabelController(mgr manager.Manager, mutatingClient corev1client.CoreV1Interface) error {
+	labelReconciler := &ReconcileSecretMissingLabel{
+		cachedClient:   mgr.GetClient(),
+		mutatingClient: mutatingClient,
+	}
 	labelController, err := controller.New(labelControllerName, mgr, controller.Options{
-		Reconciler: &ReconcileSecretMissingLabel{
-			cachedClient:   mgr.GetClient(),
-			mutatingClient: mutatingClient,
-		},
+		Reconciler: labelReconciler,
 	})
 	if err != nil {
 		return err
@@ -351,12 +359,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler, mutatingClient corev1clien
 	}
 	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
 	err = labelController.Watch(
-		source.Kind(operatorCache, &corev1.Secret{}),
+		source.Kind(mgr.GetCache(), &corev1.Secret{}),
 		missingLabelSecretsMapFn,
 		missingLabelCredSecretPredicate)
 	if err != nil {
 		return err
 	}
+	status.AddHandler(labelControllerName, labelReconciler)
 
 	return nil
 }
@@ -376,7 +385,39 @@ type ReconcileSecretMissingLabel struct {
 	mutatingClient corev1client.CoreV1Interface
 }
 
-var _ reconcile.Reconciler = &ReconcileSecretMissingLabel{}
+func (r *ReconcileSecretMissingLabel) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+	var secrets corev1.SecretList
+	if err := r.cachedClient.List(context.TODO(), &secrets); err != nil {
+		return nil, err
+	}
+	var missing int
+	for _, item := range secrets.Items {
+		if IsMissingSecretLabel(&item) {
+			missing += 1
+		}
+	}
+
+	if missing > 0 {
+		return []configv1.ClusterOperatorStatusCondition{{
+			Type:    configv1.OperatorProgressing,
+			Status:  configv1.ConditionTrue,
+			Reason:  "LabelsMissing",
+			Message: fmt.Sprintf("%d secrets created for CredentialsRequests have not been labelled", missing),
+		}}, nil
+	}
+	return []configv1.ClusterOperatorStatusCondition{}, nil
+}
+
+func (r *ReconcileSecretMissingLabel) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {
+	return nil, nil
+}
+
+func (r *ReconcileSecretMissingLabel) Name() string {
+	return labelControllerName
+}
+
+var _ reconcile.Reconciler = (*ReconcileSecretMissingLabel)(nil)
+var _ status.Handler = (*ReconcileSecretMissingLabel)(nil)
 
 func (r *ReconcileSecretMissingLabel) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	start := time.Now()
