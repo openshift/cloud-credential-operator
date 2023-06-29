@@ -22,6 +22,7 @@ import (
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	// GCP packages
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -780,66 +781,35 @@ func (a *Actuator) syncSecret(ctx context.Context, cr *minterv1.CredentialsReque
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
-
-	existingSecret := &corev1.Secret{}
-	err := a.Client.Get(ctx, types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
+	sLog.Infof("processing secret")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
+		},
+	}
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if secret.Data == nil {
+			secret.Data = map[string][]byte{}
+		}
+		secret.Data[gcpSecretJSONKey] = privateKeyData
+		return nil
+	})
+	sLog.WithField("operation", op).Info("processed secret")
 	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.Info("no existing secret found, will create one")
-
-			secret := &corev1.Secret{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      cr.Spec.SecretRef.Name,
-					Namespace: cr.Spec.SecretRef.Namespace,
-					Labels: map[string]string{
-						minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
-					},
-					Annotations: map[string]string{
-						minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
-					},
-				},
-				Data: map[string][]byte{
-					gcpSecretJSONKey: privateKeyData,
-				},
-			}
-
-			err := a.Client.Create(ctx, secret)
-			if err != nil {
-				sLog.WithError(err).Error("error creating secret")
-				return err
-			}
-			sLog.Info("secret created successfully")
-			return nil
-
-		} else {
-			return fmt.Errorf("error checking for existing secret: %v", err)
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
 		}
 	}
-
-	sLog.Info("updating existing secret")
-
-	origSecret := existingSecret.DeepCopy()
-	if existingSecret.Labels == nil {
-		existingSecret.Labels = map[string]string{}
-	}
-	existingSecret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
-
-	if existingSecret.Annotations == nil {
-		existingSecret.Annotations = map[string]string{}
-	}
-	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-	existingSecret.Data[gcpSecretJSONKey] = privateKeyData
-
-	if !reflect.DeepEqual(existingSecret, origSecret) {
-		sLog.Info("secret changed, updating")
-		err := a.Client.Update(ctx, existingSecret)
-		if err != nil {
-			return fmt.Errorf("error updating existing secret: %v", err)
-		}
-	} else {
-		sLog.Debug("target secret unchanged")
-	}
-
 	return nil
 }
 
