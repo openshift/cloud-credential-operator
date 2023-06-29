@@ -24,6 +24,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	corev1applyconfigurations "k8s.io/client-go/applyconfigurations/core/v1"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	corev1 "k8s.io/api/core/v1"
@@ -315,7 +316,107 @@ func add(mgr manager.Manager, r reconcile.Reconciler, mutatingClient corev1clien
 		return err
 	}
 
+	labelControllerName := "credentialsrequest_labeller_controller"
+	labelController, err := controller.New(labelControllerName, mgr, controller.Options{
+		Reconciler: &ReconcileSecretMissingLabel{
+			cachedClient:   mgr.GetClient(),
+			mutatingClient: mutatingClient,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	missingLabelSecretsMapFn := handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      a.GetName(),
+					Namespace: a.GetNamespace(),
+				},
+			},
+		}
+	})
+
+	missingLabelCredSecretPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return IsMissingSecretLabel(e.ObjectNew)
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			return IsMissingSecretLabel(e.Object)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return IsMissingSecretLabel(e.Object)
+		},
+	}
+	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
+	err = labelController.Watch(
+		source.Kind(operatorCache, &corev1.Secret{}),
+		missingLabelSecretsMapFn,
+		missingLabelCredSecretPredicate)
+	if err != nil {
+		return err
+	}
+
 	return nil
+}
+
+// IsMissingSecretLabel determines if the secret was createded by the CCO but has not been labelled yet
+func IsMissingSecretLabel(secret metav1.Object) bool {
+	isAdmin := isAdminCredSecret(secret.GetNamespace(), secret.GetName())
+	_, hasAnnotation := secret.GetAnnotations()[minterv1.AnnotationCredentialsRequest]
+	value, hasLabel := secret.GetLabels()[minterv1.LabelCredentialsRequest]
+	hasValue := hasLabel && value == minterv1.LabelCredentialsRequestValue
+
+	return (isAdmin || hasAnnotation) && (!hasLabel || !hasValue)
+}
+
+type ReconcileSecretMissingLabel struct {
+	cachedClient   client.Client
+	mutatingClient corev1client.CoreV1Interface
+}
+
+var _ reconcile.Reconciler = &ReconcileSecretMissingLabel{}
+
+func (r *ReconcileSecretMissingLabel) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+
+	logger := log.WithFields(log.Fields{
+		"controller": labelControllerName,
+		"secret":     fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
+	})
+
+	defer func() {
+		dur := time.Since(start)
+		metrics.MetricControllerReconcileTime.WithLabelValues(labelControllerName).Observe(dur.Seconds())
+	}()
+
+	logger.Info("syncing secret")
+	secret := &corev1.Secret{}
+	err := r.cachedClient.Get(ctx, request.NamespacedName, secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Debug("secret no longer exists")
+			return reconcile.Result{}, nil
+		}
+		logger.WithError(err).Error("error getting secret, requeuing")
+		return reconcile.Result{}, err
+	}
+
+	applyConfig := corev1applyconfigurations.Secret(secret.Name, secret.Namespace)
+	applyConfig.WithLabels(map[string]string{
+		minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+	})
+
+	if _, err := r.mutatingClient.Secrets(secret.Namespace).Apply(ctx, applyConfig, metav1.ApplyOptions{
+		Force:        true, // we're the authoritative owner of this field and should not allow anyone to stomp it
+		FieldManager: labelControllerName,
+	}); err != nil {
+		logger.WithError(err).Error("failed to update label")
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
 }
 
 // isCloudCredOperatorConfigMap returns true if given configmap is cloud-credential-operator-config configmap

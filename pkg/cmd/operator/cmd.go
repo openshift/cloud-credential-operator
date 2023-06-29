@@ -31,6 +31,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -154,7 +155,7 @@ func NewOperator() *cobra.Command {
 					}
 					var missing []types.NamespacedName
 					for _, secret := range secrets.Items {
-						if isMissingSecretLabel(secret) {
+						if credentialsrequest.IsMissingSecretLabel(&secret) {
 							missing = append(missing, types.NamespacedName{
 								Namespace: secret.Namespace,
 								Name:      secret.Name,
@@ -297,15 +298,6 @@ func NewOperator() *cobra.Command {
 	flag.CommandLine.Parse([]string{})
 
 	return cmd
-}
-
-// isMissingSecretLabel determines if the secret was created by the CCO but has not been labelled yet
-func isMissingSecretLabel(secret corev1.Secret) bool {
-	_, hasAnnotation := secret.GetAnnotations()[minterv1.AnnotationCredentialsRequest]
-	value, hasLabel := secret.GetLabels()[minterv1.LabelCredentialsRequest]
-	hasValue := hasLabel && value == minterv1.LabelCredentialsRequestValue
-
-	return hasAnnotation && (!hasLabel || !hasValue)
 }
 
 func initializeGlog(flags *pflag.FlagSet) {
