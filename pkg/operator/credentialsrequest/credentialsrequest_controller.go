@@ -211,13 +211,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	adminCredSecretPredicate := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isAdminCredSecret(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
+			return IsAdminCredSecret(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return isAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
+			return IsAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
+			return IsAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
 		},
 	}
 	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
@@ -463,7 +463,7 @@ func isCloudCredOperatorConfigMap(cm metav1.Object) bool {
 	return cm.GetName() == constants.CloudCredOperatorConfigMap && cm.GetNamespace() == minterv1.CloudCredOperatorNamespace
 }
 
-func isAdminCredSecret(namespace, secretName string) bool {
+func IsAdminCredSecret(namespace, secretName string) bool {
 	if namespace == constants.CloudCredSecretNamespace {
 		if secretName == constants.AWSCloudCredSecretName ||
 			secretName == constants.AzureCloudCredSecretName ||

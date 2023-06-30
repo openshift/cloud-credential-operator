@@ -154,6 +154,7 @@ func NewOperator() *cobra.Command {
 						log.WithError(err).Fatal("failed to list secrets")
 					}
 					var missing []types.NamespacedName
+					var admin []types.NamespacedName
 					for _, secret := range secrets.Items {
 						if credentialsrequest.IsMissingSecretLabel(&secret) {
 							missing = append(missing, types.NamespacedName{
@@ -161,10 +162,19 @@ func NewOperator() *cobra.Command {
 								Name:      secret.Name,
 							})
 						}
+						if credentialsrequest.IsAdminCredSecret(secret.Namespace, secret.Name) {
+							admin = append(admin, types.NamespacedName{
+								Namespace: secret.Namespace,
+								Name:      secret.Name,
+							})
+						}
 					}
 					if len(missing) != 0 {
-						log.WithField("missing", missing).Warnf("%s feature gate enabled but not all secrets labelled, falling back to caching all secrets on cluster", configv1.FeatureGateAWSSecurityTokenService)
+						log.WithField("missing", missing).Warn("not all secrets labelled, falling back to caching all secrets on cluster")
+					} else if len(admin) != 0 {
+						log.WithField("admin", admin).Warn("admin secrets present, falling back to caching all secrets on cluster")
 					} else {
+						log.Info("filtering the set of secrets we watch")
 						filteredWatchPossible = true
 					}
 				}
