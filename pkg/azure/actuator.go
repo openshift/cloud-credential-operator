@@ -54,14 +54,14 @@ func (a *Actuator) STSFeatureGateEnabled() bool {
 	return false
 }
 
-func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
+func NewActuator(c, rootCredClient client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating Azure codec")
 		return nil, fmt.Errorf("error creating Azure codec: %v", err)
 	}
 
-	client := newClientWrapper(c)
+	client := newClientWrapper(c, rootCredClient)
 	return &Actuator{
 		client: client,
 		codec:  codec,
@@ -71,11 +71,11 @@ func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Ac
 	}, nil
 }
 
-func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec,
+func NewFakeActuator(c, rootCredClient client.Client, codec *minterv1.ProviderCodec,
 	credentialMinterBuilder credentialMinterBuilder,
 ) *Actuator {
 	return &Actuator{
-		client:                  newClientWrapper(c),
+		client:                  newClientWrapper(c, rootCredClient),
 		codec:                   codec,
 		credentialMinterBuilder: credentialMinterBuilder,
 	}
@@ -437,7 +437,7 @@ func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 func (a *Actuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.client.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.client.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -506,5 +506,5 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.client.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.client.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }

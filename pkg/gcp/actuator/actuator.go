@@ -61,6 +61,7 @@ var _ actuatoriface.Actuator = (*Actuator)(nil)
 type Actuator struct {
 	ProjectName      string
 	Client           client.Client
+	RootCredClient   client.Client
 	Codec            *minterv1.ProviderCodec
 	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
 }
@@ -70,7 +71,7 @@ func (a *Actuator) STSFeatureGateEnabled() bool {
 }
 
 // NewActuator initializes and returns a new Actuator for GCP.
-func NewActuator(c client.Client, projectName string) (*Actuator, error) {
+func NewActuator(c, rootCredClient client.Client, projectName string) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating GCP codec")
@@ -80,6 +81,7 @@ func NewActuator(c client.Client, projectName string) (*Actuator, error) {
 	return &Actuator{
 		ProjectName:      projectName,
 		Client:           c,
+		RootCredClient:   rootCredClient,
 		Codec:            codec,
 		GCPClientBuilder: ccgcp.NewClientFromJSON,
 	}, nil
@@ -649,7 +651,7 @@ func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.GCPCloudCredSecretName))
 
 	logger.Debug("loading GCP credentials from secret")
-	jsonBytes, err := loadCredsFromSecret(a.Client, constants.CloudCredSecretNamespace, constants.GCPCloudCredSecretName)
+	jsonBytes, err := loadCredsFromSecret(a.RootCredClient, constants.CloudCredSecretNamespace, constants.GCPCloudCredSecretName)
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +689,7 @@ func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 func (a *Actuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -869,5 +871,5 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }

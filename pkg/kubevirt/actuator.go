@@ -37,7 +37,8 @@ import (
 )
 
 type KubevirtActuator struct {
-	Client client.Client
+	Client         client.Client
+	RootCredClient client.Client
 }
 
 func (a *KubevirtActuator) STSFeatureGateEnabled() bool {
@@ -49,9 +50,10 @@ const (
 )
 
 // NewActuator creates a new Kubevirt actuator.
-func NewActuator(client client.Client) (*KubevirtActuator, error) {
+func NewActuator(client, rootCredClient client.Client) (*KubevirtActuator, error) {
 	return &KubevirtActuator{
-		Client: client,
+		Client:         client,
+		RootCredClient: rootCredClient,
 	}, nil
 }
 
@@ -112,7 +114,7 @@ func (a *KubevirtActuator) GetCredentialsRootSecret(ctx context.Context, cr *min
 
 	// get the secret of the kubevirt credentials
 	kubevirtCredentialsSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), kubevirtCredentialsSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), kubevirtCredentialsSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -235,5 +237,5 @@ func (a *KubevirtActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldL
 }
 
 func (a *KubevirtActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }

@@ -84,6 +84,7 @@ func TestCredentialsFetching(t *testing.T) {
 	tests := []struct {
 		name                  string
 		existing              []runtime.Object
+		existingAdmin         []runtime.Object
 		credentialsRequest    *minterv1.CredentialsRequest
 		expectedError         bool
 		validate              func(*testing.T, *awsClientBuilderRecorder)
@@ -110,8 +111,9 @@ func TestCredentialsFetching(t *testing.T) {
 			},
 		},
 		{
-			name: "no read only secret",
-			existing: []runtime.Object{
+			name:     "no read only secret",
+			existing: []runtime.Object{},
+			existingAdmin: []runtime.Object{
 				testRootSecret(),
 			},
 			clientBuilderRecorder: func(mockCtrl *gomock.Controller) *awsClientBuilderRecorder {
@@ -131,6 +133,8 @@ func TestCredentialsFetching(t *testing.T) {
 			name: "read only creds not ready",
 			existing: []runtime.Object{
 				testReadOnlySecret(),
+			},
+			existingAdmin: []runtime.Object{
 				testRootSecret(),
 			},
 			clientBuilderRecorder: func(mockCtrl *gomock.Controller) *awsClientBuilderRecorder {
@@ -196,6 +200,7 @@ func TestCredentialsFetching(t *testing.T) {
 
 			test.existing = append(test.existing, test.credentialsRequest)
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
+			fakeAdminClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingAdmin...).Build()
 
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
@@ -204,6 +209,7 @@ func TestCredentialsFetching(t *testing.T) {
 
 			a := &AWSActuator{
 				Client:           fakeClient,
+				RootCredClient:   fakeAdminClient,
 				Codec:            codec,
 				AWSClientBuilder: clientRecorder.ClientBuilder,
 			}
@@ -363,8 +369,8 @@ func TestUpgradeable(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			a := &AWSActuator{
-				Client: fakeClient,
-				Codec:  codec,
+				RootCredClient: fakeClient,
+				Codec:          codec,
 			}
 
 			cond := a.Upgradeable(test.mode)
@@ -653,12 +659,14 @@ func TestDetectSTS(t *testing.T) {
 				WithScheme(scheme.Scheme).
 				WithStatusSubresource(&minterv1.CredentialsRequest{}).
 				WithRuntimeObjects(test.existing...).Build()
+			fakeAdminClient := fake.NewClientBuilder().Build()
 			err := fakeClient.Create(context.TODO(), testAuthentication(test.issuer))
 			if err != nil {
 				panic(err)
 			}
 			a := &AWSActuator{
 				Client:                             fakeClient,
+				RootCredClient:                     fakeAdminClient,
 				Codec:                              codec,
 				AWSSecurityTokenServiceGateEnabled: test.stsEnabled,
 			}

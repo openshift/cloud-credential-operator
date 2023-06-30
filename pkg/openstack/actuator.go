@@ -38,8 +38,9 @@ import (
 )
 
 type OpenStackActuator struct {
-	Client client.Client
-	Codec  *minterv1.ProviderCodec
+	Client         client.Client
+	RootCredClient client.Client
+	Codec          *minterv1.ProviderCodec
 }
 
 func (a *OpenStackActuator) STSFeatureGateEnabled() bool {
@@ -47,7 +48,7 @@ func (a *OpenStackActuator) STSFeatureGateEnabled() bool {
 }
 
 // NewOpenStackActuator creates a new OpenStack actuator.
-func NewOpenStackActuator(client client.Client) (*OpenStackActuator, error) {
+func NewOpenStackActuator(client, rootCredClient client.Client) (*OpenStackActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating OpenStack codec")
@@ -55,8 +56,9 @@ func NewOpenStackActuator(client client.Client) (*OpenStackActuator, error) {
 	}
 
 	return &OpenStackActuator{
-		Codec:  codec,
-		Client: client,
+		Codec:          codec,
+		Client:         client,
+		RootCredClient: rootCredClient,
 	}, nil
 }
 
@@ -174,7 +176,7 @@ func (a *OpenStackActuator) GetCredentialsRootSecretLocation() types.NamespacedN
 func (a *OpenStackActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -219,5 +221,5 @@ func (a *OpenStackActuator) getLogger(cr *minterv1.CredentialsRequest) log.Field
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *OpenStackActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }

@@ -87,17 +87,18 @@ var (
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
 // default RBAC. The Manager will set fields on the Controller and Start it when
 // the Manager is Started.
-func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType, mutatingClient corev1client.CoreV1Interface) error {
-	if err := add(mgr, newReconciler(mgr, actuator, platType)); err != nil {
+func AddWithActuator(mgr, adminMgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType, mutatingClient corev1client.CoreV1Interface) error {
+	if err := add(mgr, adminMgr, newReconciler(mgr, adminMgr, actuator, platType)); err != nil {
 		return err
 	}
 	return addLabelController(mgr, mutatingClient)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) reconcile.Reconciler {
+func newReconciler(mgr, adminMgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) reconcile.Reconciler {
 	r := &ReconcileCredentialsRequest{
 		Client:       mgr.GetClient(),
+		AdminClient:  adminMgr.GetClient(),
 		Actuator:     actuator,
 		platformType: platType,
 	}
@@ -107,7 +108,7 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	operatorCache := mgr.GetCache()
 	name := "credentialsrequest_controller"
 
@@ -222,7 +223,7 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	}
 	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
 	err = c.Watch(
-		source.Kind(operatorCache, &corev1.Secret{}),
+		source.Kind(adminMgr.GetCache(), &corev1.Secret{}),
 		allCredRequestsMapFn,
 		adminCredSecretPredicate)
 	if err != nil {
@@ -484,6 +485,7 @@ var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
 // ReconcileCredentialsRequest reconciles a CredentialsRequest object
 type ReconcileCredentialsRequest struct {
 	client.Client
+	AdminClient  client.Client
 	Actuator     actuator.Actuator
 	platformType configv1.PlatformType
 }
@@ -523,7 +525,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
 	} else if conflict {
-		logger.Error("configuration conflict betwen legacy configmap and operator config")
+		logger.Error("configuration conflict between legacy configmap and operator config")
 		return reconcile.Result{}, fmt.Errorf("configuration conflict")
 	} else if mode == operatorv1.CloudCredentialsModeManual {
 		if !stsDetected {
