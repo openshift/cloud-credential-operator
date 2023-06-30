@@ -30,7 +30,7 @@ import (
 )
 
 func Add(mgr manager.Manager, kubeconfig string) error {
-	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(mgr, kubeconfig)
+	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeconfig)
 	if err != nil {
 		log.Fatal(err)
 	}

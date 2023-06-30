@@ -102,7 +102,6 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
-				testAzureCredsSecret(constants.CloudCredSecretNamespace, constants.AzureCloudCredSecretName),
 				testAzureCredentialsRequest(t),
 			},
 			mockAzureAppClient: func(mockCtrl *gomock.Controller) *mockazure.MockAppClient {
@@ -127,7 +126,6 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
-				testAzureCredsSecret(constants.CloudCredSecretNamespace, constants.AzureCloudCredSecretName),
 				testAzureCredentialsRequestNeedingCleanup(t),
 				testAzureTargetSecret(testSecretNamespace, testSecretName, "mintedAzureClientID"),
 			},
@@ -165,7 +163,6 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
-				testAzureCredsSecret(constants.CloudCredSecretNamespace, constants.AzureCloudCredSecretName),
 				testAzureCredentialsRequestWithOrphanedCloudResource(t),
 				testAzureTargetSecret(testSecretNamespace, testSecretName, testAzureClientID),
 			},
@@ -212,9 +209,12 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().
 				WithStatusSubresource(&minterv1.CredentialsRequest{}).
 				WithRuntimeObjects(test.existing...).Build()
+			fakeAdminClient := fake.NewClientBuilder().
+				WithRuntimeObjects(testAzureCredsSecret(constants.CloudCredSecretNamespace, constants.AzureCloudCredSecretName)).Build()
 
 			azureActuator := azureactuator.NewFakeActuator(
 				fakeClient,
+				fakeAdminClient,
 				codec,
 				func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*azureactuator.AzureCredentialsMinter, error) {
 					return azureactuator.NewFakeAzureCredentialsMinter(logger,

@@ -69,6 +69,7 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
 	Client                             client.Client
+	RootCredClient                     client.Client
 	Codec                              *minterv1.ProviderCodec
 	AWSClientBuilder                   func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 	Scheme                             *runtime.Scheme
@@ -76,7 +77,7 @@ type AWSActuator struct {
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
+func NewAWSActuator(client, rootCredClient client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -86,6 +87,7 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTok
 	return &AWSActuator{
 		Codec:                              codec,
 		Client:                             client,
+		RootCredClient:                     rootCredClient,
 		AWSClientBuilder:                   awsutils.ClientBuilder,
 		Scheme:                             scheme,
 		AWSSecurityTokenServiceGateEnabled: awsSecurityTokenServiceGateEnabled,
@@ -943,13 +945,13 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 	logger.Debug("loading AWS credentials from secret")
 	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 	// cluster, we need to load different secrets for each cluster.
-	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.Client, constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
+	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.RootCredClient, constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 	if err != nil {
 		return nil, err
 	}
 
 	logger.Debug("creating root AWS client")
-	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.Client)
+	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.RootCredClient)
 }
 
 // buildReadAWSClient will return an AWS client using the the scaled down read only AWS creds
@@ -1109,7 +1111,7 @@ func (a *AWSActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 func (a *AWSActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -1397,7 +1399,7 @@ func awsSTSIAMRoleARN(codec *minterv1.ProviderCodec, credentialsRequest *minterv
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }
 
 func generateAWSCredentialsConfig(accessKeyID, secretAccessKey string) []byte {

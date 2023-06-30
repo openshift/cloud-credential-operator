@@ -44,8 +44,9 @@ var _ actuatoriface.Actuator = (*VSphereActuator)(nil)
 
 // VSphereActuator implements the CredentialsRequest Actuator interface to process CredentialsRequests in vSphere.
 type VSphereActuator struct {
-	Codec  *minterv1.ProviderCodec
-	Client client.Client
+	Codec          *minterv1.ProviderCodec
+	Client         client.Client
+	RootCredClient client.Client
 }
 
 func (a *VSphereActuator) STSFeatureGateEnabled() bool {
@@ -53,7 +54,7 @@ func (a *VSphereActuator) STSFeatureGateEnabled() bool {
 }
 
 // NewVSphereActuator creates a new VSphereActuator.
-func NewVSphereActuator(client client.Client) (*VSphereActuator, error) {
+func NewVSphereActuator(client, rootCredClient client.Client) (*VSphereActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -61,8 +62,9 @@ func NewVSphereActuator(client client.Client) (*VSphereActuator, error) {
 	}
 
 	return &VSphereActuator{
-		Codec:  codec,
-		Client: client,
+		Codec:          codec,
+		Client:         client,
+		RootCredClient: rootCredClient,
 	}, nil
 }
 
@@ -329,7 +331,7 @@ func (a *VSphereActuator) GetCredentialsRootSecretLocation() types.NamespacedNam
 func (a *VSphereActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -383,5 +385,5 @@ func isVSphereCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *VSphereActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }

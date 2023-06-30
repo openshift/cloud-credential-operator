@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -125,62 +126,45 @@ func NewOperator() *cobra.Command {
 					log.WithError(err).Fatal("failed to set up client")
 				}
 
+				infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeconfigCommandLinePath)
+				if err != nil {
+					log.Fatal(err)
+				}
+				platformType := platform.GetType(infraStatus)
+
 				// The status quo for this controller is to LIST + WATCH all Secrets on the cluster. This consumes
 				// more resources than necessary on clusters where users put other data in Secrets themselves, as we
 				// hold that data in our cache and never do anything with it. The reconcilers mainly need to react to
 				// changes in Secrets created for CredentialRequests, which they control and can label, allowing us
-				// to filter the LIST + WATCH down and hold the minimal set of data in memory. However, two caveats:
-				// - in passthrough and mint mode, admin credentials are also provided by the user through Secrets,
-				//   and we need to watch those, but we can't label them
-				// - on existing clusters, secrets exist from previous work these reconcilers did that will not have
-				//   Secrets labelled
-				// We could solve the second issue with an interim release of this controller that labels all previous
-				// Secrets, but does not restrict the watch stream.
-				// Due to the way that controller-runtime closes over the client/cache concepts, it's difficult to
-				// solve the first issue, though, since we'd need two sets of clients and caches, both for Secrets,
-				// and ensure that we use one for client access to Secrets we're creating or mutating and the other
-				// when we're interacting with admin credentials. Not impossible to do, but tricky to implement and
-				// complex.
-				// Until we undertake that effort, we apply a simplification to the space: only when AWS STS mode is
-				// enabled, we will try to filter the LIST + WATCH. This mode is brand new, so we can be reasonably
-				// sure that there are no previous secrets on the cluster, and, we make the filtering best-effort
-				// in order to check if that assumption held. Second, AWS STS mode only runs in clusters without
-				// admin credentials, so if we apply the filter, we should not see failures downstream from clients
-				// that hope to see those objects but can't.
+				// to filter the LIST + WATCH down and hold the minimal set of data in memory. However, on existing
+				// clusters, secrets exist from previous work these reconcilers did that will not have Secrets labelled.
+				//
+				// We solve this second issue two-fold:
+				// - a new controller that labels all previous Secrets, but does not restrict the watch stream
+				// - a check on startup that detects that no Secrets remain to be labelled and applies the filtering
 				var filteredWatchPossible bool
-				if awsSecurityTokenServiceGateEnabled {
-					secrets, err := coreClient.Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-					if err != nil {
-						log.WithError(err).Fatal("failed to list secrets")
+				secrets, err := coreClient.Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					log.WithError(err).Fatal("failed to list secrets")
+				}
+				var missing []types.NamespacedName
+				for _, secret := range secrets.Items {
+					if credentialsrequest.IsMissingSecretLabel(&secret) {
+						missing = append(missing, types.NamespacedName{
+							Namespace: secret.Namespace,
+							Name:      secret.Name,
+						})
 					}
-					var missing []types.NamespacedName
-					var admin []types.NamespacedName
-					for _, secret := range secrets.Items {
-						if credentialsrequest.IsMissingSecretLabel(&secret) {
-							missing = append(missing, types.NamespacedName{
-								Namespace: secret.Namespace,
-								Name:      secret.Name,
-							})
-						}
-						if credentialsrequest.IsAdminCredSecret(secret.Namespace, secret.Name) {
-							admin = append(admin, types.NamespacedName{
-								Namespace: secret.Namespace,
-								Name:      secret.Name,
-							})
-						}
-					}
-					if len(missing) != 0 {
-						log.WithField("missing", missing).Warn("not all secrets labelled, falling back to caching all secrets on cluster")
-					} else if len(admin) != 0 {
-						log.WithField("admin", admin).Warn("admin secrets present, falling back to caching all secrets on cluster")
-					} else {
-						log.Info("filtering the set of secrets we watch")
-						filteredWatchPossible = true
-					}
+				}
+				if len(missing) != 0 {
+					log.WithField("missing", missing).Warn("not all secrets labelled, falling back to caching all secrets on cluster")
+				} else {
+					log.Info("filtering the set of secrets we watch")
+					filteredWatchPossible = true
 				}
 
 				// Create a new Cmd to provide shared dependencies and start components
-				log.Info("setting up manager")
+				log.Info("setting up managers")
 				mgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: ":2112",
 					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
@@ -194,6 +178,7 @@ func NewOperator() *cobra.Command {
 							}),
 						}
 						if filteredWatchPossible {
+							log.Infof("adding label selector %s=%s to cache options for Secrets", minterv1.LabelCredentialsRequest, minterv1.LabelCredentialsRequestValue)
 							opts.ByObject[&corev1.Secret{}] = cache.ByObject{
 								Label: labels.SelectorFromSet(labels.Set{
 									minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
@@ -207,21 +192,55 @@ func NewOperator() *cobra.Command {
 					log.WithError(err).Fatal("unable to set up overall controller manager")
 				}
 
+				rootMgr, err := manager.New(cfg, manager.Options{
+					MetricsBindAddress: ":2113",
+					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+						if opts.ByObject == nil {
+							opts.ByObject = map[client.Object]cache.ByObject{}
+						}
+						opts.ByObject[&corev1.Secret{}] = cache.ByObject{
+							Field: selectorForRootCredential(platformType),
+						}
+						return cache.New(config, opts)
+					},
+				})
+				if err != nil {
+					log.WithError(err).Fatal("unable to set up root credential controller manager")
+				}
+
 				log.Info("registering components")
 
 				// Setup Scheme for all resources
 				util.SetupScheme(mgr.GetScheme())
+				util.SetupScheme(rootMgr.GetScheme())
 
 				// Setup all Controllers
-				log.Info("setting up controller")
-				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath, coreClient, awsSecurityTokenServiceGateEnabled); err != nil {
+				log.Info("setting up controllers")
+				if err := controller.AddToManager(mgr, rootMgr, kubeconfigCommandLinePath, coreClient, awsSecurityTokenServiceGateEnabled); err != nil {
 					log.WithError(err).Fatal("unable to register controllers to the manager")
 				}
 
-				// Start the Cmd
-				log.Info("starting the cmd")
-				if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-					log.WithError(err).Fatal("unable to run the manager")
+				// Start the managers
+				log.Info("starting the managers")
+				runCtx := signals.SetupSignalHandler()
+				errs := make(chan error)
+				wg := sync.WaitGroup{}
+				for _, m := range []manager.Manager{mgr, rootMgr} {
+					wg.Add(1)
+					go func(m manager.Manager, ctx context.Context) {
+						defer wg.Done()
+						errs <- m.Start(ctx)
+
+					}(m, runCtx)
+				}
+				go func() {
+					wg.Wait()
+					close(errs)
+				}()
+				for err := range errs {
+					if err != nil {
+						log.WithError(err).Fatal("unable to run the manager")
+					}
 				}
 			}
 
@@ -308,6 +327,34 @@ func NewOperator() *cobra.Command {
 	flag.CommandLine.Parse([]string{})
 
 	return cmd
+}
+
+func selectorForRootCredential(platformType configv1.PlatformType) fields.Selector {
+	var name string
+	switch platformType {
+	case configv1.AWSPlatformType:
+		name = constants.AWSCloudCredSecretName
+	case configv1.AzurePlatformType:
+		name = constants.AzureCloudCredSecretName
+	case configv1.GCPPlatformType:
+		name = constants.GCPCloudCredSecretName
+	case configv1.OpenStackPlatformType:
+		name = constants.OpenStackCloudCredsSecretName
+	case configv1.OvirtPlatformType:
+		name = constants.OvirtCloudCredsSecretName
+	case configv1.KubevirtPlatformType:
+		name = constants.KubevirtCloudCredSecretName
+	case configv1.VSpherePlatformType:
+		name = constants.VSphereCloudCredSecretName
+	default:
+		return fields.Nothing()
+	}
+	selector := fields.SelectorFromSet(fields.Set{
+		"metadata.namespace": constants.CloudCredSecretNamespace,
+		"metadata.name":      name,
+	})
+	log.WithField("selector", selector.String()).Info("setting up field selector for root credential Secret")
+	return selector
 }
 
 func initializeGlog(flags *pflag.FlagSet) {

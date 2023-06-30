@@ -62,10 +62,10 @@ func init() {
 var AddToManagerFuncs []func(manager.Manager, string) error
 
 // AddToManagerWithActuatorFuncs is a list of functions to add all Controllers with Actuators to the Manager
-var AddToManagerWithActuatorFuncs []func(manager.Manager, actuator.Actuator, configv1.PlatformType, corev1client.CoreV1Interface) error
+var AddToManagerWithActuatorFuncs []func(manager.Manager, manager.Manager, actuator.Actuator, configv1.PlatformType, corev1client.CoreV1Interface) error
 
 // AddToManager adds all Controllers to the Manager
-func AddToManager(m manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface, awsSecurityTokenServiceGateEnabled bool) error {
+func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface, awsSecurityTokenServiceGateEnabled bool) error {
 	for _, f := range AddToManagerFuncs {
 		if err := f(m, explicitKubeconfig); err != nil {
 			return err
@@ -77,7 +77,7 @@ func AddToManager(m manager.Manager, explicitKubeconfig string, coreClient corev
 		// https://github.com/openshift/api/blob/master/config/v1/types_infrastructure.go#L11
 		var err error
 		var a actuator.Actuator
-		infraStatus, err := platform.GetInfraStatusUsingKubeconfig(m, explicitKubeconfig)
+		infraStatus, err := platform.GetInfraStatusUsingKubeconfig(explicitKubeconfig)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -85,19 +85,19 @@ func AddToManager(m manager.Manager, explicitKubeconfig string, coreClient corev
 		switch platformType {
 		case configv1.AWSPlatformType:
 			log.Info("initializing AWS actuator")
-			a, err = awsactuator.NewAWSActuator(m.GetClient(), m.GetScheme(), awsSecurityTokenServiceGateEnabled)
+			a, err = awsactuator.NewAWSActuator(m.GetClient(), rootM.GetClient(), m.GetScheme(), awsSecurityTokenServiceGateEnabled)
 			if err != nil {
 				return err
 			}
 		case configv1.AzurePlatformType:
 			log.Info("initializing Azure actuator")
-			a, err = azure.NewActuator(m.GetClient(), util.GetAzureCloudName(infraStatus))
+			a, err = azure.NewActuator(m.GetClient(), rootM.GetClient(), util.GetAzureCloudName(infraStatus))
 			if err != nil {
 				return err
 			}
 		case configv1.OpenStackPlatformType:
 			log.Info("initializing OpenStack actuator")
-			a, err = openstack.NewOpenStackActuator(m.GetClient())
+			a, err = openstack.NewOpenStackActuator(m.GetClient(), rootM.GetClient())
 			if err != nil {
 				return err
 			}
@@ -106,7 +106,7 @@ func AddToManager(m manager.Manager, explicitKubeconfig string, coreClient corev
 			if infraStatus.PlatformStatus == nil || infraStatus.PlatformStatus.GCP == nil {
 				log.Fatalf("missing GCP configuration in platform status")
 			}
-			a, err = gcpactuator.NewActuator(m.GetClient(), infraStatus.PlatformStatus.GCP.ProjectID)
+			a, err = gcpactuator.NewActuator(m.GetClient(), rootM.GetClient(), infraStatus.PlatformStatus.GCP.ProjectID)
 			if err != nil {
 				return err
 			}
@@ -115,19 +115,19 @@ func AddToManager(m manager.Manager, explicitKubeconfig string, coreClient corev
 			if infraStatus.PlatformStatus == nil || infraStatus.PlatformStatus.Ovirt == nil {
 				log.Fatalf("missing Ovirt configuration in platform status")
 			}
-			a, err = ovirt.NewActuator(m.GetClient())
+			a, err = ovirt.NewActuator(m.GetClient(), rootM.GetClient())
 			if err != nil {
 				return err
 			}
 		case configv1.VSpherePlatformType:
 			log.Info("initializing VSphere actuator")
-			a, err = vsphereactuator.NewVSphereActuator(m.GetClient())
+			a, err = vsphereactuator.NewVSphereActuator(m.GetClient(), rootM.GetClient())
 			if err != nil {
 				return err
 			}
 		case configv1.KubevirtPlatformType:
 			log.Info("initializing Kubevirt actuator")
-			a, err = kubevirt.NewActuator(m.GetClient())
+			a, err = kubevirt.NewActuator(m.GetClient(), rootM.GetClient())
 			if err != nil {
 				return err
 			}
@@ -135,7 +135,7 @@ func AddToManager(m manager.Manager, explicitKubeconfig string, coreClient corev
 			log.Info("initializing no-op actuator (unsupported platform)")
 			a = &actuator.DummyActuator{}
 		}
-		if err := f(m, a, platformType, coreClient); err != nil {
+		if err := f(m, rootM, a, platformType, coreClient); err != nil {
 			return err
 		}
 	}

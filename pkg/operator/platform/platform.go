@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 
 	log "github.com/sirupsen/logrus"
 
@@ -21,12 +22,11 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	crtconfig "sigs.k8s.io/controller-runtime/pkg/client/config"
-	"sigs.k8s.io/controller-runtime/pkg/manager"
 )
 
 // GetInfraStatusUsingKubeconfig queries the k8s api for the infrastructure CR using the kubeconfig file
 // pointed to by the passed in kubeconfig (pass in empty string to use default k8s client configurations)
-func GetInfraStatusUsingKubeconfig(m manager.Manager, kubeconfig string) (*configv1.InfrastructureStatus, error) {
+func GetInfraStatusUsingKubeconfig(kubeconfig string) (*configv1.InfrastructureStatus, error) {
 	c, err := getClient(kubeconfig)
 	if err != nil {
 		return nil, err
@@ -70,6 +70,8 @@ func getClient(explicitKubeconfig string) (client.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	util.SetupScheme(dynamicClient.Scheme())
 
 	return dynamicClient, nil
 }
