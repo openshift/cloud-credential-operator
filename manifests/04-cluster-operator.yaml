@@ -9,3 +9,42 @@ status:
   versions:
   - name: operator
     version: "0.0.1-snapshot"
+  relatedObjects:
+  - group: admissionregistration.k8s.io
+    name: pod-identity-webhook
+    resource: mutatingwebhookconfigurations
+  - group: apps
+    name: pod-identity-webhook
+    namespace: openshift-cloud-credential-operator
+    resource: deployments
+  - group: cloudcredential.openshift.io
+    name: ""
+    resource: credentialsrequests
+  - group: ""
+    name: openshift-cloud-credential-operator
+    resource: namespaces
+  - group: ""
+    name: pod-identity-webhook
+    namespace: openshift-cloud-credential-operator
+    resource: serviceaccounts
+  - group: ""
+    name: pod-identity-webhook
+    namespace: openshift-cloud-credential-operator
+    resource: services
+  - group: operator.openshift.io
+    name: cluster
+    resource: cloudcredentials
+  - group: rbac.authorization.k8s.io
+    name: pod-identity-webhook
+    namespace: openshift-cloud-credential-operator
+    resource: rolebindings
+  - group: rbac.authorization.k8s.io
+    name: pod-identity-webhook
+    namespace: openshift-cloud-credential-operator
+    resource: roles
+  - group: rbac.authorization.k8s.io
+    name: pod-identity-webhook
+    resource: clusterrolebindings
+  - group: rbac.authorization.k8s.io
+    name: pod-identity-webhook
+    resource: clusterroles
