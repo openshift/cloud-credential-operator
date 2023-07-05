@@ -70,7 +70,7 @@ func init() {
 }
 
 // Add creates a new metrics Calculator and adds it to the Manager.
-func Add(mgr manager.Manager, kubeConfig string) error {
+func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	logger := log.WithField("controller", controllerName)
 
 	mc := &Calculator{

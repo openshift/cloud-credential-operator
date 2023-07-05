@@ -59,7 +59,7 @@ func init() {
 
 // AddToManagerFuncs is a list of functions to add all Controllers to the Manager.
 // String parameter is to pass in any specific override for the kubeconfig file to use.
-var AddToManagerFuncs []func(manager.Manager, string) error
+var AddToManagerFuncs []func(manager.Manager, manager.Manager, string) error
 
 // AddToManagerWithActuatorFuncs is a list of functions to add all Controllers with Actuators to the Manager
 var AddToManagerWithActuatorFuncs []func(manager.Manager, manager.Manager, actuator.Actuator, configv1.PlatformType, corev1client.CoreV1Interface) error
@@ -67,7 +67,7 @@ var AddToManagerWithActuatorFuncs []func(manager.Manager, manager.Manager, actua
 // AddToManager adds all Controllers to the Manager
 func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface, awsSecurityTokenServiceGateEnabled bool) error {
 	for _, f := range AddToManagerFuncs {
-		if err := f(m, explicitKubeconfig); err != nil {
+		if err := f(m, rootM, explicitKubeconfig); err != nil {
 			return err
 		}
 	}
