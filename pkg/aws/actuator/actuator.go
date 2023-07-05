@@ -417,20 +417,39 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 // a spec.SecretRef.Name
 // a cr.Spec.SecretRef.Namespace
 func (a *AWSActuator) createSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath string, secretRef string, secretRefNamespace string, log log.FieldLogger, ctx context.Context) error {
-	log.Infof("creating secret")
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretRef,
-			Namespace: secretRefNamespace,
-		},
-		StringData: map[string]string{
-			"credentials": fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath),
-		},
-		Type: corev1.SecretTypeOpaque,
+	log.Infof("creating secret for STS")
+	// Check if the Secret already exists.
+	existingSecret := &corev1.Secret{}
+	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: secretRefNamespace, Name: secretRef}, existingSecret)
+	if err == nil {
+		// The Secret already exists, so update it with the new cloudTokenPath.
+		existingSecret.StringData["credentials"] = fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath)
+		log.Debugf("target secret exists, updating for STS, STSIAMRoleARN: %v, cloudTokenPath: %v",
+			awsSTSIAMRoleARN, cloudTokenPath)
+		err = a.Client.Update(ctx, existingSecret)
+	} else if errors.IsNotFound(err) {
+		// The Secret does not exist, so create it.
+		log.Debugf("target secret does not exist, creating for STS, STSIAMRoleARN: %v, cloudTokenPath: %v",
+			awsSTSIAMRoleARN, cloudTokenPath)
+		secret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretRef,
+				Namespace: secretRefNamespace,
+			},
+			StringData: map[string]string{
+				"credentials": fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath),
+			},
+			Type: corev1.SecretTypeOpaque,
+		}
+		err = a.Client.Create(ctx, secret)
+	} else {
+		// An error other than "Secret not found" occurred.
+		log.Errorf("error getting secret: %v", err)
+		return err
 	}
-	err := a.Client.Create(ctx, secret)
 	if err != nil {
-		log.Errorf("error creating secret")
+		// An error occurred updating or creating the Secret.
+		log.Errorf("error updating or creating secret: %v", err)
 		return err
 	}
 	return nil
