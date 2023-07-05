@@ -88,7 +88,7 @@ func alwaysReconcileCCOConfigObject(ctx context.Context, c client.Object) []reco
 }
 
 // Add creates a new Status Controller and adds it to the Manager.
-func Add(mgr manager.Manager, kubeConfig string) error {
+func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 
 	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeConfig)
 	if err != nil {

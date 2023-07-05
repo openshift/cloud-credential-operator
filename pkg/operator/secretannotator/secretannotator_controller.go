@@ -29,7 +29,7 @@ import (
 	log "github.com/sirupsen/logrus"
 )
 
-func Add(mgr manager.Manager, kubeconfig string) error {
+func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeconfig)
 	if err != nil {
 		log.Fatal(err)
@@ -40,19 +40,19 @@ func Add(mgr manager.Manager, kubeconfig string) error {
 
 	switch platformType {
 	case configv1.AzurePlatformType:
-		return azure.Add(mgr, azure.NewReconciler(mgr))
+		return azure.Add(rootCredentialManager, azure.NewReconciler(rootCredentialManager))
 	case configv1.AWSPlatformType:
-		return aws.Add(mgr, aws.NewReconciler(mgr))
+		return aws.Add(rootCredentialManager, aws.NewReconciler(rootCredentialManager))
 	case configv1.GCPPlatformType:
 		if infraStatus.PlatformStatus == nil || infraStatus.PlatformStatus.GCP == nil {
 			log.Fatalf("Missing GCP configuration in infrastructure platform status")
 		}
-		return gcp.Add(mgr, gcp.NewReconciler(mgr, infraStatus.PlatformStatus.GCP.ProjectID))
+		return gcp.Add(rootCredentialManager, gcp.NewReconciler(rootCredentialManager, infraStatus.PlatformStatus.GCP.ProjectID))
 	case configv1.VSpherePlatformType:
-		return vsphere.Add(mgr, vsphere.NewReconciler(mgr))
+		return vsphere.Add(rootCredentialManager, vsphere.NewReconciler(rootCredentialManager))
 	case configv1.OpenStackPlatformType:
-		return openstack.Add(mgr, openstack.NewReconciler(mgr))
+		return openstack.Add(rootCredentialManager, openstack.NewReconciler(rootCredentialManager))
 	default: // returning the AWS implementation for default to avoid changing any behavior
-		return aws.Add(mgr, aws.NewReconciler(mgr))
+		return aws.Add(rootCredentialManager, aws.NewReconciler(rootCredentialManager))
 	}
 }
