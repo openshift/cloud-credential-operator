@@ -64,6 +64,25 @@ spec:
   - testServiceAccount1
   - testServiceAccount2`
 
+	credReqCustomRoleTemplate = `---
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: %s
+  namespace: openshift-cloud-credential-operator
+spec:
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: AzureProviderSpec
+    permissions:
+    - testPermission
+  secretRef:
+    name: %s
+    namespace: %s
+  serviceAccountNames:
+  - testServiceAccount1
+  - testServiceAccount2`
+
 	testManagedIdentityPrincipalID = "prinicpal-be9f-4e32-bb21-42564b35285f"
 	testScopingResourceGroupNames  = []string{testInfraName}
 )
@@ -118,8 +137,8 @@ func TestCreateManagedIdentities(t *testing.T) {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
-				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
-				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testRegionName, testSubscriptionID, resourceTags)
 				mockRoleAssignmentsListForScopePager(wrapper,
 					[]*armauthorization.RoleAssignment{},
 					testManagedIdentityPrincipalID,
@@ -136,10 +155,10 @@ func TestCreateManagedIdentities(t *testing.T) {
 						},
 					})
 				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "RandomContributorRoleAssignmentNameGUID")
-				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
-				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2", testSubscriptionID)
 				return wrapper
 			},
 			setup: func(t *testing.T) string {
@@ -154,7 +173,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -190,7 +209,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -213,8 +232,8 @@ func TestCreateManagedIdentities(t *testing.T) {
 				wrapper := mockAzureClientWrapper(mockCtrl)
 				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
 				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
-				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
-				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testRegionName, testSubscriptionID, resourceTags)
 				mockRoleAssignmentsListForScopePager(wrapper,
 					[]*armauthorization.RoleAssignment{},
 					testManagedIdentityPrincipalID,
@@ -231,10 +250,10 @@ func TestCreateManagedIdentities(t *testing.T) {
 						},
 					})
 				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "RandomContributorRoleAssignmentNameGUID")
-				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
-				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount2", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2", testSubscriptionID)
 				return wrapper
 			},
 			enableTechPreview: true,
@@ -250,7 +269,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), true)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), true, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -288,7 +307,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), true)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), true, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -300,6 +319,69 @@ func TestCreateManagedIdentities(t *testing.T) {
 				files, err = ioutil.ReadDir(filepath.Join(targetDir, provisioning.ManifestsDirName))
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
+			},
+			expectError: false,
+		},
+		{
+			name: "Create managed identities for one (1) CredentialsRequest with custom role permissions",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testRegionName, testSubscriptionID, resourceTags)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, []*armauthorization.RoleDefinition{})
+				mockCreateOrUpdateRoleDefinitionSuccess(wrapper, "testinfraname-namespace1-secretName1", testSubscriptionID)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("testinfraname-namespace1-secretName1"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "CustomRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("testinfraname-namespace1-secretName1"),
+							},
+						},
+					},
+				)
+				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "RandomContributorRoleAssignmentNameGUID")
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2", testSubscriptionID)
+				return wrapper
+			},
+			enableTechPreview: true,
+			setup: func(t *testing.T) string {
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "failed to create temp directory")
+
+				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
+				err = provisioning.EnsureDir(manifestsDirPath)
+				require.NoError(t, err, "errored while creating manifests directory for test")
+
+				credReqDirPath := filepath.Join(tempDirName, "credreqs")
+				err = provisioning.EnsureDir(credReqDirPath)
+				require.NoError(t, err, "errored while creating credreq directory for test")
+
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false, true)
+				require.NoError(t, err, "errored while setting up test CredReq files")
+				return tempDirName
+			},
+			verify: func(t *testing.T, tempDirName string) {
+				files, err := ioutil.ReadDir(tempDirName)
+				require.NoError(t, err, "unexpected error listing files in targetDir")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files in targetDir")
+
+				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
+				files, err = ioutil.ReadDir(manifestsDirPath)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
 			expectError: false,
 		},
@@ -349,8 +431,8 @@ func TestEnsureUserAssignedManagedIdentity(t *testing.T) {
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1")
-				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, resourceTags)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testRegionName, testSubscriptionID, resourceTags)
 				return wrapper
 			},
 		},
@@ -359,7 +441,7 @@ func TestEnsureUserAssignedManagedIdentity(t *testing.T) {
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockGetUserAssignedManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID, resourceTags)
+				mockGetUserAssignedManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testSubscriptionID, resourceTags)
 				return wrapper
 			},
 		},
@@ -377,8 +459,8 @@ func TestEnsureUserAssignedManagedIdentity(t *testing.T) {
 					"existingtagname0": to.Ptr("existingtagvalue0"),
 					fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, testInfraName): to.Ptr(ownedAzureResourceTagValue),
 				}
-				mockGetUserAssignedManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testSubscriptionID, gotResourceTags)
-				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", testRegionName, testSubscriptionID, wantResourceTags)
+				mockGetUserAssignedManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testSubscriptionID, gotResourceTags)
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testRegionName, testSubscriptionID, wantResourceTags)
 				return wrapper
 			},
 		},
@@ -388,7 +470,7 @@ func TestEnsureUserAssignedManagedIdentity(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-			_, err := ensureUserAssignedManagedIdentity(mockAzureClientWrapper, "testinfraname-secretName1-namespace1", testOIDCResourceGroupName, testRegionName, testUserTags)
+			_, err := ensureUserAssignedManagedIdentity(mockAzureClientWrapper, "testinfraname-namespace1-secretName1", testOIDCResourceGroupName, testRegionName, testUserTags)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
@@ -408,8 +490,8 @@ func TestEnsureFederatedIdentityCredential(t *testing.T) {
 			name: "Pre-existing federated identity credential not found, credential created",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
 				return wrapper
 			},
 		},
@@ -417,7 +499,7 @@ func TestEnsureFederatedIdentityCredential(t *testing.T) {
 			name: "Pre-existing federated identity credential found with correct audience, subject and issuer URL, credential not created or updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "openshift", testIssuerURL, "system:serviceaccount:namespace1:testServiceAccount1")
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID, "openshift", testIssuerURL, "system:serviceaccount:namespace1:testServiceAccount1")
 				return wrapper
 			},
 		},
@@ -425,8 +507,8 @@ func TestEnsureFederatedIdentityCredential(t *testing.T) {
 			name: "Pre-existing federated identity credential found with incorrect audience, credential updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "wrongaudience", testIssuerURL, "system:serviceaccount:namespace1:testServiceAccount1")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID, "wrongaudience", testIssuerURL, "system:serviceaccount:namespace1:testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
 				return wrapper
 			},
 		},
@@ -434,8 +516,8 @@ func TestEnsureFederatedIdentityCredential(t *testing.T) {
 			name: "Pre-existing federated identity credential found with incorrect subject, credential updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "openshift", testIssuerURL, "system:serviceaccount:wrongnamespace:testServiceAccount1")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID, "openshift", testIssuerURL, "system:serviceaccount:wrongnamespace:testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
 				return wrapper
 			},
 		},
@@ -443,8 +525,8 @@ func TestEnsureFederatedIdentityCredential(t *testing.T) {
 			name: "Pre-existing federated identity credential found with incorrect issuer URL, credential updated",
 			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
 				wrapper := mockAzureClientWrapper(mockCtrl)
-				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID, "openshift", "http://hue.hae", "system:serviceaccount:namespace1:testServiceAccount1")
-				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-secretName1-namespace1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID, "openshift", "http://hue.hae", "system:serviceaccount:namespace1:testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
 				return wrapper
 			},
 		},
@@ -454,7 +536,7 @@ func TestEnsureFederatedIdentityCredential(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-			err := ensureFederatedIdentityCredential(mockAzureClientWrapper, "testinfraname-secretName1-namespace1", testIssuerURL, "namespace1", "testServiceAccount1", testOIDCResourceGroupName)
+			err := ensureFederatedIdentityCredential(mockAzureClientWrapper, "testinfraname-namespace1-secretName1", testIssuerURL, "namespace1", "testServiceAccount1", testOIDCResourceGroupName)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
@@ -642,12 +724,14 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 	}
 }
 
-func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string, isTechPreview bool) error {
+func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string, isTechPreview bool, isCustomRole bool) error {
 	var credReq string
 	if isTechPreview {
-		credReq = fmt.Sprintf(credReqTechPreviewTemplate, crName, targetSecretNamespace, targetSecretName)
+		credReq = fmt.Sprintf(credReqTechPreviewTemplate, crName, targetSecretName, targetSecretNamespace)
+	} else if isCustomRole {
+		credReq = fmt.Sprintf(credReqCustomRoleTemplate, crName, targetSecretName, targetSecretNamespace)
 	} else {
-		credReq = fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
+		credReq = fmt.Sprintf(credReqTemplate, crName, targetSecretName, targetSecretNamespace)
 	}
 
 	f, err := ioutil.TempFile(targetDir, "testCredReq*.yaml")
@@ -725,6 +809,25 @@ func mockCreateOrUpdateManagedIdentitySuccess(wrapper *azureclients.AzureClientW
 		gomock.Any(), // options
 	).Return(
 		userAssignedIdentitiesClientCreateOrUpdateResponse,
+		nil, // no error
+	)
+}
+
+func mockCreateOrUpdateRoleDefinitionSuccess(wrapper *azureclients.AzureClientWrapper, roleName string, subScriptionID string) {
+	roleDefinitionCreateOrUpdateResponse := armauthorization.RoleDefinitionsClientCreateOrUpdateResponse{
+		RoleDefinition: armauthorization.RoleDefinition{
+			ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", subScriptionID, "CustomRoleDefinitionID")),
+			Name: to.Ptr(roleName),
+		},
+	}
+	wrapper.RoleDefinitionsClient.(*mockazure.MockRoleDefinitionsClient).EXPECT().CreateOrUpdate(
+		gomock.Any(), // context
+		gomock.Any(), // scope
+		gomock.Any(), // roleDefinitionName, GUID generated by createRoleDefinition()
+		gomock.Any(), // roleDefinition,
+		gomock.Any(), // options
+	).Return(
+		roleDefinitionCreateOrUpdateResponse,
 		nil, // no error
 	)
 }
