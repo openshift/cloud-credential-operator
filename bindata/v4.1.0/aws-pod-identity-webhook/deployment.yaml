@@ -29,7 +29,7 @@ spec:
         - --tls-cert=/var/run/app/certs/tls.crt
         - --tls-key=/var/run/app/certs/tls.key
         - --namespace=openshift-cloud-credential-operator
-        - --port=6443
+        - --port=9443
         - --service-name=pod-identity-webhook
         - --annotation-prefix=eks.amazonaws.com # TODO: use openshift.io based prefix
         - --token-audience=sts.amazonaws.com
@@ -66,4 +66,3 @@ spec:
       - name: webhook-certs
         secret:
           secretName: pod-identity-webhook
-

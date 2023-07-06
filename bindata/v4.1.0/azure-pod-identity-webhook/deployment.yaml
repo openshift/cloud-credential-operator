@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    azure-workload-identity.io/system: "true"
+  name: pod-identity-webhook
+  namespace: openshift-cloud-credential-operator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-identity-webhook
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+      labels:
+        app: pod-identity-webhook
+    spec:
+      containers:
+        - args:
+            - --log-level=info
+            - --disable-cert-rotation=true
+          command:
+            - /usr/bin/azure-workload-identity-webhook
+          env:
+            - name: AZURE_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: azure-credentials
+                  key: azure_tenant_id
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  apiVersion: v1
+                  fieldPath: metadata.namespace
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            failureThreshold: 6
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: pod-identity-webhook
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+          ports:
+            - containerPort: 6443
+              name: webhook-server
+              protocol: TCP
+            - containerPort: 8095
+              name: metrics
+              protocol: TCP
+            - containerPort: 9440
+              name: healthz
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: healthz
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ "ALL" ]
+          volumeMounts:
+            - mountPath: /certs
+              name: webhook-certs
+              readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 120
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 120
+      priorityClassName: system-cluster-critical
+      serviceAccountName: pod-identity-webhook
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: pod-identity-webhook
