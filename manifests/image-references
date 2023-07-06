@@ -10,6 +10,10 @@ spec:
     from:
       kind: DockerImage
       Name: quay.io/openshift/aws-pod-identity-webhook
+  - name: azure-workload-identity-webhook
+    from:
+      kind: DockerImage
+      Name: quay.io/openshift/azure-workload-identity-webhook
   - name: kube-rbac-proxy
     from:
       kind: DockerImage
