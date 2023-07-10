@@ -381,7 +381,7 @@ func IsMissingSecretLabel(secret metav1.Object) bool {
 
 type ReconcileSecretMissingLabel struct {
 	cachedClient   client.Client
-	mutatingClient corev1client.CoreV1Interface
+	mutatingClient corev1client.SecretsGetter
 }
 
 func (r *ReconcileSecretMissingLabel) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
