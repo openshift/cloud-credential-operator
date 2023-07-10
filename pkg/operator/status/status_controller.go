@@ -109,6 +109,18 @@ func Add(mgr manager.Manager, kubeConfig string) error {
 		return err
 	}
 
+	// always reconcile status when the clusteroperator/cloud-credential changes.
+	if err := c.Watch(source.Kind(operatorCache, &configv1.ClusterOperator{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
+		GenericFunc: func(genericEvent event.GenericEvent) bool {
+			if genericEvent.Object == nil {
+				return false
+			}
+			return genericEvent.Object.GetName() == "cloud-credential"
+		},
+	}); err != nil {
+		return err
+	}
+
 	// Whenever a CredentialsRequest is modified, recalculate status
 	err = c.Watch(source.Kind(operatorCache, &credreqv1.CredentialsRequest{}), handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject))
 	if err != nil {
