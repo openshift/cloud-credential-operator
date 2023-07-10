@@ -92,6 +92,16 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		}
 	}
 
+	if len(crProviderSpec.Permissions) > 0 {
+		// Ensure a custom role exists for the user-assigned managed identity with the specified permissions.
+		err := ensureCustomRole(client, shortenedManagedIdentityName, name, subscriptionID, crProviderSpec.Permissions)
+		if err != nil {
+			return fmt.Errorf("error ensuring custom role: %w", err)
+		}
+		// Add the custom role to the list of roles to assign to the user-assigned managed identity
+		crProviderSpec.RoleBindings = append(crProviderSpec.RoleBindings, credreqv1.RoleBinding{Role: shortenedManagedIdentityName})
+	}
+
 	// Ensure roles from CredentialsRequest are assigned to the user-assigned managed identity
 	err = ensureRolesAssignedToManagedIdentity(client, *userAssignedManagedIdentity.Properties.PrincipalID, subscriptionID, crProviderSpec.RoleBindings, scopingResourceGroupNames)
 	if err != nil {
@@ -107,6 +117,75 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 	}
 
 	writeCredReqSecret(credentialsRequest, outputDir, *userAssignedManagedIdentity.Properties.ClientID, *userAssignedManagedIdentity.Properties.TenantID, subscriptionID, region)
+	return nil
+}
+
+// ensureCustomRole ensures that a custom role with the provided roleName exists within the provided subscriptionID
+// and has the specified permissions.
+//
+// If a custom role with the provided roleName already exists, the custom role will be updated to match the desired state.
+func ensureCustomRole(client *azureclients.AzureClientWrapper, roleName string, name string, subscriptionID string, permissions []string) error {
+	scope := "/subscriptions/" + subscriptionID
+	// Generate actions based on permissions (conversion from []string to []*string)
+	actions := []*string{}
+	for _, permission := range permissions {
+		actions = append(actions, to.Ptr(permission))
+	}
+
+	// Determine if a role already exists with the same name
+	listRoles := client.RoleDefinitionsClient.NewListPager(
+		scope,
+		&armauthorization.RoleDefinitionsClientListOptions{
+			Filter: to.Ptr(fmt.Sprintf("roleName eq '%v'", roleName)),
+		},
+	)
+	roleDefinitions := make([]*armauthorization.RoleDefinition, 0)
+	for listRoles.More() {
+		pageResponse, err := listRoles.NextPage(context.Background())
+		if err != nil {
+			return err
+		}
+		roleDefinitions = append(roleDefinitions, pageResponse.RoleDefinitionListResult.Value...)
+	}
+
+	var roleID string
+	var isNewRole bool
+	switch len(roleDefinitions) {
+	case 0:
+		// Generate a new role ID
+		roleID = uuid.New().String()
+		isNewRole = true
+	case 1:
+		log.Printf("Found existing customRole %s %s", roleName, *roleDefinitions[0].ID)
+		roleID = *roleDefinitions[0].Name
+	default:
+		return fmt.Errorf("found %d role definitions for %s, expected one", len(roleDefinitions), roleName)
+	}
+
+	customRole, err := client.RoleDefinitionsClient.CreateOrUpdate(
+		context.Background(),
+		scope,
+		roleID,
+		armauthorization.RoleDefinition{
+			Properties: &armauthorization.RoleDefinitionProperties{
+				RoleName:         &roleName,
+				Description:      to.Ptr("Custom role for OpenShift. Owned by: " + name),
+				RoleType:         to.Ptr("CustomRole"),
+				Permissions:      []*armauthorization.Permission{{Actions: actions}},
+				AssignableScopes: []*string{&scope},
+			},
+		},
+		&armauthorization.RoleDefinitionsClientCreateOrUpdateOptions{},
+	)
+	if err != nil {
+		return err
+	}
+
+	if isNewRole {
+		log.Printf("Created customRole %s %s", roleName, *customRole.ID)
+	} else {
+		log.Printf("Updated customRole %s %s", roleName, *customRole.ID)
+	}
 	return nil
 }
 
@@ -145,10 +224,24 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 	for _, roleBinding := range roleBindings {
 		for _, scopingResourceGroupName := range scopingResourceGroupNames {
 			scope := "/subscriptions/" + subscriptionID + "/resourceGroups/" + scopingResourceGroupName
+			var roleDefinition *armauthorization.RoleDefinition
+			var err error
 			// Get Azure role definition for the role name (roleBinding.Role)
-			roleDefinition, err := getRoleDefinitionByRoleName(client, roleBinding.Role, subscriptionID)
-			if err != nil {
-				return errors.Wrap(err, fmt.Sprintf("failed to get role definition for role %s", roleBinding.Role))
+			// This can fail due to a replication delay after creating the custom role.
+			// Try up to 12 times with a 10 second delay between each attempt, up to 2 minutes.
+			for i := 0; ; i++ {
+				roleDefinition, err = getRoleDefinitionByRoleName(client, roleBinding.Role, subscriptionID)
+				// Role was found, break out of loop.
+				if err == nil {
+					break
+				}
+				// Role was not found in 12 attempts, return error.
+				if i >= 12 {
+					return errors.Wrap(err, fmt.Sprintf("failed to get role definition for role %s. If this is a new custom role, this is likely related to a replication delay and can be re-attempted.", roleBinding.Role))
+				}
+				// Role was not found, wait 10 seconds and try again.
+				log.Printf("Failed to get role definition. This is likely due to a replication delay. Retrying...")
+				time.Sleep(10 * time.Second)
 			}
 
 			// Determine if the role definition's ID is already assigned to the user-assigned managed identity
@@ -262,8 +355,8 @@ func createRoleAssignment(client *azureclients.AzureClientWrapper, managedIdenti
 
 	var rawResponse *http.Response
 	// Role assignment can fail due to a replication delay after creating the user-assigned managed identity
-	// Try up to 6 times with a 10 second delay between each attempt, up to 1 minute.
-	for i := 0; i < 6; i++ {
+	// Try up to 12 times with a 10 second delay between each attempt, up to 2 minutes.
+	for i := 0; i < 12; i++ {
 		ctxWithResp := runtime.WithCaptureResponse(context.Background(), &rawResponse)
 		roleAssignmentCreateResponse, err := client.RoleAssignmentClient.Create(
 			ctxWithResp,
@@ -280,9 +373,9 @@ func createRoleAssignment(client *azureclients.AzureClientWrapper, managedIdenti
 		if err != nil {
 			var respErr *azcore.ResponseError
 			if errors.As(err, &respErr) {
-				if respErr.ErrorCode == "PrincipalNotFound" {
+				if respErr.ErrorCode == "PrincipalNotFound" || respErr.ErrorCode == "RoleDefinitionDoesNotExist" {
 					// The identity ccoctl just created can't be found yet due to a replication delay so we need to retry.
-					if i == 5 {
+					if i >= 11 {
 						log.Fatal("Timed out assigning role to user-assigned managed identity, this is most likely due to a replication delay following creation of the user-assigned managed identity, please retry")
 						break
 					} else {
