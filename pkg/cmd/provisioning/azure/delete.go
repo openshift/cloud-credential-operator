@@ -8,7 +8,9 @@ import (
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
+	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
@@ -22,6 +24,50 @@ var (
 	// and managed identities
 	DeleteOpts = azureOptions{}
 )
+
+func deleteCustomRoles(client *azureclients.AzureClientWrapper, name string, subscriptionID string) error {
+	scope := "/subscriptions/" + subscriptionID
+	listRoles := client.RoleDefinitionsClient.NewListPager(
+		scope,
+		&armauthorization.RoleDefinitionsClientListOptions{
+			Filter: to.Ptr("type eq 'CustomRole'"),
+		},
+	)
+	roleDefinitions := make([]*armauthorization.RoleDefinition, 0)
+	for listRoles.More() {
+		pageResponse, err := listRoles.NextPage(context.Background())
+		if err != nil {
+			return err
+		}
+		for _, roleDefinition := range pageResponse.RoleDefinitionListResult.Value {
+			if roleDefinition.Properties.Description != nil && *roleDefinition.Properties.Description == fmt.Sprintf("Custom role for OpenShift. Owned by: %v", name) {
+				roleDefinitions = append(roleDefinitions, roleDefinition)
+			}
+		}
+	}
+	if len(roleDefinitions) == 0 {
+		log.Printf("Found no custom roles to delete with description 'Custom role for OpenShift. Owned by: %v'", name)
+		return nil
+	}
+	for _, roleDefinition := range roleDefinitions {
+		err := deleteRoleAssignmentsByRole(client,
+			*roleDefinition.ID,
+			*roleDefinition.Properties.RoleName,
+			subscriptionID)
+		if err != nil {
+			return err
+		}
+		_, err = client.RoleDefinitionsClient.Delete(context.Background(),
+			scope,
+			*roleDefinition.Name,
+			&armauthorization.RoleDefinitionsClientDeleteOptions{})
+		if err != nil {
+			return err
+		}
+		log.Printf("Deleted custom role %v %v", *roleDefinition.Properties.RoleName, *roleDefinition.ID)
+	}
+	return nil
+}
 
 // deleteManagedIdentities lists user-assigned managed identities and deletes those with CCO's "owned" tag.
 func deleteManagedIdentities(client *azureclients.AzureClientWrapper, name, resourceGroupName, subscriptionID, region string) error {
@@ -84,6 +130,29 @@ func deleteResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 	return nil
 }
 
+func deleteRoleAssignmentsByRole(client *azureclients.AzureClientWrapper, roleID string, roleName string, subscriptionID string) error {
+	scope := "/subscriptions/" + subscriptionID
+	listRoleAssignments := client.RoleAssignmentClient.NewListForScopePager(
+		scope,
+		&armauthorization.RoleAssignmentsClientListForScopeOptions{},
+	)
+	for listRoleAssignments.More() {
+		pageResponse, err := listRoleAssignments.NextPage(context.Background())
+		if err != nil {
+			return err
+		}
+		for _, roleAssignment := range pageResponse.RoleAssignmentListResult.Value {
+			if *roleAssignment.Properties.RoleDefinitionID == roleID {
+				err := deleteRoleAssignment(client, *roleAssignment.Properties.PrincipalID, *roleAssignment.Name, roleName, *roleAssignment.Properties.Scope, subscriptionID)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
 func deleteStorageAccount(client *azureclients.AzureClientWrapper, resourceGroupName, storageAccountName string) error {
 	_, err := client.StorageAccountClient.Delete(
 		context.Background(),
@@ -118,6 +187,14 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Printf("No --storage-account-name provided, defaulting storage account name to %s", DeleteOpts.StorageAccountName)
 	}
 	if err := validateStorageAccountName(DeleteOpts.StorageAccountName); err != nil {
+		log.Fatal(err)
+	}
+
+	// Delete custom roles
+	err = deleteCustomRoles(azureClientWrapper,
+		DeleteOpts.Name,
+		DeleteOpts.SubscriptionID)
+	if err != nil {
 		log.Fatal(err)
 	}
 

@@ -208,6 +208,8 @@ func (userAssignedIdentitiesClient *userAssignedIdentitiesClient) Get(ctx contex
 }
 
 type RoleDefinitionsClient interface {
+	CreateOrUpdate(ctx context.Context, scope string, roleDefinitionID string, roleDefinition armauthorization.RoleDefinition, options *armauthorization.RoleDefinitionsClientCreateOrUpdateOptions) (armauthorization.RoleDefinitionsClientCreateOrUpdateResponse, error)
+	Delete(ctx context.Context, scope string, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientDeleteOptions) (armauthorization.RoleDefinitionsClientDeleteResponse, error)
 	GetByID(ctx context.Context, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientGetByIDOptions) (armauthorization.RoleDefinitionsClientGetByIDResponse, error)
 	NewListPager(scope string, options *armauthorization.RoleDefinitionsClientListOptions) *runtime.Pager[armauthorization.RoleDefinitionsClientListResponse]
 }
@@ -222,6 +224,14 @@ func NewRoleDefinitionsClient(cred azcore.TokenCredential, options *policy.Clien
 		return nil, err
 	}
 	return &roleDefinitionsClient{client: client}, err
+}
+
+func (roleDefinitionsClient *roleDefinitionsClient) CreateOrUpdate(ctx context.Context, scope string, roleDefinitionID string, roleDefinition armauthorization.RoleDefinition, options *armauthorization.RoleDefinitionsClientCreateOrUpdateOptions) (armauthorization.RoleDefinitionsClientCreateOrUpdateResponse, error) {
+	return roleDefinitionsClient.client.CreateOrUpdate(ctx, scope, roleDefinitionID, roleDefinition, options)
+}
+
+func (roleDefinitionsClient *roleDefinitionsClient) Delete(ctx context.Context, scope string, roleDefinitionID string, options *armauthorization.RoleDefinitionsClientDeleteOptions) (armauthorization.RoleDefinitionsClientDeleteResponse, error) {
+	return roleDefinitionsClient.client.Delete(ctx, scope, roleDefinitionID, options)
 }
 
 func (roleDefinitionsClient *roleDefinitionsClient) NewListPager(scope string, options *armauthorization.RoleDefinitionsClientListOptions) *runtime.Pager[armauthorization.RoleDefinitionsClientListResponse] {
