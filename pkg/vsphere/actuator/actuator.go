@@ -21,6 +21,7 @@ import (
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -43,8 +44,9 @@ var _ actuatoriface.Actuator = (*VSphereActuator)(nil)
 
 // VSphereActuator implements the CredentialsRequest Actuator interface to process CredentialsRequests in vSphere.
 type VSphereActuator struct {
-	Codec  *minterv1.ProviderCodec
-	Client client.Client
+	Codec          *minterv1.ProviderCodec
+	Client         client.Client
+	RootCredClient client.Client
 }
 
 func (a *VSphereActuator) STSFeatureGateEnabled() bool {
@@ -52,7 +54,7 @@ func (a *VSphereActuator) STSFeatureGateEnabled() bool {
 }
 
 // NewVSphereActuator creates a new VSphereActuator.
-func NewVSphereActuator(client client.Client) (*VSphereActuator, error) {
+func NewVSphereActuator(client, rootCredClient client.Client) (*VSphereActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -60,8 +62,9 @@ func NewVSphereActuator(client client.Client) (*VSphereActuator, error) {
 	}
 
 	return &VSphereActuator{
-		Codec:  codec,
-		Client: client,
+		Codec:          codec,
+		Client:         client,
+		RootCredClient: rootCredClient,
 	}, nil
 }
 
@@ -215,12 +218,7 @@ func (a *VSphereActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequ
 }
 
 func (a *VSphereActuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
-	existingSecret, err := a.loadExistingSecret(cr)
-	if err != nil {
-		return err
-	}
-
-	err = a.syncTargetSecret(cr, cloudCredsSecret.Data, existingSecret, logger)
+	err := a.syncTargetSecret(ctx, cr, cloudCredsSecret.Data, logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -286,59 +284,42 @@ func (a *VSphereActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLo
 	})
 }
 
-func (a *VSphereActuator) syncTargetSecret(cr *minterv1.CredentialsRequest, secretData map[string][]byte, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+func (a *VSphereActuator) syncTargetSecret(ctx context.Context, cr *minterv1.CredentialsRequest, secretData map[string][]byte, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
-
-	if existingSecret == nil || existingSecret.Name == "" {
-		sLog.Info("creating secret")
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Spec.SecretRef.Name,
-				Namespace: cr.Spec.SecretRef.Namespace,
-				Annotations: map[string]string{
-					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
-				},
-			},
-			Data: secretData,
+	sLog.Infof("processing secret")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
+		},
+	}
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
 		}
-
-		err := a.Client.Create(context.TODO(), secret)
-		if err != nil {
-			sLog.WithError(err).Error("error creating secret")
-			return err
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
 		}
-		sLog.Info("secret created successfully")
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if secret.Data == nil {
+			secret.Data = map[string][]byte{}
+		}
+		for key, value := range secretData {
+			secret.Data[key] = value
+		}
 		return nil
-	}
-
-	// Update the existing secret:
-	sLog.Debug("updating secret")
-	origSecret := existingSecret.DeepCopy()
-	if existingSecret.Annotations == nil {
-		existingSecret.Annotations = map[string]string{}
-	}
-	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-
-	existingSecret.Data = secretData
-
-	if !reflect.DeepEqual(existingSecret, origSecret) {
-		sLog.Info("target secret has changed, updating")
-		err := a.Client.Update(context.TODO(), existingSecret)
-		if err != nil {
-			msg := "error updating secret"
-			sLog.WithError(err).Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   msg,
-			}
+	})
+	sLog.WithField("operation", op).Info("processed secret")
+	if err != nil {
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
 		}
-	} else {
-		sLog.Debug("target secret unchanged")
 	}
-
 	return nil
 }
 
@@ -350,7 +331,7 @@ func (a *VSphereActuator) GetCredentialsRootSecretLocation() types.NamespacedNam
 func (a *VSphereActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -404,5 +385,5 @@ func isVSphereCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *VSphereActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }

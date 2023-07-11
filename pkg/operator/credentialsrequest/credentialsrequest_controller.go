@@ -24,6 +24,8 @@ import (
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
+	corev1applyconfigurations "k8s.io/client-go/applyconfigurations/core/v1"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -54,7 +56,8 @@ import (
 )
 
 const (
-	controllerName = "credreq"
+	controllerName      = "credreq"
+	labelControllerName = controllerName + "_labeller"
 
 	namespaceMissing = "NamespaceMissing"
 	namespaceExists  = "NamespaceExists"
@@ -84,14 +87,18 @@ var (
 // AddWithActuator creates a new CredentialsRequest Controller and adds it to the Manager with
 // default RBAC. The Manager will set fields on the Controller and Start it when
 // the Manager is Started.
-func AddWithActuator(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) error {
-	return add(mgr, newReconciler(mgr, actuator, platType))
+func AddWithActuator(mgr, adminMgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType, mutatingClient corev1client.CoreV1Interface) error {
+	if err := add(mgr, adminMgr, newReconciler(mgr, adminMgr, actuator, platType)); err != nil {
+		return err
+	}
+	return addLabelController(mgr, mutatingClient)
 }
 
 // newReconciler returns a new reconcile.Reconciler
-func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) reconcile.Reconciler {
+func newReconciler(mgr, adminMgr manager.Manager, actuator actuator.Actuator, platType configv1.PlatformType) reconcile.Reconciler {
 	r := &ReconcileCredentialsRequest{
 		Client:       mgr.GetClient(),
+		AdminClient:  adminMgr.GetClient(),
 		Actuator:     actuator,
 		platformType: platType,
 	}
@@ -101,7 +108,7 @@ func newReconciler(mgr manager.Manager, actuator actuator.Actuator, platType con
 }
 
 // add adds a new Controller to mgr with r as the reconcile.Reconciler
-func add(mgr manager.Manager, r reconcile.Reconciler) error {
+func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	operatorCache := mgr.GetCache()
 	name := "credentialsrequest_controller"
 
@@ -205,18 +212,18 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 
 	adminCredSecretPredicate := predicate.Funcs{
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isAdminCredSecret(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
+			return IsAdminCredSecret(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
 		},
 		CreateFunc: func(e event.CreateEvent) bool {
-			return isAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
+			return IsAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
+			return IsAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
 		},
 	}
 	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
 	err = c.Watch(
-		source.Kind(operatorCache, &corev1.Secret{}),
+		source.Kind(adminMgr.GetCache(), &corev1.Secret{}),
 		allCredRequestsMapFn,
 		adminCredSecretPredicate)
 	if err != nil {
@@ -316,12 +323,148 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	return nil
 }
 
+// addLabelController adds a new Controller managing labels to mgr
+func addLabelController(mgr manager.Manager, mutatingClient corev1client.CoreV1Interface) error {
+	labelReconciler := &ReconcileSecretMissingLabel{
+		cachedClient:   mgr.GetClient(),
+		mutatingClient: mutatingClient,
+	}
+	labelController, err := controller.New(labelControllerName, mgr, controller.Options{
+		Reconciler: labelReconciler,
+	})
+	if err != nil {
+		return err
+	}
+
+	missingLabelSecretsMapFn := handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
+		return []reconcile.Request{
+			{
+				NamespacedName: types.NamespacedName{
+					Name:      a.GetName(),
+					Namespace: a.GetNamespace(),
+				},
+			},
+		}
+	})
+
+	missingLabelCredSecretPredicate := predicate.Funcs{
+		UpdateFunc: func(e event.UpdateEvent) bool {
+			return IsMissingSecretLabel(e.ObjectNew)
+		},
+		CreateFunc: func(e event.CreateEvent) bool {
+			return IsMissingSecretLabel(e.Object)
+		},
+		DeleteFunc: func(e event.DeleteEvent) bool {
+			return IsMissingSecretLabel(e.Object)
+		},
+	}
+	err = labelController.Watch(
+		source.Kind(mgr.GetCache(), &corev1.Secret{}),
+		missingLabelSecretsMapFn,
+		missingLabelCredSecretPredicate)
+	if err != nil {
+		return err
+	}
+	status.AddHandler(labelControllerName, labelReconciler)
+
+	return nil
+}
+
+// IsMissingSecretLabel determines if the secret was created by the CCO but has not been labelled yet
+func IsMissingSecretLabel(secret metav1.Object) bool {
+	_, hasAnnotation := secret.GetAnnotations()[minterv1.AnnotationCredentialsRequest]
+	value, hasLabel := secret.GetLabels()[minterv1.LabelCredentialsRequest]
+	hasValue := hasLabel && value == minterv1.LabelCredentialsRequestValue
+
+	return hasAnnotation && (!hasLabel || !hasValue)
+}
+
+type ReconcileSecretMissingLabel struct {
+	cachedClient   client.Client
+	mutatingClient corev1client.SecretsGetter
+}
+
+func (r *ReconcileSecretMissingLabel) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+	var secrets corev1.SecretList
+	if err := r.cachedClient.List(context.TODO(), &secrets); err != nil {
+		return nil, err
+	}
+	var missing int
+	for _, item := range secrets.Items {
+		if IsMissingSecretLabel(&item) {
+			missing += 1
+		}
+	}
+
+	if missing > 0 {
+		return []configv1.ClusterOperatorStatusCondition{{
+			Type:    configv1.OperatorProgressing,
+			Status:  configv1.ConditionTrue,
+			Reason:  "LabelsMissing",
+			Message: fmt.Sprintf("%d secrets created for CredentialsRequests have not been labelled", missing),
+		}}, nil
+	}
+	return []configv1.ClusterOperatorStatusCondition{}, nil
+}
+
+func (r *ReconcileSecretMissingLabel) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {
+	return nil, nil
+}
+
+func (r *ReconcileSecretMissingLabel) Name() string {
+	return labelControllerName
+}
+
+var _ reconcile.Reconciler = (*ReconcileSecretMissingLabel)(nil)
+var _ status.Handler = (*ReconcileSecretMissingLabel)(nil)
+
+func (r *ReconcileSecretMissingLabel) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
+	start := time.Now()
+
+	logger := log.WithFields(log.Fields{
+		"controller": labelControllerName,
+		"secret":     fmt.Sprintf("%s/%s", request.NamespacedName.Namespace, request.NamespacedName.Name),
+	})
+
+	defer func() {
+		dur := time.Since(start)
+		metrics.MetricControllerReconcileTime.WithLabelValues(labelControllerName).Observe(dur.Seconds())
+	}()
+
+	logger.Info("syncing secret")
+	secret := &corev1.Secret{}
+	err := r.cachedClient.Get(ctx, request.NamespacedName, secret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			logger.Debug("secret no longer exists")
+			return reconcile.Result{}, nil
+		}
+		logger.WithError(err).Error("error getting secret, re-queuing")
+		return reconcile.Result{}, err
+	}
+
+	applyConfig := corev1applyconfigurations.Secret(secret.Name, secret.Namespace)
+	applyConfig.WithLabels(map[string]string{
+		minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+	})
+
+	if _, err := r.mutatingClient.Secrets(secret.Namespace).Apply(ctx, applyConfig, metav1.ApplyOptions{
+		Force:        true, // we're the authoritative owner of this field and should not allow anyone to stomp it
+		FieldManager: labelControllerName,
+	}); err != nil {
+		logger.WithError(err).Error("failed to update label")
+		return reconcile.Result{}, err
+	}
+
+	return reconcile.Result{}, nil
+}
+
 // isCloudCredOperatorConfigMap returns true if given configmap is cloud-credential-operator-config configmap
 func isCloudCredOperatorConfigMap(cm metav1.Object) bool {
 	return cm.GetName() == constants.CloudCredOperatorConfigMap && cm.GetNamespace() == minterv1.CloudCredOperatorNamespace
 }
 
-func isAdminCredSecret(namespace, secretName string) bool {
+func IsAdminCredSecret(namespace, secretName string) bool {
 	if namespace == constants.CloudCredSecretNamespace {
 		if secretName == constants.AWSCloudCredSecretName ||
 			secretName == constants.AzureCloudCredSecretName ||
@@ -342,6 +485,7 @@ var _ reconcile.Reconciler = &ReconcileCredentialsRequest{}
 // ReconcileCredentialsRequest reconciles a CredentialsRequest object
 type ReconcileCredentialsRequest struct {
 	client.Client
+	AdminClient  client.Client
 	Actuator     actuator.Actuator
 	platformType configv1.PlatformType
 }
@@ -381,7 +525,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
 	} else if conflict {
-		logger.Error("configuration conflict betwen legacy configmap and operator config")
+		logger.Error("configuration conflict between legacy configmap and operator config")
 		return reconcile.Result{}, fmt.Errorf("configuration conflict")
 	} else if mode == operatorv1.CloudCredentialsModeManual {
 		if !stsDetected {

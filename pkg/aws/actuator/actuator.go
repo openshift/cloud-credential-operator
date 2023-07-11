@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
@@ -68,6 +69,7 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
 	Client                             client.Client
+	RootCredClient                     client.Client
 	Codec                              *minterv1.ProviderCodec
 	AWSClientBuilder                   func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 	Scheme                             *runtime.Scheme
@@ -75,7 +77,7 @@ type AWSActuator struct {
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
+func NewAWSActuator(client, rootCredClient client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating AWS codec")
@@ -85,6 +87,7 @@ func NewAWSActuator(client client.Client, scheme *runtime.Scheme, awsSecurityTok
 	return &AWSActuator{
 		Codec:                              codec,
 		Client:                             client,
+		RootCredClient:                     rootCredClient,
 		AWSClientBuilder:                   awsutils.ClientBuilder,
 		Scheme:                             scheme,
 		AWSSecurityTokenServiceGateEnabled: awsSecurityTokenServiceGateEnabled,
@@ -362,7 +365,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 			cloudTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 		}
 		if awsSTSIAMRoleARN != "" {
-			err = a.createSTSSecret(awsSTSIAMRoleARN, cloudTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, logger, ctx)
+			err = a.syncSTSSecret(awsSTSIAMRoleARN, cloudTokenPath, cr, logger, ctx)
 			if err != nil {
 				return err
 			}
@@ -410,34 +413,51 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	return nil
 }
 
-// createSTSSecret makes a time-based token available in a Secret in the namespace of an operator that
+// syncSTSSecret makes a time-based token available in a Secret in the namespace of an operator that
 // has supplied the following in the CredentialsRequest:
 // a non-nil spec.CloudTokenString
 // a path to the JWT token: spec.cloudTokenPath
 // a spec.SecretRef.Name
 // a cr.Spec.SecretRef.Namespace
-func (a *AWSActuator) createSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath string, secretRef string, secretRefNamespace string, log log.FieldLogger, ctx context.Context) error {
-	log.Infof("creating secret")
+func (a *AWSActuator) syncSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
+	sLog := logger.WithFields(log.Fields{
+		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+	})
+	sLog.Infof("processing secret")
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretRef,
-			Namespace: secretRefNamespace,
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
 		},
-		StringData: map[string]string{
-			"credentials": fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath),
-		},
-		Type: corev1.SecretTypeOpaque,
 	}
-	err := a.Client.Create(ctx, secret)
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if secret.StringData == nil {
+			secret.StringData = map[string]string{}
+		}
+		secret.StringData["credentials"] = fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath)
+		secret.Type = corev1.SecretTypeOpaque
+		return nil
+	})
+	sLog.WithField("operation", op).Info("processed secret")
 	if err != nil {
-		log.Errorf("error creating secret")
-		return err
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
+		}
 	}
 	return nil
 }
 
 func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
-	existingSecret, _, _, _ := a.loadExistingSecret(cr)
 	accessKeyID := string(cloudCredsSecret.Data[awsannotator.AwsAccessKeyName])
 	secretAccessKey := string(cloudCredsSecret.Data[awsannotator.AwsSecretAccessKeyName])
 
@@ -507,7 +527,7 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 	}
 
 	// userPolicy param empty because in passthrough mode this doesn't really have any meaning
-	err = a.syncAccessKeySecret(cr, accessKeyID, secretAccessKey, existingSecret, "", logger)
+	err = a.syncAccessKeySecret(ctx, cr, accessKeyID, secretAccessKey, "", logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -692,7 +712,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		accessKeyString = *accessKey.AccessKeyId
 		secretAccessKeyString = *accessKey.SecretAccessKey
 	}
-	err = a.syncAccessKeySecret(cr, accessKeyString, secretAccessKeyString, existingSecret, desiredUserPolicy, logger)
+	err = a.syncAccessKeySecret(ctx, cr, accessKeyString, secretAccessKeyString, desiredUserPolicy, logger)
 	if err != nil {
 		log.WithError(err).Error("error saving access key to secret")
 		return err
@@ -925,13 +945,13 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 	logger.Debug("loading AWS credentials from secret")
 	// TODO: Running in a 4.0 cluster we expect this secret to exist. When we run in a Hive
 	// cluster, we need to load different secrets for each cluster.
-	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.Client, constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
+	accessKeyID, secretAccessKey, err := utils.LoadCredsFromSecret(a.RootCredClient, constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 	if err != nil {
 		return nil, err
 	}
 
 	logger.Debug("creating root AWS client")
-	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.Client)
+	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.RootCredClient)
 }
 
 // buildReadAWSClient will return an AWS client using the the scaled down read only AWS creds
@@ -995,78 +1015,65 @@ func (a *AWSActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger
 	})
 }
 
-func (a *AWSActuator) syncAccessKeySecret(cr *minterv1.CredentialsRequest, accessKeyID, secretAccessKey string, existingSecret *corev1.Secret, userPolicy string, logger log.FieldLogger) error {
+func (a *AWSActuator) syncAccessKeySecret(ctx context.Context, cr *minterv1.CredentialsRequest, accessKeyID, secretAccessKey string, userPolicy string, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
+	sLog.Infof("processing secret")
 
-	if existingSecret == nil || existingSecret.Name == "" {
-		if accessKeyID == "" || secretAccessKey == "" {
-			msg := "new access key secret needed but no key data provided"
-			sLog.Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   msg,
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
+		},
+	}
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		secret.Annotations[minterv1.AnnotationAWSPolicyLastApplied] = userPolicy
+
+		if secret.Data == nil {
+			secret.Data = map[string][]byte{}
+		}
+		// either we know the access key ID and secret access key, or we get them from the secret itself
+		for identifier, into := range map[string]*string{
+			secretDataAccessKey: &accessKeyID,
+			secretDataSecretKey: &secretAccessKey,
+		} {
+			if *into == "" {
+				value, exists := secret.Data[identifier]
+				if !exists {
+					return &actuatoriface.ActuatorError{
+						ErrReason: minterv1.CredentialsProvisionFailure,
+						Message:   fmt.Sprintf("%s needed but no data provided", identifier),
+					}
+				}
+				*into = string(value)
+			} else {
+				secret.Data[identifier] = []byte(*into)
 			}
 		}
-		sLog.Info("creating secret")
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Spec.SecretRef.Name,
-				Namespace: cr.Spec.SecretRef.Namespace,
-				Annotations: map[string]string{
-					minterv1.AnnotationCredentialsRequest:   fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
-					minterv1.AnnotationAWSPolicyLastApplied: userPolicy,
-				},
-			},
-			Data: map[string][]byte{
-				secretDataAccessKey:                   []byte(accessKeyID),
-				secretDataSecretKey:                   []byte(secretAccessKey),
-				constants.AWSSecretDataCredentialsKey: generateAWSCredentialsConfig(accessKeyID, secretAccessKey),
-			},
-		}
 
-		err := a.Client.Create(context.TODO(), secret)
-		if err != nil {
-			sLog.WithError(err).Error("error creating secret")
-			return err
-		}
-		sLog.Info("secret created successfully")
+		// Make sure credentials config data is synced with the stored access key / secret key
+		secret.Data[constants.AWSSecretDataCredentialsKey] = generateAWSCredentialsConfig(accessKeyID, secretAccessKey)
+
 		return nil
-	}
-
-	// Update the existing secret:
-	sLog.Debug("updating secret")
-	origSecret := existingSecret.DeepCopy()
-	if existingSecret.Annotations == nil {
-		existingSecret.Annotations = map[string]string{}
-	}
-	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-	existingSecret.Annotations[minterv1.AnnotationAWSPolicyLastApplied] = userPolicy
-	if accessKeyID != "" && secretAccessKey != "" {
-		existingSecret.Data[secretDataAccessKey] = []byte(accessKeyID)
-		existingSecret.Data[secretDataSecretKey] = []byte(secretAccessKey)
-	}
-
-	// Make sure credentials config data is synced with the stored access key / secret key
-	existingSecret.Data[constants.AWSSecretDataCredentialsKey] = generateAWSCredentialsConfig(string(existingSecret.Data[secretDataAccessKey]), string(existingSecret.Data[secretDataSecretKey]))
-
-	if !reflect.DeepEqual(existingSecret, origSecret) {
-		sLog.Info("target secret has changed, updating")
-		err := a.Client.Update(context.TODO(), existingSecret)
-		if err != nil {
-			msg := "error updating secret"
-			sLog.WithError(err).Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   msg,
-			}
+	})
+	sLog.WithField("operation", op).Info("processed secret")
+	if err != nil {
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
 		}
-	} else {
-		sLog.Debug("target secret unchanged")
 	}
-
 	return nil
 }
 
@@ -1104,7 +1111,7 @@ func (a *AWSActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 func (a *AWSActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -1392,7 +1399,7 @@ func awsSTSIAMRoleARN(codec *minterv1.ProviderCodec, credentialsRequest *minterv
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }
 
 func generateAWSCredentialsConfig(accessKeyID, secretAccessKey string) []byte {

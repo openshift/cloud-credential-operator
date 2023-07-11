@@ -67,10 +67,11 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 	}
 
 	tests := []struct {
-		name      string
-		existing  []runtime.Object
-		expectErr bool
-		validate  func(client.Client, *testing.T)
+		name          string
+		existing      []runtime.Object
+		existingAdmin []runtime.Object
+		expectErr     bool
+		validate      func(client.Client, *testing.T)
 		// Expected conditions on the credentials request:
 		expectedConditions []ExpectedCondition
 		// Expected conditions on the credentials cluster operator:
@@ -82,8 +83,10 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
-				testVSphereCredsSecretPassthrough(),
 				testVSphereCredentialsRequest(t),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
@@ -104,7 +107,8 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
 			},
-			expectErr: true,
+			existingAdmin: []runtime.Object{},
+			expectErr:     true,
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
 				assert.Nil(t, targetSecret)
@@ -125,8 +129,10 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequestWithDeletionTimestamp(t),
-				testVSphereCredsSecretPassthrough(),
 				testSecret(testSecretNamespace, testSecretName, testVSphereCloudCredsSecretData),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
@@ -139,8 +145,10 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
-				testVSphereCredsSecretPassthrough(),
 				testSecret(testSecretNamespace, testSecretName, testVSphereCloudCredsSecretData),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
@@ -159,8 +167,10 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testVSphereCredentialsRequest(t),
+				testSecret(testSecretNamespace, testSecretName, map[string][]byte{"key1": []byte("olddata")}),
+			},
+			existingAdmin: []runtime.Object{
 				testVSphereCredsSecretPassthrough(),
-				testSecret(testSecretNamespace, testSecretName, map[string][]byte{"oldkey": []byte("olddata")}),
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
@@ -184,11 +194,15 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().
 				WithStatusSubresource(&minterv1.CredentialsRequest{}).
 				WithRuntimeObjects(test.existing...).Build()
+			fakeAdminClient := fake.NewClientBuilder().
+				WithRuntimeObjects(test.existingAdmin...).Build()
 			rcr := &ReconcileCredentialsRequest{
-				Client: fakeClient,
+				Client:      fakeClient,
+				AdminClient: fakeAdminClient,
 				Actuator: &actuator.VSphereActuator{
-					Client: fakeClient,
-					Codec:  codec,
+					Client:         fakeClient,
+					RootCredClient: fakeAdminClient,
+					Codec:          codec,
 				},
 				platformType: configv1.VSpherePlatformType,
 			}

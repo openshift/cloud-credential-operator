@@ -117,28 +117,11 @@ var (
 		},
 	}
 
-	rootSecretBadAnnotation = corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      constants.AzureCloudCredSecretName,
-			Namespace: constants.CloudCredSecretNamespace,
-			Annotations: map[string]string{
-				constants.AnnotationKey: "blah",
-			},
-		},
-	}
-
 	rootSecretNoAnnotation = corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        constants.AzureCloudCredSecretName,
 			Namespace:   constants.CloudCredSecretNamespace,
 			Annotations: map[string]string{},
-		},
-	}
-
-	validSecret = corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      validName,
-			Namespace: validNamespace,
 		},
 	}
 
@@ -190,32 +173,6 @@ func TestDecodeToUnknown(t *testing.T) {
 	}
 }
 
-func TestAnnotations(t *testing.T) {
-	tests := []struct {
-		name      string
-		in        corev1.Secret
-		errRegexp string
-	}{
-		{"TestValidSecretAnnotation", validPassthroughRootSecret, ""},
-		{"TestBadSecretAnnotation", rootSecretBadAnnotation, "invalid mode"},
-		{"TestMissingSecretAnnotation", rootSecretNoAnnotation, "cannot proceed without cloud cred secret annotation.*"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			f := fake.NewClientBuilder().WithRuntimeObjects(&tt.in, &validSecret).Build()
-			actuator, err := azure.NewActuator(f, openshiftapiv1.AzurePublicCloud)
-			if err != nil {
-				assert.Regexp(t, tt.errRegexp, err)
-				assert.Nil(t, actuator)
-				return
-			}
-			assert.Nil(t, err)
-			assert.NotNil(t, actuator)
-		})
-	}
-}
-
 func getCredRequest(t *testing.T, c client.Client) *minterv1.CredentialsRequest {
 	cr := &minterv1.CredentialsRequest{}
 	require.NoError(t, c.Get(context.TODO(), types.NamespacedName{Namespace: testNamespace, Name: testCredRequestName}, cr), "error while retriving credreq from fake client")
@@ -251,25 +208,27 @@ func TestActuator(t *testing.T) {
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
+		existingAdmin      []runtime.Object
 		mockAppClient      func(*gomock.Controller) *azuremock.MockAppClient
 		op                 func(*azure.Actuator, *minterv1.CredentialsRequest) error
 		credentialsRequest *minterv1.CredentialsRequest
 		expectedErr        error
-		validate           func(*testing.T, client.Client)
+		validate           func(*testing.T, client.Client, client.Client)
 	}{
 		{
 			name:               "Process a CredentialsRequest",
 			existing:           defaultExistingObjects(),
+			existingAdmin:      []runtime.Object{&validPassthroughRootSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Create(context.TODO(), cr)
 			},
-			validate: func(t *testing.T, c client.Client) {
+			validate: func(t *testing.T, c client.Client, adminC client.Client) {
 				cr := getCredRequest(t, c)
 
 				targetSecret := getCredRequestTargetSecret(t, c, cr)
 
-				rootSecret := getRootSecret(t, c)
+				rootSecret := getRootSecret(t, adminC)
 
 				assertSecretEquality(t, rootSecret, targetSecret)
 			},
@@ -301,6 +260,7 @@ func TestActuator(t *testing.T) {
 
 				return objects
 			}(),
+			existingAdmin: []runtime.Object{&validPassthroughRootSecret},
 			credentialsRequest: func() *minterv1.CredentialsRequest {
 				// Create a credreq that resembles what one previously handled via mint mode
 				// would look like.
@@ -325,12 +285,12 @@ func TestActuator(t *testing.T) {
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Update(context.TODO(), cr)
 			},
-			validate: func(t *testing.T, c client.Client) {
+			validate: func(t *testing.T, c client.Client, adminC client.Client) {
 				cr := getCredRequest(t, c)
 
 				targetSecret := getCredRequestTargetSecret(t, c, cr)
 
-				rootSecret := getRootSecret(t, c)
+				rootSecret := getRootSecret(t, adminC)
 
 				// Post mint-to-passthrough pivot the targetSecret should be a copy of the
 				// root secret.
@@ -378,6 +338,7 @@ func TestActuator(t *testing.T) {
 
 				return objects
 			}(),
+			existingAdmin: []runtime.Object{&validPassthroughRootSecret},
 			credentialsRequest: func() *minterv1.CredentialsRequest {
 				// Create a credreq that resembles what one previously handled via mint mode
 				// would look like.
@@ -404,12 +365,12 @@ func TestActuator(t *testing.T) {
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Update(context.TODO(), cr)
 			},
-			validate: func(t *testing.T, c client.Client) {
+			validate: func(t *testing.T, c client.Client, adminC client.Client) {
 				cr := getCredRequest(t, c)
 
 				targetSecret := getCredRequestTargetSecret(t, c, cr)
 
-				rootSecret := getRootSecret(t, c)
+				rootSecret := getRootSecret(t, adminC)
 
 				// The targetSecret should be a copy of the root secret.
 				assertSecretEquality(t, rootSecret, targetSecret)
@@ -460,6 +421,7 @@ func TestActuator(t *testing.T) {
 
 				return objects
 			}(),
+			existingAdmin: []runtime.Object{&validPassthroughRootSecret},
 			credentialsRequest: func() *minterv1.CredentialsRequest {
 				// Create a credreq that resembles what one previously handled via mint mode
 				// would look like.
@@ -480,12 +442,12 @@ func TestActuator(t *testing.T) {
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Update(context.TODO(), cr)
 			},
-			validate: func(t *testing.T, c client.Client) {
+			validate: func(t *testing.T, c client.Client, adminC client.Client) {
 				cr := getCredRequest(t, c)
 
 				targetSecret := getCredRequestTargetSecret(t, c, cr)
 
-				rootSecret := getRootSecret(t, c)
+				rootSecret := getRootSecret(t, adminC)
 
 				// The targetSecret should be a copy of the root secret.
 				assertSecretEquality(t, rootSecret, targetSecret)
@@ -503,10 +465,9 @@ func TestActuator(t *testing.T) {
 			name:        "Missing annotation",
 			expectedErr: fmt.Errorf("error determining whether a credentials update is needed"),
 			existing: func() []runtime.Object {
-				objects := []runtime.Object{&rootSecretNoAnnotation}
-
-				return objects
+				return nil
 			}(),
+			existingAdmin:      []runtime.Object{&rootSecretNoAnnotation},
 			credentialsRequest: testCredentialsRequest(t),
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Create(context.TODO(), cr)
@@ -516,10 +477,9 @@ func TestActuator(t *testing.T) {
 			name:        "Mint annotation",
 			expectedErr: fmt.Errorf("error determining whether a credentials update is needed"),
 			existing: func() []runtime.Object {
-				objects := []runtime.Object{&rootSecretMintAnnotation}
-
-				return objects
+				return nil
 			}(),
+			existingAdmin:      []runtime.Object{&rootSecretMintAnnotation},
 			credentialsRequest: testCredentialsRequest(t),
 			op: func(actuator *azure.Actuator, cr *minterv1.CredentialsRequest) error {
 				return actuator.Create(context.TODO(), cr)
@@ -533,6 +493,8 @@ func TestActuator(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().
 				WithStatusSubresource(&minterv1.CredentialsRequest{}).
 				WithRuntimeObjects(allObjects...).Build()
+			fakeAdminClient := fake.NewClientBuilder().
+				WithRuntimeObjects(test.existingAdmin...).Build()
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
@@ -543,6 +505,7 @@ func TestActuator(t *testing.T) {
 
 			actuator := azure.NewFakeActuator(
 				fakeClient,
+				fakeAdminClient,
 				codec,
 				func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*azure.AzureCredentialsMinter, error) {
 					return azure.NewFakeAzureCredentialsMinter(logger,
@@ -561,11 +524,11 @@ func TestActuator(t *testing.T) {
 				assert.Error(t, testErr)
 				assert.Equal(t, test.expectedErr.Error(), testErr.Error())
 				if test.validate != nil {
-					test.validate(t, fakeClient)
+					test.validate(t, fakeClient, fakeAdminClient)
 				}
 			} else {
 				require.NoError(t, testErr, "unexpected error returned during test case")
-				test.validate(t, fakeClient)
+				test.validate(t, fakeClient, fakeAdminClient)
 			}
 		})
 	}
@@ -631,7 +594,6 @@ func mockAppClientNoCalls(mockCtrl *gomock.Controller) *azuremock.MockAppClient 
 func defaultExistingObjects() []runtime.Object {
 	objs := []runtime.Object{
 		&clusterInfra,
-		&validPassthroughRootSecret,
 		&clusterDNS,
 	}
 	return objs

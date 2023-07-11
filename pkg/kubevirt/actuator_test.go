@@ -19,9 +19,10 @@ package kubevirt_test
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/api/errors"
 	"reflect"
 	"testing"
+
+	"k8s.io/apimachinery/pkg/api/errors"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/kubevirt"
@@ -97,6 +98,7 @@ func TestCreateCR(t *testing.T) {
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
+		existingAdmin      []runtime.Object
 		credentialsRequest *minterv1.CredentialsRequest
 		expectedErr        error
 		errRegexp          string
@@ -105,6 +107,7 @@ func TestCreateCR(t *testing.T) {
 		{
 			name:               "Create CR happy flow",
 			existing:           defaultExistingObjects(),
+			existingAdmin:      []runtime.Object{&kubevirtCredentialsSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			validate: func(t *testing.T, c kubernetesclient.Client) {
 				cr := getCredRequest(t, c)
@@ -126,8 +129,9 @@ func TestCreateCR(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
 			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
+			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
 
-			actuator, err := kubevirt.NewActuator(fakeClient)
+			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
 				assert.Regexp(t, test.errRegexp, err)
 				assert.Nil(t, actuator)
@@ -151,6 +155,7 @@ func TestDeleteCR(t *testing.T) {
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
+		existingAdmin      []runtime.Object
 		credentialsRequest *minterv1.CredentialsRequest
 		expectedErr        error
 		errRegexp          string
@@ -159,12 +164,14 @@ func TestDeleteCR(t *testing.T) {
 		{
 			name:               "Delete CR happy flow",
 			existing:           existingObjectsAfterCreate(t),
+			existingAdmin:      []runtime.Object{&kubevirtCredentialsSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			validate:           func(t *testing.T, c kubernetesclient.Client) {},
 		},
 		{
 			name:               "Delete CR happy flow - existingSecret not exist",
 			existing:           defaultExistingObjects(),
+			existingAdmin:      []runtime.Object{&kubevirtCredentialsSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			validate:           func(t *testing.T, c kubernetesclient.Client) {},
 		},
@@ -173,8 +180,9 @@ func TestDeleteCR(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
 			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
+			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
 
-			actuator, err := kubevirt.NewActuator(fakeClient)
+			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
 				assert.Regexp(t, test.errRegexp, err)
 				assert.Nil(t, actuator)
@@ -198,6 +206,7 @@ func TestExistsCR(t *testing.T) {
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
+		existingAdmin      []runtime.Object
 		credentialsRequest *minterv1.CredentialsRequest
 		expectedErr        error
 		errRegexp          string
@@ -206,6 +215,7 @@ func TestExistsCR(t *testing.T) {
 		{
 			name:               "Exists CR happy flow (true)",
 			existing:           existingObjectsAfterCreate(t),
+			existingAdmin:      []runtime.Object{&kubevirtCredentialsSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			validate: func(t *testing.T, c kubernetesclient.Client, isExists bool) {
 				secret := getSecret(t, c)
@@ -216,6 +226,7 @@ func TestExistsCR(t *testing.T) {
 		{
 			name:               "Non Exists CR happy flow (false)",
 			existing:           defaultExistingObjects(),
+			existingAdmin:      []runtime.Object{&kubevirtCredentialsSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			validate: func(t *testing.T, c kubernetesclient.Client, isExists bool) {
 				secret := getSecret(t, c)
@@ -228,8 +239,9 @@ func TestExistsCR(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
 			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
+			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
 
-			actuator, err := kubevirt.NewActuator(fakeClient)
+			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
 				assert.Regexp(t, test.errRegexp, err)
 				assert.Nil(t, actuator)
@@ -253,6 +265,7 @@ func TestUpdateCR(t *testing.T) {
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
+		existingAdmin      []runtime.Object
 		credentialsRequest *minterv1.CredentialsRequest
 		expectedErr        error
 		errRegexp          string
@@ -261,6 +274,7 @@ func TestUpdateCR(t *testing.T) {
 		{
 			name:               "Update CR happy flow - non exists",
 			existing:           defaultExistingObjects(),
+			existingAdmin:      []runtime.Object{&kubevirtCredentialsSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			validate: func(t *testing.T, c kubernetesclient.Client) {
 				cr := getCredRequest(t, c)
@@ -270,6 +284,7 @@ func TestUpdateCR(t *testing.T) {
 		{
 			name:               "Update CR happy flow - exists",
 			existing:           existingObjectsAfterCreate(t),
+			existingAdmin:      []runtime.Object{&kubevirtCredentialsSecret},
 			credentialsRequest: testCredentialsRequest(t),
 			validate: func(t *testing.T, c kubernetesclient.Client) {
 				cr := getCredRequest(t, c)
@@ -279,6 +294,7 @@ func TestUpdateCR(t *testing.T) {
 		{
 			name:               "Update CR fail on getCredentialSecret kube-system:kubevirt-credentials",
 			existing:           []runtime.Object{},
+			existingAdmin:      []runtime.Object{},
 			credentialsRequest: testCredentialsRequest(t),
 			expectedErr:        fmt.Errorf("unable to fetch root cloud cred secret: secrets \"kubevirt-credentials\" not found"),
 		},
@@ -287,8 +303,9 @@ func TestUpdateCR(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
 			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
+			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
 
-			actuator, err := kubevirt.NewActuator(fakeClient)
+			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
 				assert.Regexp(t, test.errRegexp, err)
 				assert.Nil(t, actuator)
@@ -329,15 +346,12 @@ func getCredRequest(t *testing.T, c kubernetesclient.Client) *minterv1.Credentia
 }
 
 func defaultExistingObjects() []runtime.Object {
-	objs := []runtime.Object{
-		&kubevirtCredentialsSecret,
-	}
+	objs := []runtime.Object{}
 	return objs
 }
 
 func existingObjectsAfterCreate(t *testing.T) []runtime.Object {
 	objs := []runtime.Object{
-		&kubevirtCredentialsSecret,
 		&kubevirtOpenshiftMachineApiSecret,
 	}
 	return objs

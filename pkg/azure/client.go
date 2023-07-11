@@ -31,14 +31,15 @@ var RootSecretKey = client.ObjectKey{Name: constants.AzureCloudCredSecretName, N
 
 type clientWrapper struct {
 	client.Client
+	RootCredClient client.Client
 }
 
-func newClientWrapper(c client.Client) *clientWrapper {
-	return &clientWrapper{Client: c}
+func newClientWrapper(c, rootC client.Client) *clientWrapper {
+	return &clientWrapper{Client: c, RootCredClient: rootC}
 }
 
 func (cw *clientWrapper) RootSecret(ctx context.Context) (*secret, error) {
-	secret, err := cw.Secret(ctx, RootSecretKey)
+	secret, err := cw.secret(ctx, cw.RootCredClient, RootSecretKey)
 	if err != nil {
 		return nil, err
 	}
@@ -54,8 +55,12 @@ func (cw *clientWrapper) RootSecret(ctx context.Context) (*secret, error) {
 }
 
 func (cw *clientWrapper) Secret(ctx context.Context, key client.ObjectKey) (*secret, error) {
+	return cw.secret(ctx, cw.Client, key)
+}
+
+func (cw *clientWrapper) secret(ctx context.Context, c client.Client, key client.ObjectKey) (*secret, error) {
 	s := &secret{}
-	if err := cw.Get(ctx, key, &s.Secret); err != nil {
+	if err := c.Get(ctx, key, &s.Secret); err != nil {
 		return nil, err
 	}
 	return s, nil
