@@ -44,7 +44,7 @@ func newReconciler(mgr manager.Manager) reconcile.Reconciler {
 }
 
 // Add creates a new Cleanup Controller and adds it to the Manager.
-func Add(mgr manager.Manager, kubeConfig string) error {
+func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	r := newReconciler(mgr)
 
 	// Create a new controller

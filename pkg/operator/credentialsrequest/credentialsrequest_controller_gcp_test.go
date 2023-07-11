@@ -27,7 +27,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	"google.golang.org/api/cloudresourcemanager/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -102,6 +102,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 	tests := []struct {
 		name              string
 		existing          []runtime.Object
+		existingAdmin     []runtime.Object
 		expectErr         bool
 		mockRootGCPClient func(mockCtrl *gomock.Controller) *mockgcp.MockClient
 		mockReadGCPClient func(mockCtrl *gomock.Controller) *mockgcp.MockClient
@@ -117,10 +118,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredentialsRequest(t),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -158,10 +161,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredentialsRequestWithPermissions(t),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -204,9 +209,11 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(""),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -248,6 +255,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
+			existingAdmin: []runtime.Object{},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 				return mockGCPClient
@@ -279,6 +287,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// only the read-only creds exist
 				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
 			},
+			existingAdmin: []runtime.Object{},
 			mockReadGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 
@@ -318,9 +327,11 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -358,10 +369,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -404,6 +417,9 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -470,6 +486,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// only the read-only creds exist
 				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
 			},
+			existingAdmin: []runtime.Object{},
 			mockReadGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 
@@ -514,6 +531,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// only the read-only creds exist
 				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
 			},
+			existingAdmin: []runtime.Object{},
 			mockReadGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 
@@ -586,7 +604,8 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// target secret exists
 				createTestNamespace(testSecretNamespace),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, `{"private_key_id": "testGCPKeyName"}`),
-
+			},
+			existingAdmin: []runtime.Object{
 				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
@@ -629,10 +648,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithDeletionTimestamp(t),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -656,10 +677,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithPermissionsWithDeletionTimestamp(t),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -683,9 +706,11 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -717,9 +742,11 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithDeletionTimestamp(t),
-				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -743,9 +770,11 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -777,9 +806,11 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -814,10 +845,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPPassthroughCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testRootGCPAuth),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -846,10 +879,12 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				createTestNamespace(testSecretNamespace),
 				testGCPPassthroughCredentialsRequest(t),
-				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret(testSecretNamespace, testSecretName, testOldPassthroughPrivateData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testGCPCredsSecretPassthrough("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 			},
 			mockRootGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -898,11 +933,15 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().
 				WithStatusSubresource(&minterv1.CredentialsRequest{}).
 				WithRuntimeObjects(test.existing...).Build()
+			fakeAdminClient := fake.NewClientBuilder().
+				WithRuntimeObjects(test.existingAdmin...).Build()
 			rcr := &ReconcileCredentialsRequest{
-				Client: fakeClient,
+				Client:      fakeClient,
+				AdminClient: fakeAdminClient,
 				Actuator: &actuator.Actuator{
-					Client: fakeClient,
-					Codec:  codec,
+					Client:         fakeClient,
+					RootCredClient: fakeAdminClient,
+					Codec:          codec,
 					GCPClientBuilder: func(name string, jsonAUTH []byte) (mintergcp.Client, error) {
 						if string(jsonAUTH) == testRootGCPAuth {
 							return mockRootGCPClient, nil

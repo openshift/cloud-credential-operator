@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"sync"
 	"syscall"
 	"time"
 
@@ -31,12 +32,18 @@ import (
 	"github.com/golang/glog"
 	"github.com/google/uuid"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
+	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/types"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -99,8 +106,65 @@ func NewOperator() *cobra.Command {
 				// logger to do nothing.
 				ctrlruntimelog.SetLogger(logr.New(ctrlruntimelog.NullLogSink{}))
 
+				log.Info("checking prerequisites")
+				featureGates, err := platform.GetFeatureGates(ctx)
+				if err != nil {
+					log.WithError(err).Fatal("unable to read feature gates")
+				}
+				awsSecurityTokenServiceGateEnabled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
+
+				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
+				rules := clientcmd.NewDefaultClientConfigLoadingRules()
+				rules.ExplicitPath = kubeconfigCommandLinePath
+				kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
+				cfg, err := kubeconfig.ClientConfig()
+				if err != nil {
+					log.WithError(err).Fatal("failed to parse kubeconfig")
+				}
+				coreClient, err := corev1client.NewForConfig(cfg)
+				if err != nil {
+					log.WithError(err).Fatal("failed to set up client")
+				}
+
+				infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeconfigCommandLinePath)
+				if err != nil {
+					log.Fatal(err)
+				}
+				platformType := platform.GetType(infraStatus)
+
+				// The status quo for this controller is to LIST + WATCH all Secrets on the cluster. This consumes
+				// more resources than necessary on clusters where users put other data in Secrets themselves, as we
+				// hold that data in our cache and never do anything with it. The reconcilers mainly need to react to
+				// changes in Secrets created for CredentialRequests, which they control and can label, allowing us
+				// to filter the LIST + WATCH down and hold the minimal set of data in memory. However, on existing
+				// clusters, secrets exist from previous work these reconcilers did that will not have Secrets labelled.
+				//
+				// We solve this second issue two-fold:
+				// - a new controller that labels all previous Secrets, but does not restrict the watch stream
+				// - a check on startup that detects that no Secrets remain to be labelled and applies the filtering
+				var filteredWatchPossible bool
+				secrets, err := coreClient.Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+				if err != nil {
+					log.WithError(err).Fatal("failed to list secrets")
+				}
+				var missing []types.NamespacedName
+				for _, secret := range secrets.Items {
+					if credentialsrequest.IsMissingSecretLabel(&secret) {
+						missing = append(missing, types.NamespacedName{
+							Namespace: secret.Namespace,
+							Name:      secret.Name,
+						})
+					}
+				}
+				if len(missing) != 0 {
+					log.WithField("missing", missing).Warn("not all secrets labelled, falling back to caching all secrets on cluster")
+				} else {
+					log.Info("filtering the set of secrets we watch")
+					filteredWatchPossible = true
+				}
+
 				// Create a new Cmd to provide shared dependencies and start components
-				log.Info("setting up manager")
+				log.Info("setting up managers")
 				mgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: ":2112",
 					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
@@ -113,6 +177,14 @@ func NewOperator() *cobra.Command {
 								"metadata.name":      constants.CloudCredOperatorConfigMap,
 							}),
 						}
+						if filteredWatchPossible {
+							log.Infof("adding label selector %s=%s to cache options for Secrets", minterv1.LabelCredentialsRequest, minterv1.LabelCredentialsRequestValue)
+							opts.ByObject[&corev1.Secret{}] = cache.ByObject{
+								Label: labels.SelectorFromSet(labels.Set{
+									minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+								}),
+							}
+						}
 						return cache.New(config, opts)
 					},
 				})
@@ -120,28 +192,55 @@ func NewOperator() *cobra.Command {
 					log.WithError(err).Fatal("unable to set up overall controller manager")
 				}
 
+				rootMgr, err := manager.New(cfg, manager.Options{
+					MetricsBindAddress: ":2113",
+					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
+						if opts.ByObject == nil {
+							opts.ByObject = map[client.Object]cache.ByObject{}
+						}
+						opts.ByObject[&corev1.Secret{}] = cache.ByObject{
+							Field: selectorForRootCredential(platformType),
+						}
+						return cache.New(config, opts)
+					},
+				})
+				if err != nil {
+					log.WithError(err).Fatal("unable to set up root credential controller manager")
+				}
+
 				log.Info("registering components")
 
 				// Setup Scheme for all resources
 				util.SetupScheme(mgr.GetScheme())
-
-				featureGates, err := platform.GetFeatureGates(ctx)
-				if err != nil {
-					log.WithError(err).Fatal("unable to read feature gates")
-				}
-				awsSecurityTokenServiveGateEnaled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
+				util.SetupScheme(rootMgr.GetScheme())
 
 				// Setup all Controllers
-				log.Info("setting up controller")
-				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
-				if err := controller.AddToManager(mgr, kubeconfigCommandLinePath, awsSecurityTokenServiveGateEnaled); err != nil {
+				log.Info("setting up controllers")
+				if err := controller.AddToManager(mgr, rootMgr, kubeconfigCommandLinePath, coreClient, awsSecurityTokenServiceGateEnabled); err != nil {
 					log.WithError(err).Fatal("unable to register controllers to the manager")
 				}
 
-				// Start the Cmd
-				log.Info("starting the cmd")
-				if err := mgr.Start(signals.SetupSignalHandler()); err != nil {
-					log.WithError(err).Fatal("unable to run the manager")
+				// Start the managers
+				log.Info("starting the managers")
+				runCtx := signals.SetupSignalHandler()
+				errs := make(chan error)
+				wg := sync.WaitGroup{}
+				for _, m := range []manager.Manager{mgr, rootMgr} {
+					wg.Add(1)
+					go func(m manager.Manager, ctx context.Context) {
+						defer wg.Done()
+						errs <- m.Start(ctx)
+
+					}(m, runCtx)
+				}
+				go func() {
+					wg.Wait()
+					close(errs)
+				}()
+				for err := range errs {
+					if err != nil {
+						log.WithError(err).Fatal("unable to run the manager")
+					}
 				}
 			}
 
@@ -228,6 +327,34 @@ func NewOperator() *cobra.Command {
 	flag.CommandLine.Parse([]string{})
 
 	return cmd
+}
+
+func selectorForRootCredential(platformType configv1.PlatformType) fields.Selector {
+	var name string
+	switch platformType {
+	case configv1.AWSPlatformType:
+		name = constants.AWSCloudCredSecretName
+	case configv1.AzurePlatformType:
+		name = constants.AzureCloudCredSecretName
+	case configv1.GCPPlatformType:
+		name = constants.GCPCloudCredSecretName
+	case configv1.OpenStackPlatformType:
+		name = constants.OpenStackCloudCredsSecretName
+	case configv1.OvirtPlatformType:
+		name = constants.OvirtCloudCredsSecretName
+	case configv1.KubevirtPlatformType:
+		name = constants.KubevirtCloudCredSecretName
+	case configv1.VSpherePlatformType:
+		name = constants.VSphereCloudCredSecretName
+	default:
+		return fields.Nothing()
+	}
+	selector := fields.SelectorFromSet(fields.Set{
+		"metadata.namespace": constants.CloudCredSecretNamespace,
+		"metadata.name":      name,
+	})
+	log.WithField("selector", selector.String()).Info("setting up field selector for root credential Secret")
+	return selector
 }
 
 func initializeGlog(flags *pflag.FlagSet) {

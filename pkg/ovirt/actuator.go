@@ -18,11 +18,11 @@ package ovirt
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	log "github.com/sirupsen/logrus"
 
@@ -49,8 +49,9 @@ const (
 )
 
 type OvirtActuator struct {
-	Client client.Client
-	Codec  *minterv1.ProviderCodec
+	Client         client.Client
+	RootCredClient client.Client
+	Codec          *minterv1.ProviderCodec
 }
 
 func (a *OvirtActuator) GetFeatureGates(ctx context.Context) (featuregates.FeatureGate, error) {
@@ -70,7 +71,7 @@ type OvirtCreds struct {
 }
 
 // NewActuator creates a new Ovirt actuator.
-func NewActuator(client client.Client) (*OvirtActuator, error) {
+func NewActuator(client, rootCredClient client.Client) (*OvirtActuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating Ovirt codec")
@@ -78,8 +79,9 @@ func NewActuator(client client.Client) (*OvirtActuator, error) {
 	}
 
 	return &OvirtActuator{
-		Codec:  codec,
-		Client: client,
+		Codec:          codec,
+		Client:         client,
+		RootCredClient: rootCredClient,
 	}, nil
 }
 
@@ -138,13 +140,11 @@ func (a *OvirtActuator) sync(ctx context.Context, cr *minterv1.CredentialsReques
 	}
 
 	logger.Debugf("provisioning secret")
-	existingSecret, err := a.loadExistingSecret(cr)
-
 	if err != nil && !errors.IsNotFound(err) {
 		return err
 	}
 
-	err = a.syncCredentialSecret(cr, &ovirtCreds, existingSecret, logger)
+	err = a.syncCredentialSecret(ctx, cr, &ovirtCreds, logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -157,101 +157,43 @@ func (a *OvirtActuator) sync(ctx context.Context, cr *minterv1.CredentialsReques
 	return nil
 }
 
-func (a *OvirtActuator) syncCredentialSecret(cr *minterv1.CredentialsRequest, ovirtCreds *OvirtCreds, existingSecret *corev1.Secret, logger log.FieldLogger) error {
+func (a *OvirtActuator) syncCredentialSecret(ctx context.Context, cr *minterv1.CredentialsRequest, ovirtCreds *OvirtCreds, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
-
-	if existingSecret == nil {
-		if ovirtCreds == nil {
-			msg := "new access key secret needed but no key data provided"
-			sLog.Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   msg,
-			}
+	sLog.Infof("processing secret")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
+		},
+	}
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
 		}
-		sLog.Info("creating secret")
-		secret := &corev1.Secret{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      cr.Spec.SecretRef.Name,
-				Namespace: cr.Spec.SecretRef.Namespace,
-				Annotations: map[string]string{
-					minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
-				},
-			},
-			Data: secretDataFrom(ovirtCreds),
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
 		}
-
-		err := a.Client.Create(context.TODO(), secret)
-		if err != nil {
-			sLog.WithError(err).Error("error creating secret")
-			return err
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if secret.Data == nil {
+			secret.Data = map[string][]byte{}
 		}
-		sLog.Info("secret created successfully")
+		for key, value := range secretDataFrom(ovirtCreds) {
+			secret.Data[key] = value
+		}
 		return nil
-	}
-
-	// Update the existing secret:
-	sLog.Debug("updating secret")
-	origSecret := existingSecret.DeepCopy()
-	if existingSecret.Annotations == nil {
-		existingSecret.Annotations = map[string]string{}
-	}
-	existingSecret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-	if ovirtCreds != nil {
-		existingSecret.Data = secretDataFrom(ovirtCreds)
-	}
-
-	if !reflect.DeepEqual(existingSecret, origSecret) {
-		sLog.Info("target secret has changed, updating")
-		err := a.Client.Update(context.TODO(), existingSecret)
-		if err != nil {
-			msg := "error updating secret"
-			sLog.WithError(err).Error(msg)
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   msg,
-			}
-		}
-	} else {
-		sLog.Debug("target secret unchanged")
-	}
-
-	return nil
-}
-
-// loadExistingSecret load the secret from the API. If the secret is not found, the NotFound
-// err is returned, with nil secret.
-// The NotFound error can be used to signal the creation of a new signal.
-func (a *OvirtActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
-	logger := a.getLogger(cr)
-
-	// Check if the credentials secret exists, if not we need to inform the syncer to generate a new one:
-	loadedSecret := &corev1.Secret{}
-	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, loadedSecret)
+	})
+	sLog.WithField("operation", op).Info("processed secret")
 	if err != nil {
-		if errors.IsNotFound(err) {
-			logger.Debug("secret does not exist")
-			return nil, err
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
 		}
 	}
-
-	if _, ok := loadedSecret.Data[urlKey]; !ok {
-		logger.Warningf("secret did not have expected key: %s", urlKey)
-	}
-	if _, ok := loadedSecret.Data[usernameKey]; !ok {
-		logger.Warningf("secret did not have expected key: %s", usernameKey)
-	}
-	if _, ok := loadedSecret.Data[passwordKey]; !ok {
-		logger.Warningf("secret did not have expected key: %s", passwordKey)
-	}
-	if _, ok := loadedSecret.Data[cabundleKey]; !ok {
-		logger.Warningf("secret did not have expected key: %s", cabundleKey)
-	}
-
-	return loadedSecret, nil
+	return nil
 }
 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
@@ -262,7 +204,7 @@ func (a *OvirtActuator) GetCredentialsRootSecretLocation() types.NamespacedName 
 func (a *OvirtActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -367,5 +309,5 @@ func secretDataFrom(ovirtCreds *OvirtCreds) map[string][]byte {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *OvirtActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }

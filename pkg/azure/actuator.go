@@ -23,6 +23,7 @@ import (
 	"reflect"
 
 	log "github.com/sirupsen/logrus"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	corev1 "k8s.io/api/core/v1"
 	kerrors "k8s.io/apimachinery/pkg/api/errors"
@@ -53,14 +54,14 @@ func (a *Actuator) STSFeatureGateEnabled() bool {
 	return false
 }
 
-func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
+func NewActuator(c, rootCredClient client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
 	codec, err := minterv1.NewCodec()
 	if err != nil {
 		log.WithError(err).Error("error creating Azure codec")
 		return nil, fmt.Errorf("error creating Azure codec: %v", err)
 	}
 
-	client := newClientWrapper(c)
+	client := newClientWrapper(c, rootCredClient)
 	return &Actuator{
 		client: client,
 		codec:  codec,
@@ -70,11 +71,11 @@ func NewActuator(c client.Client, cloudName configv1.AzureCloudEnvironment) (*Ac
 	}, nil
 }
 
-func NewFakeActuator(c client.Client, codec *minterv1.ProviderCodec,
+func NewFakeActuator(c, rootCredClient client.Client, codec *minterv1.ProviderCodec,
 	credentialMinterBuilder credentialMinterBuilder,
 ) *Actuator {
 	return &Actuator{
-		client:                  newClientWrapper(c),
+		client:                  newClientWrapper(c, rootCredClient),
 		codec:                   codec,
 		credentialMinterBuilder: credentialMinterBuilder,
 	}
@@ -325,25 +326,6 @@ func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLog
 	return nil
 }
 
-func copyCredentialsSecret(cr *minterv1.CredentialsRequest, src, dest *corev1.Secret) {
-	dest.ObjectMeta = metav1.ObjectMeta{
-		Name:      cr.Spec.SecretRef.Name,
-		Namespace: cr.Spec.SecretRef.Namespace,
-		Annotations: map[string]string{
-			minterv1.AnnotationCredentialsRequest: fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
-		},
-	}
-	dest.Data = map[string][]byte{
-		AzureClientID:       src.Data[AzureClientID],
-		AzureClientSecret:   src.Data[AzureClientSecret],
-		AzureRegion:         src.Data[AzureRegion],
-		AzureResourceGroup:  src.Data[AzureResourceGroup],
-		AzureResourcePrefix: src.Data[AzureResourcePrefix],
-		AzureSubscriptionID: src.Data[AzureSubscriptionID],
-		AzureTenantID:       src.Data[AzureTenantID],
-	}
-}
-
 func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
 	syncErr := a.syncCredentialSecrets(ctx, cr, cloudCredsSecret, logger)
 	if syncErr != nil {
@@ -405,26 +387,43 @@ func (a *Actuator) cleanupAfterPassthroughPivot(ctx context.Context, cr *minterv
 	return nil
 }
 func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
-	existing := &corev1.Secret{}
-	key := client.ObjectKey{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
-	err := a.client.Get(ctx, key, existing)
-	if err != nil && kerrors.IsNotFound(err) {
-		s := &corev1.Secret{}
-		copyCredentialsSecret(cr, cloudCredsSecret, s)
-		return a.client.Create(ctx, s)
-	} else if err != nil {
-		return err
+	sLog := logger.WithFields(log.Fields{
+		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+	})
+	sLog.Infof("processing secret")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
+		},
 	}
-
-	updated := existing.DeepCopy()
-	copyCredentialsSecret(cr, cloudCredsSecret, updated)
-	if !reflect.DeepEqual(existing, updated) {
-		err := a.client.Update(ctx, updated)
-		if err != nil {
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   "error updating secret",
-			}
+	op, err := controllerutil.CreateOrPatch(ctx, a.client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if secret.Data == nil {
+			secret.Data = map[string][]byte{}
+		}
+		secret.Data[AzureClientID] = cloudCredsSecret.Data[AzureClientID]
+		secret.Data[AzureClientSecret] = cloudCredsSecret.Data[AzureClientSecret]
+		secret.Data[AzureRegion] = cloudCredsSecret.Data[AzureRegion]
+		secret.Data[AzureResourceGroup] = cloudCredsSecret.Data[AzureResourceGroup]
+		secret.Data[AzureResourcePrefix] = cloudCredsSecret.Data[AzureResourcePrefix]
+		secret.Data[AzureSubscriptionID] = cloudCredsSecret.Data[AzureSubscriptionID]
+		secret.Data[AzureTenantID] = cloudCredsSecret.Data[AzureTenantID]
+		return nil
+	})
+	sLog.WithField("operation", op).Info("processed secret")
+	if err != nil {
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
 		}
 	}
 	return nil
@@ -438,7 +437,7 @@ func (a *Actuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 func (a *Actuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
 	cloudCredSecret := &corev1.Secret{}
-	if err := a.client.Client.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
+	if err := a.client.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
 		logger.WithError(err).Error(msg)
 		return nil, &actuatoriface.ActuatorError{
@@ -507,5 +506,5 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.client.Client, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.client.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
 }
