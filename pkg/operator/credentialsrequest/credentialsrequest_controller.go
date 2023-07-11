@@ -19,6 +19,7 @@ package credentialsrequest
 import (
 	"context"
 	"fmt"
+	"k8s.io/apimachinery/pkg/runtime"
 	"reflect"
 	"time"
 
@@ -702,7 +703,10 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 					provisionErr = true
 				}
 
-				cr.Status.Provisioned = !provisionErr
+				updateErr := r.UpdateProvisionedStatus(cr, !provisionErr)
+				if updateErr != nil {
+					logger.Errorf("failed to update credentialsrequest status: %v", updateErr)
+				}
 
 				logger.Errorf("errored with condition: %v", t.Reason())
 				r.updateActuatorConditions(cr, t.Reason(), syncErr)
@@ -714,7 +718,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		} else {
 			// it worked so clear any actuator conditions if they exist
 			r.updateActuatorConditions(cr, "", nil)
-			cr.Status.Provisioned = true
+			updateErr := r.UpdateProvisionedStatus(cr, true)
+
+			if updateErr != nil {
+				logger.Errorf("failed to update credentialsrequest status: %v", updateErr)
+			}
 		}
 	} else {
 		credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(ctx, cr)
@@ -1039,4 +1047,37 @@ func checkForFailureConditions(cr *minterv1.CredentialsRequest) bool {
 		}
 	}
 	return false
+}
+
+// UpdateProvisionedStatus will update the status subresource of this CredentialsRequest
+func (r *ReconcileCredentialsRequest) UpdateProvisionedStatus(cr *minterv1.CredentialsRequest, provisioned bool) error {
+	// Check if the status subresource is already set
+	if cr.Status.LastSyncTimestamp == nil {
+		// Create a new status object and set its fields
+		cr.Status = minterv1.CredentialsRequestStatus{
+			LastSyncTimestamp: &metav1.Time{Time: time.Now()},
+			Provisioned:       provisioned,
+			ProviderStatus:    &runtime.RawExtension{},
+		}
+	} else {
+		// Update the Provisioned field with the given parameter
+		cr.Status.Provisioned = provisioned
+	}
+
+	// Use UpdateProvisionedStatus method to update only the status subresource
+	err := r.Client.Status().Update(context.Background(), cr)
+	if err != nil {
+		// Handle possible errors from the API server
+		if errors.IsConflict(err) {
+			// Conflict error means that the object has been modified by another process
+			// Get the latest version of the object and retry the update operation
+			err := r.Client.Get(context.Background(), types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr)
+			if err != nil {
+				return err
+			}
+			return r.UpdateProvisionedStatus(cr, provisioned)
+		}
+		return err
+	}
+	return nil
 }
