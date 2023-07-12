@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -46,7 +47,7 @@ func deleteCustomRoles(client *azureclients.AzureClientWrapper, name string, sub
 		}
 	}
 	if len(roleDefinitions) == 0 {
-		log.Printf("Found no custom roles to delete with description 'Custom role for OpenShift. Owned by: %v'", name)
+		log.Printf("Found no custom roles with description 'Custom role for OpenShift. Owned by: %v'", name)
 		return nil
 	}
 	for _, roleDefinition := range roleDefinitions {
@@ -80,6 +81,14 @@ func deleteManagedIdentities(client *azureclients.AzureClientWrapper, name, reso
 	for listManagedIdentities.More() {
 		pageResponse, err := listManagedIdentities.NextPage(context.Background())
 		if err != nil {
+			var respErr *azcore.ResponseError
+			if !(errors.As(err, &respErr)) {
+				return err
+			}
+			if respErr.ErrorCode == "ResourceGroupNotFound" {
+				log.Printf("Found no resource group %s. No user-assigned managed identities to delete.", resourceGroupName)
+				return nil
+			}
 			return err
 		}
 		// Find managed identities within the resource group that have CCO's "owned" tag.
@@ -119,6 +128,14 @@ func deleteResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 		resourceGroupName,
 		&armresources.ResourceGroupsClientBeginDeleteOptions{})
 	if err != nil {
+		var respErr *azcore.ResponseError
+		if !(errors.As(err, &respErr)) {
+			return err
+		}
+		if respErr.ErrorCode == "ResourceGroupNotFound" {
+			log.Printf("Found no resource group %s", resourceGroupName)
+			return nil
+		}
 		return errors.Wrap(err, "failed to delete resource group")
 	}
 	// Stomped return is an armresources.ResourceGroupsClientDeleteResponse which is an empty struct with no values
@@ -160,6 +177,14 @@ func deleteStorageAccount(client *azureclients.AzureClientWrapper, resourceGroup
 		storageAccountName,
 		&armstorage.AccountsClientDeleteOptions{})
 	if err != nil {
+		var respErr *azcore.ResponseError
+		if !(errors.As(err, &respErr)) {
+			return err
+		}
+		if respErr.ErrorCode == "ResourceGroupNotFound" {
+			log.Printf("Found no resource group %s. No storage accounts to delete.", resourceGroupName)
+			return nil
+		}
 		return errors.Wrap(err, "failed to delete storage account")
 	}
 	log.Printf("Deleted storage account %s", storageAccountName)
