@@ -67,11 +67,13 @@ func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			credsSecret := getInputSecret()
 
-			fakeClient := fake.NewClientBuilder().WithObjects(credsSecret, test.operatorConfig).Build()
+			fakeClient := fake.NewClientBuilder().WithObjects(test.operatorConfig).Build()
+			fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(credsSecret).Build()
 
 			rcc := &ReconcileCloudCredSecret{
-				Client: fakeClient,
-				Logger: log.WithField("controller", "testSecretAnnotatorController"),
+				Client:         fakeClient,
+				RootCredClient: fakeRootCredClient,
+				Logger:         log.WithField("controller", "testSecretAnnotatorController"),
 			}
 
 			_, err := rcc.Reconcile(context.TODO(), reconcile.Request{
@@ -84,7 +86,7 @@ func TestAzureSecretAnnotatorReconcile(t *testing.T) {
 			require.NoError(t, err, "unexpected error in secret annotator controller")
 
 			secret := &corev1.Secret{}
-			err = fakeClient.Get(context.TODO(), client.ObjectKey{Name: TestSecretName, Namespace: TestNamespace}, secret)
+			err = fakeRootCredClient.Get(context.TODO(), client.ObjectKey{Name: TestSecretName, Namespace: TestNamespace}, secret)
 			require.NoError(t, err, "error fetching object from fake client")
 
 			assert.Equal(t, string(test.expectedAnnotation), string(secret.ObjectMeta.Annotations[constants.AnnotationKey]))
