@@ -2,8 +2,10 @@ package utils
 
 import (
 	"context"
+
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -23,8 +25,7 @@ var cloudSecretKeyPassThru types.NamespacedName
 
 // WatchCCOConfig will add a watch to the provided controller for the operator
 // config resource which will schedule the provided secret for reconciliation.
-func WatchCCOConfig(c controller.Controller, cloudSecretKey types.NamespacedName, mgr manager.Manager) error {
-	operatorCache := mgr.GetCache()
+func WatchCCOConfig(cache cache.Cache, c controller.Controller, cloudSecretKey types.NamespacedName, mgr manager.Manager) error {
 	cloudSecretKeyPassThru = cloudSecretKey
 
 	configPredicate := predicate.Funcs{
@@ -39,7 +40,7 @@ func WatchCCOConfig(c controller.Controller, cloudSecretKey types.NamespacedName
 		},
 	}
 
-	err := c.Watch(source.Kind(operatorCache, &operatorv1.CloudCredential{}),
+	err := c.Watch(source.Kind(cache, &operatorv1.CloudCredential{}),
 		handler.EnqueueRequestsFromMapFunc(cloudCredSecretRequest),
 		configPredicate,
 	)

@@ -41,7 +41,7 @@ import (
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 
-	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
+	"google.golang.org/api/cloudresourcemanager/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -80,6 +80,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 	tests := []struct {
 		name                    string
 		existing                []runtime.Object
+		existingRootCred        []runtime.Object
 		expectErr               bool
 		mockGCPClient           func(mockCtrl *gomock.Controller) *mockgcp.MockClient
 		validateAnnotationValue string
@@ -87,8 +88,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "cred minter mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -104,9 +107,11 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "operator disabled via configmap",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfigMap("true"),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -116,15 +121,19 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "operator disabled",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 		},
 		{
 			name: "cred passthrough mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -141,8 +150,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "useless creds",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
@@ -165,6 +176,9 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "secret missing key",
 			existing: []runtime.Object{
+				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testSecretName,
@@ -174,23 +188,26 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 						"not-the-right-key": []byte(testGCPAuthJSON),
 					},
 				},
-				testOperatorConfig(""),
 			},
 			validateAnnotationValue: constants.InsufficientAnnotation,
 		},
 		{
 			name: "annotation matches forced mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(operatorv1.CloudCredentialsModeMint),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			validateAnnotationValue: constants.MintAnnotation,
 		},
 		{
 			name: "unknown mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig("notARealMode"),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			expectErr: true,
 		},
@@ -214,6 +231,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing := append(test.existing, infra)
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
+			fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingRootCred...).Build()
 
 			fakeGCPClient := mockgcp.NewMockClient(mockCtrl)
 			if test.mockGCPClient != nil {
@@ -221,8 +239,9 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			}
 
 			rcc := &anngcp.ReconcileCloudCredSecret{
-				Client: fakeClient,
-				Logger: log.WithField("controller", "testController"),
+				Client:         fakeClient,
+				RootCredClient: fakeRootCredClient,
+				Logger:         log.WithField("controller", "testController"),
 				GCPClientBuilder: func(projectName string, authJSON []byte) (ccgcp.Client, error) {
 					return fakeGCPClient, nil
 				},
@@ -238,7 +257,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			if test.expectErr {
 				assert.Error(t, err, "expected error to be returned")
 			} else if test.validateAnnotationValue != "" {
-				validateSecretAnnotation(fakeClient, t, test.validateAnnotationValue)
+				validateSecretAnnotation(fakeRootCredClient, t, test.validateAnnotationValue)
 			}
 		})
 	}

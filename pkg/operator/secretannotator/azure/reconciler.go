@@ -33,15 +33,16 @@ import (
 var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 
 type ReconcileCloudCredSecret struct {
-	client.Client
-	Logger log.FieldLogger
+	Client         client.Client
+	RootCredClient client.Client
+	Logger         log.FieldLogger
 }
 
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	c := mgr.GetClient()
+func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
-		Client: c,
-		Logger: log.WithField("controller", constants.SecretAnnotatorControllerName),
+		Client:         c,
+		RootCredClient: mgr.GetClient(),
+		Logger:         log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 
 	s := status.NewSecretStatusHandler(c)
@@ -50,9 +51,9 @@ func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
 	return r
 }
 
-func Add(mgr manager.Manager, r reconcile.Reconciler) error {
+func Add(mgr, rootCredMgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(constants.SecretAnnotatorControllerName, rootCredMgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -69,12 +70,12 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return cloudCredSecretObjectCheck(e.Object)
 		},
 	}
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
+	err = c.Watch(source.Kind(rootCredMgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
 	if err != nil {
 		return err
 	}
 
-	secretutils.WatchCCOConfig(c, types.NamespacedName{
+	secretutils.WatchCCOConfig(mgr.GetCache(), c, types.NamespacedName{
 		Namespace: constants.CloudCredSecretNamespace,
 		Name:      constants.AzureCloudCredSecretName,
 	}, mgr)
@@ -115,7 +116,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	// From here down we must be in Passthrough mode
 
 	secret := &corev1.Secret{}
-	err = r.Get(context.Background(), request.NamespacedName, secret)
+	err = r.RootCredClient.Get(context.Background(), request.NamespacedName, secret)
 	if err != nil {
 		r.Logger.Debugf("secret not found: %v", err)
 		return reconcile.Result{}, err
@@ -151,5 +152,5 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 	secretAnnotations[constants.AnnotationKey] = value
 	secret.SetAnnotations(secretAnnotations)
 
-	return r.Update(context.Background(), secret)
+	return r.RootCredClient.Update(context.Background(), secret)
 }
