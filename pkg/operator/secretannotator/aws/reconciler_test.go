@@ -89,6 +89,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 	tests := []struct {
 		name                    string
 		existing                []runtime.Object
+		existingRootCred        []runtime.Object
 		expectErr               bool
 		mockAWSClient           func(mockCtrl *gomock.Controller) *mockaws.MockClient
 		validateAnnotationValue string
@@ -96,8 +97,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "cred minter mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -111,23 +114,29 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "operator disabled via configmap",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfigMap("true"),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 		},
 		{
 			name: "operator disabled",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 		},
 		{
 			name: "detect root user creds",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -140,8 +149,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "cred passthrough mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -158,8 +169,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "cred passthrough mode wrong region permission",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -176,8 +189,10 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 		{
 			name: "useless creds",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -202,6 +217,9 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			name:      "secret missing key",
 			expectErr: true,
 			existing: []runtime.Object{
+				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{
 						Name:      testSecretName,
@@ -212,28 +230,32 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 						"not_aws_secret_access_key": []byte(testAWSSecretAccessKey),
 					},
 				},
-				testOperatorConfig(""),
 			},
 		},
 		{
 			name: "annotation matches forced mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(operatorv1.CloudCredentialsModeMint),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			validateAnnotationValue: constants.MintAnnotation,
 		},
 		{
 			name: "unknown mode",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig("notARealMode"),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			expectErr: true,
 		},
 		{
-			name: "error on missing config CR",
-			existing: []runtime.Object{
+			name:     "error on missing config CR",
+			existing: []runtime.Object{},
+			existingRootCred: []runtime.Object{
 				testSecret(),
 			},
 			expectErr: true,
@@ -263,6 +285,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing := append(test.existing, infra)
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
+			fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingRootCred...).Build()
 
 			fakeAWSClient := mockaws.NewMockClient(mockCtrl)
 			if test.mockAWSClient != nil {
@@ -270,8 +293,9 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			}
 
 			rcc := &annaws.ReconcileCloudCredSecret{
-				Client: fakeClient,
-				Logger: log.WithField("controller", "testController"),
+				Client:         fakeClient,
+				RootCredClient: fakeRootCredClient,
+				Logger:         log.WithField("controller", "testController"),
 				AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error) {
 					return fakeAWSClient, nil
 				},
@@ -289,7 +313,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			}
 
 			if test.validateAnnotationValue != "" {
-				validateSecretAnnotation(fakeClient, t, test.validateAnnotationValue)
+				validateSecretAnnotation(fakeRootCredClient, t, test.validateAnnotationValue)
 			}
 		})
 	}

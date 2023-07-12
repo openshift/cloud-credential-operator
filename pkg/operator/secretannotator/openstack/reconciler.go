@@ -48,11 +48,11 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	c := mgr.GetClient()
+func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
-		Client: c,
-		Logger: log.WithField("controller", constants.SecretAnnotatorControllerName),
+		Client:         c,
+		RootCredClient: mgr.GetClient(),
+		Logger:         log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 
 	s := status.NewSecretStatusHandler(c)
@@ -65,9 +65,9 @@ func cloudCredSecretObjectCheck(secret metav1.Object) bool {
 	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants.OpenStackCloudCredsSecretName
 }
 
-func Add(mgr manager.Manager, r reconcile.Reconciler) error {
+func Add(mgr, rootCredMgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(constants.SecretAnnotatorControllerName, rootCredMgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -84,12 +84,12 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return cloudCredSecretObjectCheck(e.Object)
 		},
 	}
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
+	err = c.Watch(source.Kind(rootCredMgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
 	if err != nil {
 		return err
 	}
 
-	err = secretutils.WatchCCOConfig(c, types.NamespacedName{
+	err = secretutils.WatchCCOConfig(mgr.GetCache(), c, types.NamespacedName{
 		Namespace: constants.CloudCredSecretNamespace,
 		Name:      constants.OpenStackCloudCredsSecretName,
 	}, mgr)
@@ -103,8 +103,9 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 
 type ReconcileCloudCredSecret struct {
-	client.Client
-	Logger log.FieldLogger
+	Client         client.Client
+	RootCredClient client.Client
+	Logger         log.FieldLogger
 }
 
 // Reconcile will typically annotate the cloud cred secret to indicate the capabilities of the cloud credentials:
@@ -149,7 +150,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	}
 
 	secret := &corev1.Secret{}
-	err = r.Get(context.Background(), request.NamespacedName, secret)
+	err = r.RootCredClient.Get(context.Background(), request.NamespacedName, secret)
 	if err != nil {
 		r.Logger.Debugf("secret not found: %v", err)
 		return reconcile.Result{}, err
@@ -169,7 +170,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 
 	if cloudsUpdated {
 		openstack.SetRootCloudCredentialsSecretData(secret, clouds)
-		err := r.Update(context.TODO(), secret)
+		err := r.RootCredClient.Update(context.TODO(), secret)
 		if err != nil {
 			r.Logger.WithError(err).Error("error writing updated root secret")
 		}
@@ -270,5 +271,5 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 	secretAnnotations[constants.AnnotationKey] = value
 	secret.SetAnnotations(secretAnnotations)
 
-	return r.Update(context.TODO(), secret)
+	return r.RootCredClient.Update(context.TODO(), secret)
 }

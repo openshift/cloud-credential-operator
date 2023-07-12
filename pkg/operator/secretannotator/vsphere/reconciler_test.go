@@ -58,31 +58,38 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 	tests := []struct {
 		name                    string
 		existing                []runtime.Object
+		existingRootCred        []runtime.Object
 		expectErr               bool
 		validateAnnotationValue string
 	}{
 		{
 			name: "operator disabled",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfigMap("true"),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 		},
 		{
 			name: "operator enabled",
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfigMap("false"),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 		},
 		{
 			name: "annotate passthrough mode",
 			// right now only passthrough mode is supported so any secret works
 			existing: []runtime.Object{
-				testSecret(),
 				testOperatorConfig(""),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
 			},
 			validateAnnotationValue: constants.PassthroughAnnotation,
 		},
@@ -110,10 +117,12 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			existing := append(test.existing, infra)
 
 			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
+			fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingRootCred...).Build()
 
 			rcc := &ReconcileCloudCredSecret{
-				Client: fakeClient,
-				Logger: log.WithField("controller", "testController"),
+				Client:         fakeClient,
+				RootCredClient: fakeRootCredClient,
+				Logger:         log.WithField("controller", "testController"),
 			}
 
 			_, err := rcc.Reconcile(context.TODO(), reconcile.Request{
@@ -128,7 +137,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			}
 
 			if test.validateAnnotationValue != "" {
-				validateSecretAnnotation(fakeClient, t, test.validateAnnotationValue)
+				validateSecretAnnotation(fakeRootCredClient, t, test.validateAnnotationValue)
 			}
 		})
 	}
