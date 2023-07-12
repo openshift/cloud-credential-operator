@@ -11,12 +11,20 @@ rules:
   - ""
   resources:
   - secrets
-  - configmaps
   - events
   - serviceaccounts
   - services
   verbs:
   - "*"
+- apiGroups:
+    - ""
+  resources:
+    - configmaps
+  resourceNames:
+    - cloud-credential-operator-config
+    - cloud-credential-operator-leader
+  verbs:
+    - "*"
 - apiGroups:
   - apps
   resources:

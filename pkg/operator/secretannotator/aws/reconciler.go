@@ -38,10 +38,10 @@ const (
 	AwsSecretAccessKeyName = "aws_secret_access_key"
 )
 
-func NewReconciler(mgr manager.Manager) reconcile.Reconciler {
-	c := mgr.GetClient()
+func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
 		Client:           c,
+		RootCredClient:   mgr.GetClient(),
 		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
 		AWSClientBuilder: awsutils.ClientBuilder,
 	}
@@ -56,9 +56,9 @@ func cloudCredSecretObjectCheck(secret metav1.Object) bool {
 	return secret.GetNamespace() == constants.CloudCredSecretNamespace && secret.GetName() == constants.AWSCloudCredSecretName
 }
 
-func Add(mgr manager.Manager, r reconcile.Reconciler) error {
+func Add(mgr, rootCredMgr manager.Manager, r reconcile.Reconciler) error {
 	// Create a new controller
-	c, err := controller.New(constants.SecretAnnotatorControllerName, mgr, controller.Options{Reconciler: r})
+	c, err := controller.New(constants.SecretAnnotatorControllerName, rootCredMgr, controller.Options{Reconciler: r})
 	if err != nil {
 		return err
 	}
@@ -75,12 +75,12 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 			return cloudCredSecretObjectCheck(e.Object)
 		},
 	}
-	err = c.Watch(source.Kind(mgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
+	err = c.Watch(source.Kind(rootCredMgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
 	if err != nil {
 		return err
 	}
 
-	err = secretutils.WatchCCOConfig(c, types.NamespacedName{
+	err = secretutils.WatchCCOConfig(mgr.GetCache(), c, types.NamespacedName{
 		Namespace: constants.CloudCredSecretNamespace,
 		Name:      constants.AWSCloudCredSecretName,
 	}, mgr)
@@ -94,7 +94,8 @@ func Add(mgr manager.Manager, r reconcile.Reconciler) error {
 var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 
 type ReconcileCloudCredSecret struct {
-	client.Client
+	Client           client.Client
+	RootCredClient   client.Client
 	Logger           log.FieldLogger
 	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 }
@@ -133,7 +134,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	}
 
 	secret := &corev1.Secret{}
-	err = r.Get(context.Background(), request.NamespacedName, secret)
+	err = r.RootCredClient.Get(context.Background(), request.NamespacedName, secret)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			r.Logger.Info("parent credential secret does not exist")
@@ -232,5 +233,5 @@ func (r *ReconcileCloudCredSecret) updateSecretAnnotations(secret *corev1.Secret
 	secretAnnotations[constants.AnnotationKey] = value
 	secret.SetAnnotations(secretAnnotations)
 
-	return r.Update(context.Background(), secret)
+	return r.RootCredClient.Update(context.Background(), secret)
 }
