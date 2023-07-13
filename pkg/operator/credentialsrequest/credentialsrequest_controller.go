@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 	"reflect"
 	"time"
 
@@ -1064,19 +1065,11 @@ func (r *ReconcileCredentialsRequest) UpdateProvisionedStatus(cr *minterv1.Crede
 		cr.Status.Provisioned = provisioned
 	}
 
-	// Use UpdateProvisionedStatus method to update only the status subresource
-	err := r.Client.Status().Update(context.Background(), cr)
+	// Use retry.RetryOnConflict() to update the status subresource
+	err := retry.RetryOnConflict(retry.DefaultBackoff, func() error {
+		return r.Client.Status().Update(context.Background(), cr)
+	})
 	if err != nil {
-		// Handle possible errors from the API server
-		if errors.IsConflict(err) {
-			// Conflict error means that the object has been modified by another process
-			// Get the latest version of the object and retry the update operation
-			err := r.Client.Get(context.Background(), types.NamespacedName{Name: cr.Name, Namespace: cr.Namespace}, cr)
-			if err != nil {
-				return err
-			}
-			return r.UpdateProvisionedStatus(cr, provisioned)
-		}
 		return err
 	}
 	return nil
