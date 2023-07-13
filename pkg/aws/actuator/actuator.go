@@ -59,7 +59,8 @@ const (
 	secretDataAccessKey = "aws_access_key_id"
 	secretDataSecretKey = "aws_secret_access_key"
 
-	awsSTSCredsTemplate = `sts_regional_endpoints = regional
+	awsSTSCredsTemplate = `[default]
+sts_regional_endpoints = regional
 role_arn = %s
 web_identity_token_file = %s`
 )
