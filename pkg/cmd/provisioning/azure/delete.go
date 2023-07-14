@@ -6,6 +6,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
@@ -46,7 +47,7 @@ func deleteCustomRoles(client *azureclients.AzureClientWrapper, name string, sub
 		}
 	}
 	if len(roleDefinitions) == 0 {
-		log.Printf("Found no custom roles to delete with description 'Custom role for OpenShift. Owned by: %v'", name)
+		log.Printf("Found no custom roles with description 'Custom role for OpenShift. Owned by: %v'", name)
 		return nil
 	}
 	for _, roleDefinition := range roleDefinitions {
@@ -80,6 +81,14 @@ func deleteManagedIdentities(client *azureclients.AzureClientWrapper, name, reso
 	for listManagedIdentities.More() {
 		pageResponse, err := listManagedIdentities.NextPage(context.Background())
 		if err != nil {
+			var respErr *azcore.ResponseError
+			if !(errors.As(err, &respErr)) {
+				return err
+			}
+			if respErr.ErrorCode == "ResourceGroupNotFound" {
+				log.Printf("Found no resource group %s. No user-assigned managed identities to delete.", resourceGroupName)
+				return nil
+			}
 			return err
 		}
 		// Find managed identities within the resource group that have CCO's "owned" tag.
@@ -99,7 +108,11 @@ func deleteManagedIdentities(client *azureclients.AzureClientWrapper, name, reso
 		return nil
 	}
 	for _, identity := range managedIdentities {
-		_, err := client.UserAssignedIdentitiesClient.Delete(
+		err := deleteRoleAssignmentsByPrincipal(client, *identity.Properties.PrincipalID, subscriptionID)
+		if err != nil {
+			return err
+		}
+		_, err = client.UserAssignedIdentitiesClient.Delete(
 			context.Background(),
 			resourceGroupName,
 			*identity.Name,
@@ -119,6 +132,14 @@ func deleteResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 		resourceGroupName,
 		&armresources.ResourceGroupsClientBeginDeleteOptions{})
 	if err != nil {
+		var respErr *azcore.ResponseError
+		if !(errors.As(err, &respErr)) {
+			return err
+		}
+		if respErr.ErrorCode == "ResourceGroupNotFound" {
+			log.Printf("Found no resource group %s", resourceGroupName)
+			return nil
+		}
 		return errors.Wrap(err, "failed to delete resource group")
 	}
 	// Stomped return is an armresources.ResourceGroupsClientDeleteResponse which is an empty struct with no values
@@ -127,6 +148,39 @@ func deleteResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 		return err
 	}
 	log.Printf("Deleted resource group %s", resourceGroupName)
+	return nil
+}
+func deleteRoleAssignmentsByPrincipal(client *azureclients.AzureClientWrapper, principalID string, subscriptionID string) error {
+	scope := "/subscriptions/" + subscriptionID
+	listRoleAssignments := client.RoleAssignmentClient.NewListForScopePager(
+		scope,
+		&armauthorization.RoleAssignmentsClientListForScopeOptions{},
+	)
+	for listRoleAssignments.More() {
+		pageResponse, err := listRoleAssignments.NextPage(context.Background())
+		if err != nil {
+			return err
+		}
+		for _, roleAssignment := range pageResponse.RoleAssignmentListResult.Value {
+			if *roleAssignment.Properties.PrincipalID == principalID {
+				roleName := *roleAssignment.Properties.RoleDefinitionID
+				// Attempt to lookup role name, but don't fail if it can't be found.
+				role, err := getRoleDefinitionByID(client, *roleAssignment.Properties.RoleDefinitionID)
+				if err == nil {
+					roleName = *role.Properties.RoleName
+				}
+				err = deleteRoleAssignment(client,
+					*roleAssignment.Properties.PrincipalID,
+					*roleAssignment.Name,
+					roleName,
+					*roleAssignment.Properties.Scope,
+					subscriptionID)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
 	return nil
 }
 
@@ -143,7 +197,12 @@ func deleteRoleAssignmentsByRole(client *azureclients.AzureClientWrapper, roleID
 		}
 		for _, roleAssignment := range pageResponse.RoleAssignmentListResult.Value {
 			if *roleAssignment.Properties.RoleDefinitionID == roleID {
-				err := deleteRoleAssignment(client, *roleAssignment.Properties.PrincipalID, *roleAssignment.Name, roleName, *roleAssignment.Properties.Scope, subscriptionID)
+				err := deleteRoleAssignment(client,
+					*roleAssignment.Properties.PrincipalID,
+					*roleAssignment.Name,
+					roleName,
+					*roleAssignment.Properties.Scope,
+					subscriptionID)
 				if err != nil {
 					return err
 				}
@@ -160,6 +219,14 @@ func deleteStorageAccount(client *azureclients.AzureClientWrapper, resourceGroup
 		storageAccountName,
 		&armstorage.AccountsClientDeleteOptions{})
 	if err != nil {
+		var respErr *azcore.ResponseError
+		if !(errors.As(err, &respErr)) {
+			return err
+		}
+		if respErr.ErrorCode == "ResourceGroupNotFound" {
+			log.Printf("Found no resource group %s. No storage accounts to delete.", resourceGroupName)
+			return nil
+		}
 		return errors.Wrap(err, "failed to delete storage account")
 	}
 	log.Printf("Deleted storage account %s", storageAccountName)
@@ -198,6 +265,16 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
+	// Delete user-assigned managed identities
+	err = deleteManagedIdentities(azureClientWrapper,
+		DeleteOpts.Name,
+		DeleteOpts.OIDCResourceGroupName,
+		DeleteOpts.SubscriptionID,
+		DeleteOpts.Region)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	// Every Azure object created by ccoctl exists within the context of the OIDC resource group so deleting the OIDC resource group
 	// will delete everything within and we can return after the resource group has been deleted
 	if DeleteOpts.DeleteOIDCResourceGroup {
@@ -208,16 +285,6 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 			log.Fatal(err)
 		}
 		return
-	}
-
-	// Delete user-assigned managed identities
-	err = deleteManagedIdentities(azureClientWrapper,
-		DeleteOpts.Name,
-		DeleteOpts.OIDCResourceGroupName,
-		DeleteOpts.SubscriptionID,
-		DeleteOpts.Region)
-	if err != nil {
-		log.Fatal(err)
 	}
 
 	// Delete storage account

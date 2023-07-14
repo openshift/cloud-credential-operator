@@ -415,7 +415,7 @@ func deleteRoleAssignment(client *azureclients.AzureClientWrapper, managedIdenti
 	if err != nil {
 		return err
 	}
-	log.Printf("Deleted role assignment for role %s with user-assigned managed identity with principal ID %s at scope %s", roleName, managedIdentityPrincipalID, scope)
+	log.Printf("Deleted role assignment for role %s with user-assigned managed identity principal ID %s at scope %s", roleName, managedIdentityPrincipalID, scope)
 	return nil
 }
 
