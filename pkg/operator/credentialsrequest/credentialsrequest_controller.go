@@ -711,6 +711,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 
 				logger.Errorf("errored with condition: %v", t.Reason())
 				r.updateActuatorConditions(cr, t.Reason(), syncErr)
+				// Update the status of the CredentialsRequest object
+				err := r.Client.Status().Update(ctx, cr)
+				if err != nil {
+					logger.Errorf("failed to update credentialsrequest status: %v", err)
+				}
 			default:
 				logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
 				return reconcile.Result{}, syncErr
