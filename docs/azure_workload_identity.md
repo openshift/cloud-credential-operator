@@ -81,7 +81,7 @@ type: Opaque
    * Create an Azure StorageAccount, Azure Blob Container and upload OIDC configuration to the Blob Container.
    * Create User-Assigned Managed Identities for each Azure CredentialsRequest.
 
-   Manifest files needed for cluster installation are output to the `output_dir` directory.
+   Manifest files needed for cluster installation are output to the `ccoctl_output_dir` directory.
 
    ```
    ./ccoctl azure create-all --name <azure_infra_name> \
