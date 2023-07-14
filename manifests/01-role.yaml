@@ -14,17 +14,9 @@ rules:
   - events
   - serviceaccounts
   - services
+  - configmaps
   verbs:
   - "*"
-- apiGroups:
-    - ""
-  resources:
-    - configmaps
-  resourceNames:
-    - cloud-credential-operator-config
-    - cloud-credential-operator-leader
-  verbs:
-    - "*"
 - apiGroups:
   - apps
   resources:
