@@ -836,28 +836,28 @@ func (r *ReconcileCredentialsRequest) CreateOrUpdateOnCredsExist(ctx context.Con
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
-	// Clear all existing conditions first
-	clearAllConditions(cr)
 
-	switch reason {
-	case minterv1.CredentialsProvisionFailure:
+	if reason == minterv1.CredentialsProvisionFailure {
 		setFailedToProvisionCredentialsRequest(cr, true, conditionError)
-	case minterv1.InsufficientCloudCredentials:
+	} else {
+		// If this is not our error, ensure the condition is cleared.
+		setFailedToProvisionCredentialsRequest(cr, false, nil)
+	}
+
+	if reason == minterv1.InsufficientCloudCredentials {
 		setInsufficientCredsCondition(cr, true)
-	case minterv1.OrphanedCloudResource:
+	} else {
+		// If this is not our error, ensure the condition is cleared.
+		setInsufficientCredsCondition(cr, false)
+	}
+
+	if reason == minterv1.OrphanedCloudResource {
 		setOrphanedCloudResourceCondition(cr, true, conditionError)
-	default:
-		// If the reason is not one of the handled cases, ensure all conditions are cleared.
-		clearAllConditions(cr)
+	} else {
+		setOrphanedCloudResourceCondition(cr, false, conditionError)
 	}
 
 	return
-}
-
-func clearAllConditions(cr *minterv1.CredentialsRequest) {
-	setFailedToProvisionCredentialsRequest(cr, false, nil)
-	setInsufficientCredsCondition(cr, false)
-	setOrphanedCloudResourceCondition(cr, false, nil)
 }
 
 func setMissingTargetNamespaceCondition(cr *minterv1.CredentialsRequest, missing bool) {
