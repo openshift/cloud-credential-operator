@@ -68,6 +68,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		CreateAllOpts.StorageAccountName,
 		CreateAllOpts.BlobContainerName,
 		CreateAllOpts.SubscriptionID,
+		CreateAllOpts.TenantID,
 		publicKeyPath,
 		CreateAllOpts.OutputDir,
 		CreateAllOpts.UserTags,
@@ -136,7 +137,7 @@ func initEnvForCreateAllCmd(cmd *cobra.Command, args []string) {
 // NewCreateAllCmd combines create-identity-provider and create-managed-identities commands
 func NewCreateAllCmd() *cobra.Command {
 	createAllCmd := &cobra.Command{
-		Use:              "create-all --name NAME --region REGION --subscription-id SUBSCRIPTION_ID --credentials-requests-dir CRED_REQ_DIR --dnszone-resource-group-name DNSZONE_RESOURCE_GROUP_NAME",
+		Use:              "create-all --name NAME --region REGION --subscription-id SUBSCRIPTION_ID --tenant-id TENANT_ID \\ \n\t--credentials-requests-dir CRED_REQ_DIR --dnszone-resource-group-name DNSZONE_RESOURCE_GROUP_NAME",
 		Short:            "Create OIDC issuer and managed identities",
 		Run:              createAllCmd,
 		PersistentPreRun: initEnvForCreateAllCmd,
@@ -155,6 +156,8 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("region")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.SubscriptionID, "subscription-id", "", "Azure Subscription ID within which to create identity provider infrastructure")
 	createAllCmd.MarkPersistentFlagRequired("subscription-id")
+	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TenantID, "tenant-id", "", "Azure Tenant ID in which identity provider infrastructure will be created")
+	createAllCmd.MarkPersistentFlagRequired("tenant-id")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing Azure CredentialsRequests files used to create user-assigned managed identities (can be created by running 'oc adm release extract --credentials-requests --cloud=azure' against an OpenShift release image)")
 	createAllCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.DNSZoneResourceGroupName, "dnszone-resource-group-name", "", "The existing Azure resource group which contains the DNS zone that will be used for the cluster's base domain. The cluster ingress operator will be scoped to allow management of DNS records in the DNS Zone resource group.")
