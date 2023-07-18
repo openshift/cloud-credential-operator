@@ -43,6 +43,16 @@ rules:
   - list
   - watch
 - apiGroups:
+    - ""
+  resources:
+    - configmaps
+  resourceNames:
+    - cloud-credential-operator-config
+  verbs:
+    - get
+    - list
+    - watch
+- apiGroups:
   - config.openshift.io
   resources:
   - clusterversions
