@@ -25,6 +25,7 @@ import (
 
 	azureclients "github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
 var (
@@ -58,6 +59,21 @@ var (
 
 	// ownedAzureResourceTagValue is the value of the tag applied to the Azure resources created by ccoctl
 	ownedAzureResourceTagValue = "owned"
+
+	podIdentityWebhookConfigSecretTemplate = `apiVersion: v1
+stringData:
+  azure_tenant_id: %s
+kind: Secret
+metadata:
+  name: %s
+  namespace: %s
+type: Opaque`
+
+	podIdentityWebhookConfigSecretName = "azure-credentials"
+
+	podIdentityWebhookConfigSecretManifestFilename = "azure-ad-pod-identity-webhook-config.yaml"
+
+	podIdentityWebhookConfigSecretNamespace = constants.CCONameSpace
 )
 
 // ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription.
@@ -370,12 +386,25 @@ func uploadOIDCDocuments(client *azureclients.AzureClientWrapper, storageAccount
 	return blobContainerURL, nil
 }
 
+func createPodIdentityWebhookConfigSecret(tenantID, outputDir string) error {
+	manifestsDir := filepath.Join(outputDir, provisioning.ManifestsDirName)
+	filePath := filepath.Join(manifestsDir, podIdentityWebhookConfigSecretManifestFilename)
+	fileData := fmt.Sprintf(podIdentityWebhookConfigSecretTemplate, tenantID, podIdentityWebhookConfigSecretName, podIdentityWebhookConfigSecretNamespace)
+
+	if err := os.WriteFile(filePath, []byte(fileData), 0600); err != nil {
+		return errors.Wrapf(err, "failed to save secret file at path %s", filePath)
+	}
+	log.Printf("Saved Azure AD pod identity webhook configuration to: %s", filePath)
+
+	return nil
+}
+
 // createOIDCIssuer creates infrastructure necessary for Azure Workload Identity including,
 // * resource group in which to create storage account & identities
 // * scoping resource group which will remain empty and is used to scope identity role assignment, this resource group is for installation
 // * storage account
 // * blob container which hosts OIDC documents
-func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oidcResourceGroupName, storageAccountName, blobContainerName, subscriptionID, publicKeyPath, outputDir string, resourceTags map[string]string, dryRun bool) (string, error) {
+func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oidcResourceGroupName, storageAccountName, blobContainerName, subscriptionID, tenantID, publicKeyPath, outputDir string, resourceTags map[string]string, dryRun bool) (string, error) {
 	// Add CCO's "owned" tag to resource tags map
 	resourceTags[fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, name)] = ownedAzureResourceTagValue
 
@@ -427,11 +456,21 @@ func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oid
 		return "", errors.Wrap(err, "failed to create cluster authentication manifest")
 	}
 
+	// Write Azure AD pod identity webhook config secret azure-ad-pod-identity-webhook-config.yaml
+	// within outputDir/manifests
+	if err = createPodIdentityWebhookConfigSecret(tenantID, outputDir); err != nil {
+		return "", errors.Wrap(err, "failed to create Azure AD pod identity webhook manifest")
+	}
+
 	return issuerURL, nil
 }
 
 func createOIDCIssuerCmd(cmd *cobra.Command, args []string) {
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	cred, err := azidentity.NewDefaultAzureCredential(
+		&azidentity.DefaultAzureCredentialOptions{
+			TenantID: CreateOIDCIssuerOpts.TenantID,
+		},
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -466,6 +505,7 @@ func createOIDCIssuerCmd(cmd *cobra.Command, args []string) {
 		CreateOIDCIssuerOpts.StorageAccountName,
 		CreateOIDCIssuerOpts.BlobContainerName,
 		CreateOIDCIssuerOpts.SubscriptionID,
+		CreateOIDCIssuerOpts.TenantID,
 		CreateOIDCIssuerOpts.PublicKeyPath,
 		CreateOIDCIssuerOpts.OutputDir,
 		CreateOIDCIssuerOpts.UserTags,
@@ -535,6 +575,8 @@ func NewCreateOIDCIssuerCmd() *cobra.Command {
 	createOIDCIssuerCmd.MarkPersistentFlagRequired("region")
 	createOIDCIssuerCmd.PersistentFlags().StringVar(&CreateOIDCIssuerOpts.SubscriptionID, "subscription-id", "", "Azure Subscription ID within which to create identity provider infrastructure")
 	createOIDCIssuerCmd.MarkPersistentFlagRequired("subscription-id")
+	createOIDCIssuerCmd.PersistentFlags().StringVar(&CreateOIDCIssuerOpts.TenantID, "tenant-id", "", "Azure Tenant ID within which to create identity provider infrastructure")
+	createOIDCIssuerCmd.MarkPersistentFlagRequired("tenant-id")
 	createOIDCIssuerCmd.PersistentFlags().StringVar(&CreateOIDCIssuerOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 	createOIDCIssuerCmd.MarkPersistentFlagRequired("public-key-file")
 

@@ -638,7 +638,11 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 }
 
 func createManagedIdentitiesCmd(cmd *cobra.Command, args []string) {
-	cred, err := azidentity.NewDefaultAzureCredential(nil)
+	cred, err := azidentity.NewDefaultAzureCredential(
+		&azidentity.DefaultAzureCredentialOptions{
+			TenantID: CreateManagedIdentitiesOpts.TenantID,
+		},
+	)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -744,6 +748,8 @@ func NewCreateManagedIdentitiesCmd() *cobra.Command {
 	)
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.SubscriptionID, "subscription-id", "", "Azure Subscription ID within which to create and scope the access of managed identities")
 	createManagedIdentitiesCmd.MarkPersistentFlagRequired("subscription-id")
+	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.TenantID, "tenant-id", "", "Azure Tenant ID within which to create identity provider infrastructure")
+	createManagedIdentitiesCmd.MarkPersistentFlagRequired("tenant-id")
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.IssuerURL, "issuer-url", "", "OIDC Issuer URL (the OIDC Issuer can be created with the 'create-oidc-issuer' sub-command)")
 	createManagedIdentitiesCmd.MarkPersistentFlagRequired("issuer-url")
 
