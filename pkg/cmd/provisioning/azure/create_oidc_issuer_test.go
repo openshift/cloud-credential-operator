@@ -26,6 +26,7 @@ var (
 	testInfraName      = "testinfraname"
 	testRegionName     = "testregion"
 	testSubscriptionID = "123456789"
+	testTenantID       = "987654321"
 	testUserTags       = map[string]string{
 		"testtagname0": "testtagvalue0",
 		"testtagname1": "testtagvalue1",
@@ -136,6 +137,7 @@ func TestCreateOIDCIssuer(t *testing.T) {
 				testStorageAccountName,
 				testBlobContainerName,
 				testSubscriptionID,
+				testTenantID,
 				testPublicKeyPath,
 				tempDirName,
 				testUserTags,
