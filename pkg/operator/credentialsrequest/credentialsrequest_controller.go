@@ -711,6 +711,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 
 				logger.Errorf("errored with condition: %v", t.Reason())
 				r.updateActuatorConditions(cr, t.Reason(), syncErr)
+				// Update the status of the CredentialsRequest object
+				err := r.Client.Status().Update(ctx, cr)
+				if err != nil {
+					logger.Errorf("failed to update credentialsrequest status: %v", err)
+				}
 			default:
 				logger.Errorf("unexpected error while syncing credentialsrequest: %v", syncErr)
 				return reconcile.Result{}, syncErr
@@ -1063,6 +1068,9 @@ func (r *ReconcileCredentialsRequest) UpdateProvisionedStatus(cr *minterv1.Crede
 	} else {
 		// Update the Provisioned field with the given parameter
 		cr.Status.Provisioned = provisioned
+
+		// Update the LastSyncTimestamp to the current time
+		cr.Status.LastSyncTimestamp = &metav1.Time{Time: time.Now()}
 	}
 
 	// Use retry.RetryOnConflict() to update the status subresource
