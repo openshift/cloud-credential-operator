@@ -186,13 +186,13 @@ func NewOperator() *cobra.Command {
 					Cache: cache.Options{
 						ByObject: objectSelectors,
 					},
+					PprofBindAddress: ":6060",
 				})
 				if err != nil {
 					log.WithError(err).Fatal("unable to set up overall controller manager")
 				}
 
 				rootMgr, err := manager.New(cfg, manager.Options{
-					MetricsBindAddress: ":2113",
 					Cache: cache.Options{
 						ByObject: map[client.Object]cache.ByObject{
 							&corev1.Secret{}: {

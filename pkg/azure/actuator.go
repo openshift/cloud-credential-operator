@@ -46,7 +46,6 @@ var _ actuatoriface.Actuator = (*Actuator)(nil)
 // Actuator implements the CredentialsRequest Actuator interface to create credentials for Azure.
 type Actuator struct {
 	client                  *clientWrapper
-	codec                   *minterv1.ProviderCodec
 	credentialMinterBuilder credentialMinterBuilder
 }
 
@@ -55,28 +54,20 @@ func (a *Actuator) STSFeatureGateEnabled() bool {
 }
 
 func NewActuator(c, rootCredClient client.Client, cloudName configv1.AzureCloudEnvironment) (*Actuator, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		log.WithError(err).Error("error creating Azure codec")
-		return nil, fmt.Errorf("error creating Azure codec: %v", err)
-	}
-
 	client := newClientWrapper(c, rootCredClient)
 	return &Actuator{
 		client: client,
-		codec:  codec,
 		credentialMinterBuilder: func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
 			return NewAzureCredentialsMinter(logger, clientID, clientSecret, cloudName, tenantID, subscriptionID)
 		},
 	}, nil
 }
 
-func NewFakeActuator(c, rootCredClient client.Client, codec *minterv1.ProviderCodec,
+func NewFakeActuator(c, rootCredClient client.Client,
 	credentialMinterBuilder credentialMinterBuilder,
 ) *Actuator {
 	return &Actuator{
 		client:                  newClientWrapper(c, rootCredClient),
-		codec:                   codec,
 		credentialMinterBuilder: credentialMinterBuilder,
 	}
 }
@@ -96,12 +87,9 @@ func (a *Actuator) IsValidMode() error {
 }
 
 func isAzureCredentials(providerSpec *runtime.RawExtension) (bool, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		return false, err
-	}
+	var err error
 	unknown := runtime.Unknown{}
-	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	err = minterv1.Codec.DecodeProviderSpec(providerSpec, &unknown)
 	if err != nil {
 		return false, err
 	}
@@ -152,7 +140,7 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 
 	// If we still have lingering App Registration info, we should try to clean it up if possible
-	azureStatus, err := decodeProviderStatus(a.codec, cr)
+	azureStatus, err := decodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return true, err
 	}
@@ -189,7 +177,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return err
 	}
 
-	azureStatus, err := decodeProviderStatus(a.codec, cr)
+	azureStatus, err := decodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -308,7 +296,7 @@ func decodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 
 func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, azureStatus *minterv1.AzureProviderStatus) error {
 	var err error
-	cr.Status.ProviderStatus, err = a.codec.EncodeProviderStatus(azureStatus)
+	cr.Status.ProviderStatus, err = minterv1.Codec.EncodeProviderStatus(azureStatus)
 	if err != nil {
 		logger.WithError(err).Error("error encoding provider status")
 		return err
@@ -343,7 +331,7 @@ func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.Credentials
 }
 
 func (a *Actuator) cleanupAfterPassthroughPivot(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
-	azureStatus, err := decodeProviderStatus(a.codec, cr)
+	azureStatus, err := decodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}

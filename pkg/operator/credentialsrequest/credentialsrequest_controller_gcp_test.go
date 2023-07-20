@@ -92,13 +92,6 @@ func init() {
 func TestCredentialsRequestGCPReconcile(t *testing.T) {
 	schemeutils.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		fmt.Printf("error creating codec: %v", err)
-		t.FailNow()
-		return
-	}
-
 	tests := []struct {
 		name              string
 		existing          []runtime.Object
@@ -580,7 +573,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				// already minted, last synced 2 hours ago
 				func() *minterv1.CredentialsRequest {
 					cr := testGCPCredentialsRequestWithPermissions(t)
-					gcpStatus, err := codec.EncodeProviderStatus(
+					gcpStatus, err := minterv1.Codec.EncodeProviderStatus(
 						&minterv1.GCPProviderStatus{
 							TypeMeta: metav1.TypeMeta{
 								Kind: "GCPProviderSpec",
@@ -941,7 +934,6 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				Actuator: &actuator.Actuator{
 					Client:         fakeClient,
 					RootCredClient: fakeAdminClient,
-					Codec:          codec,
 					GCPClientBuilder: func(name string, jsonAUTH []byte) (mintergcp.Client, error) {
 						if string(jsonAUTH) == testRootGCPAuth {
 							return mockRootGCPClient, nil
@@ -1001,14 +993,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 func testGCPCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testGCPPassthroughCredentialsRequest(t)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-
-	gcpStatus, err := codec.EncodeProviderStatus(
+	gcpStatus, err := minterv1.Codec.EncodeProviderStatus(
 		&minterv1.GCPProviderStatus{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
@@ -1043,14 +1028,7 @@ func testGCPCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.Cred
 func testGCPCredentialsRequestWithPermissionsWithDeletionTimestamp(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testGCPCredentialsRequestWithPermissions(t)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-
-	gcpStatus, err := codec.EncodeProviderStatus(
+	gcpStatus, err := minterv1.Codec.EncodeProviderStatus(
 		&minterv1.GCPProviderStatus{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
@@ -1073,13 +1051,7 @@ func testGCPCredentialsRequestWithPermissionsWithDeletionTimestamp(t *testing.T)
 }
 
 func testGCPPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-	gcpProvSpec, err := codec.EncodeProviderSpec(
+	gcpProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
@@ -1134,13 +1106,7 @@ func testGCPCredsSecret(namespace, name, jsonAUTH string) *corev1.Secret {
 }
 
 func testGCPCredentialsRequestWithPermissions(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-	gcpProvSpec, err := codec.EncodeProviderSpec(
+	gcpProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",

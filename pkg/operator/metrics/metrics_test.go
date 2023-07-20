@@ -22,8 +22,6 @@ import (
 )
 
 var (
-	codec *credreqv1.ProviderCodec
-
 	missingTargetNamespaceCond = credreqv1.CredentialsRequestCondition{
 		Type:   credreqv1.MissingTargetNamespace,
 		Status: corev1.ConditionTrue,
@@ -51,12 +49,6 @@ var (
 )
 
 func TestSecretGetter(t *testing.T) {
-	var err error
-	codec, err = credreqv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to create codec: %v", err)
-	}
-
 	configv1.AddToScheme(scheme.Scheme)
 
 	logger := log.WithField("controller", "metricscontrollertest")
@@ -135,12 +127,6 @@ func TestSecretGetter(t *testing.T) {
 }
 
 func TestCredentialsRequests(t *testing.T) {
-	var err error
-	codec, err = credreqv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to create codec: %v", err)
-	}
-
 	credreqv1.AddToScheme(scheme.Scheme)
 	configv1.AddToScheme(scheme.Scheme)
 
@@ -381,7 +367,7 @@ func testAWSCredRequest(name string) credreqv1.CredentialsRequest {
 		Spec: credreqv1.CredentialsRequestSpec{},
 	}
 
-	awsProviderSpec, err := codec.EncodeProviderSpec(
+	awsProviderSpec, err := credreqv1.Codec.EncodeProviderSpec(
 		&credreqv1.AWSProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AWSProviderSpec",
@@ -396,7 +382,7 @@ func testAWSCredRequest(name string) credreqv1.CredentialsRequest {
 }
 
 func testGCPCredRequest(name string) credreqv1.CredentialsRequest {
-	gcpProviderSpec, err := codec.EncodeProviderSpec(
+	gcpProviderSpec, err := credreqv1.Codec.EncodeProviderSpec(
 		&credreqv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",

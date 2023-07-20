@@ -18,7 +18,6 @@ package credentialsrequest
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -58,13 +57,6 @@ func init() {
 
 func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 	schemeutils.SetupScheme(scheme.Scheme)
-
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		fmt.Printf("error creating codec: %v", err)
-		t.FailNow()
-		return
-	}
 
 	tests := []struct {
 		name          string
@@ -202,7 +194,6 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				Actuator: &actuator.VSphereActuator{
 					Client:         fakeClient,
 					RootCredClient: fakeAdminClient,
-					Codec:          codec,
 				},
 				platformType: configv1.VSpherePlatformType,
 			}
@@ -260,14 +251,7 @@ func testVSphereCredentialsRequestWithDeletionTimestamp(t *testing.T) *minterv1.
 }
 
 func testVSphereCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-
-	vsphereProvSpec, err := codec.EncodeProviderSpec(
+	vsphereProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.VSphereProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "VSphereProviderSpec",

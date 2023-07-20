@@ -146,12 +146,8 @@ func GetAuth(ctx context.Context, c client.Client) (*configv1.Authentication, er
 // GetCredentialsRequestCloudType decodes a Spec.ProviderSpec and returns the kind
 // field.
 func GetCredentialsRequestCloudType(providerSpec *runtime.RawExtension) (string, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		return "", err
-	}
 	unknown := runtime.Unknown{}
-	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	err := minterv1.Codec.DecodeProviderSpec(providerSpec, &unknown)
 	if err != nil {
 		return "", err
 	}
