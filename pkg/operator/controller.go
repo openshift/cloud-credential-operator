@@ -32,6 +32,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	"github.com/openshift/cloud-credential-operator/pkg/ovirt"
 	"github.com/openshift/cloud-credential-operator/pkg/util"
 	vsphereactuator "github.com/openshift/cloud-credential-operator/pkg/vsphere/actuator"
@@ -85,7 +86,7 @@ func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClien
 		switch platformType {
 		case configv1.AWSPlatformType:
 			log.Info("initializing AWS actuator")
-			a, err = awsactuator.NewAWSActuator(m.GetClient(), rootM.GetClient(), m.GetScheme(), awsSecurityTokenServiceGateEnabled)
+			a, err = awsactuator.NewAWSActuator(m.GetClient(), rootM.GetClient(), utils.LiveClient(m), m.GetScheme(), awsSecurityTokenServiceGateEnabled)
 			if err != nil {
 				return err
 			}

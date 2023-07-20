@@ -42,7 +42,6 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
 	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -163,29 +162,29 @@ func NewOperator() *cobra.Command {
 					filteredWatchPossible = true
 				}
 
+				objectSelectors := map[client.Object]cache.ByObject{
+					&corev1.ConfigMap{}: {
+						Field: fields.SelectorFromSet(fields.Set{
+							"metadata.namespace": minterv1.CloudCredOperatorNamespace,
+							"metadata.name":      constants.CloudCredOperatorConfigMap,
+						}),
+					},
+				}
+				if filteredWatchPossible {
+					log.Infof("adding label selector %s=%s to cache options for Secrets", minterv1.LabelCredentialsRequest, minterv1.LabelCredentialsRequestValue)
+					objectSelectors[&corev1.Secret{}] = cache.ByObject{
+						Label: labels.SelectorFromSet(labels.Set{
+							minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+						}),
+					}
+				}
+
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up managers")
 				mgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: ":2112",
-					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-						if opts.ByObject == nil {
-							opts.ByObject = map[client.Object]cache.ByObject{}
-						}
-						opts.ByObject[&corev1.ConfigMap{}] = cache.ByObject{
-							Field: fields.SelectorFromSet(fields.Set{
-								"metadata.namespace": minterv1.CloudCredOperatorNamespace,
-								"metadata.name":      constants.CloudCredOperatorConfigMap,
-							}),
-						}
-						if filteredWatchPossible {
-							log.Infof("adding label selector %s=%s to cache options for Secrets", minterv1.LabelCredentialsRequest, minterv1.LabelCredentialsRequestValue)
-							opts.ByObject[&corev1.Secret{}] = cache.ByObject{
-								Label: labels.SelectorFromSet(labels.Set{
-									minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
-								}),
-							}
-						}
-						return cache.New(config, opts)
+					Cache: cache.Options{
+						ByObject: objectSelectors,
 					},
 				})
 				if err != nil {
@@ -194,14 +193,12 @@ func NewOperator() *cobra.Command {
 
 				rootMgr, err := manager.New(cfg, manager.Options{
 					MetricsBindAddress: ":2113",
-					NewCache: func(config *rest.Config, opts cache.Options) (cache.Cache, error) {
-						if opts.ByObject == nil {
-							opts.ByObject = map[client.Object]cache.ByObject{}
-						}
-						opts.ByObject[&corev1.Secret{}] = cache.ByObject{
-							Field: selectorForRootCredential(platformType),
-						}
-						return cache.New(config, opts)
+					Cache: cache.Options{
+						ByObject: map[client.Object]cache.ByObject{
+							&corev1.Secret{}: {
+								Field: selectorForRootCredential(platformType),
+							},
+						},
 					},
 				})
 				if err != nil {
