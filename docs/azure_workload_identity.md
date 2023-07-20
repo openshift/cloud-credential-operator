@@ -69,7 +69,7 @@ type: Opaque
    ```
    oc adm release extract --command=openshift-install $RELEASE_IMAGE --registry-config ~/.pull-secret
 
-   CCO_IMAGE=$(oc adm release info --image-for='cloud-credential-operator' ${RELEASE_IMAGE}) && oc image extract ${CCO_IMAGE} --file='/usr/bin/ccoctl' --registry-config ~/.pull-secret && chmod +x ccoctl
+   oc adm release extract --command=ccoctl $RELEASE_IMAGE --registry-config ~/.pull-secret
    ```
 
 5. Create Azure resources using the [ccoctl](./ccoctl.md) tool. You will need Azure credentials with sufficient permissions. The Azure credentials can be automatically detected after having logged into the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) `az login` or may be provided as environment variables (`AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID`).
