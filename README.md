@@ -231,13 +231,14 @@ Cons:
   
 Read more about supported clouds by clicking on the links below: 
   * [AWS](./docs/sts.md)
+  * [Azure](./docs/azure_workload_identity.md)
   * [GCP](./docs/gcp_workload_identity.md)
 
 ## Support Matrix
 Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
 --- | --- | --- | --- | --- | ---
 AWS | Y | 4.4+ | Y | 4.3+ | 4.8+
-Azure | N<sup>1</sup> | N | Y | Y | N
+Azure | N<sup>1</sup> | N | Y | Y | 4.14+
 GCP | Y | 4.7+ | Y | Y | 4.10+
 IBMCloud | N | N | N | Y | N
 KubeVirt | N | N | Y | N | N

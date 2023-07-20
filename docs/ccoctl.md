@@ -9,16 +9,23 @@ The `ccoctl` tool provides various commands to assist with the creating and main
   - [Creating IAM Roles](#creating-iam-roles)
   - [Creating all the required resources together](#creating-all-the-required-resources-together)
   - [Deleting resources](#deleting-resources)
-- [GCP](#gcp)
+- [Azure](#azure)
   - [Global flags](#global-flags-1)
   - [Creating RSA keys](#creating-rsa-keys-1)
+  - [Creating OpenID Connect Issuer](#creating-openid-connect-issuer)
+  - [Creating Managed Identities](#creating-managed-identities)
+  - [Creating all the required resources together](#creating-all-the-required-resources-together-1)
+  - [Deleting resources](#deleting-resources-1)
+- [GCP](#gcp)
+  - [Global flags](#global-flags-2)
+  - [Creating RSA keys](#creating-rsa-keys-2)
   - [Creating Workload Identity Pool](#creating-workload-identity-pool)
   - [Creating Workload Identity Provider](#creating-workload-identity-provider)
   - [Creating IAM Service Accounts](#creating-iam-service-accounts)
-  - [Creating all the required resources together](#creating-all-the-required-resources-together-1)
-  - [Deleting resources](#deleting-resources-1)
+  - [Creating all the required resources together](#creating-all-the-required-resources-together-2)
+  - [Deleting resources](#deleting-resources-2)
 - [IBMCloud](#ibmcloud)
-  - [Global flags](#global-flags-2)
+  - [Global flags](#global-flags-3)
   - [Extract the Credentials Request objects from the above release image](#extract-the-credentials-request-objects-from-the-above-release-image)
     - [IBM Cloud](#ibm-cloud)
     - [IBM Cloud Power VS](#ibm-cloud-power-vs)
@@ -95,7 +102,7 @@ Then you can use `ccoctl` to process all CredentialsRequest objects in the `./cr
 $ ccoctl aws create-all --name=<name> --region=<aws-region> --credentials-requests-dir=<path-to-directory-with-list-of-credentials-requests> --create-private-s3-bucket
 ```
 
-### Deleting resources<a name="aws-delete"></a>
+### Deleting resources
 
 
 To delete resources created by ccoctl, run
@@ -105,6 +112,89 @@ $ ccoctl aws delete --name=<name> --region=<aws-region>
 ```
 
 where `name` is the name used to tag and account any cloud resources that were created, and `region` is the aws region in which cloud resources were created.
+
+## Azure
+
+### Global flags
+
+By default, the tool will output to the directory the command(s) were run in. To specify a directory, use the `--output-dir` flag.
+
+Commands which would otherwise make Azure API calls can be passed the `--dry-run` flag to display defaulted arguments and to have `ccoctl` place the OpenID and cluster authentication configuration in the output dir.
+
+Azure resources that allow tagging can be tagged with provided user tags by specifying `--user-tags exampletag1=examplevalue1,exampletag2=examplevalue2`.
+
+### Creating RSA keys
+
+To generate keys for use when setting up the cluster's OpenID Connect provider, run
+
+```bash
+$ ccoctl azure create-key-pair
+```
+
+### Creating OpenID Connect Issuer
+
+To set up an OIDC Issuer in Azure, the following command will create an Azure ResourceGroup, StorageAccount, and Blob Container which will contain OpenID configuration as well as the provided public key.
+
+```bash
+$ ccoctl azure create-oidc-issuer --name <azure_infra_name> \
+                                    --output-dir <output_dir> \
+                                    --region <azure_region> \
+                                    --subscription-id <azure_subscription_id> \
+                                    --public-key-file /path/to/rsa/keypair/serviceaccount-signer.public \
+```
+
+Note that `create-oidc-issuer` outputs an Issuer URL which is needed when creating managed identities.
+
+### Creating Managed Identities
+
+To create User-Assigned Managed Identities for each in-cluster component, you need to first extract the list of CredentialsRequest objects from the OpenShift release image.
+
+```bash
+$ oc adm release extract --credentials-requests --cloud=azure --to=./credrequests quay.io/path/to/openshift-release:version
+```
+
+Then you can use `ccoctl` to process each CredentialsRequest object in the `./credrequests` directory (from the example above).
+
+This command will create an empty Azure ResourceGroup to serve as the installation resource group with which to scope permissions granted to the created identities. This ResourceGroup must be configured as the cluster installation group in `install-config.yaml` and the OpenShift installer requires that this resource group be previously empty. The Azure ResoureGroup containing the cluster DNS Zone must also be known for scoping and provided as `--dnszone-resource-group-name`.
+
+```bash
+$ ccoctl azure create-managed-identities --name <azure_infra_name> \
+                                         --output-dir <output_dir> \
+                                         --region <azure_region> \
+                                         --subscription-id <azure_subscription_id> \
+                                         --credentials-requests-dir ./credrequests \
+                                         --issuer-url <issuer url generated when creating the oidc issuer> \
+                                         --dnszone-resource-group-name <azure resource group containing the dns zone of the cluster>
+```
+
+### Creating all the required resources together
+
+To create all the above mentioned resources in one go, run
+
+```bash
+$ oc adm release extract --credentials-requests --cloud=azure --to=./credrequests quay.io/path/to/openshift-release:version
+```
+
+Then you can use `ccoctl` to process all CredentialsRequest objects in the `./credrequests` directory (from the example above).
+
+This command will create an empty Azure ResourceGroup to serve as the installation resource group with which to scope permissions granted to the created identities. This ResourceGroup must be configured as the cluster installation group in `install-config.yaml` and the OpenShift installer requires that this resource group be previously empty. The Azure ResoureGroup containing the cluster DNS Zone must also be known for scoping and provided as `--dnszone-resource-group-name`.
+
+```bash
+$ ccoctl azure create-all --name <azure_infra_name> \
+                          --output-dir <output_dir> \
+                          --region <azure_region> \
+                          --subscription-id <azure_subscription_id> \
+                          --credentials-requests-dir ./credrequests \
+                          --dnszone-resource-group-name <azure resource group containing the dns zone of the cluster>
+```
+
+### Deleting resources
+
+To delete resources created by ccoctl, run
+
+```bash
+$ ccoctl azure delete --name <azure_infra_name> --region <azure_region> --subscription-id <azure_subscription_id> --delete-oidc-resource-group
+```
 
 ## GCP
 
