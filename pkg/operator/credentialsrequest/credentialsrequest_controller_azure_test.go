@@ -78,13 +78,6 @@ func init() {
 func TestCredentialsRequestAzureReconcile(t *testing.T) {
 	schemeutils.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		fmt.Printf("error creating codec: %v", err)
-		t.FailNow()
-		return
-	}
-
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
@@ -215,7 +208,6 @@ func TestCredentialsRequestAzureReconcile(t *testing.T) {
 			azureActuator := azureactuator.NewFakeActuator(
 				fakeClient,
 				fakeAdminClient,
-				codec,
 				func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*azureactuator.AzureCredentialsMinter, error) {
 					return azureactuator.NewFakeAzureCredentialsMinter(logger,
 						clientID,
@@ -289,14 +281,7 @@ func testAzureCredentialsRequestWithOrphanedCloudResource(t *testing.T) *minterv
 }
 func testAzureCredentialsRequestNeedingCleanup(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testAzureCredentialsRequest(t)
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-
-	azureProviderStatus, err := codec.EncodeProviderStatus(
+	azureProviderStatus, err := minterv1.Codec.EncodeProviderStatus(
 		&minterv1.AzureProviderStatus{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AzureProviderStatus",
@@ -319,14 +304,7 @@ func testAzureCredentialsRequestNeedingCleanup(t *testing.T) *minterv1.Credentia
 }
 
 func testAzureCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-
-	azureProviderSpec, err := codec.EncodeProviderSpec(
+	azureProviderSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.AzureProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AzureProviderSpec",

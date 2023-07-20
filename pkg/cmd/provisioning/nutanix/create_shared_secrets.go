@@ -173,13 +173,8 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir string, cred
 
 func processCredReq(cr *credreqv1.CredentialsRequest, targetDir string, creds *kubernetes.NutanixCredentials) error {
 	// Decode NutanixProviderSpec
-	codec, err := credreqv1.NewCodec()
-	if err != nil {
-		return errors.Wrap(err, "Failed to create credReq codec")
-	}
-
 	nutanixProviderSpec := credreqv1.NutanixProviderSpec{}
-	if err := codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &nutanixProviderSpec); err != nil {
+	if err := credreqv1.Codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &nutanixProviderSpec); err != nil {
 		return errors.Wrap(err, "Failed to decode the provider spec")
 	}
 

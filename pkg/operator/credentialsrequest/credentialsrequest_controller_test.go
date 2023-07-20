@@ -99,13 +99,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		return nil
 	}
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		fmt.Printf("error creating codec: %v", err)
-		t.FailNow()
-		return
-	}
-
 	tests := []struct {
 		name                string
 		existing            []runtime.Object
@@ -1220,7 +1213,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequest(t)
-					awsProvSpec, err := codec.EncodeProviderSpec(
+					awsProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 						&minterv1.AWSProviderSpec{
 							TypeMeta: metav1.TypeMeta{
 								Kind: "AWSProviderSpec",
@@ -1288,7 +1281,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				testOperatorConfig(""),
 				func() *minterv1.CredentialsRequest {
 					cr := testCredentialsRequest(t)
-					awsProvSpec, err := codec.EncodeProviderSpec(
+					awsProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 						&minterv1.AWSProviderSpec{
 							TypeMeta: metav1.TypeMeta{
 								Kind: "AWSProviderSpec",
@@ -1314,7 +1307,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 
 					cr.Spec.ProviderSpec = awsProvSpec
 
-					awsStatus, err := codec.EncodeProviderStatus(
+					awsStatus, err := minterv1.Codec.EncodeProviderStatus(
 						&minterv1.AWSProviderStatus{
 							User:   testAWSUser,
 							Policy: testAWSUser + "-policy",
@@ -1456,7 +1449,6 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				Actuator: &actuator.AWSActuator{
 					Client:         fakeClient,
 					RootCredClient: fakeAdminClient,
-					Codec:          codec,
 					Scheme:         scheme.Scheme,
 					AWSClientBuilder: func(accessKeyID, secretAccessKey []byte, c client.Client) (minteraws.Client, error) {
 						if string(accessKeyID) == testRootAWSAccessKeyID {
@@ -1471,7 +1463,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				platformType: configv1.AWSPlatformType,
 			}
 
-			_, err = rcr.Reconcile(context.TODO(), reconcile.Request{
+			_, err := rcr.Reconcile(context.TODO(), reconcile.Request{
 				NamespacedName: types.NamespacedName{
 					Name:      testCRName,
 					Namespace: testNamespace,
@@ -1581,13 +1573,7 @@ func testPassthroughCredentialsRequestWithLastSyncResourceVersion(t *testing.T, 
 
 // passthrough credentialsrequest objects have no awsStatus
 func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-	awsProvSpec, err := codec.EncodeProviderSpec(
+	awsProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.AWSProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AWSProviderSpec",
@@ -1629,14 +1615,7 @@ func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsReques
 func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testPassthroughCredentialsRequest(t)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-
-	awsStatus, err := codec.EncodeProviderStatus(
+	awsStatus, err := minterv1.Codec.EncodeProviderStatus(
 		&minterv1.AWSProviderStatus{
 			User: testAWSUser,
 		})

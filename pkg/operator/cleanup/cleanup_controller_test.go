@@ -234,14 +234,7 @@ func createTestNamespace(namespace string) *corev1.Namespace {
 func testStaleCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testPassthroughCredentialsRequest(t)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-
-	awsStatus, err := codec.EncodeProviderStatus(
+	awsStatus, err := minterv1.Codec.EncodeProviderStatus(
 		&minterv1.AWSProviderStatus{
 			User: testAWSUser,
 		})
@@ -256,13 +249,7 @@ func testStaleCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 }
 
 func testPassthroughCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-		return nil
-	}
-	awsProvSpec, err := codec.EncodeProviderSpec(
+	awsProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.AWSProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AWSProviderSpec",

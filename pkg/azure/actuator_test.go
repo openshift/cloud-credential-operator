@@ -153,18 +153,15 @@ var (
 )
 
 func TestDecodeToUnknown(t *testing.T) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to create codec %#v", err)
-	}
+	var err error
 	var raw *runtime.RawExtension
 	aps := minterv1.AzureProviderSpec{}
-	raw, err = codec.EncodeProviderSpec(&aps)
+	raw, err = minterv1.Codec.EncodeProviderSpec(&aps)
 	if err != nil {
 		t.Fatalf("failed to encode codec %#v", err)
 	}
 	unknown := runtime.Unknown{}
-	err = codec.DecodeProviderStatus(raw, &unknown)
+	err = minterv1.Codec.DecodeProviderStatus(raw, &unknown)
 	if err != nil {
 		t.Fatalf("should be able to decode to Unknown %#v", err)
 	}
@@ -180,13 +177,9 @@ func getCredRequest(t *testing.T, c client.Client) *minterv1.CredentialsRequest 
 }
 
 func getProviderStatus(t *testing.T, cr *minterv1.CredentialsRequest) minterv1.AzureProviderStatus {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("error creating Azure codec: %v", err)
-	}
 	azStatus := minterv1.AzureProviderStatus{}
 
-	assert.NoError(t, codec.DecodeProviderStatus(cr.Status.ProviderStatus, &azStatus))
+	assert.NoError(t, minterv1.Codec.DecodeProviderStatus(cr.Status.ProviderStatus, &azStatus))
 
 	return azStatus
 }
@@ -198,11 +191,6 @@ func TestActuator(t *testing.T) {
 
 	if err := minterv1.AddToScheme(scheme.Scheme); err != nil {
 		t.Fatal(err)
-	}
-
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("error creating Azure codec: %v", err)
 	}
 
 	tests := []struct {
@@ -271,7 +259,7 @@ func TestActuator(t *testing.T) {
 					AppID:                     testAppRegID,
 					SecretLastResourceVersion: "oldVersion",
 				}
-				encodedStatus, err := codec.EncodeProviderStatus(rawStatus)
+				encodedStatus, err := minterv1.Codec.EncodeProviderStatus(rawStatus)
 				require.NoError(t, err, "error encoding status")
 
 				cr.Status.ProviderStatus = encodedStatus
@@ -349,7 +337,7 @@ func TestActuator(t *testing.T) {
 					AppID:                testAppRegID,
 					// SecretLastResourceVersion: "oldVersion",
 				}
-				encodedStatus, err := codec.EncodeProviderStatus(rawStatus)
+				encodedStatus, err := minterv1.Codec.EncodeProviderStatus(rawStatus)
 				require.NoError(t, err, "error encoding status")
 
 				cr.Status.ProviderStatus = encodedStatus
@@ -431,7 +419,7 @@ func TestActuator(t *testing.T) {
 					ServicePrincipalName: testAppRegName,
 					AppID:                testAppRegID,
 				}
-				encodedStatus, err := codec.EncodeProviderStatus(rawStatus)
+				encodedStatus, err := minterv1.Codec.EncodeProviderStatus(rawStatus)
 				require.NoError(t, err, "error encoding status")
 
 				cr.Status.ProviderStatus = encodedStatus
@@ -506,7 +494,6 @@ func TestActuator(t *testing.T) {
 			actuator := azure.NewFakeActuator(
 				fakeClient,
 				fakeAdminClient,
-				codec,
 				func(logger log.FieldLogger, clientID, clientSecret, tenantID, subscriptionID string) (*azure.AzureCredentialsMinter, error) {
 					return azure.NewFakeAzureCredentialsMinter(logger,
 						clientID,
@@ -562,12 +549,7 @@ func generateDisplayName() string {
 }
 
 func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("error creating Azure codec: %v", err)
-	}
-
-	rawObj, err := codec.EncodeProviderSpec(azureSpec)
+	rawObj, err := minterv1.Codec.EncodeProviderSpec(azureSpec)
 	if err != nil {
 		t.Fatalf("error decoding provider v1 spec: %v", err)
 	}
