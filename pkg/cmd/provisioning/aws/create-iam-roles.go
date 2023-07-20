@@ -89,13 +89,8 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 	roleName := fmt.Sprintf("%s-%s-%s", name, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name)
 
 	// Decode AWSProviderSpec
-	codec, err := credreqv1.NewCodec()
-	if err != nil {
-		return "", errors.Wrap(err, "Failed to create credReq codec")
-	}
-
 	awsProviderSpec := credreqv1.AWSProviderSpec{}
-	if err := codec.DecodeProviderSpec(credReq.Spec.ProviderSpec, &awsProviderSpec); err != nil {
+	if err := credreqv1.Codec.DecodeProviderSpec(credReq.Spec.ProviderSpec, &awsProviderSpec); err != nil {
 		return "", errors.Wrap(err, "Failed to decode the provider spec")
 	}
 

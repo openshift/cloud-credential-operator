@@ -240,13 +240,8 @@ func createUserAndAttachPolicy(client alibabacloud.Client, name, targetDir strin
 	policyName := generatePolicyName(fmt.Sprintf("%s-%s-%s-policy", name, credReq.Spec.SecretRef.Namespace, credReq.Spec.SecretRef.Name))
 
 	// Decode Alibaba CloudProviderSpec
-	codec, err := credreqv1.NewCodec()
-	if err != nil {
-		return errors.Wrap(err, "Failed to create credReq codec")
-	}
-
 	alibabaProviderSpec := credreqv1.AlibabaCloudProviderSpec{}
-	if err := codec.DecodeProviderSpec(credReq.Spec.ProviderSpec, &alibabaProviderSpec); err != nil {
+	if err := credreqv1.Codec.DecodeProviderSpec(credReq.Spec.ProviderSpec, &alibabaProviderSpec); err != nil {
 		return errors.Wrap(err, "Failed to decode the provider spec")
 	}
 

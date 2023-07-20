@@ -25,19 +25,14 @@ type request struct {
 }
 
 func newRequest(cr *minterv1.CredentialsRequest) (*request, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		return nil, err
-	}
-
 	status := minterv1.AzureProviderStatus{}
-	err = codec.DecodeProviderStatus(cr.Status.ProviderStatus, &status)
+	err := minterv1.Codec.DecodeProviderStatus(cr.Status.ProviderStatus, &status)
 	if err != nil {
 		return nil, err
 	}
 
 	spec := minterv1.AzureProviderSpec{}
-	err = codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &spec)
+	err = minterv1.Codec.DecodeProviderSpec(cr.Spec.ProviderSpec, &spec)
 	if err != nil {
 		return nil, err
 	}

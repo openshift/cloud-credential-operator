@@ -76,11 +76,6 @@ func (a *awsClientBuilderRecorder) ClientBuilder(accessKeyID, secretAccessKey []
 func TestCredentialsFetching(t *testing.T) {
 	util.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to set up codec for tests: %v", err)
-	}
-
 	tests := []struct {
 		name                  string
 		existing              []runtime.Object
@@ -210,7 +205,6 @@ func TestCredentialsFetching(t *testing.T) {
 			a := &AWSActuator{
 				Client:           fakeClient,
 				RootCredClient:   fakeAdminClient,
-				Codec:            codec,
 				AWSClientBuilder: clientRecorder.ClientBuilder,
 			}
 
@@ -291,11 +285,6 @@ func TestGenerateUserName(t *testing.T) {
 func TestUpgradeable(t *testing.T) {
 	util.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to set up codec for tests: %v", err)
-	}
-
 	tests := []struct {
 		name           string
 		mode           operatorv1.CloudCredentialsMode
@@ -370,7 +359,6 @@ func TestUpgradeable(t *testing.T) {
 
 			a := &AWSActuator{
 				RootCredClient: fakeClient,
-				Codec:          codec,
 			}
 
 			cond := a.Upgradeable(test.mode)
@@ -583,11 +571,6 @@ func (a *testAWSError) Error() string {
 func TestDetectSTS(t *testing.T) {
 	schemeutils.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to set up codec for tests: %v", err)
-	}
-
 	tests := []struct {
 		name               string
 		existing           []runtime.Object
@@ -604,7 +587,8 @@ func TestDetectSTS(t *testing.T) {
 			},
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
-				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
+				var err error
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig("")
 				if err != nil {
 					t.Log(err)
 					t.FailNow()
@@ -622,7 +606,8 @@ func TestDetectSTS(t *testing.T) {
 			},
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
-				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "")
+				var err error
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig("")
 				if err != nil {
 					t.Log(err)
 					t.FailNow()
@@ -641,7 +626,8 @@ func TestDetectSTS(t *testing.T) {
 			},
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
-				cr.Spec.ProviderSpec, err = testAWSProviderConfig(codec, "cloud-token")
+				var err error
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig("cloud-token")
 				if err != nil {
 					t.FailNow()
 				}
@@ -667,7 +653,6 @@ func TestDetectSTS(t *testing.T) {
 			a := &AWSActuator{
 				Client:                             fakeClient,
 				RootCredClient:                     fakeAdminClient,
-				Codec:                              codec,
 				AWSSecurityTokenServiceGateEnabled: test.stsEnabled,
 			}
 			test.wantErr(t, a.sync(context.Background(), test.CredentialsRequest), fmt.Sprintf("sync(%v)", test.CredentialsRequest))
@@ -675,7 +660,7 @@ func TestDetectSTS(t *testing.T) {
 	}
 }
 
-func testAWSProviderConfig(codec *minterv1.ProviderCodec, awsSTSIAMRoleARN string) (*runtime.RawExtension, error) {
+func testAWSProviderConfig(awsSTSIAMRoleARN string) (*runtime.RawExtension, error) {
 	providerSpec := minterv1.AWSProviderSpec{
 		TypeMeta: metav1.TypeMeta{
 			Kind: "AWSProviderSpec",
@@ -695,7 +680,7 @@ func testAWSProviderConfig(codec *minterv1.ProviderCodec, awsSTSIAMRoleARN strin
 	if awsSTSIAMRoleARN != "" {
 		providerSpec.STSIAMRoleARN = awsSTSIAMRoleARN
 	}
-	awsProvSpec, err := codec.EncodeProviderSpec(&providerSpec)
+	awsProvSpec, err := minterv1.Codec.EncodeProviderSpec(&providerSpec)
 	return awsProvSpec, err
 }
 

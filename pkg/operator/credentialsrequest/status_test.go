@@ -25,7 +25,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	runtime "k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 
@@ -47,25 +47,20 @@ var (
 func TestClusterOperatorStatus(t *testing.T) {
 	schemeutils.SetupScheme(scheme.Scheme)
 
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Logf("error creating new codec: %v", err)
-		t.FailNow()
-	}
-
-	defaultAWSProviderConfig, err = testAWSProviderConfig(codec)
+	var err error
+	defaultAWSProviderConfig, err = testAWSProviderConfig()
 	if err != nil {
 		t.Logf("error creating test AWS ProviderConfig: %v", err)
 		t.FailNow()
 	}
 
-	defaultAzureProviderConfig, err = testAzureProviderConfig(codec)
+	defaultAzureProviderConfig, err = testAzureProviderConfig()
 	if err != nil {
 		t.Logf("error creating test Azure ProviderConfig: %v", err)
 		t.FailNow()
 	}
 
-	defaultGCPProviderConfig, err = testGCPProviderConfig(codec)
+	defaultGCPProviderConfig, err = testGCPProviderConfig()
 	if err != nil {
 		t.Logf("error creating test GCP ProviderConfig: %v", err)
 		t.FailNow()
@@ -262,8 +257,8 @@ func testCredentialsRequestWithStatus(name string, provisioned bool, conditions 
 	}
 }
 
-func testAWSProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
-	awsProvSpec, err := codec.EncodeProviderSpec(
+func testAWSProviderConfig() (*runtime.RawExtension, error) {
+	awsProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.AWSProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AWSProviderSpec",
@@ -284,8 +279,8 @@ func testAWSProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension
 	return awsProvSpec, err
 }
 
-func testGCPProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
-	gcpProvSpec, err := codec.EncodeProviderSpec(
+func testGCPProviderConfig() (*runtime.RawExtension, error) {
+	gcpProvSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.GCPProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "GCPProviderSpec",
@@ -298,8 +293,8 @@ func testGCPProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension
 	return gcpProvSpec, err
 }
 
-func testAzureProviderConfig(codec *minterv1.ProviderCodec) (*runtime.RawExtension, error) {
-	azureProviderSpec, err := codec.EncodeProviderSpec(
+func testAzureProviderConfig() (*runtime.RawExtension, error) {
+	azureProviderSpec, err := minterv1.Codec.EncodeProviderSpec(
 		&minterv1.AzureProviderSpec{
 			TypeMeta: metav1.TypeMeta{
 				Kind: "AzureProviderSpec",

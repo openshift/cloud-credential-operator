@@ -141,13 +141,8 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 	}
 
 	// Decode GCPProviderSpec
-	codec, err := credreqv1.NewCodec()
-	if err != nil {
-		return "", errors.Wrap(err, "Failed to create credReq codec")
-	}
-
 	gcpProviderSpec := credreqv1.GCPProviderSpec{}
-	if err := codec.DecodeProviderSpec(credReq.Spec.ProviderSpec, &gcpProviderSpec); err != nil {
+	if err := credreqv1.Codec.DecodeProviderSpec(credReq.Spec.ProviderSpec, &gcpProviderSpec); err != nil {
 		return "", errors.Wrap(err, "Failed to decode the provider spec")
 	}
 

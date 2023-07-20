@@ -73,18 +73,14 @@ var (
 )
 
 func TestDecodeToUnknown(t *testing.T) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("failed to create codec %#v", err)
-	}
 	var raw *runtime.RawExtension
 	aps := minterv1.KubevirtProviderSpec{}
-	raw, err = codec.EncodeProviderSpec(&aps)
+	raw, err := minterv1.Codec.EncodeProviderSpec(&aps)
 	if err != nil {
 		t.Fatalf("failed to encode codec %#v", err)
 	}
 	unknown := runtime.Unknown{}
-	err = codec.DecodeProviderStatus(raw, &unknown)
+	err = minterv1.Codec.DecodeProviderStatus(raw, &unknown)
 	if err != nil {
 		t.Fatalf("should be able to decode to Unknown %#v", err)
 	}
@@ -358,12 +354,7 @@ func existingObjectsAfterCreate(t *testing.T) []runtime.Object {
 }
 
 func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		t.Fatalf("error creating Kubevirt codec: %v", err)
-	}
-
-	rawObj, err := codec.EncodeProviderSpec(kubevirtSpec)
+	rawObj, err := minterv1.Codec.EncodeProviderSpec(kubevirtSpec)
 	if err != nil {
 		t.Fatalf("error decoding provider v1 spec: %v", err)
 	}
