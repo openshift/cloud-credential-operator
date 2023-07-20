@@ -40,7 +40,6 @@ import (
 type OpenStackActuator struct {
 	Client         client.Client
 	RootCredClient client.Client
-	Codec          *minterv1.ProviderCodec
 }
 
 func (a *OpenStackActuator) STSFeatureGateEnabled() bool {
@@ -49,14 +48,7 @@ func (a *OpenStackActuator) STSFeatureGateEnabled() bool {
 
 // NewOpenStackActuator creates a new OpenStack actuator.
 func NewOpenStackActuator(client, rootCredClient client.Client) (*OpenStackActuator, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		log.WithError(err).Error("error creating OpenStack codec")
-		return nil, fmt.Errorf("error creating OpenStack codec: %v", err)
-	}
-
 	return &OpenStackActuator{
-		Codec:          codec,
 		Client:         client,
 		RootCredClient: rootCredClient,
 	}, nil

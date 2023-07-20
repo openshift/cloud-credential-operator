@@ -72,7 +72,6 @@ type AWSActuator struct {
 	Client                             client.Client
 	RootCredClient                     client.Client
 	LiveClient                         client.Client
-	Codec                              *minterv1.ProviderCodec
 	AWSClientBuilder                   func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 	Scheme                             *runtime.Scheme
 	AWSSecurityTokenServiceGateEnabled bool
@@ -80,14 +79,7 @@ type AWSActuator struct {
 
 // NewAWSActuator creates a new AWSActuator.
 func NewAWSActuator(client, rootCredClient, liveClient client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		log.WithError(err).Error("error creating AWS codec")
-		return nil, fmt.Errorf("error creating AWS codec: %v", err)
-	}
-
 	return &AWSActuator{
-		Codec:                              codec,
 		Client:                             client,
 		LiveClient:                         liveClient,
 		RootCredClient:                     rootCredClient,
@@ -183,12 +175,12 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		return true, nil
 	}
 
-	awsSpec, err := DecodeProviderSpec(a.Codec, cr)
+	awsSpec, err := DecodeProviderSpec(minterv1.Codec, cr)
 	if err != nil {
 		return true, err
 	}
 
-	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
+	awsStatus, err := DecodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return true, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
@@ -354,7 +346,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	logger.Infof("stsDetected: %v", stsDetected)
 	if stsFeatureGateEnabled && stsDetected {
 		logger.Debug("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
-		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(a.Codec, cr)
+		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(minterv1.Codec, cr)
 		if err != nil {
 			return err
 		}
@@ -501,7 +493,7 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 			}
 		}
 
-		awsSpec, err := DecodeProviderSpec(a.Codec, cr)
+		awsSpec, err := DecodeProviderSpec(minterv1.Codec, cr)
 		if err != nil {
 			msg := "error decoding AWS ProviderSpec"
 			logger.WithError(err).Error(msg)
@@ -547,12 +539,12 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, logger log.FieldLogger) error {
 	var err error
 
-	awsSpec, err := DecodeProviderSpec(a.Codec, cr)
+	awsSpec, err := DecodeProviderSpec(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
 
-	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
+	awsStatus, err := DecodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -769,7 +761,7 @@ func userHasExpectedTags(logger log.FieldLogger, user *iam.User, infraName, clus
 func (a *AWSActuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, awsStatus *minterv1.AWSProviderStatus) error {
 
 	var err error
-	cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(awsStatus)
+	cr.Status.ProviderStatus, err = minterv1.Codec.EncodeProviderStatus(awsStatus)
 	if err != nil {
 		logger.WithError(err).Error("error encoding provider status")
 		return err
@@ -795,7 +787,7 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	logger := a.getLogger(cr)
 	logger.Debug("running Delete")
 	var err error
-	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
+	awsStatus, err := DecodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -993,7 +985,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	// the root client.
 	// and if our RO user is not yet live, we should just fall back to using the root user
 	// if possible.
-	awsStatus, err := DecodeProviderStatus(a.Codec, cr)
+	awsStatus, err := DecodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return nil, err
 	}
@@ -1373,12 +1365,8 @@ func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (configv1.ClusterI
 }
 
 func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		return false, err
-	}
 	unknown := runtime.Unknown{}
-	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	err := minterv1.Codec.DecodeProviderSpec(providerSpec, &unknown)
 	if err != nil {
 		return false, err
 	}

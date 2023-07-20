@@ -5,6 +5,10 @@ package sts
 
 import (
 	"context"
+	"os"
+	"testing"
+	"time"
+
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/util"
 	corev1 "k8s.io/api/core/v1"
@@ -12,15 +16,12 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/klog/v2"
-	"os"
 	"sigs.k8s.io/e2e-framework/klient/conf"
 	"sigs.k8s.io/e2e-framework/klient/k8s/resources"
 	"sigs.k8s.io/e2e-framework/pkg/env"
 	"sigs.k8s.io/e2e-framework/pkg/envconf"
 	"sigs.k8s.io/e2e-framework/pkg/envfuncs"
 	"sigs.k8s.io/e2e-framework/pkg/features"
-	"testing"
-	"time"
 )
 
 var testenv env.Environment
@@ -109,8 +110,7 @@ func newCredentialsRequest() *minterv1.CredentialsRequest {
 		STSIAMRoleARN: "arn:aws:iam::269733383069:oidc-provider/newstscluster-oidc.s3.us-east-1.amazonaws.com",
 	}
 
-	var codec, _ = minterv1.NewCodec()
-	var ProviderSpec, _ = codec.EncodeProviderSpec(in.DeepCopyObject())
+	var ProviderSpec, _ = minterv1.Codec.EncodeProviderSpec(in.DeepCopyObject())
 	var CredentialsRequestTemplate = &minterv1.CredentialsRequest{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,

@@ -55,14 +55,7 @@ func (a *VSphereActuator) STSFeatureGateEnabled() bool {
 
 // NewVSphereActuator creates a new VSphereActuator.
 func NewVSphereActuator(client, rootCredClient client.Client) (*VSphereActuator, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		log.WithError(err).Error("error creating AWS codec")
-		return nil, fmt.Errorf("error creating AWS codec: %v", err)
-	}
-
 	return &VSphereActuator{
-		Codec:          codec,
 		Client:         client,
 		RootCredClient: rootCredClient,
 	}, nil
@@ -364,12 +357,8 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 }
 
 func isVSphereCredentials(providerSpec *runtime.RawExtension) (bool, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		return false, err
-	}
 	unknown := runtime.Unknown{}
-	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	err := minterv1.Codec.DecodeProviderSpec(providerSpec, &unknown)
 	if err != nil {
 		return false, err
 	}

@@ -51,7 +51,6 @@ const (
 type OvirtActuator struct {
 	Client         client.Client
 	RootCredClient client.Client
-	Codec          *minterv1.ProviderCodec
 }
 
 func (a *OvirtActuator) GetFeatureGates(ctx context.Context) (featuregates.FeatureGate, error) {
@@ -72,14 +71,7 @@ type OvirtCreds struct {
 
 // NewActuator creates a new Ovirt actuator.
 func NewActuator(client, rootCredClient client.Client) (*OvirtActuator, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		log.WithError(err).Error("error creating Ovirt codec")
-		return nil, fmt.Errorf("error creating Ovirt codec: %v", err)
-	}
-
 	return &OvirtActuator{
-		Codec:          codec,
 		Client:         client,
 		RootCredClient: rootCredClient,
 	}, nil

@@ -14,7 +14,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/runtime"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	armauthorization "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
+	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/authorization/armauthorization/v2"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/msi/armmsi"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -82,11 +82,7 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 	// Decode CredentialsRequest.Spec.ProviderSpec.RoleBindings from Azure CredentialsRequest
 	crProviderSpec := &credreqv1.AzureProviderSpec{}
 	if credentialsRequest.Spec.ProviderSpec != nil {
-		codec, err := credreqv1.NewCodec()
-		if err != nil {
-			return err
-		}
-		err = codec.DecodeProviderSpec(credentialsRequest.Spec.ProviderSpec, crProviderSpec)
+		err := credreqv1.Codec.DecodeProviderSpec(credentialsRequest.Spec.ProviderSpec, crProviderSpec)
 		if err != nil {
 			return fmt.Errorf("error decoding provider spec from CredentialsRequest: %w", err)
 		}

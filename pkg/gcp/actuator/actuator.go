@@ -62,7 +62,6 @@ type Actuator struct {
 	ProjectName      string
 	Client           client.Client
 	RootCredClient   client.Client
-	Codec            *minterv1.ProviderCodec
 	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
 }
 
@@ -72,17 +71,10 @@ func (a *Actuator) STSFeatureGateEnabled() bool {
 
 // NewActuator initializes and returns a new Actuator for GCP.
 func NewActuator(c, rootCredClient client.Client, projectName string) (*Actuator, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		log.WithError(err).Error("error creating GCP codec")
-		return nil, fmt.Errorf("error creating GCP codec: %v", err)
-	}
-
 	return &Actuator{
 		ProjectName:      projectName,
 		Client:           c,
 		RootCredClient:   rootCredClient,
-		Codec:            codec,
 		GCPClientBuilder: ccgcp.NewClientFromJSON,
 	}, nil
 }
@@ -100,7 +92,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 	logger := a.getLogger(cr)
 	logger.Debug("running Delete")
 
-	gcpStatus, err := decodeProviderStatus(a.Codec, cr)
+	gcpStatus, err := decodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -264,7 +256,7 @@ func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.Credentials
 		return err
 	}
 
-	provSpec, err := decodeProviderSpec(a.Codec, cr)
+	provSpec, err := decodeProviderSpec(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -307,12 +299,12 @@ func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.Credentials
 
 // syncMint handles both create and update idempotently.
 func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest, infraName string, logger log.FieldLogger) error {
-	gcpSpec, err := decodeProviderSpec(a.Codec, cr)
+	gcpSpec, err := decodeProviderSpec(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
 
-	gcpStatus, err := decodeProviderStatus(a.Codec, cr)
+	gcpStatus, err := decodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return err
 	}
@@ -480,12 +472,12 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, bool, error) {
 	logger := a.getLogger(cr)
 
-	gcpSpec, err := decodeProviderSpec(a.Codec, cr)
+	gcpSpec, err := decodeProviderSpec(minterv1.Codec, cr)
 	if err != nil {
 		return true, false, fmt.Errorf("unable to decode ProviderSpec: %v", err)
 	}
 
-	gcpStatus, err := decodeProviderStatus(a.Codec, cr)
+	gcpStatus, err := decodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return true, false, fmt.Errorf("unable to decode ProviderStatus: %v", err)
 	}
@@ -635,7 +627,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 
 	// Test if the read-only client is working, if any error here we will fall back to using
 	// the root client.
-	gcpStatus, err := decodeProviderStatus(a.Codec, cr)
+	gcpStatus, err := decodeProviderStatus(minterv1.Codec, cr)
 	if err != nil {
 		return nil, err
 	}
@@ -662,7 +654,7 @@ func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 
 func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPProviderStatus) error {
 	var err error
-	cr.Status.ProviderStatus, err = a.Codec.EncodeProviderStatus(gcpStatus)
+	cr.Status.ProviderStatus, err = minterv1.Codec.EncodeProviderStatus(gcpStatus)
 	if err != nil {
 		logger.WithError(err).Error("error encoding provider status")
 		return err
@@ -722,12 +714,8 @@ func isSecretAnnotated(secret *corev1.Secret) bool {
 }
 
 func isGCPCredentials(providerSpec *runtime.RawExtension) (bool, error) {
-	codec, err := minterv1.NewCodec()
-	if err != nil {
-		return false, err
-	}
 	unknown := runtime.Unknown{}
-	err = codec.DecodeProviderSpec(providerSpec, &unknown)
+	err := minterv1.Codec.DecodeProviderSpec(providerSpec, &unknown)
 	if err != nil {
 		return false, err
 	}
