@@ -140,6 +140,7 @@ $ ccoctl azure create-oidc-issuer --name <azure_infra_name> \
                                     --output-dir <output_dir> \
                                     --region <azure_region> \
                                     --subscription-id <azure_subscription_id> \
+                                    --tenant-id <azure_tenant_id> \
                                     --public-key-file /path/to/rsa/keypair/serviceaccount-signer.public \
 ```
 
@@ -184,6 +185,7 @@ $ ccoctl azure create-all --name <azure_infra_name> \
                           --output-dir <output_dir> \
                           --region <azure_region> \
                           --subscription-id <azure_subscription_id> \
+                          --tenant-id <azure_tenant_id> \
                           --credentials-requests-dir ./credrequests \
                           --dnszone-resource-group-name <azure resource group containing the dns zone of the cluster>
 ```
