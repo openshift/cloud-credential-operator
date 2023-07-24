@@ -487,7 +487,7 @@ github.com/nutanix-cloud-native/prism-go-client/environment/types
 # github.com/oklog/ulid v1.3.1
 ## explicit
 github.com/oklog/ulid
-# github.com/openshift/api v0.0.0-20230717193525-8ad30b402d92
+# github.com/openshift/api v0.0.0-20230724190601-61a5301895a5
 ## explicit; go 1.20
 github.com/openshift/api
 github.com/openshift/api/apiserver
