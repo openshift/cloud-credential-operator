@@ -49,10 +49,6 @@ type VSphereActuator struct {
 	RootCredClient client.Client
 }
 
-func (a *VSphereActuator) STSFeatureGateEnabled() bool {
-	return false
-}
-
 // NewVSphereActuator creates a new VSphereActuator.
 func NewVSphereActuator(client, rootCredClient client.Client) (*VSphereActuator, error) {
 	return &VSphereActuator{
