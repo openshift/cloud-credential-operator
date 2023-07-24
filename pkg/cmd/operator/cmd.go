@@ -106,12 +106,6 @@ func NewOperator() *cobra.Command {
 				ctrlruntimelog.SetLogger(logr.New(ctrlruntimelog.NullLogSink{}))
 
 				log.Info("checking prerequisites")
-				featureGates, err := platform.GetFeatureGates(ctx)
-				if err != nil {
-					log.WithError(err).Fatal("unable to read feature gates")
-				}
-				awsSecurityTokenServiceGateEnabled := featureGates.Enabled(configv1.FeatureGateAWSSecurityTokenService)
-
 				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
 				rules := clientcmd.NewDefaultClientConfigLoadingRules()
 				rules.ExplicitPath = kubeconfigCommandLinePath
@@ -213,7 +207,7 @@ func NewOperator() *cobra.Command {
 
 				// Setup all Controllers
 				log.Info("setting up controllers")
-				if err := controller.AddToManager(mgr, rootMgr, kubeconfigCommandLinePath, coreClient, awsSecurityTokenServiceGateEnabled); err != nil {
+				if err := controller.AddToManager(mgr, rootMgr, kubeconfigCommandLinePath, coreClient); err != nil {
 					log.WithError(err).Fatal("unable to register controllers to the manager")
 				}
 

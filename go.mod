@@ -64,7 +64,6 @@ require (
 	github.com/google/go-cmp v0.5.9
 	github.com/microsoft/kiota-authentication-azure-go v0.6.0
 	github.com/microsoftgraph/msgraph-sdk-go v0.59.0
-	github.com/openshift/client-go v0.0.0-20230503144108-75015d2347cb
 	k8s.io/klog/v2 v2.90.1
 	sigs.k8s.io/e2e-framework v0.2.0
 )
@@ -148,7 +147,6 @@ require (
 	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.27.2 // indirect
-	k8s.io/apiserver v0.27.2 // indirect
 	k8s.io/component-base v0.27.2 // indirect
 	k8s.io/gengo v0.0.0-20220902162205-c0856e24416d // indirect
 	k8s.io/kube-aggregator v0.27.1 // indirect

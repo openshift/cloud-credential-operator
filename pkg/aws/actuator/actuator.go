@@ -69,23 +69,21 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 
 // AWSActuator implements the CredentialsRequest Actuator interface to create credentials in AWS.
 type AWSActuator struct {
-	Client                             client.Client
-	RootCredClient                     client.Client
-	LiveClient                         client.Client
-	AWSClientBuilder                   func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
-	Scheme                             *runtime.Scheme
-	AWSSecurityTokenServiceGateEnabled bool
+	Client           client.Client
+	RootCredClient   client.Client
+	LiveClient       client.Client
+	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
+	Scheme           *runtime.Scheme
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client, rootCredClient, liveClient client.Client, scheme *runtime.Scheme, awsSecurityTokenServiceGateEnabled bool) (*AWSActuator, error) {
+func NewAWSActuator(client, rootCredClient, liveClient client.Client, scheme *runtime.Scheme) (*AWSActuator, error) {
 	return &AWSActuator{
-		Client:                             client,
-		LiveClient:                         liveClient,
-		RootCredClient:                     rootCredClient,
-		AWSClientBuilder:                   awsutils.ClientBuilder,
-		Scheme:                             scheme,
-		AWSSecurityTokenServiceGateEnabled: awsSecurityTokenServiceGateEnabled,
+		Client:           client,
+		LiveClient:       liveClient,
+		RootCredClient:   rootCredClient,
+		AWSClientBuilder: awsutils.ClientBuilder,
+		Scheme:           scheme,
 	}, nil
 }
 
@@ -114,10 +112,6 @@ func DecodeProviderSpec(codec *minterv1.ProviderCodec, cr *minterv1.CredentialsR
 	}
 
 	return nil, fmt.Errorf("no providerSpec defined")
-}
-
-func (a *AWSActuator) STSFeatureGateEnabled() bool {
-	return a.AWSSecurityTokenServiceGateEnabled
 }
 
 // Checks if the credentials currently exist.
@@ -334,17 +328,12 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
-	stsDetected := false
-	stsFeatureGateEnabled := a.STSFeatureGateEnabled()
-	if stsFeatureGateEnabled {
-		stsDetected, err = utils.IsTimedTokenCluster(a.Client, ctx, logger)
-		if err != nil {
-			return err
-		}
+	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
+	if err != nil {
+		return err
 	}
-	logger.Infof("stsFeatureGateEnabled: %v", stsFeatureGateEnabled)
 	logger.Infof("stsDetected: %v", stsDetected)
-	if stsFeatureGateEnabled && stsDetected {
+	if stsDetected {
 		logger.Debug("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
 		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(minterv1.Codec, cr)
 		if err != nil {
