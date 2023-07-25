@@ -565,10 +565,15 @@ func ensureFederatedIdentityCredential(client *azureclients.AzureClientWrapper, 
 // writeCredReqSecret writes a secret file within the manifests directory (outputDir/manifests/)
 // containing user-assigned managed identity details.
 func writeCredReqSecret(cr *credreqv1.CredentialsRequest, outputDir, clientID, tenantID, subscriptionID, region string) error {
+	oidcTokenPath := provisioning.OidcTokenPath
+	if cr.Spec.CloudTokenPath != "" {
+		oidcTokenPath = cr.Spec.CloudTokenPath
+	}
+
 	manifestsDir := filepath.Join(outputDir, provisioning.ManifestsDirName)
 	fileName := fmt.Sprintf("%s-%s-credentials.yaml", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name)
 	filePath := filepath.Join(manifestsDir, fileName)
-	fileData := fmt.Sprintf(secretManifestTemplate, clientID, tenantID, region, subscriptionID, provisioning.OidcTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
+	fileData := fmt.Sprintf(secretManifestTemplate, clientID, tenantID, region, subscriptionID, oidcTokenPath, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
 
 	// clientID would be an empty string if ccoctl was in --dry-run mode
 	// so lets make sure we have an invalid Secret until the user
