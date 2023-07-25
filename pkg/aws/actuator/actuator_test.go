@@ -577,7 +577,6 @@ func TestDetectSTS(t *testing.T) {
 		wantErr            assert.ErrorAssertionFunc
 		CredentialsRequest *minterv1.CredentialsRequest
 		issuer             string
-		stsEnabled         bool
 	}{
 		{
 			name: "empty ServiceAccountIssuer on AWS STS-enabled CCO in Manual mode should error",
@@ -614,9 +613,8 @@ func TestDetectSTS(t *testing.T) {
 				}
 				return cr
 			}(),
-			issuer:     "non-empty",
-			stsEnabled: true,
-			wantErr:    assert.NoError,
+			issuer:  "non-empty",
+			wantErr: assert.NoError,
 		},
 		{
 			name: "STS mode and with a CloudTokenString and CloudTokenPath set in CredentialsRequest should create Secret & not error",
@@ -634,9 +632,8 @@ func TestDetectSTS(t *testing.T) {
 				cr.Spec.CloudTokenPath = "/var/token"
 				return cr
 			}(),
-			issuer:     "non-empty",
-			stsEnabled: true,
-			wantErr:    assert.NoError,
+			issuer:  "non-empty",
+			wantErr: assert.NoError,
 		},
 	}
 	for _, test := range tests {
@@ -651,9 +648,8 @@ func TestDetectSTS(t *testing.T) {
 				panic(err)
 			}
 			a := &AWSActuator{
-				Client:                             fakeClient,
-				RootCredClient:                     fakeAdminClient,
-				AWSSecurityTokenServiceGateEnabled: test.stsEnabled,
+				Client:         fakeClient,
+				RootCredClient: fakeAdminClient,
 			}
 			test.wantErr(t, a.sync(context.Background(), test.CredentialsRequest), fmt.Sprintf("sync(%v)", test.CredentialsRequest))
 		})

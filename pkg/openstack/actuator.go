@@ -42,10 +42,6 @@ type OpenStackActuator struct {
 	RootCredClient client.Client
 }
 
-func (a *OpenStackActuator) STSFeatureGateEnabled() bool {
-	return false
-}
-
 // NewOpenStackActuator creates a new OpenStack actuator.
 func NewOpenStackActuator(client, rootCredClient client.Client) (*OpenStackActuator, error) {
 	return &OpenStackActuator{

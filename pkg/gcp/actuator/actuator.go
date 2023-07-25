@@ -65,10 +65,6 @@ type Actuator struct {
 	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
 }
 
-func (a *Actuator) STSFeatureGateEnabled() bool {
-	return false
-}
-
 // NewActuator initializes and returns a new Actuator for GCP.
 func NewActuator(c, rootCredClient client.Client, projectName string) (*Actuator, error) {
 	return &Actuator{
