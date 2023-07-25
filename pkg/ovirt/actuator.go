@@ -20,8 +20,6 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	log "github.com/sirupsen/logrus"
@@ -53,14 +51,6 @@ type OvirtActuator struct {
 	RootCredClient client.Client
 }
 
-func (a *OvirtActuator) GetFeatureGates(ctx context.Context) (featuregates.FeatureGate, error) {
-	featureGates, err := platform.GetFeatureGates(nil)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return featureGates, err
-}
-
 type OvirtCreds struct {
 	URL      string `json:"ovirt_url"`
 	Username string `json:"ovirt_username"`
@@ -75,10 +65,6 @@ func NewActuator(client, rootCredClient client.Client) (*OvirtActuator, error) {
 		Client:         client,
 		RootCredClient: rootCredClient,
 	}, nil
-}
-
-func (a *OvirtActuator) STSFeatureGateEnabled() bool {
-	return false
 }
 
 // Exists checks if the credentials currently exist.

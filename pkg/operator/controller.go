@@ -66,7 +66,7 @@ var AddToManagerFuncs []func(manager.Manager, manager.Manager, string) error
 var AddToManagerWithActuatorFuncs []func(manager.Manager, manager.Manager, actuator.Actuator, configv1.PlatformType, corev1client.CoreV1Interface) error
 
 // AddToManager adds all Controllers to the Manager
-func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface, awsSecurityTokenServiceGateEnabled bool) error {
+func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface) error {
 	for _, f := range AddToManagerFuncs {
 		if err := f(m, rootM, explicitKubeconfig); err != nil {
 			return err
@@ -86,7 +86,7 @@ func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClien
 		switch platformType {
 		case configv1.AWSPlatformType:
 			log.Info("initializing AWS actuator")
-			a, err = awsactuator.NewAWSActuator(m.GetClient(), rootM.GetClient(), utils.LiveClient(m), m.GetScheme(), awsSecurityTokenServiceGateEnabled)
+			a, err = awsactuator.NewAWSActuator(m.GetClient(), rootM.GetClient(), utils.LiveClient(m), m.GetScheme())
 			if err != nil {
 				return err
 			}

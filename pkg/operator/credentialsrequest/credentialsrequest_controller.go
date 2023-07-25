@@ -19,10 +19,11 @@ package credentialsrequest
 import (
 	"context"
 	"fmt"
-	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/util/retry"
 	"reflect"
 	"time"
+
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/util/retry"
 
 	log "github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
@@ -518,11 +519,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
 
 	stsDetected := false
-	stsFeatureGateEnabled := r.Actuator.STSFeatureGateEnabled()
-
-	if stsFeatureGateEnabled {
-		stsDetected, _ = utils.IsTimedTokenCluster(r.Client, ctx, logger)
-	}
+	stsDetected, _ = utils.IsTimedTokenCluster(r.Client, ctx, logger)
 	if err != nil {
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
@@ -679,7 +676,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	} else {
 		crSecretExists = true
 	}
-	if stsFeatureGateEnabled && stsDetected {
+	if stsDetected {
 		// create time-based tokens based on settings in CredentialsRequests
 		logger.Debugf("timed token access cluster detected: %t, so not trying to provision with root secret",
 			stsDetected)
