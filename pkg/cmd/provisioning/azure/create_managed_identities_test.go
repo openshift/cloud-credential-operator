@@ -19,6 +19,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 
 	"github.com/golang/mock/gomock"
 )
@@ -76,6 +77,26 @@ spec:
     kind: AzureProviderSpec
     permissions:
     - testPermission
+  secretRef:
+    name: %s
+    namespace: %s
+  serviceAccountNames:
+  - testServiceAccount1
+  - testServiceAccount2`
+
+	credReqCloudTokenPathTemplate = `---
+apiVersion: cloudcredential.openshift.io/v1
+kind: CredentialsRequest
+metadata:
+  name: %s
+  namespace: openshift-cloud-credential-operator
+spec:
+  cloudTokenPath: %s
+  providerSpec:
+    apiVersion: cloudcredential.openshift.io/v1
+    kind: AzureProviderSpec
+    roleBindings:
+    - role: Contributor
   secretRef:
     name: %s
     namespace: %s
@@ -173,7 +194,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false, false)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), "", false, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -209,7 +230,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false, false)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), "", false, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -269,7 +290,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), true, false)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), "", true, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -307,7 +328,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), true, false)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), "", true, false)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -369,7 +390,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				err = provisioning.EnsureDir(credReqDirPath)
 				require.NoError(t, err, "errored while creating credreq directory for test")
 
-				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), false, true)
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), "", false, true)
 				require.NoError(t, err, "errored while setting up test CredReq files")
 				return tempDirName
 			},
@@ -382,6 +403,74 @@ func TestCreateManagedIdentities(t *testing.T) {
 				files, err = ioutil.ReadDir(manifestsDirPath)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
+			},
+			expectError: false,
+		},
+		{
+			name: "Create managed identities for one (1) CredentialsRequest with cloudTokenPath override",
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				resourceTags, _ := mergeResourceTags(testUserTags, map[string]*string{})
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockGetResourceGroupNotFound(wrapper, testInstallResourceGroupName, testSubscriptionID)
+				mockCreateOrUpdateResourceGroupSuccess(wrapper, testInstallResourceGroupName, testRegionName, testSubscriptionID, resourceTags)
+				mockGetUserAssignedManagedIdentityNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1")
+				mockCreateOrUpdateManagedIdentitySuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", testRegionName, testSubscriptionID, resourceTags)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("ContibutorRoleDefinitionID"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "ContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Contributor"),
+							},
+						},
+					})
+				mockCreateRoleAssignmentSuccess(wrapper, "/subscriptions/"+testSubscriptionID+"/resourceGroups/"+testInstallResourceGroupName, "RandomContributorRoleAssignmentNameGUID")
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount1", testSubscriptionID)
+				mockGetFederatedIdentityCredentialNotFound(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2")
+				mockCreateOrUpdateFederatedIdentityCredentialSuccess(wrapper, testOIDCResourceGroupName, "testinfraname-namespace1-secretName1", "testServiceAccount2", testSubscriptionID)
+				return wrapper
+			},
+			enableTechPreview: true,
+			setup: func(t *testing.T) string {
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "failed to create temp directory")
+
+				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
+				err = provisioning.EnsureDir(manifestsDirPath)
+				require.NoError(t, err, "errored while creating manifests directory for test")
+
+				credReqDirPath := filepath.Join(tempDirName, "credreqs")
+				err = provisioning.EnsureDir(credReqDirPath)
+				require.NoError(t, err, "errored while creating credreq directory for test")
+
+				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", filepath.Join(tempDirName, "credreqs"), "/cloud/token/path/override", false, false)
+				require.NoError(t, err, "errored while setting up test CredReq files")
+				return tempDirName
+			},
+			verify: func(t *testing.T, tempDirName string) {
+				files, err := ioutil.ReadDir(tempDirName)
+				require.NoError(t, err, "unexpected error listing files in targetDir")
+				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files in targetDir")
+
+				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
+				files, err = ioutil.ReadDir(manifestsDirPath)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
+
+				secretData, err := os.ReadFile(filepath.Join(manifestsDirPath, files[0].Name()))
+				require.NoError(t, err, "unexpected error reading secret manifest")
+
+				var secret map[string]interface{}
+				err = yaml.Unmarshal(secretData, &secret)
+				require.NoError(t, err, "unexpected error unmarshaling secret data")
+				assert.Equal(t, "/cloud/token/path/override", secret["stringData"].(map[string]interface{})["azure_federated_token_file"], "found unexpected cloudTokenPath override azure_federated_token_file field")
 			},
 			expectError: false,
 		},
@@ -724,12 +813,14 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 	}
 }
 
-func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string, isTechPreview bool, isCustomRole bool) error {
+func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir, cloudTokenPath string, isTechPreview bool, isCustomRole bool) error {
 	var credReq string
 	if isTechPreview {
 		credReq = fmt.Sprintf(credReqTechPreviewTemplate, crName, targetSecretName, targetSecretNamespace)
 	} else if isCustomRole {
 		credReq = fmt.Sprintf(credReqCustomRoleTemplate, crName, targetSecretName, targetSecretNamespace)
+	} else if cloudTokenPath != "" {
+		credReq = fmt.Sprintf(credReqCloudTokenPathTemplate, crName, cloudTokenPath, targetSecretName, targetSecretNamespace)
 	} else {
 		credReq = fmt.Sprintf(credReqTemplate, crName, targetSecretName, targetSecretNamespace)
 	}
