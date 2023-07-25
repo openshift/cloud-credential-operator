@@ -16,6 +16,12 @@ include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 # make images IMAGE_BUILD_EXTRA_FLAGS='-mount ~/projects/origin-repos/4.2/:/etc/yum.repos.d/'
 IMAGE_BUILD_EXTRA_FLAGS ?= --no-cache
 
+ifeq ($(shell command -v podman 2> /dev/null),)
+    DOCKER_CMD=docker
+else
+    DOCKER_CMD=podman
+endif
+
 # $1 - target name
 # $2 - image ref
 # $3 - Dockerfile path
@@ -23,7 +29,7 @@ IMAGE_BUILD_EXTRA_FLAGS ?= --no-cache
 define build-image-internal
 image-$(1):
 	$(strip \
-		podman build \
+		$(DOCKER_CMD) build \
 		-t $(2) \
 		-f $(3) \
 		$(IMAGE_BUILD_EXTRA_FLAGS) \
