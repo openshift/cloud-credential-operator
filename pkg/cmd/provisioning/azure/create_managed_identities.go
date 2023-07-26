@@ -654,6 +654,10 @@ func createManagedIdentitiesCmd(cmd *cobra.Command, args []string) {
 		log.Printf("No --installation-resource-group-name provided, defaulting installation resource group name to %s", CreateManagedIdentitiesOpts.InstallationResourceGroupName)
 	}
 
+	if CreateManagedIdentitiesOpts.OIDCResourceGroupName == CreateManagedIdentitiesOpts.InstallationResourceGroupName {
+		log.Fatalf("OIDC and installation resource group names cannot be the same")
+	}
+
 	err = createManagedIdentities(
 		azureClientWrapper,
 		CreateManagedIdentitiesOpts.CredRequestDir,
