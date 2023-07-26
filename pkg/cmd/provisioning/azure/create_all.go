@@ -43,6 +43,15 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Printf("No --oidc-resource-group-name provided, defaulting OIDC resource group name to %s", CreateAllOpts.OIDCResourceGroupName)
 	}
 
+	if CreateAllOpts.InstallationResourceGroupName == "" {
+		CreateAllOpts.InstallationResourceGroupName = CreateAllOpts.Name
+		log.Printf("No --installation-resource-group-name provided, defaulting installation resource group name to %s", CreateAllOpts.InstallationResourceGroupName)
+	}
+
+	if CreateAllOpts.OIDCResourceGroupName == CreateAllOpts.InstallationResourceGroupName {
+		log.Fatalf("OIDC and installation resource group names cannot be the same")
+	}
+
 	if CreateAllOpts.StorageAccountName == "" {
 		CreateAllOpts.StorageAccountName = CreateAllOpts.Name
 		log.Printf("No --storage-account-name provided, defaulting storage account name to %s", CreateAllOpts.StorageAccountName)
@@ -54,11 +63,6 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 	if CreateAllOpts.BlobContainerName == "" {
 		CreateAllOpts.BlobContainerName = CreateAllOpts.Name
 		log.Printf("No --blob-container-name provided, defaulting blob container name to %s", CreateAllOpts.BlobContainerName)
-	}
-
-	if CreateAllOpts.InstallationResourceGroupName == "" {
-		CreateAllOpts.InstallationResourceGroupName = CreateAllOpts.Name
-		log.Printf("No --installation-resource-group-name provided, defaulting installation resource group name to %s", CreateAllOpts.InstallationResourceGroupName)
 	}
 
 	issuerURL, err := createOIDCIssuer(azureClientWrapper,
@@ -177,7 +181,7 @@ func NewCreateAllCmd() *cobra.Command {
 			"The OpenShift installer requires that the resource group provided for installation resources be initially empty so this resource group must "+
 			"contain no resources if the resource group was previously created. "+
 			"A resource group will be created (with name derived from the --name parameter) if an installation-resource-group-name parameter was not provided. "+
-			"Note that this resource group must be provided as the installation resource group when installing the OpenShift cluster",
+			"Note that this resource group must be provided as the installation resource group when installing the OpenShift cluster.",
 	)
 	createAllCmd.PersistentFlags().StringVar(
 		&CreateAllOpts.StorageAccountName,
