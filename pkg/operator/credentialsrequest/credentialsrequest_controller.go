@@ -688,20 +688,17 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 
 		var syncErr error
 		syncErr = r.CreateOrUpdateOnCredsExist(ctx, credsExists, syncErr, cr)
-		var provisionErr bool
 		if syncErr != nil {
 			switch t := syncErr.(type) {
 			case actuator.ActuatorStatus:
 				if t.Reason() == minterv1.OrphanedCloudResource {
 					// not a critical error, just set the condition to communicate
-					// what happened
-					provisionErr = false
+					// what happened with updateActuatorConditions()
 				} else {
 					logger.Errorf("error syncing credentials: %v", syncErr)
-					provisionErr = true
 				}
-
-				updateErr := r.UpdateProvisionedStatus(cr, !provisionErr)
+				// syncErr means we failed to provision, so cr.status.provisioned is set false
+				updateErr := r.UpdateProvisionedStatus(cr, false)
 				if updateErr != nil {
 					logger.Errorf("failed to update credentialsrequest status: %v", updateErr)
 				}
