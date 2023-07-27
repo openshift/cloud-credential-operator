@@ -606,7 +606,7 @@ func TestDetectSTS(t *testing.T) {
 			CredentialsRequest: func() *minterv1.CredentialsRequest {
 				cr := testCredentialsRequest()
 				var err error
-				cr.Spec.ProviderSpec, err = testAWSProviderConfig("")
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig("not empty	")
 				if err != nil {
 					t.Log(err)
 					t.FailNow()
