@@ -341,7 +341,10 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 		if awsSTSIAMRoleARN == "" {
 			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
-			return err
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   "an empty roleARN was found so no Secret was created",
+			}
 		}
 		cloudTokenPath := cr.Spec.CloudTokenPath
 		if cr.Spec.CloudTokenPath == "" {
