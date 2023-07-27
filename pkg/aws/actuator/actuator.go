@@ -341,7 +341,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 		if awsSTSIAMRoleARN == "" {
 			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
-			return nil
+			return err
 		}
 		cloudTokenPath := cr.Spec.CloudTokenPath
 		if cr.Spec.CloudTokenPath == "" {
