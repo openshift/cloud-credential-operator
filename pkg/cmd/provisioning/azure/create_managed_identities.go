@@ -88,9 +88,9 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		}
 	}
 
-	if len(crProviderSpec.Permissions) > 0 {
+	if len(crProviderSpec.Permissions) > 0 || len(crProviderSpec.DataPermissions) > 0 {
 		// Ensure a custom role exists for the user-assigned managed identity with the specified permissions.
-		err := ensureCustomRole(client, shortenedManagedIdentityName, name, subscriptionID, crProviderSpec.Permissions)
+		err := ensureCustomRole(client, shortenedManagedIdentityName, name, subscriptionID, crProviderSpec.Permissions, crProviderSpec.DataPermissions)
 		if err != nil {
 			return fmt.Errorf("error ensuring custom role: %w", err)
 		}
@@ -120,12 +120,17 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 // and has the specified permissions.
 //
 // If a custom role with the provided roleName already exists, the custom role will be updated to match the desired state.
-func ensureCustomRole(client *azureclients.AzureClientWrapper, roleName string, name string, subscriptionID string, permissions []string) error {
+func ensureCustomRole(client *azureclients.AzureClientWrapper, roleName string, name string, subscriptionID string, permissions []string, dataPermissions []string) error {
 	scope := "/subscriptions/" + subscriptionID
 	// Generate actions based on permissions (conversion from []string to []*string)
 	actions := []*string{}
 	for _, permission := range permissions {
 		actions = append(actions, to.Ptr(permission))
+	}
+
+	dataActions := []*string{}
+	for _, dataPermission := range dataPermissions {
+		dataActions = append(dataActions, to.Ptr(dataPermission))
 	}
 
 	// Determine if a role already exists with the same name
@@ -167,7 +172,7 @@ func ensureCustomRole(client *azureclients.AzureClientWrapper, roleName string, 
 				RoleName:         &roleName,
 				Description:      to.Ptr("Custom role for OpenShift. Owned by: " + name),
 				RoleType:         to.Ptr("CustomRole"),
-				Permissions:      []*armauthorization.Permission{{Actions: actions}},
+				Permissions:      []*armauthorization.Permission{{Actions: actions, DataActions: dataActions}},
 				AssignableScopes: []*string{&scope},
 			},
 		},

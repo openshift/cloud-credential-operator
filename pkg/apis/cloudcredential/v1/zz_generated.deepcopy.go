@@ -184,6 +184,11 @@ func (in *AzureProviderSpec) DeepCopyInto(out *AzureProviderSpec) {
 		*out = make([]string, len(*in))
 		copy(*out, *in)
 	}
+	if in.DataPermissions != nil {
+		in, out := &in.DataPermissions, &out.DataPermissions
+		*out = make([]string, len(*in))
+		copy(*out, *in)
+	}
 	return
 }
 
