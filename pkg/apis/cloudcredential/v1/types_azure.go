@@ -39,6 +39,14 @@ type AzureProviderSpec struct {
 	// and RoleBindings.
 	// +optional
 	Permissions []string `json:"permissions,omitempty"`
+
+	// DataPermissions is the list of Azure data permissions required to create a more fine-grained custom
+	// role to satisfy the CredentialsRequest.
+	// The DataPermissions field may be provided in addition to RoleBindings. When both fields are specified,
+	// the user-assigned managed identity will have union of permissions defined from both DataPermissions
+	// and RoleBindings.
+	// +optional
+	DataPermissions []string `json:"dataPermissions,omitempty"`
 }
 
 // RoleBinding models part of the Azure RBAC Role Binding
