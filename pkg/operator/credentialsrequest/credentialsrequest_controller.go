@@ -727,6 +727,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			if updateErr != nil {
 				logger.Errorf("failed to update credentialsrequest status: %v", updateErr)
 			}
+			err = utils.UpdateStatus(r.Client, origCR, cr, logger)
+			if err != nil {
+				logger.Errorf("error updating status: %v", err)
+				return reconcile.Result{}, err
+			}
 		}
 	} else {
 		credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(ctx, cr)
