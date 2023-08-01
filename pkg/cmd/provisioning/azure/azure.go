@@ -15,6 +15,7 @@ type azureOptions struct {
 	StorageAccountName string
 	BlobContainerName  string
 	SubscriptionID     string
+	TenantID           string
 	OutputDir          string
 	DryRun             bool
 	EnableTechPreview  bool

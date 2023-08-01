@@ -88,6 +88,7 @@ type: Opaque
                              --output-dir <ccoctl_output_dir> \
                              --region <azure_region> \
                              --subscription-id <azure_subscription_id> \
+                             --tenant-id <azure_tenant_id> \
                              --credentials-requests-dir /path/to/credreqs/directory/created/in/step/3 \
                              --dnszone-resource-group-name <azure_dns_zone_resourcegroup_name>
    ```
