@@ -722,9 +722,15 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			// it worked so clear any actuator conditions if they exist
 			r.updateActuatorConditions(cr, "", nil)
 			updateErr := r.UpdateProvisionedStatus(cr, true)
-
+			// same as in non-STS case, sync happened so update the lastSyncGeneration
+			cr.Status.LastSyncGeneration = origCR.Generation
 			if updateErr != nil {
 				logger.Errorf("failed to update credentialsrequest status: %v", updateErr)
+			}
+			err = utils.UpdateStatus(r.Client, origCR, cr, logger)
+			if err != nil {
+				logger.Errorf("error updating status: %v", err)
+				return reconcile.Result{}, err
 			}
 		}
 	} else {
