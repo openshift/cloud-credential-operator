@@ -48,6 +48,7 @@ import (
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
+
 )
 
 const (
