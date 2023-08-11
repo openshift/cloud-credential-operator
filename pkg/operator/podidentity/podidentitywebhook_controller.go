@@ -1,13 +1,12 @@
-package awspodidentity
+package podidentity
 
 import (
 	"context"
 	"fmt"
-	"os"
+	"strings"
 	"time"
 
 	log "github.com/sirupsen/logrus"
-
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -36,28 +35,24 @@ import (
 )
 
 const (
-	controllerName                      = "awspodidentity"
+	controllerName                      = "pod-identity"
 	deploymentName                      = "cloud-credential-operator"
 	operatorNamespace                   = "openshift-cloud-credential-operator"
 	retryInterval                       = 10 * time.Second
 	reasonStaticResourceReconcileFailed = "StaticResourceReconcileFailed"
+	pdb                                 = "v4.1.0/common/poddisruptionbudget.yaml"
 )
 
 var (
 	defaultCodecs = serializer.NewCodecFactory(scheme.Scheme)
 	defaultCodec  = defaultCodecs.UniversalDeserializer()
 	staticFiles   = []string{
-		"v4.1.0/aws-pod-identity-webhook/sa.yaml",
-		"v4.1.0/aws-pod-identity-webhook/clusterrole.yaml",
-		"v4.1.0/aws-pod-identity-webhook/role.yaml",
-		"v4.1.0/aws-pod-identity-webhook/clusterrolebinding.yaml",
-		"v4.1.0/aws-pod-identity-webhook/rolebinding.yaml",
-		"v4.1.0/aws-pod-identity-webhook/svc.yaml",
-	}
-	templateFiles = []string{
-		"v4.1.0/aws-pod-identity-webhook/deployment.yaml",
-		"v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml",
-		"v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml",
+		"v4.1.0/common/sa.yaml",
+		"v4.1.0/common/clusterrole.yaml",
+		"v4.1.0/common/role.yaml",
+		"v4.1.0/common/clusterrolebinding.yaml",
+		"v4.1.0/common/rolebinding.yaml",
+		"v4.1.0/common/svc.yaml",
 	}
 	relatedObjects = []configv1.ObjectReference{
 		{
@@ -106,13 +101,21 @@ var (
 	}
 )
 
-type awsPodIdentityController struct {
+type PodIdentityManifestSource interface {
+	Deployment() string
+	GetImagePullSpec() string
+	Webhook() string
+	ShouldBeDeployed(ctx context.Context, clientSet kubernetes.Interface, namespace string) (bool, error)
+	Name() string
+}
+
+type podIdentityController struct {
 	reconciler *staticResourceReconciler
 	cache      cache.Cache
 	logger     log.FieldLogger
 }
 
-func (c *awsPodIdentityController) Start(ctx context.Context) error {
+func (c *podIdentityController) Start(ctx context.Context) error {
 	retryTimer := time.NewTimer(retryInterval)
 	for {
 		err := c.reconciler.ReconcileResources(ctx)
@@ -133,16 +136,24 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 	if err != nil {
 		return err
 	}
-	// Only add controller when PlatformType is AWS
-	platformType := platform.GetType(infraStatus)
-	if platformType != configv1.AWSPlatformType {
-		return nil
-	}
 	// Do not add controller when ControlPlaneTopology is External
 	if infraStatus.ControlPlaneTopology == configv1.ExternalTopologyMode {
 		return nil
 	}
-	log.Info("setting up AWS pod identity controller")
+
+	var podIdentityType PodIdentityManifestSource
+	platformType := platform.GetType(infraStatus)
+	switch platformType {
+	case configv1.AWSPlatformType:
+		podIdentityType = AwsPodIdentity{}
+	case configv1.AzurePlatformType:
+		podIdentityType = AzurePodIdentity{}
+	default:
+		log.WithField("controller", controllerName).Warn("Failed to get platform type")
+		return nil
+	}
+	ctx := context.TODO()
+	logger := log.WithFields(log.Fields{"platform": platformType, "controller": controllerName})
 
 	config := mgr.GetConfig()
 	clientset, err := kubernetes.NewForConfig(config)
@@ -150,27 +161,40 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		return err
 	}
 
+	shouldBeDeployed, err := podIdentityType.ShouldBeDeployed(ctx, clientset, operatorNamespace)
+	if err != nil {
+		return err
+	}
+	if !shouldBeDeployed {
+		logger.Info("pod identity was not enabled, nothing to deploy")
+		return nil
+	}
+
+	logger.Info("setting up pod identity controller")
+
 	controllerRef := &corev1.ObjectReference{
 		Kind:      "deployment",
 		Namespace: operatorNamespace,
 		Name:      deploymentName,
 	}
 	eventRecorder := events.NewKubeRecorder(clientset.CoreV1().Events(operatorNamespace), deploymentName, controllerRef)
-	logger := log.WithFields(log.Fields{"controller": controllerName})
-	imagePullSpec := os.Getenv("AWS_POD_IDENTITY_WEBHOOK_IMAGE")
+
+	imagePullSpec := podIdentityType.GetImagePullSpec()
 	if len(imagePullSpec) == 0 {
-		logger.Warn("AWS_POD_IDENTITY_WEBHOOK_IMAGE is not set, AWS pod identity webhook will not be deployed")
+		logger.Warnf("%s_POD_IDENTITY_WEBHOOK_IMAGE is not set, pod identity webhook will not be deployed",
+			strings.ToUpper(string(platformType)))
 		return nil
 	}
 
 	r := &staticResourceReconciler{
-		client:        mgr.GetClient(),
-		clientset:     clientset,
-		logger:        logger,
-		eventRecorder: eventRecorder,
-		imagePullSpec: imagePullSpec,
-		conditions:    []configv1.ClusterOperatorStatusCondition{},
-		cache:         resourceapply.NewResourceCache(),
+		client:          mgr.GetClient(),
+		clientset:       clientset,
+		logger:          logger,
+		eventRecorder:   eventRecorder,
+		imagePullSpec:   imagePullSpec,
+		conditions:      []configv1.ClusterOperatorStatusCondition{},
+		cache:           resourceapply.NewResourceCache(),
+		podIdentityType: podIdentityType,
 	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
@@ -193,11 +217,12 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 
 	// Create a namespace local cache separate from the Manager cache
 	// A namespace scoped cache can still handle cluster scoped resources
-	cache, err := cache.New(config, cache.Options{Namespaces: namespaces})
+	controllerCache, err := cache.New(config, cache.Options{Namespaces: namespaces})
 	if err != nil {
 		return err
 	}
-	allFiles := append(staticFiles, templateFiles...)
+
+	allFiles := append(staticFiles, []string{podIdentityType.Webhook(), podIdentityType.Deployment(), pdb}...)
 	for _, file := range allFiles {
 		objBytes := v410_00_assets.MustAsset(file)
 		obj, _, err := defaultCodec.Decode(objBytes, nil, nil)
@@ -209,7 +234,7 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		if !ok {
 			return fmt.Errorf("failed to convert runtime.Object to client.Object")
 		}
-		informer, err := cache.GetInformer(context.TODO(), co)
+		informer, err := controllerCache.GetInformer(ctx, co)
 		if err != nil {
 			return err
 		}
@@ -221,7 +246,7 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 	}
 
 	status.AddHandler(controllerName, r)
-	if err := mgr.Add(&awsPodIdentityController{reconciler: r, cache: cache, logger: logger}); err != nil {
+	if err := mgr.Add(&podIdentityController{reconciler: r, cache: controllerCache, logger: logger}); err != nil {
 		return err
 	}
 
@@ -245,6 +270,7 @@ type staticResourceReconciler struct {
 	imagePullSpec        string
 	conditions           []configv1.ClusterOperatorStatusCondition
 	cache                resourceapply.ResourceCache
+	podIdentityType      PodIdentityManifestSource
 }
 
 var _ reconcile.Reconciler = &staticResourceReconciler{}
@@ -293,8 +319,7 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 		r.logger.Infof("%s reconciled successfully", result.Type)
 	}
 
-	// "v4.1.0/aws-pod-identity-webhook/deployment.yaml"
-	requestedDeployment := resourceread.ReadDeploymentV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/deployment.yaml"))
+	requestedDeployment := resourceread.ReadDeploymentV1OrDie(v410_00_assets.MustAsset(r.podIdentityType.Deployment()))
 	if topology == configv1.SingleReplicaTopologyMode {
 		// Set replicas=1 for deployment on single replica topology clusters
 		requestedDeployment.Spec.Replicas = pointer.Int32(1)
@@ -310,9 +335,8 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 		r.logger.Infof("Deployment reconciled successfully")
 	}
 
-	// "v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"
-	requestedMutatingWebhookConfiguration := resourceread.ReadMutatingWebhookConfigurationV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/mutatingwebhook.yaml"))
-	_, modified, err = resourceapply.ApplyMutatingWebhookConfigurationImproved(context.TODO(), r.clientset.AdmissionregistrationV1(), r.eventRecorder, requestedMutatingWebhookConfiguration, r.cache)
+	requestedMutatingWebhookConfiguration := resourceread.ReadMutatingWebhookConfigurationV1OrDie(v410_00_assets.MustAsset(r.podIdentityType.Webhook()))
+	_, modified, err = resourceapply.ApplyMutatingWebhookConfigurationImproved(ctx, r.clientset.AdmissionregistrationV1(), r.eventRecorder, requestedMutatingWebhookConfiguration, r.cache)
 	if err != nil {
 		r.logger.WithError(err).Error("error applying MutatingWebhookConfiguration")
 		return err
@@ -325,9 +349,8 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 		// Don't deploy the PDB to single replica topology clusters
 		r.logger.Debugf("not deploying PodDisruptionBudget to single replica topology")
 	} else {
-		// "v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"
-		requestedPDB := resourceread.ReadPodDisruptionBudgetV1OrDie(v410_00_assets.MustAsset("v4.1.0/aws-pod-identity-webhook/poddisruptionbudget.yaml"))
-		_, modified, err = resourceapply.ApplyPodDisruptionBudget(context.TODO(), r.clientset.PolicyV1(), r.eventRecorder, requestedPDB)
+		requestedPDB := resourceread.ReadPodDisruptionBudgetV1OrDie(v410_00_assets.MustAsset(pdb))
+		_, modified, err = resourceapply.ApplyPodDisruptionBudget(ctx, r.clientset.PolicyV1(), r.eventRecorder, requestedPDB)
 		if err != nil {
 			r.logger.WithError(err).Error("error applying PodDisruptionBudget")
 			return err
