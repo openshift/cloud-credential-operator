@@ -251,9 +251,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		}
 
 	} else {
-		// for passthrough creds, just see if root cloud creds have not changed and
-		// we have the permissions requested in the credentials request
-
+		// for passthrough creds, just see if root cloud creds have not changed.
 		// but for the case where the operator mode is non-default, then we will avoid performing any
 		// policy simulations and assume that the passthrough creds must be good enough
 
