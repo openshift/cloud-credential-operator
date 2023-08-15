@@ -229,15 +229,15 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 			var err error
 			// Get Azure role definition for the role name (roleBinding.Role)
 			// This can fail due to a replication delay after creating the custom role.
-			// Try up to 12 times with a 10 second delay between each attempt, up to 2 minutes.
+			// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
 			for i := 0; ; i++ {
 				roleDefinition, err = getRoleDefinitionByRoleName(client, roleBinding.Role, subscriptionID)
 				// Role was found, break out of loop.
 				if err == nil {
 					break
 				}
-				// Role was not found in 12 attempts, return error.
-				if i >= 12 {
+				// Role was not found in 24 attempts, return error.
+				if i >= 24 {
 					return errors.Wrap(err, fmt.Sprintf("failed to get role definition for role %s. If this is a new custom role, this is likely related to a replication delay and can be re-attempted.", roleBinding.Role))
 				}
 				// Role was not found, wait 10 seconds and try again.
@@ -356,7 +356,7 @@ func createRoleAssignment(client *azureclients.AzureClientWrapper, managedIdenti
 
 	var rawResponse *http.Response
 	// Role assignment can fail due to a replication delay after creating the user-assigned managed identity
-	// Try up to 12 times with a 10 second delay between each attempt, up to 2 minutes.
+	// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
 	for i := 0; i < 12; i++ {
 		ctxWithResp := runtime.WithCaptureResponse(context.Background(), &rawResponse)
 		roleAssignmentCreateResponse, err := client.RoleAssignmentClient.Create(
@@ -376,7 +376,7 @@ func createRoleAssignment(client *azureclients.AzureClientWrapper, managedIdenti
 			if errors.As(err, &respErr) {
 				if respErr.ErrorCode == "PrincipalNotFound" || respErr.ErrorCode == "RoleDefinitionDoesNotExist" {
 					// The identity ccoctl just created can't be found yet due to a replication delay so we need to retry.
-					if i >= 11 {
+					if i >= 23 {
 						log.Fatal("Timed out assigning role to user-assigned managed identity, this is most likely due to a replication delay following creation of the user-assigned managed identity, please retry")
 						break
 					} else {
