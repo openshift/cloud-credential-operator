@@ -6,6 +6,7 @@ import (
 
 	operatorcmd "github.com/openshift/cloud-credential-operator/pkg/cmd/operator"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/render"
+	webhookoperatorcmd "github.com/openshift/cloud-credential-operator/pkg/cmd/webhookoperator"
 	"github.com/openshift/cloud-credential-operator/pkg/version"
 	"github.com/spf13/cobra"
 )
@@ -44,6 +45,7 @@ func main() {
 
 	cmd.AddCommand(operatorcmd.NewOperator())
 	cmd.AddCommand(render.NewRenderCommand())
+	cmd.AddCommand(webhookoperatorcmd.NewOperator())
 
 	err := cmd.Execute()
 	if err != nil {
