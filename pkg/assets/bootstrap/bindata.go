@@ -60,6 +60,7 @@ var _bootstrapCloudcredential_v1_credentialsrequest_crdYaml = []byte(`apiVersion
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    capability.openshift.io/name: CloudCredential
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
   name: credentialsrequests.cloudcredential.openshift.io
@@ -418,6 +419,7 @@ var _bootstrapNamespaceYaml = []byte(`apiVersion: v1
 kind: Namespace
 metadata:
   annotations:
+    capability.openshift.io/name: CloudCredential
     openshift.io/node-selector: ""
   labels:
     controller-tools.k8s.io: "1.0"

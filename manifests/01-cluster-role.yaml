@@ -4,6 +4,7 @@ metadata:
   creationTimestamp: null
   name: cloud-credential-operator-role
   annotations:
+    capability.openshift.io/name: CloudCredential
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 rules:
