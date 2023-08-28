@@ -3,6 +3,7 @@ kind: ClusterOperator
 metadata:
   name: cloud-credential
   annotations:
+    capability.openshift.io/name: CloudCredential
     exclude.release.openshift.io/internal-openshift-hosted: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
 status:
