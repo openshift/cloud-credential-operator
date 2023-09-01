@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"fmt"
+	"k8s.io/utils/strings/slices"
 	"log"
 	"net/http"
 	"os"
@@ -43,7 +44,10 @@ metadata:
   namespace: %s
 type: Opaque`
 
-	ingressCredentialRequestName = "openshift-ingress-azure"
+	ingressCredentialRequestName                    = "openshift-ingress-azure"
+	machineAPIOperatorCredentialRequestName         = "openshift-machine-api-azure"
+	clusterStorageOperatorFileCredentialRequestName = "azure-file-csi-driver-operator"
+	clusterNetworkOperatorCredentialRequestName     = "openshift-cloud-network-config-controller-azure"
 )
 
 // createManagedIdentity creates a user-assigned managed identity for the provided CredentialsRequest
@@ -607,7 +611,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, outputDir, clientID, t
 // additionally scoped within the resource group identified by dnsZoneResourceGroupName.
 //
 // Kubernetes secrets containing the user-assigned managed identity's clientID will be generated and written to the outputDir.
-func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, installationResourceGroupName, dnsZoneResourceGroupName string, resourceTags map[string]string, enableTechPreview, dryRun bool) error {
+func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, installationResourceGroupName, dnsZoneResourceGroupName, networkResourceGroupName string, resourceTags map[string]string, enableTechPreview, dryRun bool) error {
 	// Add CCO's "owned" tag to resource tags map
 	resourceTags[fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, name)] = ownedAzureResourceTagValue
 
@@ -633,6 +637,13 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 		// Additionally scope the ingress CredentialsRequest within the dnsZoneResourceGroupName
 		if credentialsRequest.Name == ingressCredentialRequestName {
 			scopingResourceGroupNames = append(scopingResourceGroupNames, dnsZoneResourceGroupName)
+		}
+		// Additionally scope vnet related CredentialRequest within the networkResourceGroupName,
+		// if one is provided
+		if len(networkResourceGroupName) > 0 {
+			if slices.Contains([]string{machineAPIOperatorCredentialRequestName, clusterStorageOperatorFileCredentialRequestName, clusterNetworkOperatorCredentialRequestName}, credentialsRequest.Name) {
+				scopingResourceGroupNames = append(scopingResourceGroupNames, networkResourceGroupName)
+			}
 		}
 		err := createManagedIdentity(client, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, scopingResourceGroupNames, resourceTags, credentialsRequest, dryRun)
 		if err != nil {
@@ -679,6 +690,7 @@ func createManagedIdentitiesCmd(cmd *cobra.Command, args []string) {
 		CreateManagedIdentitiesOpts.OutputDir,
 		CreateManagedIdentitiesOpts.InstallationResourceGroupName,
 		CreateManagedIdentitiesOpts.DNSZoneResourceGroupName,
+		CreateManagedIdentitiesOpts.NetworkResourceGroupName,
 		CreateManagedIdentitiesOpts.UserTags,
 		CreateManagedIdentitiesOpts.EnableTechPreview,
 		CreateManagedIdentitiesOpts.DryRun)
@@ -752,6 +764,15 @@ func NewCreateManagedIdentitiesCmd() *cobra.Command {
 			"A resource group will be created (with name derived from the --name parameter) if an installation-resource-group-name parameter was not provided. "+
 			"Note that this resource group must be provided as the installation resource group when installing the OpenShift cluster",
 	)
+	createManagedIdentitiesCmd.PersistentFlags().StringVar(
+		&CreateManagedIdentitiesOpts.NetworkResourceGroupName,
+		"network-resource-group-name",
+		"",
+		"The name of the Azure resource group in which existing Azure Virtual Network (VNet) infrastructure has been created for cluster installation. "+
+			"Cluster operators which interact with network resources will be scoped to allow management of resources in the network resource group. "+
+			"This is an optional parameter that does not need to be specified when installation will not utilize an existing VNet in the install-config.yaml.",
+	)
+
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.SubscriptionID, "subscription-id", "", "Azure Subscription ID within which to create and scope the access of managed identities")
 	createManagedIdentitiesCmd.MarkPersistentFlagRequired("subscription-id")
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.IssuerURL, "issuer-url", "", "OIDC Issuer URL (the OIDC Issuer can be created with the 'create-oidc-issuer' sub-command)")
