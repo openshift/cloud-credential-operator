@@ -39,6 +39,7 @@ var (
 	testStorageAccountName       = testInfraName
 	testBlobContainerName        = testInfraName
 	testDNSZoneResourceGroupName = testInfraName
+	testNetworkResourceGroupName = "" // not supplied by default
 	testIssuerURL                = fmt.Sprintf("https://%s.blob.core.windows.net/%s", testBlobContainerName, testBlobContainerName)
 
 	testPublicKeyFile = "publicKeyFile"
