@@ -496,6 +496,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				tempDirName,
 				testInstallResourceGroupName,
 				testDNSZoneResourceGroupName,
+				testNetworkResourceGroupName,
 				testUserTags,
 				test.enableTechPreview,
 				test.dryRun)
