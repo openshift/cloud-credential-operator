@@ -115,8 +115,8 @@ var (
             "Quantity":1,
             "Items":[
                {
-                  "Id":"%s.s3.%s.amazonaws.com",
-                  "DomainName":"%s.s3.%s.amazonaws.com",
+                  "Id":"%s.s3.%s.%s",
+                  "DomainName":"%s.s3.%s.%s",
                   "OriginPath":"",
                   "CustomHeaders":{
                      "Quantity":0
@@ -133,7 +133,7 @@ var (
             ]
          },
          "DefaultCacheBehavior":{
-            "TargetOriginId":"%s.s3.%s.amazonaws.com",
+            "TargetOriginId":"%s.s3.%s.%s",
             "TrustedSigners":{
                "Enabled":false,
                "Quantity":0
@@ -430,7 +430,12 @@ func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, tar
 }
 
 func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir string, createPrivateS3, generateOnly bool) (string, error) {
-	s3BucketURL := fmt.Sprintf("https://%s.s3.%s.amazonaws.com", bucketName, region)
+	partition, found := endpoints.PartitionForRegion([]endpoints.Partition{endpoints.AwsPartition(), endpoints.AwsCnPartition(), endpoints.AwsUsGovPartition()}, region)
+	if !found {
+		return "", fmt.Errorf("could not find AWS partition for provided region %s", region)
+	}
+	dnsSuffix := partition.DNSSuffix()
+	s3BucketURL := fmt.Sprintf("https://%s.s3.%s.%s", bucketName, region, dnsSuffix)
 	if generateOnly {
 		oidcBucketFilepath := filepath.Join(targetDir, oidcBucketFilename)
 		var oidcBucketJSON string
@@ -469,7 +474,7 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 			}
 
 			cloudFrontDistributionFilepath := filepath.Join(targetDir, cloudFrontDistributionFilename)
-			cloudFrontDistributionJSON := fmt.Sprintf(cloudFrontDistributionWithTagsTemplate, name, bucketName, region, bucketName, region, bucketName, region, fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name), name)
+			cloudFrontDistributionJSON := fmt.Sprintf(cloudFrontDistributionWithTagsTemplate, name, bucketName, region, dnsSuffix, bucketName, region, dnsSuffix, bucketName, region, dnsSuffix, fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name), name)
 			log.Printf("Saving JSON to create CloudFront Distribution locally at %s", cloudFrontDistributionFilepath)
 			if err := ioutil.WriteFile(cloudFrontDistributionFilepath, []byte(cloudFrontDistributionJSON), fileModeCcoctlDryRun); err != nil {
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to create CloudFront Distribution locally at %s", cloudFrontDistributionFilepath))
@@ -562,7 +567,7 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 				}
 				log.Printf("Blocked public access for the bucket %s", bucketName)
 
-				cloudFrontDistributionDomainName := fmt.Sprintf("%s.s3.%s.amazonaws.com", bucketName, region)
+				cloudFrontDistributionDomainName := fmt.Sprintf("%s.s3.%s.%s", bucketName, region, dnsSuffix)
 				cloudFrontDistributionOriginAccessIdentity := fmt.Sprintf("origin-access-identity/cloudfront/%s", originAccessIdentityID)
 				createCloudFrontDistributionOutput, err := client.CreateCloudFrontDistributionWithTags(&cloudfront.CreateDistributionWithTagsInput{
 					DistributionConfigWithTags: &cloudfront.DistributionConfigWithTags{
