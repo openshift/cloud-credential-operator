@@ -235,7 +235,11 @@ func TestIAMRoles(t *testing.T) {
 
 				return tempDirName
 			},
-			verify: func(t *testing.T, targetDir, manifestsDir string) {},
+			verify: func(t *testing.T, targetDir, manifestsDir string) {
+				files, err := ioutil.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
+			},
 		},
 	}
 
