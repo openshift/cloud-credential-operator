@@ -341,7 +341,7 @@ func NewCreateRAMUsersCmd() *cobra.Command {
 	createRAMUsersCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createRAMUsersCmd.PersistentFlags().StringVar(&CreateRAMUsersOpts.Region, "region", "", "Alibaba Cloud region endpoint only required for GovCloud")
 	createRAMUsersCmd.PersistentFlags().StringVar(&CreateRAMUsersOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
-	createRAMUsersCmd.PersistentFlags().BoolVar(&CreateRAMUsersOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
+	createRAMUsersCmd.PersistentFlags().BoolVar(&CreateRAMUsersOpts.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createRAMUsersCmd
 }

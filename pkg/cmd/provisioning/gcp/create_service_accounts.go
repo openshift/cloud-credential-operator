@@ -488,7 +488,7 @@ func NewCreateServiceAccountsCmd() *cobra.Command {
 	createServiceAccountsCmd.MarkPersistentFlagRequired("project")
 	createServiceAccountsCmd.PersistentFlags().BoolVar(&CreateServiceAccountsOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createServiceAccountsCmd.PersistentFlags().StringVar(&CreateServiceAccountsOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
-	createServiceAccountsCmd.PersistentFlags().BoolVar(&CreateServiceAccountsOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
+	createServiceAccountsCmd.PersistentFlags().BoolVar(&CreateServiceAccountsOpts.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createServiceAccountsCmd
 }

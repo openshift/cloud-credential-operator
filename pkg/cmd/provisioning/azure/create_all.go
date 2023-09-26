@@ -208,7 +208,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.OutputDir, "output-dir", "", "Directory to place generated manifest files. Defaults to the current directory.")
 	createAllCmd.PersistentFlags().StringToStringVar(&CreateAllOpts.UserTags, "user-tags", map[string]string{}, "User tags to be applied to Azure resources, multiple tags may be specified comma-separated for example: --user-tags key1=value1,key2=value2")
-	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests annotated with TechPreviewNoUpgrade")
+	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests annotated with TechPreviewNoUpgrade")
 
 	return createAllCmd
 }

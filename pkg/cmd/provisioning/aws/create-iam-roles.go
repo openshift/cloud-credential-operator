@@ -408,7 +408,7 @@ func NewCreateIAMRolesCmd() *cobra.Command {
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.Region, "region", "", "AWS region endpoint only required for GovCloud")
 	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createIAMRolesCmd.PersistentFlags().StringVar(&CreateIAMRolesOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
-	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
+	createIAMRolesCmd.PersistentFlags().BoolVar(&CreateIAMRolesOpts.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createIAMRolesCmd
 }

@@ -51,7 +51,7 @@ func NewCreateServiceIDCmd() *cobra.Command {
 	createServiceIDCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createServiceIDCmd.PersistentFlags().StringVar(&Options.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
 	createServiceIDCmd.PersistentFlags().StringVar(&Options.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
-	createServiceIDCmd.PersistentFlags().BoolVar(&Options.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
+	createServiceIDCmd.PersistentFlags().BoolVar(&Options.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
 
 	return createServiceIDCmd
 }
