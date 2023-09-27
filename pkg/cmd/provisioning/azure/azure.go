@@ -46,6 +46,12 @@ type azureOptions struct {
 	// DeleteResourceGroup is a bool indicating that the OIDC resource group should be deleted when
 	// ccoctl azure delete is invoked with the --delete-oidc-resource-group flag
 	DeleteOIDCResourceGroup bool
+
+	// NetworkResourceGroupName is the name of the Azure resource group for network resources like
+	// the Virtual Network and Subnets used by the cluster. If provided, several operators
+	// (cluster-network-operator, machine-api-operator, and cluster-storage-operator(file)) will be
+	// scoped to the NetworkResourceGroupName.
+	NetworkResourceGroupName string
 }
 
 // NewAzureCmd implements the "azure" subcommand for credentials provisioning

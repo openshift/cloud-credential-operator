@@ -92,6 +92,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		CreateAllOpts.OutputDir,
 		CreateAllOpts.InstallationResourceGroupName,
 		CreateAllOpts.DNSZoneResourceGroupName,
+		CreateAllOpts.NetworkResourceGroupName,
 		CreateAllOpts.UserTags,
 		CreateAllOpts.EnableTechPreview,
 		// dryRun may only be invoked by subcommands create-oidc-issuer and create-managed-identities
@@ -185,6 +186,14 @@ func NewCreateAllCmd() *cobra.Command {
 			"contain no resources if the resource group was previously created. "+
 			"A resource group will be created (with name derived from the --name parameter) if an installation-resource-group-name parameter was not provided. "+
 			"Note that this resource group must be provided as the installation resource group when installing the OpenShift cluster.",
+	)
+	createAllCmd.PersistentFlags().StringVar(
+		&CreateAllOpts.NetworkResourceGroupName,
+		"network-resource-group-name",
+		"",
+		"The name of the Azure resource group in which existing Azure Virtual Network (VNet) infrastructure has been created for cluster installation. "+
+			"Cluster operators which interact with network resources will be scoped to allow management of resources in the network resource group. "+
+			"This is an optional parameter that does not need to be specified when installation will not utilize an existing VNet in the install-config.yaml.",
 	)
 	createAllCmd.PersistentFlags().StringVar(
 		&CreateAllOpts.StorageAccountName,
