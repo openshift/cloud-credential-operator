@@ -35,6 +35,7 @@ func NewRefreshKeysCmd() *cobra.Command {
 	refreshKeysCmd.PersistentFlags().StringVar(&Options.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
 	refreshKeysCmd.PersistentFlags().BoolVar(&Options.Create, "create", false, "Create the ServiceID if does not exists")
 	refreshKeysCmd.PersistentFlags().BoolVar(&Options.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
+	refreshKeysCmd.PersistentFlags().MarkDeprecated("enable-tech-preview", "and will be removed in a future release. Extracting CredentialsRequests with 'oc adm release extract --included ...' will filter out CredentialsRequests that your cluster is not expected to need, including tech-preview requests for non-tech-preview clusters.")
 
 	return refreshKeysCmd
 }

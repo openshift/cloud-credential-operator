@@ -105,6 +105,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
+	createAllCmd.PersistentFlags().MarkDeprecated("enable-tech-preview", "and will be removed in a future release. Extracting CredentialsRequests with 'oc adm release extract --included ...' will filter out CredentialsRequests that your cluster is not expected to need, including tech-preview requests for non-tech-preview clusters.")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.CreatePrivateS3Bucket, "create-private-s3-bucket", false, "Create private S3 bucket with public CloudFront OIDC endpoint")
 
 	return createAllCmd

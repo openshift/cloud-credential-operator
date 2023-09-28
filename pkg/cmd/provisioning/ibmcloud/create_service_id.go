@@ -52,6 +52,7 @@ func NewCreateServiceIDCmd() *cobra.Command {
 	createServiceIDCmd.PersistentFlags().StringVar(&Options.ResourceGroupName, "resource-group-name", "", "Name of the resource group used for scoping the access policies")
 	createServiceIDCmd.PersistentFlags().StringVar(&Options.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createServiceIDCmd.PersistentFlags().BoolVar(&Options.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
+	createServiceIDCmd.PersistentFlags().MarkDeprecated("enable-tech-preview", "and will be removed in a future release. Extracting CredentialsRequests with 'oc adm release extract --included ...' will filter out CredentialsRequests that your cluster is not expected to need, including tech-preview requests for non-tech-preview clusters.")
 
 	return createServiceIDCmd
 }

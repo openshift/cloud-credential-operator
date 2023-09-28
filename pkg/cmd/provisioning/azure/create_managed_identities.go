@@ -769,6 +769,7 @@ func NewCreateManagedIdentitiesCmd() *cobra.Command {
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.OutputDir, "output-dir", "", "Directory to place generated files. Defaults to the current directory.")
 	createManagedIdentitiesCmd.PersistentFlags().StringToStringVar(&CreateManagedIdentitiesOpts.UserTags, "user-tags", map[string]string{}, "User tags to be applied to Azure resources, multiple tags may be specified comma-separated for example: --user-tags key1=value1,key2=value2")
 	createManagedIdentitiesCmd.PersistentFlags().BoolVar(&CreateManagedIdentitiesOpts.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests annotated with TechPreviewNoUpgrade")
+	createManagedIdentitiesCmd.PersistentFlags().MarkDeprecated("enable-tech-preview", "and will be removed in a future release. Extracting CredentialsRequests with 'oc adm release extract --included ...' will filter out CredentialsRequests that your cluster is not expected to need, including tech-preview requests for non-tech-preview clusters.")
 
 	return createManagedIdentitiesCmd
 }

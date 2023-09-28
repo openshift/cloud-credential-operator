@@ -57,7 +57,7 @@ func createSharedSecretsCmd() *cobra.Command {
 	cmd.PersistentFlags().StringVar(&CreateSharedSecretsOpts.CredentialsSourceFilePath, "credentials-source-filepath", "", "The filepath of the nutanix credentials data. If not specified, will use the default path ~/.nutanix/credentials")
 	cmd.PersistentFlags().StringVar(&CreateSharedSecretsOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	cmd.PersistentFlags().BoolVar(&CreateSharedSecretsOpts.EnableTechPreview, "enable-tech-preview", true, "Opt into processing CredentialsRequests marked as tech-preview")
-
+	cmd.PersistentFlags().MarkDeprecated("enable-tech-preview", "and will be removed in a future release. Extracting CredentialsRequests with 'oc adm release extract --included ...' will filter out CredentialsRequests that your cluster is not expected to need, including tech-preview requests for non-tech-preview clusters.")
 	return cmd
 }
 
