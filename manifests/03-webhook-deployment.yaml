@@ -5,14 +5,14 @@ metadata:
     config.openshift.io/inject-proxy: cloud-credential-operator
     exclude.release.openshift.io/internal-openshift-hosted: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
-  name: cloud-credential-operator
+  name: cloud-credential-webhook-operator
   namespace: openshift-cloud-credential-operator
 spec:
   replicas: 1
   revisionHistoryLimit: 4
   selector:
     matchLabels:
-      control-plane: controller-manager
+      control-plane: webhook-controller-manager
       controller-tools.k8s.io: "1.0"
   strategy:
     type: Recreate
@@ -21,8 +21,8 @@ spec:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
       labels:
-        app: cloud-credential-operator
-        control-plane: controller-manager
+        app: cloud-credential-webhook-operator
+        control-plane: webhook-controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
       securityContext:
@@ -62,13 +62,17 @@ spec:
               echo "Copying system trust bundle"
               cp -f /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
           fi
-          exec /usr/bin/cloud-credential-operator operator
+          exec /usr/bin/cloud-credential-operator webhook
         command:
         - /bin/bash
         - -ec
         env:
         - name: RELEASE_VERSION
           value: 0.0.1-snapshot
+        - name: AZURE_POD_IDENTITY_WEBHOOK_IMAGE
+          value: quay.io/openshift/azure-workload-identity-webhook:latest
+        - name: AWS_POD_IDENTITY_WEBHOOK_IMAGE
+          value: quay.io/openshift/aws-pod-identity-webhook:latest
         image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: IfNotPresent
         name: cloud-credential-operator
@@ -87,7 +91,7 @@ spec:
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
-      serviceAccountName: cloud-credential-operator
+      serviceAccountName: cloud-credential-webhook-operator
       terminationGracePeriodSeconds: 10
       tolerations:
       - effect: NoSchedule
