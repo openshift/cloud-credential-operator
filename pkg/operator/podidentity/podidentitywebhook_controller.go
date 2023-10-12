@@ -131,7 +131,7 @@ func (c *podIdentityController) Start(ctx context.Context) error {
 	return nil
 }
 
-func Add(mgr manager.Manager, kubeconfig string) error {
+func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeconfig)
 	if err != nil {
 		return err
