@@ -3,12 +3,13 @@ package azure
 import (
 	"context"
 	"fmt"
-	"k8s.io/utils/strings/slices"
 	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"time"
+
+	"k8s.io/utils/strings/slices"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/arm/policy"
@@ -48,6 +49,7 @@ type: Opaque`
 	machineAPIOperatorCredentialRequestName         = "openshift-machine-api-azure"
 	clusterStorageOperatorFileCredentialRequestName = "azure-file-csi-driver-operator"
 	clusterNetworkOperatorCredentialRequestName     = "openshift-cloud-network-config-controller-azure"
+	cloudControllerManagerCredentialRequestName     = "openshift-azure-cloud-controller-manager"
 )
 
 // createManagedIdentity creates a user-assigned managed identity for the provided CredentialsRequest
@@ -641,7 +643,7 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 		// Additionally scope vnet related CredentialRequest within the networkResourceGroupName,
 		// if one is provided
 		if len(networkResourceGroupName) > 0 {
-			if slices.Contains([]string{machineAPIOperatorCredentialRequestName, clusterStorageOperatorFileCredentialRequestName, clusterNetworkOperatorCredentialRequestName}, credentialsRequest.Name) {
+			if slices.Contains([]string{machineAPIOperatorCredentialRequestName, clusterStorageOperatorFileCredentialRequestName, clusterNetworkOperatorCredentialRequestName, cloudControllerManagerCredentialRequestName}, credentialsRequest.Name) {
 				scopingResourceGroupNames = append(scopingResourceGroupNames, networkResourceGroupName)
 			}
 		}
