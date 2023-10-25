@@ -684,7 +684,6 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				mockGetProjectIamPolicy(mockGCPClient, testValidPolicyBindings)
 				mockSetProjectIamPolicy(mockGCPClient)
 				mockDeleteServiceAccount(mockGCPClient)
-				mockDeleteRole(mockGCPClient)
 
 				return mockGCPClient
 			},
@@ -932,6 +931,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				Client:      fakeClient,
 				AdminClient: fakeAdminClient,
 				Actuator: &actuator.Actuator{
+					ProjectName:    testGCPProjectName,
 					Client:         fakeClient,
 					RootCredClient: fakeAdminClient,
 					GCPClientBuilder: func(name string, jsonAUTH []byte) (mintergcp.Client, error) {
