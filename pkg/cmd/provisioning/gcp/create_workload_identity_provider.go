@@ -248,7 +248,7 @@ func createIdentityProvider(ctx context.Context, client gcp.Client, name, projec
 // validationForCreateWorkloadIdentityProviderCmd will validate the arguments to the command, ensure the destination directory
 // is ready to receive the generated files, and will create the directory if necessary.
 func validationForCreateWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
-	if len(CreateWorkloadIdentityPoolOpts.Name) > 32 {
+	if len(CreateWorkloadIdentityProviderOpts.Name) > 32 {
 		log.Fatalf("Name can be at most 32 characters long")
 	}
 

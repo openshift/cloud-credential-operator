@@ -16,10 +16,16 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
+// Extend the options struct with an extra option
+type deleteOptions struct {
+	options
+	ForceDeleteCustomRoles bool
+}
+
 var (
 	// DeleteOpts captures the options that affect deletion
 	// of the generated objects.
-	DeleteOpts = options{}
+	DeleteOpts = deleteOptions{}
 )
 
 // deleteOIDCObjectsFromBucket deletes the objects in OIDC cloud storage bucket
@@ -99,7 +105,7 @@ func deleteServiceAccounts(ctx context.Context, client gcp.Client, namePrefix, c
 }
 
 // deleteCustomRoles deletes the IAM custom roles created by ccoctl
-func deleteCustomRoles(ctx context.Context, client gcp.Client, namePrefix, credReqDir string) error {
+func deleteCustomRoles(ctx context.Context, client gcp.Client, credReqDir string) error {
 	projectName := client.GetProjectName()
 	projectResourceName := fmt.Sprintf("projects/%s", projectName)
 
@@ -113,8 +119,8 @@ func deleteCustomRoles(ctx context.Context, client gcp.Client, namePrefix, credR
 	for _, cr := range credReqs {
 		// Generate role name from credentials request to fetch custom role if it exists
 		// The role name field has a 100 char max, so generate a name consisting of the
-		// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
-		roleNameFromCredReq, err := utils.GenerateNameWithFieldLimits(namePrefix, 50, cr.Name, 49)
+		// projectName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
+		roleNameFromCredReq, err := actuator.GenerateRoleName(client.GetProjectName(), cr.Name)
 		if err != nil {
 			return errors.Wrapf(err, "Failed to generate custom role name from credentils request %s", cr.Name)
 		}
@@ -200,8 +206,10 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Print(err)
 	}
 
-	if err := deleteCustomRoles(ctx, gcpClient, DeleteOpts.Name, DeleteOpts.CredRequestDir); err != nil {
-		log.Print(err)
+	if DeleteOpts.ForceDeleteCustomRoles {
+		if err := deleteCustomRoles(ctx, gcpClient, DeleteOpts.CredRequestDir); err != nil {
+			log.Print(err)
+		}
 	}
 
 	if err := deleteServiceAccounts(ctx, gcpClient, DeleteOpts.Name, DeleteOpts.CredRequestDir); err != nil {
@@ -213,13 +221,21 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 	}
 }
 
+// validationForDeleteCmd will validate the arguments to the command
+func validationForDeleteCmd(cmd *cobra.Command, args []string) {
+	if len(DeleteOpts.Name) > 32 {
+		log.Fatalf("Name can be at most 32 characters long")
+	}
+}
+
 // NewDeleteCmd implements the "delete" command for the credentials provisioning
 func NewDeleteCmd() *cobra.Command {
 	deleteCmd := &cobra.Command{
-		Use:   "delete",
-		Short: "Delete credentials objects",
-		Long:  "Deleting objects related to cloud credentials",
-		Run:   deleteCmd,
+		Use:              "delete",
+		Short:            "Delete credentials objects",
+		Long:             "Deleting objects related to cloud credentials",
+		Run:              deleteCmd,
+		PersistentPreRun: validationForDeleteCmd,
 	}
 
 	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Name, "name", "", "User-defined name for all created google cloud resources (can be separate from the cluster's infra-id)")
@@ -228,6 +244,7 @@ func NewDeleteCmd() *cobra.Command {
 	deleteCmd.MarkPersistentFlagRequired("project")
 	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to delete IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=ibmcloud' against an OpenShift release image)")
 	deleteCmd.MarkPersistentFlagRequired("credentials-requests-dir")
+	deleteCmd.PersistentFlags().BoolVar(&DeleteOpts.ForceDeleteCustomRoles, "force-delete-custom-roles", false, "Delete per-project custom roles")
 
 	return deleteCmd
 }

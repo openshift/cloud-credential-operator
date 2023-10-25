@@ -26,8 +26,6 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	utilrand "k8s.io/apimachinery/pkg/util/rand"
-
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
 
@@ -97,31 +95,57 @@ func DeleteRole(gcpClient ccgcp.Client, roleName string) (*iamadminpb.Role, erro
 	return role, err
 }
 
-// GenerateRoleID generates a unique ID for the role given infra name and credentials request name.
+// GenerateRoleID generates a unique ID for the role given project name and credentials request name.
 // The role ID has a max length of 64 chars and can include only letters, numbers, period and underscores
-// we sanitize infraName and crName to make them alphanumeric and then
-// split role ID into 29_28_5 where the resulting string becomes:
-// <infraName chopped to 29 chars>_<crName chopped to 28 chars>_<random 5 chars>
-func GenerateRoleID(infraName string, crName string) (string, error) {
-	infraName = makeAlphanumeric(infraName)
+// we sanitize projectName and crName to make them alphanumeric and then
+// split role ID into 32_31 where the resulting string becomes:
+// <projectName chopped to 32 chars>_<crName chopped to 31 chars>
+func GenerateRoleID(projectName string, crName string) (string, error) {
+	projectName = makeAlphanumeric(projectName)
 	crName = makeAlphanumeric(crName)
 
-	infraNameMaxLenForRoleName := 29
-	crNameMaxLenForRoleName := 28
+	projectNameMaxLenForRoleID := 32
+	crNameMaxLenForRoleID := 31
+
+	if projectName == "" {
+		return "", fmt.Errorf("empty project name")
+	}
 
 	if crName == "" {
 		return "", fmt.Errorf("empty credential request name")
 	}
 
-	if infraName != "" {
-		if len(infraName) > infraNameMaxLenForRoleName {
-			infraName = infraName[0:infraNameMaxLenForRoleName]
-		}
+	if len(projectName) > projectNameMaxLenForRoleID {
+		projectName = projectName[0:projectNameMaxLenForRoleID]
+	}
+	if len(crName) > crNameMaxLenForRoleID {
+		crName = crName[0:crNameMaxLenForRoleID]
+	}
+	return fmt.Sprintf("%s_%s", projectName, crName), nil
+}
+
+// GenerateRoleName generates a unique name for the role given project name and credentials request name.
+// The role name has a max length of 100 chars, so we split role ID into 50-49 where the resulting string becomes:
+// <projectName chopped to 50 chars>-<crName chopped to 49 chars>
+func GenerateRoleName(projectName string, crName string) (string, error) {
+	projectNameMaxLenForRoleName := 50
+	crNameMaxLenForRoleName := 49
+
+	if projectName == "" {
+		return "", fmt.Errorf("empty project name")
+	}
+
+	if crName == "" {
+		return "", fmt.Errorf("empty credential request name")
+	}
+
+	if len(projectName) > projectNameMaxLenForRoleName {
+		projectName = projectName[0:projectNameMaxLenForRoleName]
 	}
 	if len(crName) > crNameMaxLenForRoleName {
 		crName = crName[0:crNameMaxLenForRoleName]
 	}
-	return fmt.Sprintf("%s_%s_%s", infraName, crName, utilrand.String(5)), nil
+	return fmt.Sprintf("%s-%s", projectName, crName), nil
 }
 
 // makeAlphanumeric makes a given string alphanumeric
