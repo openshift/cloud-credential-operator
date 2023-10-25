@@ -288,7 +288,8 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 			return true, fmt.Errorf("error fetching custom role: %v", err)
 		}
 
-		if !AreSlicesEqualWithoutOrder(role.IncludedPermissions, permissions) {
+		addedPermissions, _ := CalculateSliceDiff(role.IncludedPermissions, permissions)
+		if len(addedPermissions) > 0 {
 			return true, nil
 		}
 	}
