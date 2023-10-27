@@ -437,7 +437,10 @@ func mockStorageAccountBeginCreate(wrapper *azureclients.AzureClientWrapper, res
 			Name: to.Ptr(armstorage.SKUNameStandardLRS),
 		},
 		Location: to.Ptr(region),
-		Tags:     tags,
+		Properties: &armstorage.AccountPropertiesCreateParameters{
+			AllowBlobPublicAccess: to.Ptr(true),
+		},
+		Tags: tags,
 	}
 
 	// This poller is not returned from subsequent PollerWrapper.PollUntilDone() and is just instantiated
