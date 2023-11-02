@@ -128,14 +128,17 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 	}
 
 	// The role ID has a max length of 64 chars and can include only letters, numbers, period and underscores
-	// we sanitize infraName and crName to make them alphanumeric and then
-	// split role ID into 29_28_5 where the resulting string becomes:
-	// <infraName chopped to 29 chars>_<crName chopped to 28 chars>_<random 5 chars>
-	roleID, err := actuator.GenerateRoleID(name, credReq.Name)
+	// we sanitize projectName and crName to make them alphanumeric and then
+	// split role ID into 32_31 where the resulting string becomes:
+	// <projectName chopped to 32 chars>_<crName chopped to 31 chars>
+	roleID, err := actuator.GenerateRoleID(client.GetProjectName(), credReq.Name)
+	if err != nil {
+		return "", fmt.Errorf("error generating custom role id: %v", err)
+	}
 
 	// The role name field has a 100 char max, so generate a name consisting of the
-	// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
-	roleName, err := utils.GenerateNameWithFieldLimits(name, 50, credReq.Name, 49)
+	// projectName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
+	roleName, err := actuator.GenerateRoleName(client.GetProjectName(), credReq.Name)
 	if err != nil {
 		return "", fmt.Errorf("error generating custom role name: %v", err)
 	}
@@ -158,8 +161,7 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 	identityProviderBindingNames := getIdentityProviderBindingNames(projectNum, workloadIdentityPool, credReq.Spec.SecretRef.Namespace, credReq.Spec.ServiceAccountNames)
 
 	var encodedCredentialsConfig string
-	switch generateOnly {
-	case true:
+	if generateOnly {
 		// Create shell script to create IAM service account
 		createSvcAcctScript := createShellScript([]string{
 			fmt.Sprintf(createServiceAccountCmd, serviceAccountID, serviceAccountName),
@@ -227,8 +229,7 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		}
 
 		return "", nil
-
-	default:
+	} else {
 		createdByCcoctlForSvcAcct := fmt.Sprintf("%s for service account %s", createdByCcoctl, serviceAccountName)
 
 		var serviceAccount *iamadminpb.ServiceAccount
@@ -264,8 +265,15 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 				}
 			} else {
 				log.Printf("Existing IAM custom role %s found, updating permissions", role.Title)
-				if !actuator.AreSlicesEqualWithoutOrder(role.IncludedPermissions, gcpProviderSpec.Permissions) {
-					role.IncludedPermissions = gcpProviderSpec.Permissions
+				addedPermissions, removedPermissions := actuator.CalculateSliceDiff(role.IncludedPermissions, gcpProviderSpec.Permissions)
+
+				if len(removedPermissions) > 0 {
+					allRemovedPermissions := strings.Join(removedPermissions, ", ")
+					log.Printf("Unexpected permissions found on existing custom role %s: %s", role.Title, allRemovedPermissions)
+				}
+
+				if len(addedPermissions) > 0 {
+					role.IncludedPermissions = append(role.IncludedPermissions, addedPermissions...)
 					_, err := actuator.UpdateRole(client, role, role.Name)
 					if err != nil {
 						return "", errors.Wrapf(err, "Failed to update custom role %s", role.Title)
@@ -439,6 +447,10 @@ func createServiceAccountsCmd(cmd *cobra.Command, args []string) {
 // initEnvForCreateServiceAccountsCmd will ensure the destination directory is ready to receive the generated
 // files, and will create the directory if necessary.
 func initEnvForCreateServiceAccountsCmd(cmd *cobra.Command, args []string) {
+	if len(CreateServiceAccountsOpts.Name) > 32 {
+		log.Fatalf("Name can be at most 32 characters long")
+	}
+
 	if CreateServiceAccountsOpts.TargetDir == "" {
 		pwd, err := os.Getwd()
 		if err != nil {

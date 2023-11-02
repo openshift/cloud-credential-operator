@@ -20,11 +20,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"reflect"
-	"sort"
-
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -93,20 +91,17 @@ func loadCredsFromSecret(kubeClient client.Client, namespace, secretName string)
 	return jsonBytes, nil
 }
 
-// AreSlicesEqualWithoutOrder check for equality on slices without order
-func AreSlicesEqualWithoutOrder(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
+// CalculateSliceDiff compares the two slices, and returns two new slices:
+// The first slice is all the elements from new that are not present in original.
+// The second slice is all the elements from original that are not present in new.
+// To this effect, the first slice can be considered the elements that new has "added" over original,
+// and the second slice can be considered the elements that new has "removed" from original.
+func CalculateSliceDiff(original, new []string) ([]string, []string) {
+	originalSet := sets.New(original...)
+	newSet := sets.New(new...)
 
-	aCopy := make([]string, len(a))
-	bCopy := make([]string, len(b))
+	removed := originalSet.Difference(newSet)
+	added := newSet.Difference(originalSet)
 
-	copy(aCopy, a)
-	copy(bCopy, b)
-
-	sort.Strings(aCopy)
-	sort.Strings(bCopy)
-
-	return reflect.DeepEqual(aCopy, bCopy)
+	return added.UnsortedList(), removed.UnsortedList()
 }
