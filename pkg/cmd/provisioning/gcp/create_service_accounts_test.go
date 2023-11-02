@@ -75,7 +75,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			generateOnly: true,
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
-				mockGetProjectName(mockGCPClient, 1)
+				mockGetProjectName(mockGCPClient, 3)
 				mockGetProject(mockGCPClient)
 				return mockGCPClient
 			},
@@ -106,7 +106,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				mockListServiceAccountsEmpty(mockGCPClient)
 				mockListRolesEmpty(mockGCPClient)
 				mockCreateServiceAccountSuccessful(mockGCPClient)
-				mockGetProjectName(mockGCPClient, 6)
+				mockGetProjectName(mockGCPClient, 8)
 				mockGetProject(mockGCPClient)
 				mockGetProjectIamPolicy(mockGCPClient)
 				mockSetProjectIamPolicy(mockGCPClient)
@@ -140,7 +140,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			generateOnly: false,
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
-				mockGetProjectName(mockGCPClient, 2)
+				mockGetProjectName(mockGCPClient, 4)
 				mockGetProject(mockGCPClient)
 				mockListServiceAccountsEmpty(mockGCPClient)
 				mockCreateServiceAccountFailed(mockGCPClient)
@@ -164,7 +164,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
 				mockListServiceAccountsNotEmpty(mockGCPClient)
 				mockListRolesNotEmpty(mockGCPClient)
-				mockGetProjectName(mockGCPClient, 6)
+				mockGetProjectName(mockGCPClient, 8)
 				mockGetProject(mockGCPClient)
 				mockGetProjectIamPolicy(mockGCPClient)
 				mockSetProjectIamPolicy(mockGCPClient)
@@ -290,7 +290,7 @@ func mockListRolesNotEmpty(mockGCPClient *mockgcp.MockClient) {
 		&iamadminpb.ListRolesResponse{
 			Roles: []*iamadminpb.Role{
 				{
-					Title: fmt.Sprintf("%s-%s", testName, testCredReqName),
+					Title: fmt.Sprintf("%s-%s", testProject, testCredReqName),
 				},
 			},
 		}, nil).Times(1)

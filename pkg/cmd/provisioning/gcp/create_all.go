@@ -60,7 +60,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 // validationForCreateAllCmd will validate the arguments to the command, ensure the destination directory
 // is ready to receive the generated files, and will create the directory if necessary.
 func validationForCreateAllCmd(cmd *cobra.Command, args []string) {
-	if len(CreateWorkloadIdentityPoolOpts.Name) > 32 {
+	if len(CreateAllOpts.Name) > 32 {
 		log.Fatalf("Name can be at most 32 characters long")
 	}
 

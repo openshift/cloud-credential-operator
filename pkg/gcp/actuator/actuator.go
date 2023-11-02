@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -106,14 +107,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		return err
 	}
 
-	if gcpStatus.RoleID != "" {
-		logger.Infof("deleting custom role %s from GCP", gcpStatus.RoleID)
-		roleName := fmt.Sprintf("projects/%s/roles/%s", a.ProjectName, gcpStatus.RoleID)
-		_, err := DeleteRole(gcpClient, roleName)
-		if err != nil {
-			return fmt.Errorf("failed to delete custom role %s: %v", gcpStatus.RoleID, err)
-		}
-	}
+	// Do not delete per-project custom roles, as they may be used by other clusters within the project
 
 	svcAcct, err := GetServiceAccount(gcpClient, gcpStatus.ServiceAccountID)
 	if err != nil {
@@ -319,15 +313,15 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 
 	if gcpStatus.RoleID == "" && len(gcpSpec.Permissions) > 0 {
 		// The role ID has a max length of 64 chars and can include only letters, numbers, period and underscores
-		// we sanitize infraName and crName to make them alphanumeric and then
-		// split role ID into 29_28_5 where the resulting string becomes:
-		// <infraName chopped to 29 chars>_<crName chopped to 28 chars>_<random 5 chars>
-		roleID, err := GenerateRoleID(infraName, cr.Name)
+		// we sanitize projectName and crName to make them alphanumeric and then
+		// split role ID into 32_31 where the resulting string becomes:
+		// <projectName chopped to 32 chars>_<crName chopped to 31 chars>
+		roleID, err := GenerateRoleID(a.ProjectName, cr.Name)
 		if err != nil {
 			return fmt.Errorf("error generating role ID: %v", err)
 		}
 		gcpStatus.RoleID = roleID
-		logger.WithField("role", gcpStatus.RoleID).Info("generated random ID for GCP custom role")
+		logger.WithField("role", gcpStatus.RoleID).Info("generated ID for GCP custom role")
 
 	}
 
@@ -414,8 +408,8 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 			logger.WithField("role", gcpStatus.RoleID).Debug("custom role does not exist, creating")
 
 			// The role name field has a 100 char max, so generate a name consisting of the
-			// infraName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
-			roleName, err := utils.GenerateNameWithFieldLimits(infraName, 50, cr.Name, 49)
+			// projectName chopped to 50 chars + the crName chopped to 49 chars (separated by a '-').
+			roleName, err := GenerateRoleName(a.ProjectName, cr.Name)
 			if err != nil {
 				return fmt.Errorf("error generating custom role name: %v", err)
 			}
@@ -426,9 +420,16 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 			}
 			roles = append(roles, role.Name)
 		} else {
-			if !AreSlicesEqualWithoutOrder(role.IncludedPermissions, gcpSpec.Permissions) {
+			addedPermissions, removedPermissions := CalculateSliceDiff(role.IncludedPermissions, gcpSpec.Permissions)
+
+			if len(removedPermissions) > 0 {
+				allRemovedPermissions := strings.Join(removedPermissions, ", ")
+				log.Printf("Unexpected permissions found on existing custom role %s: %s", role.Title, allRemovedPermissions)
+			}
+
+			if len(addedPermissions) > 0 {
 				logger.WithField("role", gcpStatus.RoleID).Info("custom role exists, updating the permissions")
-				role.IncludedPermissions = gcpSpec.Permissions
+				role.IncludedPermissions = append(role.IncludedPermissions, addedPermissions...)
 				_, err := UpdateRole(rootGCPClient, role, role.Name)
 				if err != nil {
 					return fmt.Errorf("error updating custom role %s: %v", role.Name, err)
