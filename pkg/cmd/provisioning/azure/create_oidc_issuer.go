@@ -205,7 +205,10 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 					Name: to.Ptr(armstorage.SKUNameStandardLRS),
 				},
 				Location: to.Ptr(region),
-				Tags:     mergedResourceTags,
+				Properties: &armstorage.AccountPropertiesCreateParameters{
+					AllowBlobPublicAccess: to.Ptr(true),
+				},
+				Tags: mergedResourceTags,
 			},
 			&armstorage.AccountsClientBeginCreateOptions{})
 		if err != nil {
