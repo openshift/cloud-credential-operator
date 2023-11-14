@@ -266,7 +266,7 @@ func NewOperator() *cobra.Command {
 
 			kubeClient := kubernetes.NewForConfigOrDie(cfg)
 			lock, err := resourcelock.New(
-				resourcelock.ConfigMapsLeasesResourceLock,
+				resourcelock.LeasesResourceLock,
 				minterv1.CloudCredOperatorNamespace,
 				leaderElectionLockName,
 				kubeClient.CoreV1(),
