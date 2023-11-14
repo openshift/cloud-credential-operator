@@ -294,9 +294,9 @@ func (a *VSphereActuator) syncTargetSecret(ctx context.Context, cr *minterv1.Cre
 			secret.Annotations = map[string]string{}
 		}
 		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
-		if secret.Data == nil {
-			secret.Data = map[string][]byte{}
-		}
+
+		secret.Data = map[string][]byte{}
+
 		for key, value := range secretData {
 			secret.Data[key] = value
 		}
