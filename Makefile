@@ -137,6 +137,10 @@ test-e2e-sts:
 	go test -mod=vendor -race -tags e2e ./test/e2e/aws/sts/...
 .PHONY: test-e2e-sts
 
+test-e2e-azident:
+	go test -mod=vendor -race -tags e2e ./test/e2e/azure/azident/...
+.PHONY: test-e2e-azident
+
 vet: verify-govet
 .PHONY: vet
 
