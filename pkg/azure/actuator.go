@@ -36,6 +36,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
@@ -68,20 +69,6 @@ func NewFakeActuator(c, rootCredClient client.Client,
 	}
 }
 
-func (a *Actuator) IsValidMode() error {
-	mode, err := a.client.Mode(context.Background())
-	if err != nil {
-		return err
-	}
-
-	switch mode {
-	case constants.PassthroughAnnotation:
-		return nil
-	default:
-		return errors.New("invalid mode")
-	}
-}
-
 func isAzureCredentials(providerSpec *runtime.RawExtension) (bool, error) {
 	var err error
 	unknown := runtime.Unknown{}
@@ -107,6 +94,19 @@ func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 	if !exists {
 		return true, nil
+	}
+
+	// Manual mode just update
+	credentialsMode, _, err := utils.GetOperatorConfiguration(a.client, logger)
+	if err != nil {
+		logger.WithError(err).Error("error loading CCO configuration to determine valid mode")
+		return true, err
+	}
+	if credentialsMode == operatorv1.CloudCredentialsModeManual {
+		return true, nil
+	}
+	if credentialsMode == operatorv1.CloudCredentialsModeMint {
+		return false, errors.New("mint mode is invalid")
 	}
 	// passthrough-specifc checks here (now the only kind of checks...)
 
@@ -160,11 +160,17 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 	if isAzure, err := isAzureCredentials(cr.Spec.ProviderSpec); !isAzure {
 		return err
 	}
-	if err := a.IsValidMode(); err != nil {
+	logger := a.getLogger(cr)
+	credentialsMode, _, err := utils.GetOperatorConfiguration(a.client, logger)
+	if err != nil {
+		logger.WithError(err).Error("error loading CCO configuration to determine valid mode")
 		return err
 	}
+	if credentialsMode == operatorv1.CloudCredentialsModeManual {
+		logger.Debug("running delete in manual mode")
+		return nil
+	}
 
-	logger := a.getLogger(cr)
 	logger.Debug("running delete")
 
 	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
@@ -230,6 +236,52 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		logger.Debug("credentials already up to date")
 		return nil
 	}
+	stsDetected, err := utils.IsTimedTokenCluster(a.client, ctx, logger)
+	if err != nil {
+		return err
+	}
+	if stsDetected {
+		logger.Debug("actuator detected Azure AD Workload Identity enabled cluster, enabling Workload Identity secret brokering for CredentialsRequests providing a Managed Identity")
+		azureProviderSpec, err := decodeProviderSpec(minterv1.Codec, cr)
+		if err != nil {
+			return err
+		}
+		azureFederatedTokenFile := cr.Spec.CloudTokenPath
+		if cr.Spec.CloudTokenPath == "" {
+			logger.Debugf("CredentialsRequest has no cloudTokenPath, defaulting azure_federated_token_file to %s", provisioning.OidcTokenPath)
+			azureFederatedTokenFile = provisioning.OidcTokenPath
+		}
+		// Check for old Manual Mode where all 4 fields are empty - defaulting to old behavior
+		// where CCO exists and the secret is created manually
+		if azureProviderSpec.AzureClientID == "" && azureProviderSpec.AzureTenantID == "" && azureProviderSpec.AzureSubscriptionID == "" && azureProviderSpec.AzureRegion == "" {
+			return nil
+		}
+		err = validateAzureProviderSpec(*azureProviderSpec)
+		if err != nil {
+			// At least one of the fields was set indicating that the new workload identity
+			// behavior of creating the secret is desired but not all fields required were
+			// provided.
+			msg := "error validating credentials request Azure AD Workload Identity fields"
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v: %v", msg, err),
+			}
+		}
+		desiredSecret := &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      cr.Spec.SecretRef.Name,
+				Namespace: cr.Spec.SecretRef.Namespace,
+			},
+			StringData: map[string]string{
+				AzureClientID:           azureProviderSpec.AzureClientID,
+				AzureTenantID:           azureProviderSpec.AzureTenantID,
+				AzureRegion:             azureProviderSpec.AzureRegion,
+				AzureSubscriptionID:     azureProviderSpec.AzureSubscriptionID,
+				AzureFederatedTokenFile: azureFederatedTokenFile,
+			},
+		}
+		return a.syncCredentialSecrets(ctx, cr, desiredSecret, logger)
+	}
 
 	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
@@ -259,7 +311,6 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 			Message:   msg,
 		}
 	}
-
 	return nil
 }
 
@@ -370,7 +421,25 @@ func (a *Actuator) cleanupAfterPassthroughPivot(ctx context.Context, cr *minterv
 
 	return nil
 }
-func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
+
+// For Azure Workload Identity, the generated Secret needs to look like this:
+/*
+	apiVersion: v1
+	stringData:
+	  azure_client_id: 0420bfd1-ab26-4b80-a9ac-deadbeeff1f9
+	  azure_tenant_id: 6047c7e9-b2ad-488d-a54e-deadbeefa7ee
+	  azure_region: centralus
+	  azure_subscription_id: 8c20ec23-8478-4f46-96f4-deadbeeff185
+	  azure_federated_token_file: /var/run/secrets/openshift/serviceaccount/token
+	kind: Secret
+	metadata:
+	  name: azure-cloud-credentials
+	  namespace: openshift-machine-api
+	type: Opaque
+*/
+// The first 4 fields need to come from `spec.ProviderSpec` in the CredentialsRequest with
+// spec.cloudTokenPath matching up to: `azure_federated_token_file`
+func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.CredentialsRequest, desiredSecret *corev1.Secret, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -391,16 +460,24 @@ func (a *Actuator) syncCredentialSecrets(ctx context.Context, cr *minterv1.Crede
 			secret.Annotations = map[string]string{}
 		}
 		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if desiredSecret.Data == nil {
+			if secret.StringData == nil {
+				secret.StringData = map[string]string{}
+			}
+			secret.StringData = desiredSecret.StringData
+			secret.Type = corev1.SecretTypeOpaque
+			return nil
+		}
 		if secret.Data == nil {
 			secret.Data = map[string][]byte{}
 		}
-		secret.Data[AzureClientID] = cloudCredsSecret.Data[AzureClientID]
-		secret.Data[AzureClientSecret] = cloudCredsSecret.Data[AzureClientSecret]
-		secret.Data[AzureRegion] = cloudCredsSecret.Data[AzureRegion]
-		secret.Data[AzureResourceGroup] = cloudCredsSecret.Data[AzureResourceGroup]
-		secret.Data[AzureResourcePrefix] = cloudCredsSecret.Data[AzureResourcePrefix]
-		secret.Data[AzureSubscriptionID] = cloudCredsSecret.Data[AzureSubscriptionID]
-		secret.Data[AzureTenantID] = cloudCredsSecret.Data[AzureTenantID]
+		secret.Data[AzureClientID] = desiredSecret.Data[AzureClientID]
+		secret.Data[AzureClientSecret] = desiredSecret.Data[AzureClientSecret]
+		secret.Data[AzureRegion] = desiredSecret.Data[AzureRegion]
+		secret.Data[AzureResourceGroup] = desiredSecret.Data[AzureResourceGroup]
+		secret.Data[AzureResourcePrefix] = desiredSecret.Data[AzureResourcePrefix]
+		secret.Data[AzureSubscriptionID] = desiredSecret.Data[AzureSubscriptionID]
+		secret.Data[AzureTenantID] = desiredSecret.Data[AzureTenantID]
 		return nil
 	})
 	sLog.WithField("operation", op).Info("processed secret")
@@ -463,9 +540,6 @@ func (a *Actuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) 
 	if isAzure, err := isAzureCredentials(cr.Spec.ProviderSpec); !isAzure {
 		return false, err
 	}
-	if err := a.IsValidMode(); err != nil {
-		return false, err
-	}
 
 	existingSecret := &corev1.Secret{}
 	err := a.client.Get(ctx, types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
@@ -491,4 +565,29 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 // value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
 	return utils.UpgradeableCheck(a.client.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
+}
+
+func validateAzureProviderSpec(azureProviderSpec minterv1.AzureProviderSpec) error {
+	var errors []error
+	isEmptyAzureClientID := azureProviderSpec.AzureClientID == ""
+	isEmptyAzureTenantID := azureProviderSpec.AzureTenantID == ""
+	isEmptyAzureSubscriptionID := azureProviderSpec.AzureSubscriptionID == ""
+	isEmptyAzureRegion := azureProviderSpec.AzureRegion == ""
+
+	if isEmptyAzureClientID {
+		errors = append(errors, fmt.Errorf("AzureClientID must not be empty"))
+	}
+	if isEmptyAzureTenantID {
+		errors = append(errors, fmt.Errorf("AzureTenantID must not be empty"))
+	}
+	if isEmptyAzureRegion {
+		errors = append(errors, fmt.Errorf("AzureRegion must not be empty"))
+	}
+	if isEmptyAzureSubscriptionID {
+		errors = append(errors, fmt.Errorf("AzureSubscriptionID must not be empty"))
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("AzureProviderSpec validation failed: %v", errors)
+	}
+	return nil
 }
