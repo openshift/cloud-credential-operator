@@ -47,6 +47,24 @@ type AzureProviderSpec struct {
 	// and RoleBindings.
 	// +optional
 	DataPermissions []string `json:"dataPermissions,omitempty"`
+
+	// The following fields are only required for Azure Workload Identity.
+	// AzureClientID is the ID of the specific application you created in Azure
+	// +optional
+	AzureClientID string `json:"azureClientID,omitempty"`
+
+	// AzureRegion is the geographic region of the Azure service.
+	// +optional
+	AzureRegion string `json:"azureRegion,omitempty"`
+
+	// Each Azure subscription has an ID associated with it, as does the tenant to which a subscription belongs.
+	// AzureSubscriptionID is the ID of the subscription.
+	// +optional
+	AzureSubscriptionID string `json:"azureSubscriptionID,omitempty"`
+
+	// AzureTenantID is the ID of the tenant to which the subscription belongs.
+	// +optional
+	AzureTenantID string `json:"azureTenantID,omitempty"`
 }
 
 // RoleBinding models part of the Azure RBAC Role Binding
