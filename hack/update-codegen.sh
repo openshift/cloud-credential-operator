@@ -2,6 +2,8 @@
 
 set -x
 
+verify="${VERIFY:-}"
+
 # set the passed in directory as a usable GOPATH
 # that deepcopy-gen can operate in
 ensure-temp-gopath() {
@@ -19,7 +21,15 @@ cd ${REPO_FULL_PATH}
 
 CODEGEN_PKG=${CODEGEN_PKG:-$(cd ${SCRIPT_ROOT}; ls -d -1 ./vendor/k8s.io/code-generator 2>/dev/null || echo ../../../k8s.io/code-generator)}
 
-verify="${VERIFY:-}"
+# HACK 1: For some reason this script is not executable.
+sed -i 's,^exec \(".*/generate-internal-groups.sh"\),bash \1,g' ${CODEGEN_PKG}/generate-groups.sh
+# HACK 2: For verification we need to ensure we don't remove files
+if test -n "$verify"; then
+  sed -i 's/xargs \-0 rm \-f/xargs -0 echo ""/g' ${CODEGEN_PKG}/generate-internal-groups.sh
+fi
+# ...but we have to put it back, or `verify` will puke.
+trap "git checkout ${CODEGEN_PKG}/generate-internal-groups.sh ${CODEGEN_PKG}/generate-groups.sh" EXIT
+
 
 valid_gopath=$(realpath $REPO_FULL_PATH/../../../..)
 if [[ "$(realpath ${valid_gopath}/src/github.com/openshift/cloud-credential-operator)" == "${REPO_FULL_PATH}" ]]; then
