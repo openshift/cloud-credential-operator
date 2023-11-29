@@ -74,7 +74,7 @@ func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret st
 	}
 	adapter, err := msgraphsdk.NewGraphRequestAdapter(authorizer)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to construct GraphRequest adatper: %v", err)
+		return nil, fmt.Errorf("Unable to construct GraphRequest adapter: %v", err)
 	}
 
 	return &AzureCredentialsMinter{
