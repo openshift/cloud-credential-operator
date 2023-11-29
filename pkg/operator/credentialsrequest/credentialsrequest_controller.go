@@ -531,7 +531,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			logger.Infof("operator set to disabled / manual mode")
 			return reconcile.Result{}, err
 		} else {
-			logger.Infof("operator detects STS enabled cluster")
+			logger.Infof("operator detects timed access token enabled cluster (STS, Workload Identity, etc.)")
 		}
 	}
 
