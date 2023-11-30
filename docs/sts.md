@@ -126,8 +126,9 @@ $ mkdir ./newstscluster ; mv serviceaccount-signer.public ./newstscluster/servic
 ```
 
 3. Create the AWS IAM Identity provider and the S3 bucket with the OIDC config files:
+In `<name-you-choose>` it will be the prefix of the OIDC bucket name and identity provider name that would be created (since under the hood it's an S3 bucket name, it should be globally unique).
 ```bash
-$ ./ccoctl aws create-identity-provider --output-dir newstscluster --name newstscluster --region us-east-2
+$ ./ccoctl aws create-identity-provider --output-dir newstscluster --name <name-you-choose> --region us-east-2
 ```
 
 4. Save/note the last line from that output which contains the ARN for the IAM Identity provider.
