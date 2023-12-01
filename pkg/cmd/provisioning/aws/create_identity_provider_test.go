@@ -25,7 +25,7 @@ import (
 
 const (
 	testInfraName     = "test-infra-name"
-	testRegionName    = "test-region"
+	testRegionName    = "us-west-2"
 	testPublicKeyFile = "publicKeyFile"
 	testPublicKeyData = "-----BEGIN PUBLIC KEY-----" +
 		"\nMIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEAwlzW80E8Tj19NCuPTdwd" +
