@@ -74,7 +74,8 @@ const (
 )
 
 type ControllerManagerOptions struct {
-	LogLevel string
+	LogLevel                string
+	LeaderElectionNamespace string
 }
 
 func NewOperator() *cobra.Command {
@@ -267,7 +268,7 @@ func NewOperator() *cobra.Command {
 			kubeClient := kubernetes.NewForConfigOrDie(cfg)
 			lock, err := resourcelock.New(
 				resourcelock.LeasesResourceLock,
-				minterv1.CloudCredOperatorNamespace,
+				opts.LeaderElectionNamespace,
 				leaderElectionLockName,
 				kubeClient.CoreV1(),
 				kubeClient.CoordinationV1(),
@@ -313,6 +314,7 @@ func NewOperator() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
+	cmd.PersistentFlags().StringVar(&opts.LeaderElectionNamespace, "leader-election-namespace", minterv1.CloudCredOperatorNamespace, "Namespace in which leader election locks should be held.")
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 	initializeGlog(cmd.PersistentFlags())
 	flag.CommandLine.Parse([]string{})
