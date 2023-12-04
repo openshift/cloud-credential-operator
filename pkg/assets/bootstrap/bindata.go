@@ -259,6 +259,7 @@ var _bootstrapCloudcredential_v1_operator_config_custresdefYaml = []byte(`apiVer
 kind: CustomResourceDefinition
 metadata:
   annotations:
+    capability.openshift.io/name: CloudCredential
     api-approved.openshift.io: https://github.com/openshift/api/pull/692
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
