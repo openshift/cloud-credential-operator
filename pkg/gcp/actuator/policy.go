@@ -18,6 +18,7 @@ package actuator
 
 import (
 	"fmt"
+
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iam/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -286,6 +287,11 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 		role, err := GetRole(gcpClient, roleID, projectName)
 		if err != nil {
 			return true, fmt.Errorf("error fetching custom role: %v", err)
+		}
+
+		// custom roles should not be in the deleted state
+		if role.Deleted {
+			return true, nil
 		}
 
 		addedPermissions, _ := CalculateSliceDiff(role.IncludedPermissions, permissions)
