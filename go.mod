@@ -25,7 +25,7 @@ require (
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/mitchellh/mapstructure v1.4.1 // indirect
 	github.com/nutanix-cloud-native/prism-go-client v0.2.1-0.20220804130801-c8a253627c64
-	github.com/openshift/api v0.0.0-20230724190601-61a5301895a5
+	github.com/openshift/api v0.0.0-20231204192004-bfea29e5e6c4
 	github.com/openshift/build-machinery-go v0.0.0-20230306181456-d321ffa04533
 	github.com/openshift/library-go v0.0.0-20230620084201-504ca4bd5a83
 	github.com/pkg/errors v0.9.1
