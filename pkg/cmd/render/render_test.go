@@ -1,11 +1,13 @@
 package render
 
 import (
+	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
+
+	v1 "github.com/openshift/api/config/v1"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 	"github.com/stretchr/testify/assert"
@@ -85,16 +87,16 @@ func TestRender(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			manifestsDir, err := ioutil.TempDir("/tmp", "rendertestmanifests")
+			manifestsDir, err := os.MkdirTemp("/tmp", "rendertestmanifests")
 			require.NoError(t, err, "errored setting up test")
 			defer os.RemoveAll(manifestsDir)
 
 			for _, file := range test.existingFiles {
 				filePath := filepath.Join(manifestsDir, file.name)
-				err := ioutil.WriteFile(filePath, []byte(file.data), 0644)
+				err := os.WriteFile(filePath, []byte(file.data), 0644)
 				require.NoError(t, err, "failed writing out manifests for test")
 			}
-			destDir, err := ioutil.TempDir("/tmp", "rendertestdestination")
+			destDir, err := os.MkdirTemp("/tmp", "rendertestdestination")
 			require.NoError(t, err, "errored setting up test")
 			defer os.RemoveAll(destDir)
 
@@ -163,6 +165,29 @@ func verifyConfigMode(t *testing.T, destDir, expectMode string) {
 	require.NoError(t, err, "error decoding rendered config")
 
 	assert.Equal(t, expectMode, string(conf.Spec.CredentialsMode), "config file has unexpected mode set")
+}
+
+func TestInstallConfig(t *testing.T) {
+	installConfigData := `baseDomain: test.openshift.io
+credentialsMode: Manual
+capabilities:
+  baselineCapabilitySet: v4.13
+  additionalEnabledCapabilities:
+  - CloudCredential`
+
+	capSpec := &v1.ClusterVersionCapabilitiesSpec{
+		BaselineCapabilitySet:         v1.ClusterVersionCapabilitySet4_13,
+		AdditionalEnabledCapabilities: []v1.ClusterVersionCapability{v1.ClusterVersionCapabilityCloudCredential},
+	}
+
+	ic := &basicInstallConfig{}
+	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewBufferString(installConfigData), 4096)
+	err := decoder.Decode(&ic)
+	assert.NoError(t, err)
+	assert.Equal(t, operatorv1.CloudCredentialsModeManual, ic.CredentialsMode)
+	assert.Equal(t, capSpec, ic.Capabilities)
+
+	assert.Equal(t, false, isDisabledViaCapability(ic.Capabilities))
 }
 
 func testConfigMap(disabled string) *testFile {
