@@ -95,6 +95,14 @@ func DeleteRole(gcpClient ccgcp.Client, roleName string) (*iamadminpb.Role, erro
 	return role, err
 }
 
+// UndeleteRole undeletes a previously deleted role that has not yet been pruned
+func UndeleteRole(gcpClient ccgcp.Client, roleName string) (*iamadminpb.Role, error) {
+	role, err := gcpClient.UndeleteRole(context.TODO(), &iamadminpb.UndeleteRoleRequest{
+		Name: roleName,
+	})
+	return role, err
+}
+
 // GenerateRoleID generates a unique ID for the role given project name and credentials request name.
 // The role ID has a max length of 64 chars and can include only letters, numbers, period and underscores
 // we sanitize projectName and crName to make them alphanumeric and then

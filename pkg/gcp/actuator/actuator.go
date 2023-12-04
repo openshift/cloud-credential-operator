@@ -420,11 +420,20 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 			}
 			roles = append(roles, role.Name)
 		} else {
+			if role.Deleted {
+				_, err = UndeleteRole(rootGCPClient, role.Name)
+				if err != nil {
+					return fmt.Errorf("error undeleting custom role %s: %v", role.Name, err)
+				}
+				role.Deleted = false
+				logger.WithField("role", gcpStatus.RoleID).Info("custom role was previously deleted, undeleting")
+			}
+
 			addedPermissions, removedPermissions := CalculateSliceDiff(role.IncludedPermissions, gcpSpec.Permissions)
 
 			if len(removedPermissions) > 0 {
 				allRemovedPermissions := strings.Join(removedPermissions, ", ")
-				log.Printf("Unexpected permissions found on existing custom role %s: %s", role.Title, allRemovedPermissions)
+				logger.WithField("role", gcpStatus.RoleID).WithField("permissions", allRemovedPermissions).Warnf("unexpected permissions found on existing custom role")
 			}
 
 			if len(addedPermissions) > 0 {
