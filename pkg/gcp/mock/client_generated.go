@@ -526,6 +526,21 @@ func (mr *MockClientMockRecorder) TestIamPermissions(arg0, arg1 interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TestIamPermissions", reflect.TypeOf((*MockClient)(nil).TestIamPermissions), arg0, arg1)
 }
 
+// UndeleteRole mocks base method.
+func (m *MockClient) UndeleteRole(arg0 context.Context, arg1 *admin.UndeleteRoleRequest) (*admin.Role, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UndeleteRole", arg0, arg1)
+	ret0, _ := ret[0].(*admin.Role)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UndeleteRole indicates an expected call of UndeleteRole.
+func (mr *MockClientMockRecorder) UndeleteRole(arg0, arg1 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndeleteRole", reflect.TypeOf((*MockClient)(nil).UndeleteRole), arg0, arg1)
+}
+
 // UndeleteWorkloadIdentityPool mocks base method.
 func (m *MockClient) UndeleteWorkloadIdentityPool(arg0 context.Context, arg1 string, arg2 *iam0.UndeleteWorkloadIdentityPoolRequest) (*iam0.Operation, error) {
 	m.ctrl.T.Helper()
