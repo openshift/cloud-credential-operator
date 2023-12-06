@@ -48,6 +48,7 @@ type Client interface {
 	CreateRole(context.Context, *iamadminpb.CreateRoleRequest) (*iamadminpb.Role, error)
 	UpdateRole(context.Context, *iamadminpb.UpdateRoleRequest) (*iamadminpb.Role, error)
 	DeleteRole(context.Context, *iamadminpb.DeleteRoleRequest) (*iamadminpb.Role, error)
+	UndeleteRole(context.Context, *iamadminpb.UndeleteRoleRequest) (*iamadminpb.Role, error)
 	ListRoles(context.Context, *iamadminpb.ListRolesRequest) (*iamadminpb.ListRolesResponse, error)
 	GetServiceAccount(context.Context, *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error)
 	ListServiceAccountKeys(context.Context, *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error)
@@ -148,6 +149,12 @@ func (c *gcpClient) DeleteRole(ctx context.Context, request *iamadminpb.DeleteRo
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
 	return c.iamClient.DeleteRole(ctx, request)
+}
+
+func (c *gcpClient) UndeleteRole(ctx context.Context, request *iamadminpb.UndeleteRoleRequest) (*iamadminpb.Role, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamClient.UndeleteRole(ctx, request)
 }
 
 func (c *gcpClient) ListRoles(ctx context.Context, request *iamadminpb.ListRolesRequest) (*iamadminpb.ListRolesResponse, error) {
