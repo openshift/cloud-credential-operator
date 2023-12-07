@@ -19,17 +19,19 @@ package render
 import (
 	"bytes"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"text/template"
+
+	v1 "github.com/openshift/api/config/v1"
+	"k8s.io/apimachinery/pkg/util/sets"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
-	yaml "k8s.io/apimachinery/pkg/util/yaml"
+	"k8s.io/apimachinery/pkg/util/yaml"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
@@ -143,12 +145,19 @@ func runRenderCmd(cmd *cobra.Command, args []string) {
 func render() error {
 	operatorDisabledViaConfigmap := isDisabledViaConfigmap()
 
-	installConfigMode, err := getModeFromInstallConfig()
+	installConfig, err := getInstallConfig()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to read install config")
 	}
+
+	installConfigMode := installConfig.CredentialsMode
+
 	if !isValidMode(installConfigMode) {
 		return fmt.Errorf("invalid mode defined: %s", installConfigMode)
+	}
+
+	if isDisabledViaCapability(installConfig.Capabilities) {
+		return nil
 	}
 
 	effectiveMode, conflict := utils.GetEffectiveOperatorMode(operatorDisabledViaConfigmap, installConfigMode)
@@ -201,7 +210,7 @@ func render() error {
 		podPath := filepath.Join(ccoRenderDir, bootstrapManifestsDir, podYamlFilename)
 		podContent := fmt.Sprintf(podTemplate, renderOpts.ccoImage)
 		log.Infof("writing file: %s", podPath)
-		err := ioutil.WriteFile(podPath, []byte(podContent), 0644)
+		err := os.WriteFile(podPath, []byte(podContent), 0644)
 		if err != nil {
 			return errors.Wrap(err, "failed to write file")
 		}
@@ -212,9 +221,23 @@ func render() error {
 	return nil
 }
 
+func isDisabledViaCapability(capabilities *v1.ClusterVersionCapabilitiesSpec) bool {
+	baselineSet := v1.ClusterVersionCapabilitySetCurrent
+	if capabilities != nil && capabilities.BaselineCapabilitySet != "" {
+		baselineSet = capabilities.BaselineCapabilitySet
+	}
+
+	enabledCaps := sets.New[v1.ClusterVersionCapability](v1.ClusterVersionCapabilitySets[baselineSet]...)
+	if capabilities != nil {
+		enabledCaps.Insert(capabilities.AdditionalEnabledCapabilities...)
+	}
+
+	return !enabledCaps.Has(v1.ClusterVersionCapabilityCloudCredential)
+}
+
 func writeFile(filePath string, fileData []byte) error {
 	log.Infof("Writing file: %s", filePath)
-	err := ioutil.WriteFile(filePath, fileData, 0644)
+	err := os.WriteFile(filePath, fileData, 0644)
 	if err != nil {
 		return errors.Wrap(err, "failed to write file")
 	}
@@ -264,42 +287,44 @@ func isDisabledViaConfigmap() bool {
 }
 
 type basicInstallConfig struct {
-	CredentialsMode operatorv1.CloudCredentialsMode `json:"credentialsMode"`
+	CredentialsMode operatorv1.CloudCredentialsMode    `json:"credentialsMode"`
+	Capabilities    *v1.ClusterVersionCapabilitiesSpec `json:"capabilities"`
 }
 
-func getModeFromInstallConfig() (operatorv1.CloudCredentialsMode, error) {
+func getInstallConfig() (*basicInstallConfig, error) {
+	instConf := &basicInstallConfig{}
 
 	// if we were not provided a place to search for the install-time manifests,
 	// just return the default cloudCredentialsMode (empty string)
 	if renderOpts.manifestsDir == "" {
-		return "", nil
+		return instConf, nil
 	}
 
 	cm, err := getConfigMap(renderOpts.manifestsDir, installConfigNamespace, installConfigName)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to find configmap %s/%s in manifests", installConfigNamespace, installConfigName)
+		return nil, errors.Wrapf(err, "failed to find configmap %s/%s in manifests", installConfigNamespace, installConfigName)
 	}
 	if cm == nil {
-		return "", fmt.Errorf("failed to find configmap %s/%s in manifests", installConfigNamespace, installConfigName)
+		return nil, fmt.Errorf("failed to find configmap %s/%s in manifests", installConfigNamespace, installConfigName)
 	}
 
 	data, ok := cm.Data[installConfigKeyName]
 	if !ok {
-		return "", fmt.Errorf("did not find key %s in configmap %s/%s", installConfigKeyName, installConfigNamespace, installConfigName)
+		return nil, fmt.Errorf("did not find key %s in configmap %s/%s", installConfigKeyName, installConfigNamespace, installConfigName)
 	}
 
 	decoder := yaml.NewYAMLOrJSONDecoder(bytes.NewReader([]byte(data)), 4096)
-	instConf := &basicInstallConfig{}
 	if err := decoder.Decode(instConf); err != nil {
-		return "", errors.Wrap(err, "failed to decode install config")
+		return nil, errors.Wrap(err, "failed to decode install config")
 	}
 	log.Debugf("install-config contains CredentialsMode: %s", instConf.CredentialsMode)
-	return instConf.CredentialsMode, nil
+
+	return instConf, nil
 }
 
 func getConfigMap(manifestsDir, namespace, name string) (*corev1.ConfigMap, error) {
 
-	files, err := ioutil.ReadDir(manifestsDir)
+	files, err := os.ReadDir(manifestsDir)
 	if err != nil {
 		log.WithError(err).Errorf("failed to list files in %s", manifestsDir)
 		return nil, err
