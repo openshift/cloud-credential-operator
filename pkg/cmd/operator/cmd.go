@@ -59,7 +59,6 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
@@ -74,7 +73,8 @@ const (
 )
 
 type ControllerManagerOptions struct {
-	LogLevel string
+	LogLevel   string
+	Kubeconfig string
 }
 
 func NewOperator() *cobra.Command {
@@ -93,9 +93,12 @@ func NewOperator() *cobra.Command {
 
 			// Get a config to talk to the apiserver
 			log.Info("setting up client for manager")
-			cfg, err := config.GetConfig()
+			rules := clientcmd.NewDefaultClientConfigLoadingRules()
+			rules.ExplicitPath = opts.Kubeconfig
+			kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
+			cfg, err := kubeconfig.ClientConfig()
 			if err != nil {
-				log.WithError(err).Fatal("unable to set up client config")
+				log.WithError(err).Fatal("failed to parse kubeconfig")
 			}
 
 			run := func(ctx context.Context) {
@@ -106,20 +109,12 @@ func NewOperator() *cobra.Command {
 				ctrlruntimelog.SetLogger(logr.New(ctrlruntimelog.NullLogSink{}))
 
 				log.Info("checking prerequisites")
-				kubeconfigCommandLinePath := cmd.PersistentFlags().Lookup("kubeconfig").Value.String()
-				rules := clientcmd.NewDefaultClientConfigLoadingRules()
-				rules.ExplicitPath = kubeconfigCommandLinePath
-				kubeconfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, &clientcmd.ConfigOverrides{})
-				cfg, err := kubeconfig.ClientConfig()
-				if err != nil {
-					log.WithError(err).Fatal("failed to parse kubeconfig")
-				}
 				coreClient, err := corev1client.NewForConfig(cfg)
 				if err != nil {
 					log.WithError(err).Fatal("failed to set up client")
 				}
 
-				infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeconfigCommandLinePath)
+				infraStatus, err := platform.GetInfraStatusUsingKubeconfig(opts.Kubeconfig)
 				if err != nil {
 					log.Fatal(err)
 				}
@@ -207,7 +202,7 @@ func NewOperator() *cobra.Command {
 
 				// Setup all Controllers
 				log.Info("setting up controllers")
-				if err := controller.AddToManager(mgr, rootMgr, kubeconfigCommandLinePath, coreClient); err != nil {
+				if err := controller.AddToManager(mgr, rootMgr, opts.Kubeconfig, coreClient); err != nil {
 					log.WithError(err).Fatal("unable to register controllers to the manager")
 				}
 
@@ -313,6 +308,7 @@ func NewOperator() *cobra.Command {
 	}
 
 	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
+	cmd.PersistentFlags().StringVar(&opts.Kubeconfig, "kubeconfig", "", "Path to the kubeconfig to use.")
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 	initializeGlog(cmd.PersistentFlags())
 	flag.CommandLine.Parse([]string{})
