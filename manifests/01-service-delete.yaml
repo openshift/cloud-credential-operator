@@ -2,6 +2,7 @@ apiVersion: v1
 kind: Service
 metadata:
   annotations:
+    capability.openshift.io/name: CloudCredential
     include.release.openshift.io/self-managed-high-availability: "true"
     release.openshift.io/delete: "true"
   labels:
