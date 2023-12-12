@@ -208,7 +208,7 @@ func (a *Actuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequest) 
 		// Just log and move on, the App Registration is properly tagged so some Service Principal with the
 		// new Microsoft Graph API permissions can find/delete the orphaned resources.
 		// TODO: log to ClusterOperator???
-		logger.WithError(err).Error("failed to delete App Registration / Serivce Principal")
+		logger.WithError(err).Error("failed to delete App Registration / Service Principal")
 	}
 
 	return nil
