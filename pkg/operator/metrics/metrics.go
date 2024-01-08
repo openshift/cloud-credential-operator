@@ -74,7 +74,7 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	logger := log.WithField("controller", controllerName)
 
 	mc := &Calculator{
-		Client:   mgr.GetClient(),
+		Client:   utils.LiveClient(mgr),
 		Interval: 2 * time.Minute,
 		log:      logger,
 	}
