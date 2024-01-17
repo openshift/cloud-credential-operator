@@ -3,11 +3,10 @@ package aws
 import (
 	"bytes"
 	"crypto/sha1"
-	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"log"
-	"net/url"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -280,21 +279,23 @@ func createIdentityProvider(client aws.Client, name, region, publicKeyPath, targ
 }
 
 func getTLSFingerprint(bucketURL string) (string, error) {
-	u, err := url.Parse(bucketURL)
+	client := http.DefaultClient
+	resp, err := client.Head(bucketURL)
 	if err != nil {
-		return "", err
+		return "", errors.Wrapf(err, "error validating TLS Fingerprint")
+	}
+	defer resp.Body.Close()
+
+	if resp.TLS == nil {
+		return "", errors.Wrapf(err, "unable to get TLS connection from URL %s", bucketURL)
+	}
+	if resp.TLS.PeerCertificates == nil {
+		return "", errors.Wrapf(err, "unable to get TLS PeerCertificates from connection URL %s", bucketURL)
 	}
 
-	urlWithPort := fmt.Sprintf("%s:443", u.Host)
+	certs := resp.TLS.PeerCertificates
 
-	conn, err := tls.Dial("tcp", urlWithPort, &tls.Config{})
-	if err != nil {
-		return "", err
-	}
-
-	certs := conn.ConnectionState().PeerCertificates
 	numCerts := len(certs)
-
 	fingerprint := sha1.Sum(certs[numCerts-1].Raw)
 	var buf bytes.Buffer
 	for _, f := range fingerprint {
