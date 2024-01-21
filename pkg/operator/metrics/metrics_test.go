@@ -49,7 +49,8 @@ var (
 )
 
 func TestSecretGetter(t *testing.T) {
-	configv1.AddToScheme(scheme.Scheme)
+	err := configv1.Install(scheme.Scheme)
+	assert.NoError(t, err, "error installing configv1 types to scheme")
 
 	logger := log.WithField("controller", "metricscontrollertest")
 
@@ -112,11 +113,12 @@ func TestSecretGetter(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.clusterInfra, test.cloudCredsSecret).Build()
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.clusterInfra).Build()
+			fakeRootClient := fake.NewClientBuilder().WithRuntimeObjects(test.cloudCredsSecret).Build()
 			calc := &Calculator{
-				Client: fakeClient,
-				log:    logger,
+				Client:     fakeClient,
+				rootClient: fakeRootClient,
+				log:        logger,
 			}
 
 			secret, err := calc.getCloudSecret()
