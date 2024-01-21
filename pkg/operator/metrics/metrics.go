@@ -74,9 +74,10 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	logger := log.WithField("controller", controllerName)
 
 	mc := &Calculator{
-		Client:   utils.LiveClient(mgr),
-		Interval: 2 * time.Minute,
-		log:      logger,
+		Client:     mgr.GetClient(),
+		rootClient: rootCredentialManager.GetClient(),
+		Interval:   2 * time.Minute,
+		log:        logger,
 	}
 	err := mgr.Add(mc)
 	if err != nil {
@@ -92,7 +93,11 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 // This should be used for metrics which do not fit well into controller reconcile loops,
 // things that are calculated globally rather than metrics related to specific reconciliations.
 type Calculator struct {
+	// controller-runtime client used for querying anything except the root credential
 	Client client.Client
+
+	// controller-runtime client used for querying the root credential only
+	rootClient client.Client
 
 	// Interval is the length of time we sleep between metrics calculations.
 	Interval time.Duration
@@ -181,7 +186,7 @@ func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
 		mc.log.WithField("cloud", platformType).Info("unsupported cloud for determining CCO mode")
 		return nil, nil
 	}
-	err = mc.Client.Get(context.TODO(), secretKey, secret)
+	err = mc.rootClient.Get(context.TODO(), secretKey, secret)
 	return secret, err
 }
 
