@@ -90,7 +90,7 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 // a standard controller watching Kube resources, it runs periodically and then goes to sleep.
 //
 // This should be used for metrics which do not fit well into controller reconcile loops,
-// things that are calculated globally rather than metrics releated to specific reconciliations.
+// things that are calculated globally rather than metrics related to specific reconciliations.
 type Calculator struct {
 	Client client.Client
 
@@ -178,7 +178,7 @@ func (mc *Calculator) getCloudSecret() (*corev1.Secret, error) {
 	case configv1.KubevirtPlatformType:
 		secretKey.Name = constants.KubevirtCloudCredSecretName
 	default:
-		mc.log.WithField("cloud", platformType).Info("unsupported cloud for determing CCO mode")
+		mc.log.WithField("cloud", platformType).Info("unsupported cloud for determining CCO mode")
 		return nil, nil
 	}
 	err = mc.Client.Get(context.TODO(), secretKey, secret)
@@ -227,7 +227,7 @@ func newAccumulator(client client.Client, logger log.FieldLogger) *credRequestAc
 	}
 
 	// make entries with '0' so we make sure to send updated metrics for any
-	// condititons that may have cleared
+	// conditions that may have cleared
 	for _, c := range credreqv1.FailureConditionTypes {
 		acc.crConditions[c] = 0
 	}
