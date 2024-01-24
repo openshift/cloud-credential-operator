@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"fmt"
 	"testing"
 
 	log "github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
 
@@ -46,6 +48,14 @@ var (
 		Type:   credreqv1.StaleCredentials,
 		Status: corev1.ConditionTrue,
 	}
+
+	azurePassthroughCredsTemplate = `azure_client_id: %s
+azure_client_secret: %s
+azure_region: %s
+azure_resource_prefix: %s
+azure_resourcegroup: %s
+azure_subscription_id: %s
+azure_tenant_id: %s`
 )
 
 func TestSecretGetter(t *testing.T) {
@@ -129,9 +139,6 @@ func TestSecretGetter(t *testing.T) {
 }
 
 func TestCredentialsRequests(t *testing.T) {
-	credreqv1.AddToScheme(scheme.Scheme)
-	configv1.AddToScheme(scheme.Scheme)
-
 	logger := log.WithField("controller", "metricscontrollertest")
 
 	tests := []struct {
@@ -226,6 +233,26 @@ func TestCredentialsRequests(t *testing.T) {
 			},
 			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				assert.Equal(t, 2, accumulator.crTotals["aws"])
+				assert.Equal(t, 1, accumulator.podIdentityCredentials)
+			},
+		},
+		{
+			name:        "cco manual mode with Azure Workload Identity",
+			ccoDisabled: true,
+			existingObjects: []runtime.Object{
+				testSecret("wi-namespace", "wi-name", map[string][]byte{
+					azure.AzureFederatedTokenFile: []byte("/path/to/mounted/service/account/token"),
+				}),
+				testSecret("non-wi-namespace", "non-wi-name", map[string][]byte{
+					"credentials": []byte(fmt.Sprintf(azurePassthroughCredsTemplate, "foo", "bar", "baz", "quux", "fred", "thud", "grault")),
+				}),
+			},
+			credReqs: []credreqv1.CredentialsRequest{
+				testCredRequestWithSecretRef(testAzureCredRequest("wi-style"), "wi-namespace", "wi-name"),
+				testCredRequestWithSecretRef(testAzureCredRequest("non-wi-style"), "non-wi-namespace", "non-wi-name"),
+			},
+			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
+				assert.Equal(t, 2, accumulator.crTotals["azure"])
 				assert.Equal(t, 1, accumulator.podIdentityCredentials)
 			},
 		},
@@ -380,6 +407,29 @@ func testAWSCredRequest(name string) credreqv1.CredentialsRequest {
 		panic("failed to encode AWSProviderSpec for test")
 	}
 	cr.Spec.ProviderSpec = awsProviderSpec
+	return cr
+}
+
+func testAzureCredRequest(name string) credreqv1.CredentialsRequest {
+	cr := credreqv1.CredentialsRequest{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: "openshift-cloud-credential-operator",
+		},
+		Spec: credreqv1.CredentialsRequestSpec{},
+	}
+
+	azureProviderSpec, err := credreqv1.Codec.EncodeProviderSpec(
+		&credreqv1.AzureProviderSpec{
+			TypeMeta: metav1.TypeMeta{
+				Kind: "AzureProviderSpec",
+			},
+		},
+	)
+	if err != nil {
+		panic("failed to encode AzureProviderSpec for test")
+	}
+	cr.Spec.ProviderSpec = azureProviderSpec
 	return cr
 }
 

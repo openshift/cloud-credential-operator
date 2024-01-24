@@ -21,6 +21,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
@@ -388,6 +389,9 @@ func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string
 		}
 
 		return false, nil
+	case "AzureProviderSpec":
+		_, ok := secret.Data[azure.AzureFederatedTokenFile]
+		return ok, nil
 	default:
 		return false, nil
 	}
