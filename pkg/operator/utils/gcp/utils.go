@@ -190,6 +190,7 @@ func filterOutPermissions(gcpClient ccgcp.Client, projectName string, permList [
 func CheckPermissionsAgainstPermissionList(gcpClient ccgcp.Client, permList []string, logger log.FieldLogger) (bool, error) {
 
 	projectName := gcpClient.GetProjectName()
+	projectNamePath := fmt.Sprintf(`//cloudresourcemanager.googleapis.com/projects/%s`, projectName)
 
 	filteredPermList, err := filterOutPermissions(gcpClient, projectName, permList, logger)
 	if err != nil {
@@ -210,7 +211,7 @@ func CheckPermissionsAgainstPermissionList(gcpClient ccgcp.Client, permList []st
 			end = permLen
 		}
 		req := &cloudresourcemanager.TestIamPermissionsRequest{Permissions: filteredPermList[i:end]}
-		resp, err := gcpClient.TestIamPermissions(projectName, req)
+		resp, err := gcpClient.TestIamPermissions(projectNamePath, req)
 		if err != nil {
 			return false, fmt.Errorf("error testing permissions: %v", err)
 		}
