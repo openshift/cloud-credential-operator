@@ -110,7 +110,7 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	}
 
 	// always reconcile status when the clusteroperator/cloud-credential changes.
-	if err := c.Watch(source.Kind(operatorCache, &configv1.ClusterOperator{}), &handler.EnqueueRequestForObject{}, predicate.Funcs{
+	if err := c.Watch(source.Kind(operatorCache, &configv1.ClusterOperator{}), handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject), predicate.Funcs{
 		GenericFunc: func(genericEvent event.GenericEvent) bool {
 			if genericEvent.Object == nil {
 				return false
