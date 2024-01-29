@@ -63,7 +63,7 @@ func LoadInfrastructureRegion(c client.Client, logger log.FieldLogger) (string, 
 		logger.WithError(err).Error("error loading Infrastructure region")
 		return "", err
 	}
-	if infra.Status.PlatformStatus == nil {
+	if infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.AWS == nil {
 		// Older clusters may have an Infrastructure object without the PlatformStatus fields.
 		// Send back an empty region and the AWS client will use default settings.
 		// The permissions simulation will also simply not fill out the region for simulations.

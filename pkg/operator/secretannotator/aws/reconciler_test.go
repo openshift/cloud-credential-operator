@@ -150,6 +150,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			name: "cred passthrough mode",
 			existing: []runtime.Object{
 				testOperatorConfig(""),
+				testInfrastructure(configv1.AWSPlatformType),
 			},
 			existingRootCred: []runtime.Object{
 				testSecret(),
@@ -170,6 +171,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			name: "cred passthrough mode wrong region permission",
 			existing: []runtime.Object{
 				testOperatorConfig(""),
+				testInfrastructure(configv1.AWSPlatformType),
 			},
 			existingRootCred: []runtime.Object{
 				testSecret(),
@@ -190,6 +192,28 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			name: "useless creds",
 			existing: []runtime.Object{
 				testOperatorConfig(""),
+				testInfrastructure(configv1.AWSPlatformType),
+			},
+			existingRootCred: []runtime.Object{
+				testSecret(),
+			},
+			mockAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient)
+
+				mockGetUser(mockAWSClient)
+				mockSimulatePrincipalPolicyCredPassthroughFail(mockAWSClient)
+
+				return mockAWSClient
+			},
+			validateAnnotationValue: constants.InsufficientAnnotation,
+		},
+		{
+			name: "useless creds - None platform",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				testInfrastructure(configv1.NonePlatformType),
 			},
 			existingRootCred: []runtime.Object{
 				testSecret(),
@@ -267,24 +291,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
-			infra := &configv1.Infrastructure{
-				ObjectMeta: metav1.ObjectMeta{
-					Name: "cluster",
-				},
-				Status: configv1.InfrastructureStatus{
-					Platform:           configv1.AWSPlatformType,
-					InfrastructureName: testInfraName,
-					PlatformStatus: &configv1.PlatformStatus{
-						AWS: &configv1.AWSPlatformStatus{
-							Region: testAWSRegion,
-						},
-					},
-				},
-			}
-
-			existing := append(test.existing, infra)
-
-			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(test.existing...).Build()
 			fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingRootCred...).Build()
 
 			fakeAWSClient := mockaws.NewMockClient(mockCtrl)
@@ -356,6 +363,27 @@ func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudC
 	}
 
 	return conf
+}
+
+func testInfrastructure(platformType configv1.PlatformType) *configv1.Infrastructure {
+	infra := &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+		Status: configv1.InfrastructureStatus{
+			Platform:           platformType,
+			InfrastructureName: testInfraName,
+			PlatformStatus: &configv1.PlatformStatus{
+				Type: platformType,
+			},
+		},
+	}
+	if platformType == configv1.AWSPlatformType {
+		infra.Status.PlatformStatus.AWS = &configv1.AWSPlatformStatus{
+			Region: testAWSRegion,
+		}
+	}
+	return infra
 }
 
 func mockGetRootUser(mockAWSClient *mockaws.MockClient) {
