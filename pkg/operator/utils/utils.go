@@ -107,25 +107,6 @@ func LoadInfrastructureName(c client.Client, logger log.FieldLogger) (string, er
 	return infra.Status.InfrastructureName, nil
 }
 
-// LoadInfrastructureRegion loads the AWS region the cluster is installed to.
-func LoadInfrastructureRegion(c client.Client, logger log.FieldLogger) (string, error) {
-	infra, err := GetInfrastructure(c)
-	if err != nil {
-		logger.WithError(err).Error("error loading Infrastructure region")
-		return "", err
-	}
-	if infra.Status.PlatformStatus == nil {
-		// Older clusters may have an Infrastructure object without the PlatformStatus fields.
-		// Send back an empty region and the AWS client will use default settings.
-		// The permissions simulation will also simply not fill out the region for simulations.
-		// TODO: Once the oldest supported version of OpenShift includes the new migration operator,
-		// we can remove this legacy handling and know that PlatformStatus/Region is set
-		// https://github.com/openshift/cloud-credential-operator/pull/195#discussion_r432089284
-		return "", nil
-	}
-	return infra.Status.PlatformStatus.AWS.Region, nil
-}
-
 // GetInfrastructure will return the cluster's Infrastructure object.
 func GetInfrastructure(c client.Client) (*configv1.Infrastructure, error) {
 	infra := &configv1.Infrastructure{}
