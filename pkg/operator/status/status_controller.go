@@ -112,13 +112,13 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	// always reconcile status when the clusteroperator/cloud-credential changes.
 	if err := c.Watch(source.Kind(operatorCache, &configv1.ClusterOperator{}), handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject), predicate.Funcs{
 		CreateFunc: func(e event.CreateEvent) bool {
-			return e.Object.GetName() == constants.CloudCredClusterOperatorName
+			return e.Object != nil && e.Object.GetName() == constants.CloudCredClusterOperatorName
 		},
 		UpdateFunc: func(e event.UpdateEvent) bool {
-			return e.ObjectNew.GetName() == constants.CloudCredClusterOperatorName
+			return e.ObjectNew != nil && e.ObjectNew.GetName() == constants.CloudCredClusterOperatorName
 		},
 		DeleteFunc: func(e event.DeleteEvent) bool {
-			return e.Object.GetName() == constants.CloudCredClusterOperatorName
+			return e.Object != nil && e.Object.GetName() == constants.CloudCredClusterOperatorName
 		},
 	}); err != nil {
 		return err
