@@ -456,6 +456,18 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 		return upgradeableCondition
 	}
 
+	// Guard against upgrading GCP from 4.14 to 4.15 without RoleAdmin role.
+	if platformType == configv1.GCPPlatformType && (mode == operatorv1.CloudCredentialsModeMint || mode == operatorv1.CloudCredentialsModeDefault) {
+		upgradeableCondition.Status = configv1.ConditionFalse
+		upgradeableCondition.Reason = constants.MissingUpgradeableAnnotationReason
+		upgradeableCondition.Message = fmt.Sprintf("The GCP service account requires additional permissions starting with v4.15."+
+			" Ensure the service account has the RoleAdmin role before proceeding."+
+			" See 'Required GCP roles' in the documentation for more information."+
+			" Upgradeable annotation %s on cloudcredential.operator.openshift.io/cluster object needs updating before the upgrade can proceed."+
+			" See 'Indicating that the cluster is ready to upgrade' for instructions on setting the upgradeable annotation.", constants.UpgradeableAnnotation)
+		return upgradeableCondition
+	}
+
 	// Only return non-default conditions as the status controller will set defaults
 	return nil
 }
