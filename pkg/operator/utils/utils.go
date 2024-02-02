@@ -363,7 +363,7 @@ func IsValidMode(operatorMode operatorv1.CloudCredentialsMode) bool {
 //	Manual: check that the CCO's config CR has been annotated properly to signal that the user has performed the pre-upgrade credentials tasks.
 //
 // Note: the upgradeable flag can only stop upgrades from 4.x to 4.y, not 4.x.y to 4.x.z.
-func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentialsMode, rootSecret types.NamespacedName) *configv1.ClusterOperatorStatusCondition {
+func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentialsMode, platformType configv1.PlatformType, rootSecret types.NamespacedName) *configv1.ClusterOperatorStatusCondition {
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
 		Type: configv1.OperatorUpgradeable,
 	}

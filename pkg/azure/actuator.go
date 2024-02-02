@@ -564,7 +564,7 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *Actuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.client.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.client.RootCredClient, mode, configv1.AzurePlatformType, a.GetCredentialsRootSecretLocation())
 }
 
 func validateAzureProviderSpec(azureProviderSpec minterv1.AzureProviderSpec) error {

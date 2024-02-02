@@ -233,5 +233,5 @@ func (a *KubevirtActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldL
 }
 
 func (a *KubevirtActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, configv1.KubevirtPlatformType, a.GetCredentialsRootSecretLocation())
 }

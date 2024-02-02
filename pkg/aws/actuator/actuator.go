@@ -1380,7 +1380,7 @@ func awsSTSIAMRoleARN(codec *minterv1.ProviderCodec, credentialsRequest *minterv
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.
 func (a *AWSActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	return utils.UpgradeableCheck(a.RootCredClient, mode, a.GetCredentialsRootSecretLocation())
+	return utils.UpgradeableCheck(a.RootCredClient, mode, configv1.AWSPlatformType, a.GetCredentialsRootSecretLocation())
 }
 
 func generateAWSCredentialsConfig(accessKeyID, secretAccessKey string) []byte {
