@@ -17,6 +17,17 @@ ensure-temp-gopath() {
 	ln -s "$REPO_FULL_PATH" "${fake_repopath}"
 }
 
+cleanup() {
+    # Restore modified files, or `verify` will puke.
+    git checkout "${CODEGEN_PKG}"/generate-internal-groups.sh "${CODEGEN_PKG}"/generate-groups.sh
+
+    # Remove TMP_DIR if created
+    [[ -z ${TMP_DIR} ]] && return
+    chmod -R +w "${TMP_DIR}"
+    # ok b/c we will symlink to the original repo
+    rm -r "${TMP_DIR}"
+}
+
 SCRIPT_ROOT=$(dirname ${BASH_SOURCE})/..
 REPO_FULL_PATH=$(realpath ${SCRIPT_ROOT})
 cd ${REPO_FULL_PATH}
@@ -29,24 +40,14 @@ ${SED_CMD} -i 's,^exec \(".*/generate-internal-groups.sh"\),bash \1,g' ${CODEGEN
 if test -n "$verify"; then
   ${SED_CMD} -i 's/xargs \-0 rm \-f/xargs -0 echo ""/g' ${CODEGEN_PKG}/generate-internal-groups.sh
 fi
-# ...but we have to put it back, or `verify` will puke.
-trap "git checkout ${CODEGEN_PKG}/generate-internal-groups.sh ${CODEGEN_PKG}/generate-groups.sh" EXIT
-
+trap cleanup EXIT
 
 valid_gopath=$(realpath $REPO_FULL_PATH/../../../..)
 if [[ "$(realpath ${valid_gopath}/src/github.com/openshift/cloud-credential-operator)" == "${REPO_FULL_PATH}" ]]; then
 	temp_gopath=${valid_gopath}
 else
 	TMP_DIR=$(mktemp -d -t cloud-credential-operator-codegen.XXXX)
-	function finish {
-		chmod -R +w ${TMP_DIR}
-		# ok b/c we will symlink to the original repo
-		rm -r ${TMP_DIR}
-	}
-	trap finish EXIT
-
 	ensure-temp-gopath ${TMP_DIR}
-
 	temp_gopath=${TMP_DIR}
 fi
 
