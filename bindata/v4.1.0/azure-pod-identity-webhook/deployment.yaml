@@ -68,6 +68,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ "ALL" ]
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /certs
               name: webhook-certs
