@@ -232,7 +232,6 @@ func CheckPermissionsAgainstActions(awsClient Client, actionList []string, param
 // CheckCloudCredPassthrough will see if the provided creds are good enough to pass through
 // to other components as-is based on the static list of permissions needed by the various
 // users of CredentialsRequests
-// TODO: move away from static list (to dynamic passthrough validation?)
 func CheckCloudCredPassthrough(awsClient Client, params *SimulateParams, logger log.FieldLogger) (bool, error) {
 	return CheckPermissionsAgainstActions(awsClient, credPassthroughActions, params, logger)
 }
