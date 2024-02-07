@@ -104,6 +104,7 @@ spec:
           requests:
             cpu: 10m
             memory: 10Mi
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: webhook-certs
           mountPath: /var/run/app/certs
@@ -264,6 +265,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ "ALL" ]
+          terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /certs
               name: webhook-certs
