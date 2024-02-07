@@ -38,6 +38,7 @@ spec:
           requests:
             cpu: 10m
             memory: 10Mi
+        terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - name: webhook-certs
           mountPath: /var/run/app/certs
