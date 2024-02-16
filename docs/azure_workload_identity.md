@@ -223,10 +223,7 @@ NOTE This is just for developers interested in taking an existing cluster to Azu
 1. Restart all pods (this *will* take a while) in the cluster (because all ServiceAccounts need to be refreshed after updating the serviceAccountIssuer field):
 
    ```bash
-   for I in $(oc get ns -o jsonpath='{range .items[*]} {.metadata.name}{"\n"} {end}'); \
-       do oc delete pods --all -n $I; \
-       sleep 1; \
-       done
+   oc adm reboot-machine-config-pool mcp/worker mcp/master
    ```
 
 1. Set the `CloudCredentials`` CR's .spec.credentialsMode to Manual.
