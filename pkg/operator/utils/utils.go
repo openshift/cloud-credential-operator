@@ -363,7 +363,7 @@ func IsValidMode(operatorMode operatorv1.CloudCredentialsMode) bool {
 //	Manual: check that the CCO's config CR has been annotated properly to signal that the user has performed the pre-upgrade credentials tasks.
 //
 // Note: the upgradeable flag can only stop upgrades from 4.x to 4.y, not 4.x.y to 4.x.z.
-func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentialsMode, rootSecret types.NamespacedName) *configv1.ClusterOperatorStatusCondition {
+func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentialsMode, platformType configv1.PlatformType, rootSecret types.NamespacedName) *configv1.ClusterOperatorStatusCondition {
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
 		Type: configv1.OperatorUpgradeable,
 	}
@@ -453,6 +453,18 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 		upgradeableCondition.Status = configv1.ConditionFalse
 		upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
 		upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgraded: %s", err)
+		return upgradeableCondition
+	}
+
+	// Guard against upgrading GCP from 4.14 to 4.15 without RoleAdmin role.
+	if platformType == configv1.GCPPlatformType && (mode == operatorv1.CloudCredentialsModeMint || mode == operatorv1.CloudCredentialsModeDefault) {
+		upgradeableCondition.Status = configv1.ConditionFalse
+		upgradeableCondition.Reason = constants.MissingUpgradeableAnnotationReason
+		upgradeableCondition.Message = fmt.Sprintf("The GCP service account requires additional permissions starting with v4.15."+
+			" Ensure the service account has the RoleAdmin role before proceeding."+
+			" See 'Required GCP roles' in the documentation for more information."+
+			" Upgradeable annotation %s on cloudcredential.operator.openshift.io/cluster object needs updating before the upgrade can proceed."+
+			" See 'Indicating that the cluster is ready to upgrade' for instructions on setting the upgradeable annotation.", constants.UpgradeableAnnotation)
 		return upgradeableCondition
 	}
 

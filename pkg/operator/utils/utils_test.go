@@ -189,7 +189,7 @@ func TestUpgradeableCheck(t *testing.T) {
 			fakeKubeClient := fake.NewClientBuilder().WithRuntimeObjects(runtimeObjects...).Build()
 
 			// Test
-			returnedCondition := UpgradeableCheck(fakeKubeClient, test.mode, test.rootSecretNameParam)
+			returnedCondition := UpgradeableCheck(fakeKubeClient, test.mode, configv1.NonePlatformType, test.rootSecretNameParam)
 
 			// Assert
 			if test.expectedCondition != nil {
