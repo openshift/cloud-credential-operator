@@ -78,6 +78,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
       labels:
         app: pod-identity-webhook
     spec:
@@ -210,6 +211,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
       labels:
         app: pod-identity-webhook
     spec:
