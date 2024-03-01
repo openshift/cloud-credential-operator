@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"io/ioutil"
+	"k8s.io/apimachinery/pkg/runtime"
 	golog "log"
 	"os"
 	"os/signal"
@@ -168,6 +169,10 @@ func NewOperator() *cobra.Command {
 					}
 				}
 
+				scheme := runtime.NewScheme()
+				// Setup Scheme for all resources
+				util.SetupScheme(scheme)
+
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up managers")
 				mgr, err := manager.New(cfg, manager.Options{
@@ -176,6 +181,7 @@ func NewOperator() *cobra.Command {
 						ByObject: objectSelectors,
 					},
 					PprofBindAddress: ":6060",
+					Scheme:           scheme,
 				})
 				if err != nil {
 					log.WithError(err).Fatal("unable to set up overall controller manager")
@@ -189,16 +195,13 @@ func NewOperator() *cobra.Command {
 							},
 						},
 					},
+					Scheme: scheme,
 				})
 				if err != nil {
 					log.WithError(err).Fatal("unable to set up root credential controller manager")
 				}
 
 				log.Info("registering components")
-
-				// Setup Scheme for all resources
-				util.SetupScheme(mgr.GetScheme())
-				util.SetupScheme(rootMgr.GetScheme())
 
 				// Setup all Controllers
 				log.Info("setting up controllers")
