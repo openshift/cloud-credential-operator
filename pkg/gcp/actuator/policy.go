@@ -19,6 +19,7 @@ package actuator
 import (
 	"fmt"
 
+	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iam/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
@@ -258,29 +259,35 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 			if binding.Role == roleName {
 				foundRole = true
 				if !isServiceAccountInBinding(svcAcctBindingName, binding) {
+					log.Debugf("service account %s is missing role: %s", svcAcctBindingName, roleName)
 					return true, nil
 				}
 			}
 		}
 		if !foundRole {
 			// we have a role being requested that we don't have a policy binding for
+			log.Debugf("no binding found for role: %s", roleName)
 			return true, nil
 		}
 	}
 
 	// if permissions are specified check if binding exists for custom role and if custom role has all the permissions
+	var customRole string
 	if len(permissions) > 0 {
 		foundCustomRole := false
+		customRole = fmt.Sprintf("projects/%s/roles/%s", projectName, roleID)
 		for _, binding := range policy.Bindings {
-			if binding.Role == fmt.Sprintf("projects/%s/roles/%s", projectName, roleID) {
+			if binding.Role == customRole {
 				foundCustomRole = true
 				if !isServiceAccountInBinding(svcAcctBindingName, binding) {
+					log.Debugf("service account %s is missing role: %s", svcAcctBindingName, customRole)
 					return true, nil
 				}
 			}
 		}
 		if !foundCustomRole {
 			// permissions are specified but we do not have any policy binding for the custom role
+			log.Debugf("no binding found for role: %s", customRole)
 			return true, nil
 		}
 
@@ -291,11 +298,13 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 
 		// custom roles should not be in the deleted state
 		if role.Deleted {
+			log.Debugf("custom role should not be deleted: %s", customRole)
 			return true, nil
 		}
 
 		addedPermissions, _ := CalculateSliceDiff(role.IncludedPermissions, permissions)
 		if len(addedPermissions) > 0 {
+			log.Debug("cutom role is missing permissions")
 			return true, nil
 		}
 	}
@@ -310,7 +319,8 @@ func serviceAccountNeedsPermissionsUpdate(gcpClient ccgcp.Client, serviceAccount
 					break
 				}
 			}
-			if extraRoleDetected {
+			if extraRoleDetected && binding.Role != customRole {
+				log.Debugf("extra role detected for %s: %s", svcAcctBindingName, binding.Role)
 				return true, nil
 			}
 		}
