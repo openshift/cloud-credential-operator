@@ -20,7 +20,6 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	jose "gopkg.in/square/go-jose.v2"
 
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -241,10 +240,6 @@ var (
 	blockPublicAccessToOidcBucketFilename              = "07-block-public-access-to-oidc-bucket.json"
 	cloudFrontDistributionFilename                     = "08-cloudfront-distribution.json"
 )
-
-type JSONWebKeySet struct {
-	Keys []jose.JSONWebKey `json:"keys"`
-}
 
 func createIdentityProvider(client aws.Client, name, region, publicKeyPath, targetDir string, createPrivateS3, generateOnly bool) (string, error) {
 	// Create the S3 bucket and (if specified) a CloudFront Distribution to serve OIDC endpoint
