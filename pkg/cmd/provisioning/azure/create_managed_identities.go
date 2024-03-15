@@ -45,6 +45,7 @@ metadata:
   namespace: %s
 type: Opaque`
 
+	imageRegistryCredentialRequestName              = "openshift-image-registry-azure"
 	ingressCredentialRequestName                    = "openshift-ingress-azure"
 	machineAPIOperatorCredentialRequestName         = "openshift-machine-api-azure"
 	clusterStorageOperatorFileCredentialRequestName = "azure-file-csi-driver-operator"
@@ -643,7 +644,15 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 		// Additionally scope vnet related CredentialRequest within the networkResourceGroupName,
 		// if one is provided
 		if len(networkResourceGroupName) > 0 {
-			if slices.Contains([]string{machineAPIOperatorCredentialRequestName, clusterStorageOperatorFileCredentialRequestName, clusterNetworkOperatorCredentialRequestName, cloudControllerManagerCredentialRequestName}, credentialsRequest.Name) {
+			networkResourceGroupCredentialsRequests := []string{
+				imageRegistryCredentialRequestName,
+				ingressCredentialRequestName,
+				machineAPIOperatorCredentialRequestName,
+				clusterStorageOperatorFileCredentialRequestName,
+				clusterNetworkOperatorCredentialRequestName,
+				cloudControllerManagerCredentialRequestName,
+			}
+			if slices.Contains(networkResourceGroupCredentialsRequests, credentialsRequest.Name) {
 				scopingResourceGroupNames = append(scopingResourceGroupNames, networkResourceGroupName)
 			}
 		}
