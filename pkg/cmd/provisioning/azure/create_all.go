@@ -76,8 +76,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		publicKeyPath,
 		CreateAllOpts.OutputDir,
 		CreateAllOpts.UserTags,
-		// dryRun may only be invoked by subcommands create-oidc-issuer and create-managed-identities
-		false)
+		CreateAllOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -96,7 +95,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		CreateAllOpts.UserTags,
 		CreateAllOpts.EnableTechPreview,
 		// dryRun may only be invoked by subcommands create-oidc-issuer and create-managed-identities
-		false)
+		CreateAllOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -215,6 +214,7 @@ func NewCreateAllCmd() *cobra.Command {
 			"and storage account identified by --storage-account-name.",
 	)
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
+	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.DryRun, "dry-run", false, "Skip creating objects and just save what would have been created into files")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.OutputDir, "output-dir", "", "Directory to place generated manifest files. Defaults to the current directory.")
 	createAllCmd.PersistentFlags().StringToStringVar(&CreateAllOpts.UserTags, "user-tags", map[string]string{}, "User tags to be applied to Azure resources, multiple tags may be specified comma-separated for example: --user-tags key1=value1,key2=value2")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests annotated with TechPreviewNoUpgrade")

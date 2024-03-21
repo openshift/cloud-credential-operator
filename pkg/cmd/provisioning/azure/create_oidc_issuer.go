@@ -1,7 +1,10 @@
 package azure
 
 import (
+	"bytes"
 	"context"
+	_ "embed"
+	"encoding/json"
 	"fmt"
 	"io/fs"
 	"log"
@@ -9,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
+	"text/template"
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
@@ -27,6 +32,9 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 )
+
+//go:embed dry-run-oidc-blob-container.sh
+var dryRunOidcBlobContainerTemplate string
 
 var (
 	// CreateOIDCIssuerOpts captures the azureOptions that affect creation of the OIDC issuer
@@ -411,6 +419,11 @@ func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oid
 	// Add CCO's "owned" tag to resource tags map
 	resourceTags[fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, name)] = ownedAzureResourceTagValue
 
+	outputDirAbsPath, err := filepath.Abs(outputDir)
+	if err != nil {
+		return "", err
+	}
+
 	storageAccountKey := ""
 	if !dryRun {
 		// Ensure that the public key file can be read at the publicKeyPath before continuing
@@ -441,13 +454,46 @@ func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oid
 		if err != nil {
 			return "", errors.Wrap(err, "failed to create blob container")
 		}
+	} else {
+		tmp, err := template.New("dryRunOidcBlobContainerTemplate").Parse(dryRunOidcBlobContainerTemplate)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to parse bash script template (this is a bug)")
+		}
+
+		resourceTagsJson, err := json.Marshal(resourceTags)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to marshal template variables (this is a bug)")
+		}
+
+		type templateData struct {
+			Region             string
+			ResourceGroupName  string
+			StorageAccountName string
+			BlobContainerName  string
+			ResourceTags       string
+		}
+
+		var buff bytes.Buffer
+		err = tmp.Execute(&buff, templateData{
+			Region:             strconv.Quote(region),
+			ResourceGroupName:  strconv.Quote(oidcResourceGroupName),
+			StorageAccountName: strconv.Quote(storageAccountName),
+			BlobContainerName:  strconv.Quote(blobContainerName),
+			ResourceTags:       strconv.Quote(string(resourceTagsJson)),
+		})
+		if err != nil {
+			return "", errors.Wrap(err, "failed to execute bash script template (this is a bug)")
+		}
+
+		scriptPath := filepath.Join(outputDirAbsPath, "01_01_oidc_blob_container.sh")
+		fmt.Printf("saving to %v\n", scriptPath)
+		if err := os.WriteFile(scriptPath, buff.Bytes(), 0700); err != nil {
+			return "", errors.Wrapf(err, "failed to save bash script at path %s", scriptPath)
+		}
+		panic("early exit!")
 	}
 
 	// Upload OIDC documents (openid-configuration, jwks.json) to the blob container
-	outputDirAbsPath, err := filepath.Abs(outputDir)
-	if err != nil {
-		return "", err
-	}
 	issuerURL, err := uploadOIDCDocuments(client, storageAccountName, storageAccountKey, publicKeyPath, blobContainerName, outputDirAbsPath, dryRun, resourceTags)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to upload OIDC documents")
