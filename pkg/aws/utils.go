@@ -54,7 +54,6 @@ var (
 		"s3:GetLifecycleConfiguration",
 		"s3:GetBucketLocation",
 		"s3:ListBucket",
-		"s3:HeadBucket",
 		"s3:GetObject",
 		"s3:PutObject",
 		"s3:DeleteObject",
