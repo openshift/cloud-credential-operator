@@ -1,14 +1,24 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15 AS builder
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.20-openshift-4.15 AS builder_rhel9
 WORKDIR /go/src/github.com/openshift/cloud-credential-operator
 COPY . .
 ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
 RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/cloud-credential-operator
 RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/ccoctl
 
-FROM registry.ci.openshift.org/ocp/4.15:base
-COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/cloud-credential-operator /usr/bin/
-COPY --from=builder /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.20-openshift-4.15 AS builder_rhel8
+WORKDIR /go/src/github.com/openshift/cloud-credential-operator
+COPY . .
+ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
+RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/ccoctl
+
+
+FROM registry.ci.openshift.org/ocp/4.15:base-rhel9
+COPY --from=builder_rhel9 /go/src/github.com/openshift/cloud-credential-operator/cloud-credential-operator /usr/bin/cloud-credential-operator
+COPY --from=builder_rhel8 /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/ccoctl.rhel8
+COPY --from=builder_rhel9 /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/ccoctl.rhel9
+COPY --from=builder_rhel8 /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/ccoctl
 COPY manifests /manifests
+
 # Update perms so we can copy updated CA if needed
 RUN chmod -R g+w /etc/pki/ca-trust/extracted/pem/
 LABEL io.openshift.release.operator=true
