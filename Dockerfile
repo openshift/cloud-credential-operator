@@ -16,7 +16,7 @@ FROM registry.ci.openshift.org/ocp/4.16:base-rhel9
 COPY --from=builder_rhel9 /go/src/github.com/openshift/cloud-credential-operator/cloud-credential-operator /usr/bin/cloud-credential-operator
 COPY --from=builder_rhel8 /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/ccoctl.rhel8
 COPY --from=builder_rhel9 /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/ccoctl.rhel9
-COPY --from=builder_rhel9 /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/ccoctl
+COPY --from=builder_rhel8 /go/src/github.com/openshift/cloud-credential-operator/ccoctl /usr/bin/ccoctl
 COPY manifests /manifests
 
 # Update perms so we can copy updated CA if needed
