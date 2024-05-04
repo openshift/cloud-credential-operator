@@ -44,7 +44,6 @@ require (
 	google.golang.org/api v0.58.0
 	google.golang.org/genproto v0.0.0-20220107163113-42d7afdf6368
 	google.golang.org/grpc v1.40.0
-	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.25.3
 	k8s.io/apimachinery v0.25.3
@@ -54,6 +53,8 @@ require (
 	sigs.k8s.io/controller-runtime v0.11.0
 	sigs.k8s.io/yaml v1.3.0
 )
+
+require gopkg.in/go-jose/go-jose.v2 v2.6.3
 
 require (
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
