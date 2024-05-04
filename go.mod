@@ -41,7 +41,6 @@ require (
 	google.golang.org/api v0.126.0
 	google.golang.org/genproto v0.0.0-20230711160842-782d3b101e98
 	google.golang.org/grpc v1.58.3
-	gopkg.in/square/go-jose.v2 v2.5.1
 	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.26.1
 	k8s.io/apimachinery v0.26.1
@@ -58,6 +57,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/azidentity v1.1.0
 	github.com/microsoft/kiota-authentication-azure-go v0.5.0
 	github.com/microsoftgraph/msgraph-sdk-go v0.44.0
+	gopkg.in/go-jose/go-jose.v2 v2.6.3
 )
 
 require (
