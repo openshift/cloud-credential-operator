@@ -273,9 +273,11 @@ NOTE This is just for developers interested in taking an existing cluster to Azu
    find ./output_dir/manifests -iname "openshift*yaml" -print0 | xargs -I {} -0 -t oc replace -f {}
    ```
 
-1. Wait for the cluster to become stable.
+1. Restart all the pods, as they may have additional functionality when they detect they are workload identity enabled.
 
    ```bash
+   oc adm reboot-machine-config-pool mcp/worker mcp/master
+   oc adm wait-for-node-reboot nodes --all
    oc adm wait-for-stable-cluster
    ```
 
