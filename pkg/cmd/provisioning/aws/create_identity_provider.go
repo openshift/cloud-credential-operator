@@ -21,7 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	jose "gopkg.in/square/go-jose.v2"
+	jose "gopkg.in/go-jose/go-jose.v2"
 
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
