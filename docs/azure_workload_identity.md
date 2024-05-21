@@ -233,17 +233,10 @@ NOTE This is just for developers interested in taking an existing cluster to Azu
    oc patch cloudcredential cluster --patch '{"spec":{"credentialsMode":"Manual"}}' --type=merge
    ```
 
-1. Extract CredentialsCrequests from the cluster's release image for the given version.
+1. Extract CredentialsCrequests from the cluster's release image.
 
    ```bash
-   # Obtain release image from the cluster version. Will not work with pre-release versions.
-   CLUSTER_VERSION=`oc get clusterversion version -o json | jq -r '.status.desired.version'`
-   RELEASE_IMAGE=`oc get clusterversion version -o json | jq -r '.status.history[] | select(.version == "VERSION_FROM_PREVIOUS_COMMAND") | .image'`
-
-   # Set the RELEASE_IMAGE explicitly.
-   RELEASE_IMAGE="registry.ci.openshift.org/ocp/release:4.14.0-0.ci-2023-09-12-113607"
-
-   oc adm release extract --credentials-requests --cloud=azure $RELEASE_IMAGE --to credreqs
+   oc adm release extract --credentials-requests --included --to credreqs --registry-config ~/.pull-secret
    ```
 
 1. Create Managed Identities for each of the CredentialsRequests from the release image.
