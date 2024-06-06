@@ -61,6 +61,7 @@ kind: CustomResourceDefinition
 metadata:
   annotations:
     capability.openshift.io/name: CloudCredential
+    include.release.openshift.io/hypershift: "true"
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
   name: credentialsrequests.cloudcredential.openshift.io
@@ -261,6 +262,7 @@ metadata:
   annotations:
     capability.openshift.io/name: CloudCredential
     api-approved.openshift.io: https://github.com/openshift/api/pull/692
+    include.release.openshift.io/hypershift: "true"
     include.release.openshift.io/ibm-cloud-managed: "true"
     include.release.openshift.io/self-managed-high-availability: "true"
     include.release.openshift.io/single-node-developer: "true"
