@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"regexp"
 	"strings"
 
 	log "github.com/sirupsen/logrus"
@@ -54,6 +55,20 @@ const (
 	roGCPCredsSecret          = "cloud-credential-operator-gcp-ro-creds"
 
 	gcpSecretJSONKey = "service_account.json"
+
+	gcpSTSCredsTemplate = `{
+  "type": "external_account",
+  "audience": "%s",
+  "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
+  "token_url": "https://sts.googleapis.com/v1/token",
+  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
+  "credential_source": {
+    "file": "%s",
+    "format": {
+      "type": "text"
+    }
+  }
+}`
 )
 
 var _ actuatoriface.Actuator = (*Actuator)(nil)
@@ -195,6 +210,40 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return nil
 	}
 
+	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
+	if err != nil {
+		return err
+	}
+	if stsDetected {
+		logger.Debug("actuator detected STS enabled GCP cluster (WIF)")
+		providerSpec, err := decodeProviderSpec(minterv1.Codec, cr)
+		if err != nil {
+			return err
+		}
+		if providerSpec.ServiceAccountEmail == "" {
+			logger.Debug("CredentialsRequest has no ServiceAccountEmail, no reason to sync")
+			return nil
+		}
+		err = validateSTSProviderSpec(*providerSpec)
+		if err != nil {
+			// At least one of the fields was set indicating that the new workload identity
+			// behavior of creating the secret is desired but not all fields required were
+			// provided.
+			msg := "error validating credentials request GCP Workload Identity Federation fields"
+			return &actuatoriface.ActuatorError{
+				ErrReason: minterv1.CredentialsProvisionFailure,
+				Message:   fmt.Sprintf("%v: %v", msg, err),
+			}
+		}
+		cloudTokenPath := cr.Spec.CloudTokenPath
+		if cr.Spec.CloudTokenPath == "" {
+			logger.Debug("CredentialsRequest has no cloudTokenPath, defaulting cloudTokenPath to /var/run/secrets/openshift/serviceaccount/token")
+			cloudTokenPath = "/var/run/secrets/openshift/serviceaccount/token"
+		}
+
+		return a.syncSTSSecret(providerSpec.Audience, providerSpec.ServiceAccountEmail, cloudTokenPath, cr, logger, ctx)
+	}
+
 	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
@@ -235,6 +284,50 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		}
 	}
 
+	return nil
+}
+
+// syncSTSSecret makes a time-based token available in a Secret in the namespace of an operator that
+// has supplied the following in the CredentialsRequest:
+// a non-empty cr.CloudTokenPath
+// a non-empty cr.ProviderSpec.ServiceAccountEmail
+// a non-empty cr.ProviderSpec.PoolID
+// a non-empty cr.ProviderSpec.ProviderID
+func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
+	sLog := logger.WithFields(log.Fields{
+		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+	})
+	sLog.Infof("processing secret")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
+		},
+	}
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if secret.StringData == nil {
+			secret.StringData = map[string]string{}
+		}
+		secret.StringData["service_account.json"] = fmt.Sprintf(gcpSTSCredsTemplate, audience, serviceAccount, cloudTokenPath)
+		secret.Type = corev1.SecretTypeOpaque
+		return nil
+	})
+	sLog.WithField("operation", op).Info("processed secret")
+	if err != nil {
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
+		}
+	}
 	return nil
 }
 
@@ -859,6 +952,24 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 	}
 
 	return serviceAPIsEnabled, nil
+}
+
+var audienceFormat = regexp.MustCompile("^//iam\\.googleapis\\.com/projects/(git\\d+?)/locations/global/workloadIdentityPools/([^/]+?)/providers/([^/]+?)$")
+
+func validateSTSProviderSpec(providerSpec minterv1.GCPProviderSpec) error {
+	var errors []error
+	if providerSpec.Audience == "" {
+		errors = append(errors, fmt.Errorf("Audience must not be empty"))
+	} else if !audienceFormat.MatchString(providerSpec.Audience) {
+		errors = append(errors, fmt.Errorf("Audience is malformed"))
+	}
+	if providerSpec.ServiceAccountEmail == "" {
+		errors = append(errors, fmt.Errorf("ServiceAccountEmail must not be empty"))
+	}
+	if len(errors) > 0 {
+		return fmt.Errorf("GCPProviderSpec validation failed: %v", errors)
+	}
+	return nil
 }
 
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type
