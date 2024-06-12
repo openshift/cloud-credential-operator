@@ -54,6 +54,10 @@ const (
 	roGCPCredsSecret          = "cloud-credential-operator-gcp-ro-creds"
 
 	gcpSecretJSONKey = "service_account.json"
+
+	gcpWIFCredsTemplate = `[default]
+role_arn = %s
+web_identity_token_file = %s`
 )
 
 var _ actuatoriface.Actuator = (*Actuator)(nil)
@@ -195,6 +199,36 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return nil
 	}
 
+	wifDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
+	if err != nil {
+		return err
+	}
+	logger.Debugf("wifDetected: %v", wifDetected)
+	if wifDetected {
+		logger.Debug("actuator detected WIF enabled cluster")
+		gcpWIFRoleARN, err := gcpWIFRoleARN(minterv1.Codec, cr)
+		if err != nil {
+			return err
+		}
+		if gcpWIFRoleARN == "" {
+			logger.Debug("CredentialsRequest has no gcpWIFRoleARN, no reason to sync")
+			return nil
+		}
+		cloudTokenPath := cr.Spec.CloudTokenPath
+		if cr.Spec.CloudTokenPath == "" {
+			logger.Debug("CredentialsRequest has no cloudTokenPath, defaulting cloudTokenPath to /var/run/secrets/kubernetes.io/serviceaccount/token")
+			cloudTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+		}
+		if gcpWIFRoleARN != "" {
+			err = a.syncWIFSecret(gcpWIFRoleARN, cloudTokenPath, cr, logger, ctx)
+			if err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
 	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
@@ -235,6 +269,50 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		}
 	}
 
+	return nil
+}
+
+// syncWIFSecret makes a time-based token available in a Secret in the namespace of an operator that
+// has supplied the following in the CredentialsRequest:
+// a non-nil spec.CloudTokenString
+// a path to the JWT token: spec.cloudTokenPath
+// a spec.SecretRef.Name
+// a cr.Spec.SecretRef.Namespace
+func (a *Actuator) syncWIFSecret(gcpWIFRoleARN string, cloudTokenPath string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
+	sLog := logger.WithFields(log.Fields{
+		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
+	})
+	sLog.Infof("processing secret")
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      cr.Spec.SecretRef.Name,
+			Namespace: cr.Spec.SecretRef.Namespace,
+		},
+	}
+	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+		if secret.Labels == nil {
+			secret.Labels = map[string]string{}
+		}
+		secret.Labels[minterv1.LabelCredentialsRequest] = minterv1.LabelCredentialsRequestValue
+		if secret.Annotations == nil {
+			secret.Annotations = map[string]string{}
+		}
+		secret.Annotations[minterv1.AnnotationCredentialsRequest] = fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+		if secret.StringData == nil {
+			secret.StringData = map[string]string{}
+		}
+		secret.StringData["credentials"] = fmt.Sprintf(gcpWIFCredsTemplate, gcpWIFRoleARN, cloudTokenPath)
+		secret.Type = corev1.SecretTypeOpaque
+		return nil
+	})
+	sLog.WithField("operation", op).Info("processed secret")
+	if err != nil {
+		return &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   "error processing secret",
+		}
+	}
 	return nil
 }
 
@@ -859,6 +937,14 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 	}
 
 	return serviceAPIsEnabled, nil
+}
+
+func gcpWIFRoleARN(codec *minterv1.ProviderCodec, credentialsRequest *minterv1.CredentialsRequest) (string, error) {
+	gcpSpec, err := decodeProviderSpec(codec, credentialsRequest)
+	if err != nil {
+		return "", err
+	}
+	return gcpSpec.GCPWIFRoleARN, nil
 }
 
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type

@@ -39,6 +39,12 @@ type GCPProviderSpec struct {
 	// have the necessary services enabled
 	// +optional
 	SkipServiceCheck bool `json:"skipServiceCheck,omitempty"`
+	// gcpWIFRoleARN is the Amazon Resource Name (ARN) of an IAM Role which was created manually for the associated
+	// CredentialsRequest.
+	// The presence of an gcpWIFRoleARN within the AWSProviderSpec initiates creation of a secret containing IAM
+	// Role details necessary for assuming the IAM Role via Amazon's Secure Token Service.
+	// +optional
+	GCPWIFRoleARN string `json:"gcpWIFRoleARN,omitempty"`
 }
 
 // GCPProviderStatus contains the status of the GCP credentials request.
