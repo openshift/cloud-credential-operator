@@ -326,11 +326,12 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		logger.Debug("credentials already up to date")
 		return nil
 	}
+
 	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
 	if err != nil {
 		return err
 	}
-	logger.Infof("stsDetected: %v", stsDetected)
+	logger.Debugf("stsDetected: %v", stsDetected)
 	if stsDetected {
 		logger.Debug("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
 		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(minterv1.Codec, cr)
@@ -339,10 +340,7 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		}
 		if awsSTSIAMRoleARN == "" {
 			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
-			return &actuatoriface.ActuatorError{
-				ErrReason: minterv1.CredentialsProvisionFailure,
-				Message:   "an empty awsSTSIAMRoleARN was found so no Secret was created",
-			}
+			return nil
 		}
 		cloudTokenPath := cr.Spec.CloudTokenPath
 		if cr.Spec.CloudTokenPath == "" {
