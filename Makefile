@@ -127,7 +127,7 @@ run: build
 
 # Install CRDs into a cluster
 install: update-codegen
-	kubectl apply -f manifests/00-crd.yaml
+	kubectl apply -f manifests/0000_03_cloud-credential-operator_01_crd.yaml
 
 # TODO targets for backward compatibility while we make the shift in CI
 test-no-gen: test
