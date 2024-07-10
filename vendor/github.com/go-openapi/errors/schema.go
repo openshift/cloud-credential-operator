@@ -120,6 +120,10 @@ func (c *CompositeError) Error() string {
 	return c.message
 }
 
+func (c *CompositeError) Unwrap() []error {
+	return c.Errors
+}
+
 // MarshalJSON implements the JSON encoding interface
 func (c CompositeError) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]interface{}{
@@ -133,9 +137,22 @@ func (c CompositeError) MarshalJSON() ([]byte, error) {
 func CompositeValidationError(errors ...error) *CompositeError {
 	return &CompositeError{
 		code:    CompositeErrorCode,
-		Errors:  append([]error{}, errors...),
+		Errors:  append(make([]error, 0, len(errors)), errors...),
 		message: "validation failure list",
 	}
+}
+
+// ValidateName recursively sets the name for all validations or updates them for nested properties
+func (c *CompositeError) ValidateName(name string) *CompositeError {
+	for i, e := range c.Errors {
+		if ve, ok := e.(*Validation); ok {
+			c.Errors[i] = ve.ValidateName(name)
+		} else if ce, ok := e.(*CompositeError); ok {
+			c.Errors[i] = ce.ValidateName(name)
+		}
+	}
+
+	return c
 }
 
 // FailedAllPatternProperties an error for when the property doesn't match a pattern
