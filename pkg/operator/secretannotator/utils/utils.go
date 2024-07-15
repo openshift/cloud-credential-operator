@@ -8,7 +8,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 
-	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/event"
 	"sigs.k8s.io/controller-runtime/pkg/handler"
@@ -28,22 +27,21 @@ var cloudSecretKeyPassThru types.NamespacedName
 func WatchCCOConfig(cache cache.Cache, c controller.Controller, cloudSecretKey types.NamespacedName, mgr manager.Manager) error {
 	cloudSecretKeyPassThru = cloudSecretKey
 
-	configPredicate := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	configPredicate := predicate.TypedFuncs[*operatorv1.CloudCredential]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*operatorv1.CloudCredential]) bool {
 			return cloudCredentialConfigObjectCheck(e.ObjectNew)
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*operatorv1.CloudCredential]) bool {
 			return cloudCredentialConfigObjectCheck(e.Object)
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*operatorv1.CloudCredential]) bool {
 			return cloudCredentialConfigObjectCheck(e.Object)
 		},
 	}
 
-	err := c.Watch(source.Kind(cache, &operatorv1.CloudCredential{}),
-		handler.EnqueueRequestsFromMapFunc(cloudCredSecretRequest),
-		configPredicate,
-	)
+	err := c.Watch(source.Kind[*operatorv1.CloudCredential](cache, &operatorv1.CloudCredential{},
+		handler.TypedEnqueueRequestsFromMapFunc[*operatorv1.CloudCredential](cloudCredSecretRequest[*operatorv1.CloudCredential]),
+		configPredicate))
 	return err
 }
 
@@ -51,7 +49,7 @@ func cloudCredentialConfigObjectCheck(conf metav1.Object) bool {
 	return conf.GetName() == constants.CloudCredOperatorConfig
 }
 
-func cloudCredSecretRequest(ctx context.Context, o client.Object) []reconcile.Request {
+func cloudCredSecretRequest[T *operatorv1.CloudCredential](ctx context.Context, object T) []reconcile.Request {
 	// Just requeue the cloud-cred secret for any change to the CCO config object
 	return []reconcile.Request{
 		{
