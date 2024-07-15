@@ -45,6 +45,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	configv1 "github.com/openshift/api/config/v1"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -171,9 +172,11 @@ func NewOperator() *cobra.Command {
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up managers")
 				mgr, err := manager.New(cfg, manager.Options{
-					MetricsBindAddress: ":2112",
 					Cache: cache.Options{
 						ByObject: objectSelectors,
+					},
+					Metrics: metricsserver.Options{
+						BindAddress: ":2112",
 					},
 					PprofBindAddress: ":6060",
 				})

@@ -132,7 +132,7 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	// Watch for changes to CredentialsRequest
 	// TODO: we should limit the namespaces where we watch, we want all requests in one namespace so anyone with admin on a namespace cannot create
 	// a request for any credentials they want.
-	err = c.Watch(source.Kind(operatorCache, &minterv1.CredentialsRequest{}), &handler.EnqueueRequestForObject{})
+	err = c.Watch(source.Kind(operatorCache, &minterv1.CredentialsRequest{}, &handler.TypedEnqueueRequestForObject[*minterv1.CredentialsRequest]{}))
 	if err != nil {
 		return err
 	}
@@ -141,7 +141,7 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	// We use an annotation on secrets that refers back to their owning credentials request because
 	// the normal owner reference is not namespaced, and we want to support credentials requests being
 	// in a centralized namespace, but writing secrets into component namespaces.
-	targetCredSecretMapFunc := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
+	targetCredSecretMapFunc := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *corev1.Secret) []reconcile.Request {
 		namespace, name, err := cache.SplitMetaNamespaceKey(a.GetAnnotations()[minterv1.AnnotationCredentialsRequest])
 		if err != nil {
 			log.WithField("labels", a.GetAnnotations()).WithError(err).Error("error splitting namespace key for label")
@@ -160,8 +160,8 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	})
 
 	// These functions are used to determine if a event for the given Secret should trigger a sync:
-	p := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	p := predicate.TypedFuncs[*corev1.Secret]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Secret]) bool {
 
 			// The object doesn't contain our label, so we have nothing to reconcile.
 			if _, ok := e.ObjectOld.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
@@ -169,13 +169,13 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 			}
 			return true
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Secret]) bool {
 			if _, ok := e.Object.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
 			}
 			return true
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Secret]) bool {
 			if _, ok := e.Object.GetAnnotations()[minterv1.AnnotationCredentialsRequest]; !ok {
 				return false
 			}
@@ -185,15 +185,15 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 
 	// Watch Secrets and reconcile if we see one with our label.
 	err = c.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Secret{}),
-		targetCredSecretMapFunc,
-		p)
+		source.Kind(mgr.GetCache(), &corev1.Secret{},
+			targetCredSecretMapFunc,
+			p))
 	if err != nil {
 		return err
 	}
 
-	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
-	allCredRequestsMapFn := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
+	// secretAllCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
+	secretAllCredRequestsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *corev1.Secret) []reconcile.Request {
 		log.Info("requeueing all CredentialsRequests")
 		crs := &minterv1.CredentialsRequestList{}
 		err := mgr.GetClient().List(ctx, crs)
@@ -213,22 +213,22 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 		return requests
 	})
 
-	adminCredSecretPredicate := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	adminCredSecretPredicate := predicate.TypedFuncs[*corev1.Secret]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Secret]) bool {
 			return IsAdminCredSecret(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Secret]) bool {
 			return IsAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Secret]) bool {
 			return IsAdminCredSecret(e.Object.GetNamespace(), e.Object.GetName())
 		},
 	}
 	// Watch Secrets and reconcile if we see an event for an admin credential secret in kube-system.
 	err = c.Watch(
-		source.Kind(adminMgr.GetCache(), &corev1.Secret{}),
-		allCredRequestsMapFn,
-		adminCredSecretPredicate)
+		source.Kind(adminMgr.GetCache(), &corev1.Secret{},
+			secretAllCredRequestsMapFn,
+			adminCredSecretPredicate))
 	if err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	// for that new namespace. This allows us to be up and running for other components that don't
 	// yet exist, but will.
 
-	namespaceMapFn := handler.EnqueueRequestsFromMapFunc(func(ctx context.Context, a client.Object) []reconcile.Request {
+	namespaceMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *metav1.PartialObjectMetadata) []reconcile.Request {
 		// Iterate all CredentailsRequests to determine if we have any that target
 		// this new namespace. We are not anticipating huge numbers of CredentialsRequests,
 		// nor namespace creations.
@@ -264,16 +264,16 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 		return requests
 	})
 
-	namespacePred := predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
+	namespacePred := predicate.TypedFuncs[*metav1.PartialObjectMetadata]{
+		CreateFunc: func(e event.TypedCreateEvent[*metav1.PartialObjectMetadata]) bool {
 			// WARNING: on restart, the controller sees all namespaces as creates even if they
 			// are pre-existing
 			return true
 		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
+		UpdateFunc: func(e event.TypedUpdateEvent[*metav1.PartialObjectMetadata]) bool {
 			return false
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*metav1.PartialObjectMetadata]) bool {
 			return false
 		},
 	}
@@ -284,41 +284,82 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 				Kind:       "Namespace",
 				APIVersion: "v1",
 			},
-		}),
-		namespaceMapFn,
-		namespacePred)
+		},
+			namespaceMapFn,
+			namespacePred))
 	if err != nil {
 		return err
 	}
+
+	// configMapAllCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
+	configMapAllCredRequestsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *corev1.ConfigMap) []reconcile.Request {
+		log.Info("requeueing all CredentialsRequests")
+		crs := &minterv1.CredentialsRequestList{}
+		err := mgr.GetClient().List(ctx, crs)
+		var requests []reconcile.Request
+		if err != nil {
+			log.WithError(err).Error("error listing all cred requests for requeue")
+			return requests
+		}
+		for _, cr := range crs.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      cr.Name,
+					Namespace: cr.Namespace,
+				},
+			})
+		}
+		return requests
+	})
 
 	// Monitor the cloud-credential-operator-config configmap to check if operator is re-enabled.
 	// Check if attempts were made to delete the credentials requests when the operator was disabled.
 	// We have to have to reconcile all those credential requests.
 	// Check if operator is re-enabled in cloud-credential-operator-config configmap
-	configMapPredicate := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	configMapPredicate := predicate.TypedFuncs[*corev1.ConfigMap]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.ConfigMap]) bool {
 			return isCloudCredOperatorConfigMap(e.ObjectNew)
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.ConfigMap]) bool {
 			return isCloudCredOperatorConfigMap(e.Object)
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.ConfigMap]) bool {
 			return isCloudCredOperatorConfigMap(e.Object)
 		},
 	}
 	err = c.Watch(
-		source.Kind(operatorCache, &corev1.ConfigMap{}),
-		allCredRequestsMapFn,
-		configMapPredicate)
+		source.Kind(operatorCache, &corev1.ConfigMap{},
+			configMapAllCredRequestsMapFn,
+			configMapPredicate))
 	if err != nil {
 		return err
 	}
 
+	// credentialMapAllCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
+	credentialMapAllCredRequestsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *operatorv1.CloudCredential) []reconcile.Request {
+		log.Info("requeueing all CredentialsRequests")
+		crs := &minterv1.CredentialsRequestList{}
+		err := mgr.GetClient().List(ctx, crs)
+		var requests []reconcile.Request
+		if err != nil {
+			log.WithError(err).Error("error listing all cred requests for requeue")
+			return requests
+		}
+		for _, cr := range crs.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      cr.Name,
+					Namespace: cr.Namespace,
+				},
+			})
+		}
+		return requests
+	})
+
 	// Watch the CloudCredential config object and reconcile everything on changes.
 	err = c.Watch(
-		source.Kind(operatorCache, &operatorv1.CloudCredential{}),
-		allCredRequestsMapFn,
-	)
+		source.Kind(operatorCache, &operatorv1.CloudCredential{},
+			credentialMapAllCredRequestsMapFn))
 	if err != nil {
 		return err
 	}
@@ -339,7 +380,7 @@ func addLabelController(mgr manager.Manager, mutatingClient corev1client.CoreV1I
 		return err
 	}
 
-	missingLabelSecretsMapFn := handler.EnqueueRequestsFromMapFunc(func(_ context.Context, a client.Object) []reconcile.Request {
+	missingLabelSecretsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(_ context.Context, a *corev1.Secret) []reconcile.Request {
 		return []reconcile.Request{
 			{
 				NamespacedName: types.NamespacedName{
@@ -350,21 +391,21 @@ func addLabelController(mgr manager.Manager, mutatingClient corev1client.CoreV1I
 		}
 	})
 
-	missingLabelCredSecretPredicate := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	missingLabelCredSecretPredicate := predicate.TypedFuncs[*corev1.Secret]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Secret]) bool {
 			return IsMissingSecretLabel(e.ObjectNew)
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Secret]) bool {
 			return IsMissingSecretLabel(e.Object)
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Secret]) bool {
 			return IsMissingSecretLabel(e.Object)
 		},
 	}
 	err = labelController.Watch(
-		source.Kind(mgr.GetCache(), &corev1.Secret{}),
-		missingLabelSecretsMapFn,
-		missingLabelCredSecretPredicate)
+		source.Kind(mgr.GetCache(), &corev1.Secret{},
+			missingLabelSecretsMapFn,
+			missingLabelCredSecretPredicate))
 	if err != nil {
 		return err
 	}

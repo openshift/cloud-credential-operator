@@ -124,8 +124,8 @@ func TestCreateCR(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
-			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
-			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(allObjects...).WithScheme(scheme.Scheme).Build()
+			fakeAdminClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingAdmin...).WithScheme(scheme.Scheme).Build()
 
 			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
@@ -175,8 +175,8 @@ func TestDeleteCR(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
-			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
-			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(allObjects...).WithScheme(scheme.Scheme).Build()
+			fakeAdminClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingAdmin...).WithScheme(scheme.Scheme).Build()
 
 			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
@@ -234,8 +234,8 @@ func TestExistsCR(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
-			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
-			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(allObjects...).WithScheme(scheme.Scheme).Build()
+			fakeAdminClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingAdmin...).WithScheme(scheme.Scheme).Build()
 
 			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
@@ -298,8 +298,8 @@ func TestUpdateCR(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			allObjects := append(test.existing, test.credentialsRequest)
-			fakeClient := fake.NewFakeClientWithScheme(scheme.Scheme, allObjects...)
-			fakeAdminClient := fake.NewFakeClientWithScheme(scheme.Scheme, test.existingAdmin...)
+			fakeClient := fake.NewClientBuilder().WithRuntimeObjects(allObjects...).WithScheme(scheme.Scheme).Build()
+			fakeAdminClient := fake.NewClientBuilder().WithRuntimeObjects(test.existingAdmin...).WithScheme(scheme.Scheme).Build()
 
 			actuator, err := kubevirt.NewActuator(fakeClient, fakeAdminClient)
 			if err != nil {
