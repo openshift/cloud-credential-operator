@@ -15,9 +15,8 @@ import (
 
 	"cloud.google.com/go/compute/metadata"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google/externalaccount"
+	"golang.org/x/oauth2/google/internal/externalaccount"
 	"golang.org/x/oauth2/google/internal/externalaccountauthorizeduser"
-	"golang.org/x/oauth2/google/internal/impersonate"
 	"golang.org/x/oauth2/jwt"
 )
 
@@ -201,12 +200,12 @@ func (f *credentialsFile) tokenSource(ctx context.Context, params CredentialsPar
 			ServiceAccountImpersonationLifetimeSeconds: f.ServiceAccountImpersonation.TokenLifetimeSeconds,
 			ClientSecret:             f.ClientSecret,
 			ClientID:                 f.ClientID,
-			CredentialSource:         &f.CredentialSource,
+			CredentialSource:         f.CredentialSource,
 			QuotaProjectID:           f.QuotaProjectID,
 			Scopes:                   params.Scopes,
 			WorkforcePoolUserProject: f.WorkforcePoolUserProject,
 		}
-		return externalaccount.NewTokenSource(ctx, *cfg)
+		return cfg.TokenSource(ctx)
 	case externalAccountAuthorizedUserKey:
 		cfg := &externalaccountauthorizeduser.Config{
 			Audience:       f.Audience,
@@ -229,7 +228,7 @@ func (f *credentialsFile) tokenSource(ctx context.Context, params CredentialsPar
 		if err != nil {
 			return nil, err
 		}
-		imp := impersonate.ImpersonateTokenSource{
+		imp := externalaccount.ImpersonateTokenSource{
 			Ctx:       ctx,
 			URL:       f.ServiceAccountImpersonationURL,
 			Scopes:    params.Scopes,
