@@ -630,6 +630,9 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 
 	logger.Debug("creating read GCP client")
 	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build GCP client: %w", err)
+	}
 
 	// Test if the read-only client is working, if any error here we will fall back to using
 	// the root client.

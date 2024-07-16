@@ -427,11 +427,7 @@ type Binding struct {
 	Members []string `json:"members,omitempty"`
 
 	// Role: Role that is assigned to the list of `members`, or principals.
-	// For example, `roles/viewer`, `roles/editor`, or `roles/owner`. For an
-	// overview of the IAM roles and permissions, see the IAM documentation
-	// (https://cloud.google.com/iam/docs/roles-overview). For a list of the
-	// available pre-defined roles, see here
-	// (https://cloud.google.com/iam/docs/understanding-roles).
+	// For example, `roles/viewer`, `roles/editor`, or `roles/owner`.
 	Role string `json:"role,omitempty"`
 
 	// ForceSendFields is a list of field names (e.g. "Condition") to
@@ -2065,12 +2061,6 @@ type Project struct {
 	// ProjectNumber: The number uniquely identifying the project. Example:
 	// `415104041262` Read-only.
 	ProjectNumber int64 `json:"projectNumber,omitempty,string"`
-
-	// Tags: Optional. Input only. Immutable. Tag keys/values directly bound
-	// to this project. Each item in the map must be expressed as " : ". For
-	// example: "123/environment" : "production", "123/costCenter" :
-	// "marketing"
-	Tags map[string]string `json:"tags,omitempty"`
 
 	// ServerResponse contains the HTTP response code and headers from the
 	// server.

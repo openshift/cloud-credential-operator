@@ -168,3 +168,7 @@ require (
 	sigs.k8s.io/kube-storage-version-migrator v0.0.4 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+replace golang.org/x/oauth2 => golang.org/x/oauth2 v0.15.0
+
+replace google.golang.org/api => google.golang.org/api v0.157.0
