@@ -671,7 +671,16 @@ func createManagedIdentitiesCmd(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	azureClientWrapper, err := azureclients.NewAzureClientWrapper(CreateManagedIdentitiesOpts.SubscriptionID, cred, &policy.ClientOptions{}, false)
+	clientOptions := &policy.ClientOptions{}
+	if CreateManagedIdentitiesOpts.Cloud != "" {
+		cloud, err := SelectCloudConfiguration(CreateManagedIdentitiesOpts.Cloud)
+		if err != nil {
+			log.Fatalf("Unable to determine cloud configuration: %s", err)
+		}
+		clientOptions.Cloud = cloud
+	}
+
+	azureClientWrapper, err := azureclients.NewAzureClientWrapper(CreateManagedIdentitiesOpts.SubscriptionID, cred, clientOptions, false)
 	if err != nil {
 		log.Fatalf("Failed to create Azure client: %s", err)
 	}
@@ -790,6 +799,12 @@ func NewCreateManagedIdentitiesCmd() *cobra.Command {
 	createManagedIdentitiesCmd.MarkPersistentFlagRequired("issuer-url")
 
 	// Optional
+	createManagedIdentitiesCmd.PersistentFlags().StringVar(
+		&CreateManagedIdentitiesOpts.Cloud,
+		"cloud",
+		"",
+		"The Azure cloud in which to create the resources: AzurePublic, AzureChina, AzureGovernment",
+	)
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(
 		&CreateManagedIdentitiesOpts.OIDCResourceGroupName,
 		"oidc-resource-group-name",
