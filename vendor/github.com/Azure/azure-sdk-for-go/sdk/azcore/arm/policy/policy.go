@@ -14,6 +14,17 @@ import (
 
 // BearerTokenOptions configures the bearer token policy's behavior.
 type BearerTokenOptions struct {
+	// AuxiliaryTenants are additional tenant IDs for authenticating cross-tenant requests.
+	// The policy will add a token from each of these tenants to every request. The
+	// authenticating user or service principal must be a guest in these tenants, and the
+	// policy's credential must support multitenant authentication.
+	AuxiliaryTenants []string
+
+	// InsecureAllowCredentialWithHTTP enables authenticated requests over HTTP.
+	// By default, authenticated requests to an HTTP endpoint are rejected by the client.
+	// WARNING: setting this to true will allow sending the authentication key in clear text. Use with caution.
+	InsecureAllowCredentialWithHTTP bool
+
 	// Scopes contains the list of permission scopes required for the token.
 	Scopes []string
 }
@@ -38,11 +49,22 @@ type RegistrationOptions struct {
 	// The default valule is 5 minutes.
 	// NOTE: Setting this to a small value might cause the policy to prematurely fail.
 	PollingDuration time.Duration
+
+	// StatusCodes contains the slice of custom HTTP status codes to use instead
+	// of the default http.StatusConflict. This should only be set if a service
+	// returns a non-standard HTTP status code when unregistered.
+	StatusCodes []int
 }
 
 // ClientOptions contains configuration settings for a client's pipeline.
 type ClientOptions struct {
 	policy.ClientOptions
+
+	// AuxiliaryTenants are additional tenant IDs for authenticating cross-tenant requests.
+	// The client will add a token from each of these tenants to every request. The
+	// authenticating user or service principal must be a guest in these tenants, and the
+	// client's credential must support multitenant authentication.
+	AuxiliaryTenants []string
 
 	// DisableRPRegistration disables the auto-RP registration policy. Defaults to false.
 	DisableRPRegistration bool
