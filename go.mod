@@ -13,7 +13,6 @@ require (
 	github.com/Azure/go-autorest/autorest/date v0.3.0 // indirect
 	github.com/IBM/go-sdk-core/v5 v5.17.4
 	github.com/IBM/platform-services-go-sdk v0.64.4
-	github.com/aliyun/alibaba-cloud-sdk-go v1.61.1323
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2 // indirect
 	github.com/aws/aws-sdk-go v1.37.14
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
@@ -161,7 +160,6 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240311173647-c811ad7063a7 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
-	gopkg.in/ini.v1 v1.62.0 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.30.2 // indirect
 	k8s.io/component-base v0.30.2 // indirect
