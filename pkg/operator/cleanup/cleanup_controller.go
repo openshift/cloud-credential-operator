@@ -54,23 +54,23 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	}
 
 	// trigger a sync only in case of an event for a stale credential request
-	stateCredentialRequestPredicate := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	stateCredentialRequestPredicate := predicate.TypedFuncs[*minterv1.CredentialsRequest]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*minterv1.CredentialsRequest]) bool {
 			return isStaleCredentialsRequest(e.ObjectNew.GetNamespace(), e.ObjectNew.GetName())
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*minterv1.CredentialsRequest]) bool {
 			return isStaleCredentialsRequest(e.Object.GetNamespace(), e.Object.GetName())
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*minterv1.CredentialsRequest]) bool {
 			return isStaleCredentialsRequest(e.Object.GetNamespace(), e.Object.GetName())
 		},
 	}
 
 	// Watch for changes to CredentialsRequest and reconcile only the stale one
 	err = c.Watch(
-		source.Kind(mgr.GetCache(), &minterv1.CredentialsRequest{}),
-		&handler.EnqueueRequestForObject{},
-		stateCredentialRequestPredicate)
+		source.Kind(mgr.GetCache(), &minterv1.CredentialsRequest{},
+			&handler.TypedEnqueueRequestForObject[*minterv1.CredentialsRequest]{},
+			stateCredentialRequestPredicate))
 	if err != nil {
 		return err
 	}
