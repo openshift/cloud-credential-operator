@@ -65,18 +65,18 @@ func Add(mgr, rootCredMgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	// Watch for changes to cluster cloud secret
-	p := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	p := predicate.TypedFuncs[*corev1.Secret]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Secret]) bool {
 			return cloudCredSecretObjectCheck(e.ObjectNew)
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Secret]) bool {
 			return cloudCredSecretObjectCheck(e.Object)
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Secret]) bool {
 			return cloudCredSecretObjectCheck(e.Object)
 		},
 	}
-	err = c.Watch(source.Kind(rootCredMgr.GetCache(), &corev1.Secret{}), &handler.EnqueueRequestForObject{}, p)
+	err = c.Watch(source.Kind(rootCredMgr.GetCache(), &corev1.Secret{}, &handler.TypedEnqueueRequestForObject[*corev1.Secret]{}, p))
 	if err != nil {
 		return err
 	}

@@ -77,7 +77,7 @@ func newReconciler(mgr manager.Manager, platformType configv1.PlatformType) reco
 	return r
 }
 
-func alwaysReconcileCCOConfigObject(ctx context.Context, c client.Object) []reconcile.Request {
+func alwaysReconcileCCOConfigObject[T any](ctx context.Context, object T) []reconcile.Request {
 	return []reconcile.Request{
 		{
 			NamespacedName: types.NamespacedName{
@@ -105,27 +105,27 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	}
 	operatorCache := mgr.GetCache()
 
-	if err := c.Watch(source.Kind(operatorCache, &operatorv1.CloudCredential{}), &handler.EnqueueRequestForObject{}); err != nil {
+	if err := c.Watch(source.Kind(operatorCache, &operatorv1.CloudCredential{}, &handler.TypedEnqueueRequestForObject[*operatorv1.CloudCredential]{})); err != nil {
 		return err
 	}
 
 	// always reconcile status when the clusteroperator/cloud-credential changes.
-	if err := c.Watch(source.Kind(operatorCache, &configv1.ClusterOperator{}), handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject), predicate.Funcs{
-		CreateFunc: func(e event.CreateEvent) bool {
+	if err := c.Watch(source.Kind(operatorCache, &configv1.ClusterOperator{}, handler.TypedEnqueueRequestsFromMapFunc[*configv1.ClusterOperator](alwaysReconcileCCOConfigObject), predicate.TypedFuncs[*configv1.ClusterOperator]{
+		CreateFunc: func(e event.TypedCreateEvent[*configv1.ClusterOperator]) bool {
 			return e.Object != nil && e.Object.GetName() == constants.CloudCredClusterOperatorName
 		},
-		UpdateFunc: func(e event.UpdateEvent) bool {
+		UpdateFunc: func(e event.TypedUpdateEvent[*configv1.ClusterOperator]) bool {
 			return e.ObjectNew != nil && e.ObjectNew.GetName() == constants.CloudCredClusterOperatorName
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*configv1.ClusterOperator]) bool {
 			return e.Object != nil && e.Object.GetName() == constants.CloudCredClusterOperatorName
 		},
-	}); err != nil {
+	})); err != nil {
 		return err
 	}
 
 	// Whenever a CredentialsRequest is modified, recalculate status
-	err = c.Watch(source.Kind(operatorCache, &credreqv1.CredentialsRequest{}), handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject))
+	err = c.Watch(source.Kind(operatorCache, &credreqv1.CredentialsRequest{}, handler.TypedEnqueueRequestsFromMapFunc[*credreqv1.CredentialsRequest](alwaysReconcileCCOConfigObject)))
 	if err != nil {
 		return err
 	}
@@ -135,23 +135,23 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	// 	Future known secrets to set appropriate Upgradeable conditions.
 	//	Secrets with the CCO annotation on them (secrets created by CCO).
 	//	The root cloud cred secret in the kube-system namespace.
-	p := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
+	p := predicate.TypedFuncs[*corev1.Secret]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Secret]) bool {
 			return isWatchedSecret(platformType, e.ObjectNew.GetNamespace(), e.ObjectNew.GetName(), e.ObjectNew.GetAnnotations())
 		},
-		CreateFunc: func(e event.CreateEvent) bool {
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Secret]) bool {
 			return isWatchedSecret(platformType, e.Object.GetNamespace(), e.Object.GetName(), e.Object.GetAnnotations())
 		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Secret]) bool {
 			return isWatchedSecret(platformType, e.Object.GetNamespace(), e.Object.GetName(), e.Object.GetAnnotations())
 		},
 	}
 
 	// Whenever one of our watched Secrets is updated, recalculate status
-	err = c.Watch(source.Kind(operatorCache, &corev1.Secret{}),
-		handler.EnqueueRequestsFromMapFunc(alwaysReconcileCCOConfigObject),
+	err = c.Watch(source.Kind(operatorCache, &corev1.Secret{},
+		handler.TypedEnqueueRequestsFromMapFunc[*corev1.Secret](alwaysReconcileCCOConfigObject),
 		p,
-	)
+	))
 	if err != nil {
 		return err
 	}

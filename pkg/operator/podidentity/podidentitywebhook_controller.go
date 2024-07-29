@@ -202,22 +202,25 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		return err
 	}
 
-	p := predicate.Funcs{
-		UpdateFunc: func(e event.UpdateEvent) bool {
-			return isManaged(e.ObjectNew)
-		},
-		CreateFunc: func(e event.CreateEvent) bool {
-			return isManaged(e.Object)
-		},
-		DeleteFunc: func(e event.DeleteEvent) bool {
-			return isManaged(e.Object)
+	p := []predicate.Predicate{
+		predicate.Funcs{
+			UpdateFunc: func(e event.UpdateEvent) bool {
+				return isManaged(e.ObjectNew)
+			},
+			CreateFunc: func(e event.CreateEvent) bool {
+				return isManaged(e.Object)
+			},
+			DeleteFunc: func(e event.DeleteEvent) bool {
+				return isManaged(e.Object)
+			},
 		},
 	}
-	var namespaces = []string{operatorNamespace}
+	var namespaces = make(map[string]cache.Config)
+	namespaces[operatorNamespace] = cache.Config{}
 
 	// Create a namespace local cache separate from the Manager cache
 	// A namespace scoped cache can still handle cluster scoped resources
-	controllerCache, err := cache.New(config, cache.Options{Namespaces: namespaces})
+	controllerCache, err := cache.New(config, cache.Options{DefaultNamespaces: namespaces})
 	if err != nil {
 		return err
 	}
@@ -239,7 +242,12 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 			return err
 		}
 
-		err = c.Watch(&source.Informer{Informer: informer}, &handler.EnqueueRequestForObject{}, p)
+		err = c.Watch(&source.Informer{
+			Informer:   informer,
+			Handler:    &handler.EnqueueRequestForObject{},
+			Predicates: p,
+		},
+		)
 		if err != nil {
 			return err
 		}
