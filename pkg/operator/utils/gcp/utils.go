@@ -83,7 +83,7 @@ var (
 
 	// Regexp to find which API permission is being reported as invalid
 	// for testing against the Project level.
-	invalidProjectPermissionsCheck = regexp.MustCompile(`^Permission (.*) is not valid for this resource.$`)
+	invalidProjectPermissionsRegex = regexp.MustCompile(`^Permission (.*) is not valid for this resource.$`)
 )
 
 func init() {
@@ -212,6 +212,14 @@ func CheckPermissionsAgainstPermissionList(gcpClient ccgcp.Client, permList []st
 		req := &cloudresourcemanager.TestIamPermissionsRequest{Permissions: filteredPermList[i:end]}
 		resp, err := gcpClient.TestIamPermissions(projectName, req)
 		if err != nil {
+			// Sometimes the API responds that a valid permission is invalid.
+			// As a workaround, detect when this is the case and remove the problematic
+			// permission from the cache.
+			invalidProjectPermission := invalidProjectPermissionsRegex.FindString(err.Error())
+			if invalidProjectPermission != "" {
+				logger.Warnf("removing problematic permission from cache: %s", invalidProjectPermission)
+				delete(testablePerms.permSet, invalidProjectPermission)
+			}
 			return false, fmt.Errorf("error testing permissions: %v", err)
 		}
 		allowedPerms.Insert(resp.Permissions...)
