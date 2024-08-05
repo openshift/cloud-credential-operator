@@ -32,9 +32,6 @@ The `ccoctl` tool provides various commands to assist with the creating and main
   - [Creating Service IDs](#creating-service-ids)
   - [Refresh the API keys for Service ID](#refresh-the-api-keys-for-service-id)
   - [Deleting the Service IDs](#deleting-the-service-ids)
-- [Alibaba Cloud](#alibaba-cloud)
-  - [Prerequisite](#prerequisite)
-  - [Procedure](#procedure)
 - [Nutanix](#nutanix)
   - [Prerequisite](#prerequisite-1)
   - [Procedure](#procedure-1)
@@ -66,7 +63,7 @@ $ ccoctl aws create-identity-provider --name=<name> --region=<aws-region> --publ
 
 ```
 
-where `name` is the name used to tag and account any cloud resources that are created; `region` is the aws region in which cloud resources will be created; and `public-key-file` is the path to a public key file generated using `ccoctl aws create-key-pair` as [above](#creating-rsa-keys). `create-private-s3-bucket` is an optional parameter which can be used to create private S3 bucket with public CloudFront OIDC endpoint (More details [here](./sts-private-bucket.md)).  
+where `name` is the name used to tag and account any cloud resources that are created; `region` is the aws region in which cloud resources will be created; and `public-key-file` is the path to a public key file generated using `ccoctl aws create-key-pair` as [above](#creating-rsa-keys). `create-private-s3-bucket` is an optional parameter which can be used to create private S3 bucket with public CloudFront OIDC endpoint (More details [here](./sts-private-bucket.md)).
 
 The above command will create a discovery document file named `02-openid-configuration` and a JSON web key set file named `03-keys.json` when the `--dry-run` flag is used.
 
@@ -218,7 +215,7 @@ This will write out public/private key files named `serviceaccount-signer.privat
 
 ### Creating Workload Identity Pool
 
-To set up a workload identity pool in the cloud, run 
+To set up a workload identity pool in the cloud, run
 
 ```bash
 $ ccoctl gcp create-workload-identity-pool --name=<name> --project=<gcp-project-id>
@@ -318,12 +315,12 @@ This command will create the service ID for each credential request, assign the 
 ccoctl ibmcloud create-service-id --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name> --resource-group-name <resource-group-name>
 ```
 
-> Note: --resource-group-name option is optional, but it is recommended to use to have finer grained access to the resources. 
+> Note: --resource-group-name option is optional, but it is recommended to use to have finer grained access to the resources.
 
 ### Refresh the API keys for Service ID
 
 ```bash
-ccoctl ibmcloud refresh-keys --kubeconfig <openshift-kubeconfig-file> --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name> 
+ccoctl ibmcloud refresh-keys --kubeconfig <openshift-kubeconfig-file> --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name>
 ```
 
 > Note: Any new credential request in the credentials request directory will require the --create parameter.
@@ -335,129 +332,9 @@ ccoctl ibmcloud refresh-keys --kubeconfig <openshift-kubeconfig-file> --credenti
 This command will delete the service ID from the IBM Cloud
 
 ```bash
-ccoctl ibmcloud delete-service-id --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name> 
+ccoctl ibmcloud delete-service-id --credentials-requests-dir <path-to-directory-with-list-of-credentials-requests> --name <name>
 ```
 
-## Alibaba Cloud
-
-This is a guide for using manual mode on alibaba cloud. For more info about manual mode, please refer to [cco-mode-manual](mode-manual-creds.md).
-
-For alibaba cloud, the CCO utility (`ccoctl`) will create credentials Secret manifests for the OpenShift installer. It will also create a user along with a long-lived RAM AccessKey (AK) for each OpenShift in-cluster component. Every RAM user who owns the AK will be attached to RAM policies with the permission defined in each component's CredentialsRequest. To do all this, ccoctl consumes the AK of a root RAM user with permissions required for creating the user/policy and attaching the policy to the user.
-
-### Prerequisite
-
-1. Extract and prepare the ccoctl binary from the release image.
-
-2. Choose an existing RAM user who has the below permissions, and get this user's accesskey id/secret for creating the RAM users and policies for each in-cluster component.
-
-   ```bash
-   ram:CreatePolicy
-   ram:GetPolicy
-   ram:CreatePolicyVersion
-   ram:DeletePolicy
-   ram:DetachPolicyFromUser
-   ram:ListPoliciesForUser
-   ram:AttachPolicyToUser
-   ram:CreateUser
-   ram:GetUser
-   ram:DeleteUser
-   ram:CreateAccessKey
-   ram:ListAccessKeys
-   ram:DeleteAccessKey
-   ```
-
-3. Use the selected RAM user’s accesskey id/secret to configure the Alibaba Cloud SDK client's credential provider chain with [Envionment Creadentials](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#1-environment-credentials) mode or through [Credentials File](https://github.com/aliyun/alibaba-cloud-sdk-go/blob/master/docs/2-Client-EN.md#2-credentials-file) mode.
-
-### Procedure
-
-1. Extract the list of CredentialsRequest custom resources (CRs) from the OpenShift Container Platform release image:
-
-   ```bash
-   $ oc adm release extract --credentials-requests --cloud=alibabacloud --to=<path_to_directory_with_list_of_credentials_requests>/credrequests quay.io/<path_to>/ocp-release:<version>
-   
-   ```
-
-   >  steps 2 & 3 are only needed when preparing for upgrading clusters with manually maintained credentials. When doing a fresh installation please skip these steps.
-
-2. For each CredentialsRequest CR in the release image, ensure that a namespace corresponding to spec.secretRef.namespace exists in the cluster. This field indicates where the generated secrets that hold the credentials configuration are stored.
-
-   Sample Alibaba Cloud CredentialsRequest object
-
-   ```yaml
-   apiVersion: cloudcredential.openshift.io/v1
-   kind: CredentialsRequest
-   metadata:
-     name: cloud-credential-operator-ram-ro
-     namespace: openshift-cloud-credential-operator
-   spec:
-     providerSpec:
-       apiVersion: cloudcredential.openshift.io/v1
-       kind: AlibabaCloudProviderSpec
-       statementEntries:
-       - action:
-         - ecs:CopySnapshot
-         - ecs:DeleteDisk
-         - ecs:DescribeInstanceAttribute
-         - ecs:DescribeInstances
-         effect: Allow
-         resource: '*'
-     secretRef:
-       namespace: cloud-credential-operator-ram-ro-creds
-       name: openshift-cloud-credential-operator
-   ```
-
-3. For any `CredentialsRequest` CR for which the cluster does not already have a namespace with the name specified in `spec.secretRef.namespace`, create the namespace:
-
-   ```bash
-   $ oc create namespace <component_namespace>
-   ```
-
-4. Use the `ccoctl` tool to process all `CredentialsRequest` objects in the `credrequests` directory:
-
-   ```bash
-   $ ccoctl alibabacloud create-ram-users --name <name> --region=<region> --credentials-requests-dir=<path_to_directory_with_list_of_credentials_requests>/credrequests --output-dir=xxxxxx
-   ```
-
-    where:
-
-   - `name` is the name used to tag any cloud resources that are created for tracking. 
-   - `region` is the Alibaba Cloud region in which cloud resources will be created.
-   - `credentials-requests-dir` is the directory containing files of component CredentialsRequests.
-   - `output-dir`/manifests is the directory containing files of component credentials secret.
-    
-   > Note:  A ram user can have up to two accesskeys at the same time, so when the `ccoctl alibabacloud create-ram-users` command is run more than twice, the previous generated manifests secret will become stale and you should apply the new generated secrets again.
-
-5. Prepare to run the OpenShift Container Platform installer:
-
-   a. Create the install-config.yaml file:
-   ```bash
-   $ openshift-install create install-config --dir ./path/to/installation/dir
-   ```
-   b. Configure the cluster to install with the CCO in manual mode:
-
-   ```bash
-   $ echo "credentialsMode: Manual" >> ./path/to/installation/dir/install-config.yaml
-   ```
-   
-   c. Create install manifests:
-
-   ```bash
-   $ openshift-install create manifests --dir ./path/to/installation/dir
-   ```
-
-   d. Copy the generated credential files to the target manifests directory:
-
-   ```bash
-   $ cp <output_dir>/manifests/*credentials.yaml ./path/to/installation/dir/manifests/
-   ```
-6. To delete resources created by ccoctl, run
-
-   ```bash
-   $ ccoctl alibabacloud delete-ram-users --name <name> --region=<region>
-   ```
-   where:
-   - `name` is the name used to tag any cloud resources that are created for tracking. 
-   - `region` is the Alibaba Cloud region in which cloud resources will be created.   
 
 ## Nutanix
 
