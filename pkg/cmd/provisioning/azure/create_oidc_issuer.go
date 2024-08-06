@@ -474,7 +474,16 @@ func createOIDCIssuerCmd(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	azureClientWrapper, err := azureclients.NewAzureClientWrapper(CreateOIDCIssuerOpts.SubscriptionID, cred, &policy.ClientOptions{}, false)
+	clientOptions := &policy.ClientOptions{}
+	if CreateOIDCIssuerOpts.Cloud != "" {
+		cloud, err := SelectCloudConfiguration(CreateOIDCIssuerOpts.Cloud)
+		if err != nil {
+			log.Fatalf("Unable to determine cloud configuration: %s", err)
+		}
+		clientOptions.Cloud = cloud
+	}
+
+	azureClientWrapper, err := azureclients.NewAzureClientWrapper(CreateOIDCIssuerOpts.SubscriptionID, cred, clientOptions, false)
 	if err != nil {
 		log.Fatalf("Failed to create Azure client: %s", err)
 	}
@@ -580,6 +589,12 @@ func NewCreateOIDCIssuerCmd() *cobra.Command {
 	createOIDCIssuerCmd.MarkPersistentFlagRequired("public-key-file")
 
 	// Optional parameters
+	createOIDCIssuerCmd.PersistentFlags().StringVar(
+		&CreateOIDCIssuerOpts.Cloud,
+		"cloud",
+		"",
+		"The Azure cloud in which to create the resources: AzurePublic, AzureChina, AzureGovernment",
+	)
 	createOIDCIssuerCmd.PersistentFlags().StringVar(
 		&CreateOIDCIssuerOpts.OIDCResourceGroupName,
 		"oidc-resource-group-name",

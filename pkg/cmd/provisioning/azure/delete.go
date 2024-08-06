@@ -239,7 +239,16 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	azureClientWrapper, err := azureclients.NewAzureClientWrapper(DeleteOpts.SubscriptionID, cred, &policy.ClientOptions{}, false)
+	clientOptions := &policy.ClientOptions{}
+	if DeleteOpts.Cloud != "" {
+		cloud, err := SelectCloudConfiguration(DeleteOpts.Cloud)
+		if err != nil {
+			log.Fatalf("Unable to determine cloud configuration: %s", err)
+		}
+		clientOptions.Cloud = cloud
+	}
+
+	azureClientWrapper, err := azureclients.NewAzureClientWrapper(DeleteOpts.SubscriptionID, cred, clientOptions, false)
 	if err != nil {
 		log.Fatal("Failed to create Azure client")
 	}
@@ -315,6 +324,12 @@ func NewDeleteCmd() *cobra.Command {
 	deleteCmd.MarkPersistentFlagRequired("subscription-id")
 
 	// Optional
+	deleteCmd.PersistentFlags().StringVar(
+		&DeleteOpts.Cloud,
+		"cloud",
+		"",
+		"The Azure cloud in which to create the resources: AzurePublic, AzureChina, AzureGovernment",
+	)
 	deleteCmd.PersistentFlags().BoolVar(
 		&DeleteOpts.DeleteOIDCResourceGroup,
 		"delete-oidc-resource-group",

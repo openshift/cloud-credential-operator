@@ -25,7 +25,16 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatal(err)
 	}
 
-	azureClientWrapper, err := azureclients.NewAzureClientWrapper(CreateAllOpts.SubscriptionID, cred, &policy.ClientOptions{}, false)
+	clientOptions := &policy.ClientOptions{}
+	if CreateAllOpts.Cloud != "" {
+		cloud, err := SelectCloudConfiguration(CreateAllOpts.Cloud)
+		if err != nil {
+			log.Fatalf("Unable to determine cloud configuration: %s", err)
+		}
+		clientOptions.Cloud = cloud
+	}
+
+	azureClientWrapper, err := azureclients.NewAzureClientWrapper(CreateAllOpts.SubscriptionID, cred, clientOptions, false)
 	if err != nil {
 		log.Fatalf("Failed to create Azure client: %s", err)
 	}
@@ -169,6 +178,12 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("dnszone-resource-group-name")
 
 	// Optional parameters
+	createAllCmd.PersistentFlags().StringVar(
+		&CreateAllOpts.Cloud,
+		"cloud",
+		"",
+		"The Azure cloud in which to create the resources: AzurePublic, AzureChina, AzureGovernment",
+	)
 	createAllCmd.PersistentFlags().StringVar(
 		&CreateAllOpts.OIDCResourceGroupName,
 		"oidc-resource-group-name",

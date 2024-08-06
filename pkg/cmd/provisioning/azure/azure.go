@@ -1,12 +1,16 @@
 package azure
 
 import (
+	"fmt"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
 type azureOptions struct {
+	Cloud              string
 	CredRequestDir     string
 	IssuerURL          string
 	Name               string
@@ -69,4 +73,18 @@ func NewAzureCmd() *cobra.Command {
 	createCmd.AddCommand(NewDeleteCmd())
 
 	return createCmd
+}
+
+// SelectCloudConfiguration selects the cloud configuration
+func SelectCloudConfiguration(cloudName string) (cloud.Configuration, error) {
+	switch cloudName {
+	case "AzureChina":
+		return cloud.AzureChina, nil
+	case "AzureGovernment":
+		return cloud.AzureGovernment, nil
+	case "AzurePublic":
+		return cloud.AzurePublic, nil
+	default:
+		return cloud.Configuration{}, fmt.Errorf("invalid cloud name: %s", cloudName)
+	}
 }
