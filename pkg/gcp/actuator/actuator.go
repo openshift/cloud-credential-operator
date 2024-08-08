@@ -290,9 +290,7 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 // syncSTSSecret makes a time-based token available in a Secret in the namespace of an operator that
 // has supplied the following in the CredentialsRequest:
 // a non-empty cr.CloudTokenPath
-// a non-empty cr.ProviderSpec.ServiceAccountEmail
-// a non-empty cr.ProviderSpec.PoolID
-// a non-empty cr.ProviderSpec.ProviderID
+// a non-empty, well-formed cr.ProviderSpec.Audience
 func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
@@ -954,7 +952,7 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 	return serviceAPIsEnabled, nil
 }
 
-var audienceFormat = regexp.MustCompile("^//iam\\.googleapis\\.com/projects/(git\\d+?)/locations/global/workloadIdentityPools/([^/]+?)/providers/([^/]+?)$")
+var audienceFormat = regexp.MustCompile("^//iam\\.googleapis\\.com/projects/(\\d+?)/locations/global/workloadIdentityPools/([^/]+?)/providers/([^/]+?)$")
 
 func validateSTSProviderSpec(providerSpec minterv1.GCPProviderSpec) error {
 	var errors []error
