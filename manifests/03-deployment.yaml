@@ -75,6 +75,8 @@ spec:
           value: quay.io/openshift/azure-workload-identity-webhook:latest
         - name: AWS_POD_IDENTITY_WEBHOOK_IMAGE
           value: quay.io/openshift/aws-pod-identity-webhook:latest
+        - name: GCP_POD_IDENTITY_WEBHOOK_IMAGE
+          value: quay.io/openshift/gcp-workload-identity-federation-webhook:latest
         image: quay.io/openshift/origin-cloud-credential-operator:latest
         imagePullPolicy: IfNotPresent
         name: cloud-credential-operator
