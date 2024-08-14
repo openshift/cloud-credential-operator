@@ -1,0 +1,73 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-identity-webhook
+  namespace: openshift-cloud-credential-operator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-identity-webhook
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
+      labels:
+        app: pod-identity-webhook
+    spec:
+      containers:
+        - command:
+          - /usr/bin/gcp-workload-identity-federation-webhook
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: pod-identity-webhook
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ "ALL" ]
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs/
+              name: webhook-certs
+              readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 120
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 120
+      priorityClassName: system-cluster-critical
+      serviceAccountName: pod-identity-webhook
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: pod-identity-webhook
