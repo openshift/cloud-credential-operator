@@ -290,9 +290,7 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 // syncSTSSecret makes a time-based token available in a Secret in the namespace of an operator that
 // has supplied the following in the CredentialsRequest:
 // a non-empty cr.CloudTokenPath
-// a non-empty cr.ProviderSpec.ServiceAccountEmail
-// a non-empty cr.ProviderSpec.PoolID
-// a non-empty cr.ProviderSpec.ProviderID
+// a non-empty, well-formed cr.ProviderSpec.Audience
 func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
@@ -317,7 +315,7 @@ func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string
 		if secret.StringData == nil {
 			secret.StringData = map[string]string{}
 		}
-		secret.StringData["service_account.json"] = fmt.Sprintf(gcpSTSCredsTemplate, audience, serviceAccount, cloudTokenPath)
+		secret.StringData[gcpSecretJSONKey] = fmt.Sprintf(gcpSTSCredsTemplate, audience, serviceAccount, cloudTokenPath)
 		secret.Type = corev1.SecretTypeOpaque
 		return nil
 	})
@@ -570,6 +568,16 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 // a bool indicating whether any update to existing perms are needed, and any error encountered.
 func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, bool, error) {
 	logger := a.getLogger(cr)
+
+	// HACK: this function is far too complex for its stated purpose, and should be refactored eventually
+	// once someone figures out how it actually works.  For the time being, we need to short-circuit out of here
+	// if we detect STS (WIF) enabled.  See azure/actuator/needsUpdate() for a more idealized version of this function.
+	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
+	if err != nil {
+		return true, false, err
+	} else if stsDetected {
+		return true, true, nil
+	}
 
 	gcpSpec, err := decodeProviderSpec(minterv1.Codec, cr)
 	if err != nil {
@@ -954,7 +962,7 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 	return serviceAPIsEnabled, nil
 }
 
-var audienceFormat = regexp.MustCompile("^//iam\\.googleapis\\.com/projects/(git\\d+?)/locations/global/workloadIdentityPools/([^/]+?)/providers/([^/]+?)$")
+var audienceFormat = regexp.MustCompile("^//iam\\.googleapis\\.com/projects/(\\d+?)/locations/global/workloadIdentityPools/([^/]+?)/providers/([^/]+?)$")
 
 func validateSTSProviderSpec(providerSpec minterv1.GCPProviderSpec) error {
 	var errors []error
