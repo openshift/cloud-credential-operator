@@ -136,19 +136,31 @@ func NewOperator() *cobra.Command {
 				// - a new controller that labels all previous Secrets, but does not restrict the watch stream
 				// - a check on startup that detects that no Secrets remain to be labelled and applies the filtering
 				var filteredWatchPossible bool
-				secrets, err := coreClient.Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
-				if err != nil {
-					log.WithError(err).Fatal("failed to list secrets")
-				}
 				var missing []types.NamespacedName
-				for _, secret := range secrets.Items {
-					if credentialsrequest.IsMissingSecretLabel(&secret) {
-						missing = append(missing, types.NamespacedName{
-							Namespace: secret.Namespace,
-							Name:      secret.Name,
-						})
+				var continueToken string
+				for {
+					secrets, err := coreClient.Secrets(metav1.NamespaceAll).List(ctx, metav1.ListOptions{
+						Limit:    100,
+						Continue: continueToken,
+					})
+					if err != nil {
+						log.WithError(err).Fatal("failed to list secrets")
 					}
+					for _, secret := range secrets.Items {
+						if credentialsrequest.IsMissingSecretLabel(&secret) {
+							missing = append(missing, types.NamespacedName{
+								Namespace: secret.Namespace,
+								Name:      secret.Name,
+							})
+						}
+					}
+
+					if secrets.Continue == "" {
+						break
+					}
+					continueToken = secrets.Continue
 				}
+
 				if len(missing) != 0 {
 					log.WithField("missing", missing).Warn("not all secrets labelled, falling back to caching all secrets on cluster")
 				} else {
