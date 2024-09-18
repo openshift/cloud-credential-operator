@@ -8,3 +8,6 @@ ignore:
     'SNYK-GOLANG-K8SIOCLIENTGOTRANSPORT-7538822':
      - '* > k8s.io/client-go/transport':
         reason: 'Snyk mistakenly identifies v1.17.0-alpha.1 as newer than v0.29.7. client-go has a complicated history of versioning. Presumably, v1.20.0-alpha.1 referred to kubernetes-v1.20. kubernetes tags have since been prefaced by "kubernetes", whereas actual client-go versions resumed numbering from 0.x'
+    'SNYK-GOLANG-GITHUBCOMAZUREAZURESDKFORGOSDKAZIDENTITY-7246767':
+    - '* > github.com/Azure/azure-sdk-for-go/sdk/azidentity':
+       reason: 'This is a medium vulnerability which would require an attacker to gain access to the cluster. Resolving it requires upgrading to golang beyond the 1.19 build image available for this release. Furthermore, release-4.13 and release-4.14 are EOL in apx 4 months'
