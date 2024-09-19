@@ -10,6 +10,12 @@ import (
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 // +kubebuilder:object:root=true
 // +kubebuilder:subresource:status
+// +kubebuilder:resource:path=routes,scope=Namespaced
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/1228
+// +kubebuilder:printcolumn:name=Host,JSONPath=.status.ingress[0].host,type=string
+// +kubebuilder:printcolumn:name=Admitted,JSONPath=.status.ingress[0].conditions[?(@.type=="Admitted")].status,type=string
+// +kubebuilder:printcolumn:name=Service,JSONPath=.spec.to.name,type=string
+// +kubebuilder:printcolumn:name=TLS,JSONPath=.spec.tls.type,type=string
 
 // A route allows developers to expose services through an HTTP(S) aware load balancing and proxy
 // layer via a public DNS entry. The route may further specify TLS options and a certificate, or
@@ -130,6 +136,9 @@ type RouteSpec struct {
 	// Use the weight field in RouteTargetReference object to specify relative preference.
 	//
 	// +kubebuilder:validation:MaxItems=3
+	// +listType=map
+	// +listMapKey=name
+	// +listMapKey=kind
 	AlternateBackends []RouteTargetReference `json:"alternateBackends,omitempty" protobuf:"bytes,4,rep,name=alternateBackends"`
 
 	// If specified, the port to be used by the router. Most routers will use all
@@ -344,6 +353,7 @@ type RouteStatus struct {
 	// ingress describes the places where the route may be exposed. The list of
 	// ingress points may contain duplicate Host or RouterName values. Routes
 	// are considered live once they are `Ready`
+	// +listType=atomic
 	Ingress []RouteIngress `json:"ingress,omitempty" protobuf:"bytes,1,rep,name=ingress"`
 }
 
@@ -354,6 +364,8 @@ type RouteIngress struct {
 	// Name is a name chosen by the router to identify itself; this value is required
 	RouterName string `json:"routerName,omitempty" protobuf:"bytes,2,opt,name=routerName"`
 	// Conditions is the state of the route, may be empty.
+	// +listType=map
+	// +listMapKey=type
 	Conditions []RouteIngressCondition `json:"conditions,omitempty" protobuf:"bytes,3,rep,name=conditions"`
 	// Wildcard policy is the wildcard policy that was allowed where this route is exposed.
 	WildcardPolicy WildcardPolicyType `json:"wildcardPolicy,omitempty" protobuf:"bytes,4,opt,name=wildcardPolicy"`
@@ -369,14 +381,16 @@ type RouteIngressConditionType string
 const (
 	// RouteAdmitted means the route is able to service requests for the provided Host
 	RouteAdmitted RouteIngressConditionType = "Admitted"
-	// TODO: add other route condition types
+	// RouteUnservableInFutureVersions indicates that the route is using an unsupported
+	// configuration that may be incompatible with a future version of OpenShift.
+	RouteUnservableInFutureVersions RouteIngressConditionType = "UnservableInFutureVersions"
 )
 
 // RouteIngressCondition contains details for the current condition of this route on a particular
 // router.
 type RouteIngressCondition struct {
 	// Type is the type of the condition.
-	// Currently only Admitted.
+	// Currently only Admitted or UnservableInFutureVersions.
 	Type RouteIngressConditionType `json:"type" protobuf:"bytes,1,opt,name=type,casttype=RouteIngressConditionType"`
 	// Status is the status of the condition.
 	// Can be True, False, Unknown.
@@ -407,7 +421,7 @@ type RouterShard struct {
 // TLSConfig defines config used to secure a route and provide termination
 //
 // +kubebuilder:validation:XValidation:rule="has(self.termination) && has(self.insecureEdgeTerminationPolicy) ? !((self.termination=='passthrough') && (self.insecureEdgeTerminationPolicy=='Allow')) : true", message="cannot have both spec.tls.termination: passthrough and spec.tls.insecureEdgeTerminationPolicy: Allow"
-// +openshift:validation:FeatureSetAwareXValidation:featureSet=TechPreviewNoUpgrade;CustomNoUpgrade,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
+// +openshift:validation:FeatureGateAwareXValidation:featureGate=RouteExternalCertificate,rule="!(has(self.certificate) && has(self.externalCertificate))", message="cannot have both spec.tls.certificate and spec.tls.externalCertificate"
 type TLSConfig struct {
 	// termination indicates termination type.
 	//
@@ -439,8 +453,12 @@ type TLSConfig struct {
 	// insecureEdgeTerminationPolicy indicates the desired behavior for insecure connections to a route. While
 	// each router may make its own decisions on which ports to expose, this is normally port 80.
 	//
-	// * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only) (default).
-	// * None - no traffic is allowed on the insecure port.
+	// If a route does not specify insecureEdgeTerminationPolicy, then the default behavior is "None".
+	//
+	// * Allow - traffic is sent to the server on the insecure port (edge/reencrypt terminations only).
+	//
+	// * None - no traffic is allowed on the insecure port (default).
+	//
 	// * Redirect - clients are redirected to the secure port.
 	//
 	// +kubebuilder:validation:Enum=Allow;None;Redirect;""
@@ -452,7 +470,7 @@ type TLSConfig struct {
 	// be present in the same namespace as that of the Route.
 	// Forbidden when `certificate` is set.
 	//
-	// +openshift:enable:FeatureSets=CustomNoUpgrade;TechPreviewNoUpgrade
+	// +openshift:enable:FeatureGate=RouteExternalCertificate
 	// +optional
 	ExternalCertificate *LocalObjectReference `json:"externalCertificate,omitempty" protobuf:"bytes,7,opt,name=externalCertificate"`
 }
