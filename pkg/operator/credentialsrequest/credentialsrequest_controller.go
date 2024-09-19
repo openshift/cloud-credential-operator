@@ -233,6 +233,46 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
+	allCredRequestsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *configv1.Infrastructure) []reconcile.Request {
+		log.Info("requeueing all CredentialsRequests")
+		crs := &minterv1.CredentialsRequestList{}
+		err := mgr.GetClient().List(ctx, crs)
+		var requests []reconcile.Request
+		if err != nil {
+			log.WithError(err).Error("error listing all cred requests for requeue")
+			return requests
+		}
+		for _, cr := range crs.Items {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      cr.Name,
+					Namespace: cr.Namespace,
+				},
+			})
+		}
+		return requests
+	})
+
+	// predicate functions to filter the events based on the AWS resourceTags presence.
+	infraResourcePredicate := predicate.TypedFuncs[*configv1.Infrastructure]{
+		CreateFunc: func(e event.TypedCreateEvent[*configv1.Infrastructure]) bool {
+			return hasResourceTags(e.Object)
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[*configv1.Infrastructure]) bool {
+			return false
+		},
+		UpdateFunc: func(e event.TypedUpdateEvent[*configv1.Infrastructure]) bool {
+			return areTagsUpdated(e.ObjectOld, e.ObjectNew)
+		},
+	}
+	// Watch for the changes happening to Infrastructure Resource
+	err = c.Watch(
+		source.Kind(adminMgr.GetCache(), &configv1.Infrastructure{}, allCredRequestsMapFn, infraResourcePredicate))
+	if err != nil {
+		return err
+	}
+
 	// Monitor namespace creation, and check out list of credentials requests for any destined
 	// for that new namespace. This allows us to be up and running for other components that don't
 	// yet exist, but will.
@@ -365,6 +405,31 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	}
 
 	return nil
+}
+
+// hasResourceTags returns true if the AWS resourceTags are present in the Infrastructure resource
+func hasResourceTags(event client.Object) bool {
+	switch infra := event.(type) {
+	case *configv1.Infrastructure:
+		if infra != nil && infra.Status.PlatformStatus.AWS != nil && len(infra.Status.PlatformStatus.AWS.ResourceTags) != 0 {
+			return true
+		}
+	default:
+		return false
+	}
+	return false
+}
+
+// areTagsUpdated validates and returns a true if the resourceTags are updated in the new event
+func areTagsUpdated(oldEvent, newEvent client.Object) bool {
+	if !hasResourceTags(newEvent) {
+		return false
+	}
+
+	if hasResourceTags(oldEvent) && hasResourceTags(newEvent) {
+		return !reflect.DeepEqual(oldEvent.(*configv1.Infrastructure).Status.PlatformStatus.AWS.ResourceTags, newEvent.(*configv1.Infrastructure).Status.PlatformStatus.AWS.ResourceTags)
+	}
+	return true
 }
 
 // addLabelController adds a new Controller managing labels to mgr
@@ -777,6 +842,12 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
 		}
 		cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
+		infra, err := utils.GetInfrastructure(r.Client)
+		if err != nil {
+			log.WithError(err).Debug("unable to retrieve the infrastructure resource")
+		}
+		isInfrastructureUpdated := infra != nil && infra.ResourceVersion != cr.Status.LastSyncInfrastructureResourceVersion
+
 		isStale := cr.Generation != cr.Status.LastSyncGeneration
 		hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
 		hasActiveFailureConditions := checkForFailureConditions(cr)
@@ -789,7 +860,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			"NOT hasActiveFailureConditions": hasActiveFailureConditions,
 			"cr.Status.Provisioned":          cr.Status.Provisioned,
 		}).Debug("The above are ANDed together to determine: lastsyncgeneration is current and lastsynctimestamp < an hour ago")
-		if !cloudCredsSecretUpdated && !isStale && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
+		if !cloudCredsSecretUpdated && !isStale && !isInfrastructureUpdated && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
 			logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
 			// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
 			// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
@@ -844,6 +915,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			if credentialsRootSecret != nil {
 				cr.Status.LastSyncCloudCredsSecretResourceVersion = credentialsRootSecret.ResourceVersion
 			}
+		}
+
+		// updating the LastSyncInfrastructureResourceVersion
+		if infra != nil {
+			cr.Status.LastSyncInfrastructureResourceVersion = infra.ResourceVersion
 		}
 
 		err = utils.UpdateStatus(r.Client, origCR, cr, logger)
