@@ -229,6 +229,49 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "new credential cluster has infra resource tags",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+				testInfrastructurewithTags(testInfraName),
+			},
+			existingAdmin: []runtime.Object{
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserTagged(mockAWSClient)
+				mockCreateUser(mockAWSClient)
+				mockPutUserPolicy(mockAWSClient)
+				mockCreateAccessKey(mockAWSClient, testAWSAccessKeyID, testAWSSecretAccessKey)
+				mockUpdatedTagUser(mockAWSClient)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockGetUserPolicyMissing(mockAWSClient)
+				mockListAccessKeysEmpty(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				require.NotNil(t, targetSecret)
+				assert.Equal(t, testAWSAccessKeyID,
+					string(targetSecret.Data["aws_access_key_id"]))
+				assert.Equal(t, testAWSSecretAccessKey,
+					string(targetSecret.Data["aws_secret_access_key"]))
+				cr := getCR(c)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
+		{
 			// This tests the case where we create our own read only creds initially:
 			name: "new credential no read-only creds available",
 			existing: []runtime.Object{
@@ -1530,6 +1573,9 @@ const (
 	testReadAWSSecretAccessKey        = "readsecretkey"
 	testPermissionsBoundaryARN        = "some:boundary:ARN:1234"
 	testPermissionBoundaryType        = "Policy" // currently the only allowed value in AWS
+	infraResourceTagTestKey           = "test-tag"
+	infraResourceTagTestValue         = "test-value"
+	infraStructureTestVersion         = "test"
 )
 
 var (
@@ -1548,6 +1594,7 @@ func testPassthroughCredentialsRequestWithDeletionTimestamp(t *testing.T) *minte
 
 func testCredentialsRequestWithRecentLastSync(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testCredentialsRequest(t)
+	cr.Status.LastSyncInfrastructureResourceVersion = infraStructureTestVersion
 	cr.Status.LastSyncGeneration = cr.Generation
 	cr.Status.LastSyncTimestamp = &metav1.Time{
 		// fake 20 minute old last sync
@@ -1732,6 +1779,27 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 		}, nil).AnyTimes()
 }
 
+func mockGetUserTagged(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+		&iam.GetUserOutput{
+			User: &iam.User{
+				UserId:   aws.String(testAWSUserID),
+				UserName: aws.String(testAWSUser),
+				Arn:      aws.String(testAWSARN),
+				Tags: []*iam.Tag{
+					{
+						Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
+						Value: aws.String("owned"),
+					},
+					{
+						Key:   aws.String(infraResourceTagTestKey),
+						Value: aws.String(infraResourceTagTestValue),
+					},
+				},
+			},
+		}, nil).AnyTimes()
+}
+
 func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
 		&iam.GetUserOutput{
@@ -1841,6 +1909,23 @@ func mockTagUser(mockAWSClient *mockaws.MockClient) {
 		}).Return(&iam.TagUserOutput{}, nil)
 }
 
+func mockUpdatedTagUser(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().TagUser(
+		&iam.TagUserInput{
+			UserName: aws.String(testAWSUser),
+			Tags: []*iam.Tag{
+				{
+					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
+					Value: aws.String("owned"),
+				},
+				{
+					Key:   aws.String(infraResourceTagTestKey),
+					Value: aws.String(infraResourceTagTestValue),
+				},
+			},
+		}).Return(&iam.TagUserOutput{}, nil)
+}
+
 // mockTagUserLegacy should be used when infraname is not set in the cluster.
 func mockTagUserLegacy(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().TagUser(
@@ -1921,6 +2006,25 @@ func mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient *mockaws.MockClient) 
 func testInfrastructure(infraName string) *configv1.Infrastructure {
 	return &configv1.Infrastructure{
 		ObjectMeta: metav1.ObjectMeta{
+			Name:            "cluster",
+			ResourceVersion: infraStructureTestVersion,
+		},
+		Status: configv1.InfrastructureStatus{
+			Platform:           configv1.AWSPlatformType,
+			InfrastructureName: infraName,
+			PlatformStatus: &configv1.PlatformStatus{
+				AWS: &configv1.AWSPlatformStatus{
+					Region: "test-region-2",
+				},
+			},
+		},
+	}
+}
+
+// testInfrastructurewithTags returns an Infrastructure object with the user provided resourceTags field populated.
+func testInfrastructurewithTags(infraName string) *configv1.Infrastructure {
+	return &configv1.Infrastructure{
+		ObjectMeta: metav1.ObjectMeta{
 			Name: "cluster",
 		},
 		Status: configv1.InfrastructureStatus{
@@ -1929,6 +2033,9 @@ func testInfrastructure(infraName string) *configv1.Infrastructure {
 			PlatformStatus: &configv1.PlatformStatus{
 				AWS: &configv1.AWSPlatformStatus{
 					Region: "test-region-2",
+					ResourceTags: []configv1.AWSResourceTag{
+						{Key: infraResourceTagTestKey, Value: infraResourceTagTestValue},
+					},
 				},
 			},
 		},
