@@ -233,8 +233,8 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
-	// allCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
-	allCredRequestsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *configv1.Infrastructure) []reconcile.Request {
+	// infraAllCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
+	infraAllCredRequestsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *configv1.Infrastructure) []reconcile.Request {
 		log.Info("requeueing all CredentialsRequests")
 		crs := &minterv1.CredentialsRequestList{}
 		err := mgr.GetClient().List(ctx, crs)
@@ -268,7 +268,7 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	}
 	// Watch for the changes happening to Infrastructure Resource
 	err = c.Watch(
-		source.Kind(adminMgr.GetCache(), &configv1.Infrastructure{}, allCredRequestsMapFn, infraResourcePredicate))
+		source.Kind(adminMgr.GetCache(), &configv1.Infrastructure{}, infraAllCredRequestsMapFn, infraResourcePredicate))
 	if err != nil {
 		return err
 	}
