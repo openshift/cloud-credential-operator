@@ -738,7 +738,7 @@ func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterUUID str
 		}
 	}
 
-	if infraResource.Status.InfrastructureName != "" {
+	if infraResource != nil && infraResource.Status.InfrastructureName != "" {
 		clusterTag := fmt.Sprintf("kubernetes.io/cluster/%s", infraResource.Status.InfrastructureName)
 		if !userHasTag(user, clusterTag, "owned") {
 			log.Warnf("user missing tag: %s=%s", clusterTag, "owned")
@@ -921,16 +921,14 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 		})
 	}
 	// appending the tags present in the Infrastructure CR
-	if infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.AWS != nil {
-		if len(infra.Status.PlatformStatus.AWS.ResourceTags) != 0 {
-			logger.WithField("userTags", infra.Status.PlatformStatus.AWS.ResourceTags).
-				Info("tagging the user with the tags present in the infrastructure object")
-			for _, userTag := range infra.Status.PlatformStatus.AWS.ResourceTags {
-				tags = append(tags, &iam.Tag{
-					Key:   aws.String(userTag.Key),
-					Value: aws.String(userTag.Value),
-				})
-			}
+	if infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.AWS != nil && len(infra.Status.PlatformStatus.AWS.ResourceTags) != 0 {
+		logger.WithField("userTags", infra.Status.PlatformStatus.AWS.ResourceTags).
+			Info("tagging the user with the tags present in the infrastructure object")
+		for _, userTag := range infra.Status.PlatformStatus.AWS.ResourceTags {
+			tags = append(tags, &iam.Tag{
+				Key:   aws.String(userTag.Key),
+				Value: aws.String(userTag.Value),
+			})
 		}
 	}
 
