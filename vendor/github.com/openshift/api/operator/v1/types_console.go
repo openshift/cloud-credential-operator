@@ -9,6 +9,11 @@ import (
 // +genclient
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=consoles,scope=Cluster
+// +kubebuilder:subresource:status
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/486
+// +openshift:file-pattern=cvoRunLevel=0000_50,operatorName=console,operatorOrdering=01
 
 // Console provides a means to configure an operator to manage the console.
 //
@@ -52,6 +57,11 @@ type ConsoleSpec struct {
 	// plugins defines a list of enabled console plugin names.
 	// +optional
 	Plugins []string `json:"plugins,omitempty"`
+	// ingress allows to configure the alternative ingress for the console.
+	// This field is intended for clusters without ingress capability,
+	// where access to routes is not possible.
+	// +optional
+	Ingress Ingress `json:"ingress"`
 }
 
 // ConsoleConfigRoute holds information on external route access to console.
@@ -89,8 +99,63 @@ type StatuspageProvider struct {
 	PageID string `json:"pageID"`
 }
 
+// ConsoleCapabilityName defines name of UI capability in the console UI.
+type ConsoleCapabilityName string
+
+const (
+	// lightspeedButton is the name for the Lightspeed button HTML element.
+	LightspeedButton ConsoleCapabilityName = "LightspeedButton"
+
+	// gettingStartedBanner is the name of the 'Getting started resources' banner in the console UI Overview page.
+	GettingStartedBanner ConsoleCapabilityName = "GettingStartedBanner"
+)
+
+// CapabilityState defines the state of the capability in the console UI.
+type CapabilityState string
+
+const (
+	// "Enabled" means that the capability will be rendered in the console UI.
+	CapabilityEnabled CapabilityState = "Enabled"
+	// "Disabled" means that the capability will not be rendered in the console UI.
+	CapabilityDisabled CapabilityState = "Disabled"
+)
+
+// CapabilityVisibility defines the criteria to enable/disable a capability.
+// +union
+type CapabilityVisibility struct {
+	// state defines if the capability is enabled or disabled in the console UI.
+	// Enabling the capability in the console UI is represented by the "Enabled" value.
+	// Disabling the capability in the console UI is represented by the "Disabled" value.
+	// +unionDiscriminator
+	// +kubebuilder:validation:Enum:="Enabled";"Disabled"
+	// +kubebuilder:validation:Required
+	State CapabilityState `json:"state"`
+}
+
+// Capabilities contains set of UI capabilities and their state in the console UI.
+type Capability struct {
+	// name is the unique name of a capability.
+	// Available capabilities are LightspeedButton and GettingStartedBanner.
+	// +kubebuilder:validation:Enum:="LightspeedButton";"GettingStartedBanner"
+	// +kubebuilder:validation:Required
+	Name ConsoleCapabilityName `json:"name"`
+	// visibility defines the visibility state of the capability.
+	// +kubebuilder:validation:Required
+	Visibility CapabilityVisibility `json:"visibility"`
+}
+
 // ConsoleCustomization defines a list of optional configuration for the console UI.
 type ConsoleCustomization struct {
+	// capabilities defines an array of capabilities that can be interacted with in the console UI.
+	// Each capability defines a visual state that can be interacted with the console to render in the UI.
+	// Available capabilities are LightspeedButton and GettingStartedBanner.
+	// Each of the available capabilities may appear only once in the list.
+	// +kubebuilder:validation:MinItems=1
+	// +kubebuilder:validation:MaxItems=2
+	// +listType=map
+	// +listMapKey=name
+	// +optional
+	Capabilities []Capability `json:"capabilities,omitempty"`
 	// brand is the default branding of the web console which can be overridden by
 	// providing the brand field.  There is a limited set of specific brand options.
 	// This field controls elements of the console such as the logo.
@@ -369,6 +434,35 @@ const (
 	// Branding for Red Hat OpenShift Service on AWS
 	BrandROSA Brand = "ROSA"
 )
+
+// Ingress allows cluster admin to configure alternative ingress for the console.
+type Ingress struct {
+	// consoleURL is a URL to be used as the base console address.
+	// If not specified, the console route hostname will be used.
+	// This field is required for clusters without ingress capability,
+	// where access to routes is not possible.
+	// Make sure that appropriate ingress is set up at this URL.
+	// The console operator will monitor the URL and may go degraded
+	// if it's unreachable for an extended period.
+	// Must use the HTTPS scheme.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="size(self) == 0 || isURL(self)",message="console url must be a valid absolute URL"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 0 || url(self).getScheme() == 'https'",message="console url scheme must be https"
+	// +kubebuilder:validation:MaxLength=1024
+	ConsoleURL string `json:"consoleURL"`
+	// clientDownloadsURL is a URL to be used as the address to download client binaries.
+	// If not specified, the downloads route hostname will be used.
+	// This field is required for clusters without ingress capability,
+	// where access to routes is not possible.
+	// The console operator will monitor the URL and may go degraded
+	// if it's unreachable for an extended period.
+	// Must use the HTTPS scheme.
+	// +optional
+	// +kubebuilder:validation:XValidation:rule="size(self) == 0 || isURL(self)",message="client downloads url must be a valid absolute URL"
+	// +kubebuilder:validation:XValidation:rule="size(self) == 0 || url(self).getScheme() == 'https'",message="client downloads url scheme must be https"
+	// +kubebuilder:validation:MaxLength=1024
+	ClientDownloadsURL string `json:"clientDownloadsURL"`
+}
 
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
