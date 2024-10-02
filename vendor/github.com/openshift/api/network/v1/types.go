@@ -12,15 +12,18 @@ const (
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// ClusterNetwork describes the cluster network. There is normally only one object of this type,
-// named "default", which is created by the SDN network plugin based on the master configuration
-// when the cluster is brought up for the first time.
+// ClusterNetwork was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +kubebuilder:resource:scope="Cluster"
-// +kubebuilder:printcolumn:name="Cluster Network",type=string,JSONPath=`.network`,description="The primary cluster network CIDR"
-// +kubebuilder:printcolumn:name="Service Network",type=string,JSONPath=`.serviceNetwork`,description="The service network CIDR"
-// +kubebuilder:printcolumn:name="Plugin Name",type=string,JSONPath=`.pluginName`,description="The Openshift SDN network plug-in in use"
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=clusternetworks,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=001
+// +kubebuilder:printcolumn:name="Cluster Network",type=string,JSONPath=.network,description="The primary cluster network CIDR"
+// +kubebuilder:printcolumn:name="Service Network",type=string,JSONPath=.serviceNetwork,description="The service network CIDR"
+// +kubebuilder:printcolumn:name="Plugin Name",type=string,JSONPath=.pluginName,description="The OpenShift SDN network plug-in in use"
 // +openshift:compatibility-gen:level=1
 type ClusterNetwork struct {
 	metav1.TypeMeta `json:",inline"`
@@ -109,15 +112,20 @@ type HostSubnetEgressCIDR string
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// HostSubnet describes the container subnet network on a node. The HostSubnet object must have the
-// same name as the Node object it corresponds to.
+// HostSubnet was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +kubebuilder:printcolumn:name="Host",type=string,JSONPath=`.host`,description="The name of the node"
-// +kubebuilder:printcolumn:name="Host IP",type=string,JSONPath=`.hostIP`,description="The IP address to be used as a VTEP by other nodes in the overlay network"
-// +kubebuilder:printcolumn:name="Subnet",type=string,JSONPath=`.subnet`,description="The CIDR range of the overlay network assigned to the node for its pods"
-// +kubebuilder:printcolumn:name="Egress CIDRs",type=string,JSONPath=`.egressCIDRs`,description="The network egress CIDRs"
-// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=`.egressIPs`,description="The network egress IP addresses"
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=hostsubnets,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=002
+// +kubebuilder:printcolumn:name="Host",type=string,JSONPath=.host,description="The name of the node"
+// +kubebuilder:printcolumn:name="Host IP",type=string,JSONPath=.hostIP,description="The IP address to be used as a VTEP by other nodes in the overlay network"
+// +kubebuilder:printcolumn:name="Subnet",type=string,JSONPath=.subnet,description="The CIDR range of the overlay network assigned to the node for its pods"
+// +kubebuilder:printcolumn:name="Egress CIDRs",type=string,JSONPath=.egressCIDRs,description="The network egress CIDRs"
+// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=.egressIPs,description="The network egress IP addresses"
 // +openshift:compatibility-gen:level=1
 type HostSubnet struct {
 	metav1.TypeMeta `json:",inline"`
@@ -177,13 +185,17 @@ type NetNamespaceEgressIP string
 // +genclient:nonNamespaced
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// NetNamespace describes a single isolated network. When using the redhat/openshift-ovs-multitenant
-// plugin, every Namespace will have a corresponding NetNamespace object with the same name.
-// (When using redhat/openshift-ovs-subnet, NetNamespaces are not used.)
+// NetNamespace was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
-// +kubebuilder:printcolumn:name="NetID",type=integer,JSONPath=`.netid`,description="The network identifier of the network namespace"
-// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=`.egressIPs`,description="The network egress IP addresses"
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=netnamespaces,scope=Cluster
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=003
+// +kubebuilder:printcolumn:name="NetID",type=integer,JSONPath=.netid,description="The network identifier of the network namespace"
+// +kubebuilder:printcolumn:name="Egress IPs",type=string,JSONPath=.egressIPs,description="The network egress IP addresses"
 // +openshift:compatibility-gen:level=1
 type NetNamespace struct {
 	metav1.TypeMeta `json:",inline"`
@@ -263,13 +275,15 @@ type EgressNetworkPolicySpec struct {
 // +genclient
 // +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
-// EgressNetworkPolicy describes the current egress network policy for a Namespace. When using
-// the 'redhat/openshift-ovs-multitenant' network plugin, traffic from a pod to an IP address
-// outside the cluster will be checked against each EgressNetworkPolicyRule in the pod's
-// namespace's EgressNetworkPolicy, in order. If no rule matches (or no EgressNetworkPolicy
-// is present) then the traffic will be allowed by default.
+// EgressNetworkPolicy was used by OpenShift SDN.
+// DEPRECATED: OpenShift SDN is no longer supported and this object is no longer used in
+// any way by OpenShift.
 //
 // Compatibility level 1: Stable within a major release for a minimum of 12 months or 3 minor releases (whichever is longer).
+// +kubebuilder:object:root=true
+// +kubebuilder:resource:path=egressnetworkpolicies,scope=Namespaced
+// +openshift:api-approved.openshift.io=https://github.com/openshift/api/pull/527
+// +openshift:file-pattern=operatorOrdering=004
 // +openshift:compatibility-gen:level=1
 type EgressNetworkPolicy struct {
 	metav1.TypeMeta `json:",inline"`
