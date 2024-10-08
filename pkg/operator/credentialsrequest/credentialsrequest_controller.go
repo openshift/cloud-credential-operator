@@ -116,9 +116,9 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 	name := "credentialsrequest_controller"
 
 	// Custom rateLimiter that sets minimum backoff to 2 seconds
-	rateLimiter := workqueue.NewMaxOfRateLimiter(
-		workqueue.NewItemExponentialFailureRateLimiter(2*time.Second, 1000*time.Second),
-		&workqueue.BucketRateLimiter{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
+	rateLimiter := workqueue.NewTypedMaxOfRateLimiter(
+		workqueue.NewTypedItemExponentialFailureRateLimiter[reconcile.Request](2*time.Second, 1000*time.Second),
+		&workqueue.TypedBucketRateLimiter[reconcile.Request]{Limiter: rate.NewLimiter(rate.Limit(10), 100)},
 	)
 
 	c, err := controller.New(name, mgr, controller.Options{
