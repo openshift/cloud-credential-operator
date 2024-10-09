@@ -19,8 +19,9 @@ package podidentity
 import (
 	"context"
 	"fmt"
-	clientgotesting "k8s.io/client-go/testing"
 	"testing"
+
+	clientgotesting "k8s.io/client-go/testing"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -197,9 +198,10 @@ func TestPodIdentityWebhookController(t *testing.T) {
 				podDisruptionBudget, err := getPDB(fakeClientset, "pod-identity-webhook", "openshift-cloud-credential-operator")
 				if test.expectPDB {
 					assert.Nil(t, err)
-					assert.NotNil(t, podDisruptionBudget, "did not find expected pod-identity-webhook PodDisruptionBudget")
+					assert.NotEqual(t, podDisruptionBudget.Kind, "", "did not find expected pod-identity-webhook PodDisruptionBudget")
 				} else {
-					assert.Nil(t, podDisruptionBudget, "found unexpected pod-identity-webhook PodDisruptionBudget")
+					assert.NotNil(t, err)
+					assert.Equal(t, podDisruptionBudget.Kind, "", "found unexpected pod-identity-webhook PodDisruptionBudget")
 				}
 
 				webhook, err := getWebhook(fakeClientset, "pod-identity-webhook")
