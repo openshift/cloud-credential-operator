@@ -35,6 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 )
 
+func toPointer[T any](item T) *T {
+	return &item
+}
+
 func TestReconcileSecretMissingLabel_Reconcile(t *testing.T) {
 	// we unconditionally send the SSA request, since it's easy and trivial to make the logic correct.
 	// the server determines if a mutation needs to occur. so, we expect the patch to be sent in every case
@@ -62,10 +66,11 @@ func TestReconcileSecretMissingLabel_Reconcile(t *testing.T) {
 			},
 			expectErr: false,
 			expected: []*clientgotesting.PatchActionImpl{{
-				PatchType:  types.ApplyPatchType,
-				ActionImpl: clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
-				Name:       "test-secret",
-				Patch:      []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchType:    types.ApplyPatchType,
+				ActionImpl:   clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
+				Name:         "test-secret",
+				Patch:        []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchOptions: metav1.PatchOptions{Force: toPointer(true), FieldManager: "credreq_labeller"},
 			}},
 		},
 		{
@@ -80,10 +85,11 @@ func TestReconcileSecretMissingLabel_Reconcile(t *testing.T) {
 			},
 			expectErr: false,
 			expected: []*clientgotesting.PatchActionImpl{{
-				PatchType:  types.ApplyPatchType,
-				ActionImpl: clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
-				Name:       "test-secret",
-				Patch:      []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchType:    types.ApplyPatchType,
+				ActionImpl:   clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
+				Name:         "test-secret",
+				Patch:        []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchOptions: metav1.PatchOptions{Force: toPointer(true), FieldManager: "credreq_labeller"},
 			}},
 		},
 		{
@@ -101,10 +107,11 @@ func TestReconcileSecretMissingLabel_Reconcile(t *testing.T) {
 			},
 			expectErr: false,
 			expected: []*clientgotesting.PatchActionImpl{{
-				PatchType:  types.ApplyPatchType,
-				ActionImpl: clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
-				Name:       "test-secret",
-				Patch:      []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchType:    types.ApplyPatchType,
+				ActionImpl:   clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
+				Name:         "test-secret",
+				Patch:        []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchOptions: metav1.PatchOptions{Force: toPointer(true), FieldManager: "credreq_labeller"},
 			}},
 		},
 		{
@@ -125,10 +132,11 @@ func TestReconcileSecretMissingLabel_Reconcile(t *testing.T) {
 			},
 			expectErr: false,
 			expected: []*clientgotesting.PatchActionImpl{{
-				PatchType:  types.ApplyPatchType,
-				ActionImpl: clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
-				Name:       "test-secret",
-				Patch:      []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchType:    types.ApplyPatchType,
+				ActionImpl:   clientgotesting.ActionImpl{Namespace: "myproject", Verb: "patch", Resource: corev1.SchemeGroupVersion.WithResource("secrets")},
+				Name:         "test-secret",
+				Patch:        []uint8(`{"kind":"Secret","apiVersion":"v1","metadata":{"name":"test-secret","namespace":"myproject","labels":{"cloudcredential.openshift.io/credentials-request":"true"}}}`),
+				PatchOptions: metav1.PatchOptions{Force: toPointer(true), FieldManager: "credreq_labeller"},
 			}},
 		},
 	}
