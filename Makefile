@@ -85,6 +85,13 @@ $(call build-image,ocp-cloud-credential-operator,$(IMAGE_REGISTRY)/$(IMAGE_REPO)
 $(call add-crd-gen,cloudcredential-manifests,./pkg/apis/cloudcredential/v1,./manifests,./manifests)
 $(call add-crd-gen,cloudcredential-bindata,./pkg/apis/cloudcredential/v1,./bindata/bootstrap,./bindata/bootstrap)
 
+# Override ensure-controller-gen to use vendored version
+GOBIN ?="$(abspath ${controller_gen_dir})"
+ensure-controller-gen:
+	GOBIN="${GOBIN}" go install $(shell realpath vendor/sigs.k8s.io/controller-tools/cmd/controller-gen)
+	cp "${GOBIN}/controller-gen" "${GOBIN}/controller-gen-${CONTROLLER_GEN_VERSION}"
+.PHONY: ensure-controller-gen
+
 update: update-vendored-crds update-codegen update-bindata generate
 .PHONY: update
 
