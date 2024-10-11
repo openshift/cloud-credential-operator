@@ -11,6 +11,8 @@
 // bindata/v4.1.0/common/rolebinding.yaml
 // bindata/v4.1.0/common/sa.yaml
 // bindata/v4.1.0/common/svc.yaml
+// bindata/v4.1.0/gcp-pod-identity-webhook/deployment.yaml
+// bindata/v4.1.0/gcp-pod-identity-webhook/mutatingwebhook.yaml
 package v410_00_assets
 
 import (
@@ -572,6 +574,139 @@ func v410CommonSvcYaml() (*asset, error) {
 	return a, nil
 }
 
+var _v410GcpPodIdentityWebhookDeploymentYaml = []byte(`apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pod-identity-webhook
+  namespace: openshift-cloud-credential-operator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pod-identity-webhook
+  template:
+    metadata:
+      annotations:
+        target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
+        openshift.io/required-scc: restricted-v2
+      labels:
+        app: pod-identity-webhook
+    spec:
+      containers:
+        - command:
+          - /usr/bin/gcp-workload-identity-federation-webhook
+          image: ${IMAGE}
+          imagePullPolicy: IfNotPresent
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8081
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          name: pod-identity-webhook
+          resources:
+            requests:
+              cpu: 10m
+              memory: 10Mi
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 8081
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: [ "ALL" ]
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - mountPath: /tmp/k8s-webhook-server/serving-certs/
+              name: webhook-certs
+              readOnly: true
+      nodeSelector:
+        node-role.kubernetes.io/master: ""
+      tolerations:
+        - effect: NoSchedule
+          key: node-role.kubernetes.io/master
+          operator: Exists
+        - effect: NoExecute
+          key: node.kubernetes.io/unreachable
+          operator: Exists
+          tolerationSeconds: 120
+        - effect: NoExecute
+          key: node.kubernetes.io/not-ready
+          operator: Exists
+          tolerationSeconds: 120
+      priorityClassName: system-cluster-critical
+      serviceAccountName: pod-identity-webhook
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: webhook-certs
+          secret:
+            secretName: pod-identity-webhook
+`)
+
+func v410GcpPodIdentityWebhookDeploymentYamlBytes() ([]byte, error) {
+	return _v410GcpPodIdentityWebhookDeploymentYaml, nil
+}
+
+func v410GcpPodIdentityWebhookDeploymentYaml() (*asset, error) {
+	bytes, err := v410GcpPodIdentityWebhookDeploymentYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "v4.1.0/gcp-pod-identity-webhook/deployment.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
+var _v410GcpPodIdentityWebhookMutatingwebhookYaml = []byte(`apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: pod-identity-webhook
+  annotations:
+    service.beta.openshift.io/inject-cabundle: "true"
+webhooks:
+  - admissionReviewVersions:
+      - v1
+    clientConfig:
+      service:
+        name: pod-identity-webhook
+        namespace: openshift-cloud-credential-operator
+        path: /mutate-v1-pod
+    failurePolicy: Ignore
+    name: pod-identity-webhook.gcp.mutate.io
+    rules:
+      - apiGroups:
+          - ""
+        apiVersions:
+          - v1
+        operations:
+          - CREATE
+        resources:
+          - pods
+    sideEffects: None
+`)
+
+func v410GcpPodIdentityWebhookMutatingwebhookYamlBytes() ([]byte, error) {
+	return _v410GcpPodIdentityWebhookMutatingwebhookYaml, nil
+}
+
+func v410GcpPodIdentityWebhookMutatingwebhookYaml() (*asset, error) {
+	bytes, err := v410GcpPodIdentityWebhookMutatingwebhookYamlBytes()
+	if err != nil {
+		return nil, err
+	}
+
+	info := bindataFileInfo{name: "v4.1.0/gcp-pod-identity-webhook/mutatingwebhook.yaml", size: 0, mode: os.FileMode(0), modTime: time.Unix(0, 0)}
+	a := &asset{bytes: bytes, info: info}
+	return a, nil
+}
+
 // Asset loads and returns the asset for the given name.
 // It returns an error if the asset could not be found or
 // could not be loaded.
@@ -635,6 +770,8 @@ var _bindata = map[string]func() (*asset, error){
 	"v4.1.0/common/rolebinding.yaml":                         v410CommonRolebindingYaml,
 	"v4.1.0/common/sa.yaml":                                  v410CommonSaYaml,
 	"v4.1.0/common/svc.yaml":                                 v410CommonSvcYaml,
+	"v4.1.0/gcp-pod-identity-webhook/deployment.yaml":        v410GcpPodIdentityWebhookDeploymentYaml,
+	"v4.1.0/gcp-pod-identity-webhook/mutatingwebhook.yaml":   v410GcpPodIdentityWebhookMutatingwebhookYaml,
 }
 
 // AssetDir returns the file names below a certain
@@ -697,6 +834,10 @@ var _bintree = &bintree{nil, map[string]*bintree{
 			"rolebinding.yaml":         {v410CommonRolebindingYaml, map[string]*bintree{}},
 			"sa.yaml":                  {v410CommonSaYaml, map[string]*bintree{}},
 			"svc.yaml":                 {v410CommonSvcYaml, map[string]*bintree{}},
+		}},
+		"gcp-pod-identity-webhook": {nil, map[string]*bintree{
+			"deployment.yaml":      {v410GcpPodIdentityWebhookDeploymentYaml, map[string]*bintree{}},
+			"mutatingwebhook.yaml": {v410GcpPodIdentityWebhookMutatingwebhookYaml, map[string]*bintree{}},
 		}},
 	}},
 }}

@@ -14,6 +14,10 @@ spec:
     from:
       kind: DockerImage
       Name: quay.io/openshift/azure-workload-identity-webhook
+  - name: gcp-workload-identity-federation-webhook
+    from:
+      kind: DockerImage
+      Name: quay.io/openshift/gcp-workload-identity-federation-webhook
   - name: kube-rbac-proxy
     from:
       kind: DockerImage
