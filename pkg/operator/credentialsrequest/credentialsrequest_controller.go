@@ -519,7 +519,7 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	mode, conflict, err := utils.GetOperatorConfiguration(r.Client, logger)
 
 	stsDetected := false
-	stsDetected, _ = utils.IsTimedTokenCluster(r.Client, ctx, logger)
+	stsDetected, _ = r.Actuator.IsTimedTokenCluster(r.Client, ctx, logger)
 	if err != nil {
 		logger.WithError(err).Error("error checking if operator is disabled")
 		return reconcile.Result{}, err
