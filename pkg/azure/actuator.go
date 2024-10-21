@@ -561,7 +561,7 @@ func (a *Actuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldLogger {
 }
 
 func (a *Actuator) IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
-	return false, nil
+	return utils.IsTimedTokenCluster(c, ctx, logger)
 }
 
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type
