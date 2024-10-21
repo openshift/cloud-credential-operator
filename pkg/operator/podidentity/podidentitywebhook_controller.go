@@ -148,6 +148,8 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		podIdentityType = AwsPodIdentity{}
 	case configv1.AzurePlatformType:
 		podIdentityType = AzurePodIdentity{}
+	case configv1.GCPPlatformType:
+		podIdentityType = GcpPodIdentity{}
 	default:
 		log.WithField("controller", controllerName).Warn("Failed to get platform type")
 		return nil
