@@ -36,6 +36,8 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
+var _ actuatoriface.Actuator = (*KubevirtActuator)(nil)
+
 type KubevirtActuator struct {
 	Client         client.Client
 	RootCredClient client.Client
@@ -230,6 +232,10 @@ func (a *KubevirtActuator) getLogger(cr *minterv1.CredentialsRequest) log.FieldL
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
+}
+
+func (a *KubevirtActuator) IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
+	return false, nil
 }
 
 func (a *KubevirtActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
