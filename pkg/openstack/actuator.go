@@ -37,6 +37,8 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
+var _ actuatoriface.Actuator = (*OpenStackActuator)(nil)
+
 type OpenStackActuator struct {
 	Client         client.Client
 	RootCredClient client.Client
@@ -203,6 +205,10 @@ func (a *OpenStackActuator) getLogger(cr *minterv1.CredentialsRequest) log.Field
 		"actuator": "openstack",
 		"cr":       fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
+}
+
+func (a *OpenStackActuator) IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
+	return false, nil
 }
 
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type

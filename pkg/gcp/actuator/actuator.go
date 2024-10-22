@@ -861,6 +861,10 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 	return serviceAPIsEnabled, nil
 }
 
+func (a *Actuator) IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
+	return false, nil
+}
+
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type
 // if the system is considered not upgradeable. Otherwise, return nil as the default
 // value is for things to be upgradeable.

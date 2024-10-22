@@ -18,11 +18,14 @@ package actuator
 import (
 	"context"
 
+	log "github.com/sirupsen/logrus"
+
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
@@ -41,6 +44,8 @@ type Actuator interface {
 	Exists(context.Context, *minterv1.CredentialsRequest) (bool, error)
 	// GetCredentialsRootSecretLocation returns the namespace and name where the credentials root secret is stored.
 	GetCredentialsRootSecretLocation() types.NamespacedName
+	// IsTimedTokenCluster returns true if the cluster is capable and configured to use timed token credentials.
+	IsTimedTokenCluster(client.Client, context.Context, log.FieldLogger) (bool, error)
 	// Upgradeable returns a ClusterOperator Upgradeable condition to indicate whether or not this cluster can
 	// be safely upgraded to the next "minor" (4.y) Openshift release.
 	Upgradeable(operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition
@@ -70,6 +75,10 @@ func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequ
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *DummyActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName}
+}
+
+func (a *DummyActuator) IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
+	return false, nil
 }
 
 func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
