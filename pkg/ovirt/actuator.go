@@ -46,6 +46,8 @@ const (
 	cabundleKey = "ovirt_ca_bundle"
 )
 
+var _ actuatoriface.Actuator = (*OvirtActuator)(nil)
+
 type OvirtActuator struct {
 	Client         client.Client
 	RootCredClient client.Client
@@ -281,6 +283,10 @@ func secretDataFrom(ovirtCreds *OvirtCreds) map[string][]byte {
 		insecureKey: []byte(strconv.FormatBool(ovirtCreds.Insecure)),
 		cabundleKey: []byte(ovirtCreds.CABundle),
 	}
+}
+
+func (a *OvirtActuator) IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
+	return false, nil
 }
 
 // Upgradeable returns a ClusterOperator status condition for the upgradeable type
