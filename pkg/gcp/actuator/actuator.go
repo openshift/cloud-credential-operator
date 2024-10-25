@@ -181,7 +181,12 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		}
 	}
 
-	if !servicesAPIsEnabled {
+	gcpSpec, err := decodeProviderSpec(minterv1.Codec, cr)
+	if err != nil {
+		return fmt.Errorf("unable to decode ProviderSpec: %v", err)
+	}
+
+	if !servicesAPIsEnabled && !gcpSpec.SkipServiceCheck {
 		msg := "not all required service APIs are enabled"
 		logger.Error(msg)
 		return &actuatoriface.ActuatorError{
