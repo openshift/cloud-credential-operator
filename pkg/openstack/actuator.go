@@ -96,7 +96,7 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 		return err
 	}
 
-	clouds, err := GetRootCloudCredentialsSecretData(credentialsRootSecret, logger)
+	clouds, cacert, err := GetRootCloudCredentialsSecretData(credentialsRootSecret, logger)
 	if err != nil {
 		logger.WithError(err).Error("issue with cloud credentials secret")
 		return &actuatoriface.ActuatorError{
@@ -106,7 +106,7 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 	}
 
 	logger.Debugf("provisioning secret")
-	err = a.syncCredentialSecret(ctx, cr, clouds, logger)
+	err = a.syncCredentialSecret(ctx, cr, clouds, cacert, logger)
 	if err != nil {
 		msg := "error creating/updating secret"
 		logger.WithError(err).Error(msg)
@@ -119,7 +119,7 @@ func (a *OpenStackActuator) sync(ctx context.Context, cr *minterv1.CredentialsRe
 	return nil
 }
 
-func (a *OpenStackActuator) syncCredentialSecret(ctx context.Context, cr *minterv1.CredentialsRequest, clouds string, logger log.FieldLogger) error {
+func (a *OpenStackActuator) syncCredentialSecret(ctx context.Context, cr *minterv1.CredentialsRequest, clouds, cacert string, logger log.FieldLogger) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
@@ -145,6 +145,12 @@ func (a *OpenStackActuator) syncCredentialSecret(ctx context.Context, cr *minter
 				secret.Data = map[string][]byte{}
 			}
 			secret.Data[RootOpenStackCredsSecretKey] = []byte(clouds)
+
+			// This means we only write cacert if clouds.yaml is present. That's okay, since
+			// the former is useless without the latter.
+			if cacert != "" {
+				secret.Data[RootOpenStackCAFileSecretKey] = []byte(cacert)
+			}
 		}
 		return nil
 	})

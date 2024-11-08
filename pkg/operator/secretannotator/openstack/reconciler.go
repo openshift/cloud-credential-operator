@@ -156,7 +156,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	clouds, err := openstack.GetRootCloudCredentialsSecretData(secret, r.Logger)
+	clouds, cacert, err := openstack.GetRootCloudCredentialsSecretData(secret, r.Logger)
 	if err != nil {
 		r.Logger.WithError(err).Error("errored getting clouds.yaml from secret")
 		return reconcile.Result{}, err
@@ -169,7 +169,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	}
 
 	if cloudsUpdated {
-		openstack.SetRootCloudCredentialsSecretData(secret, clouds)
+		openstack.SetRootCloudCredentialsSecretData(secret, clouds, cacert)
 		err := r.RootCredClient.Update(context.TODO(), secret)
 		if err != nil {
 			r.Logger.WithError(err).Error("error writing updated root secret")
