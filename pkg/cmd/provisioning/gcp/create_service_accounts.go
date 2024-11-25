@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -285,9 +286,26 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 
 		// Add member <-> role bindings for the project
 		svcAcctBindingName := actuator.ServiceAccountBindingName(serviceAccount)
-		err = actuator.EnsurePolicyBindingsForProject(client, roles, svcAcctBindingName)
-		if err != nil {
-			return "", errors.Wrap(err, fmt.Sprintf("Failed to add predefined roles for IAM service account %s", serviceAccount.DisplayName))
+		// EnsurePolicyBindingsForProject can fail due to a replication delay after service account creation
+		// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
+		for i := 0; ; i++ {
+			err = actuator.EnsurePolicyBindingsForProject(client, roles, svcAcctBindingName)
+			if err != nil {
+				if strings.Contains(err.Error(), "Service account "+serviceAccount.Email+" does not exist") {
+					// The service account just created can't be found yet due to a replication delay so we need to retry.
+					if i >= 23 {
+						log.Fatal("Timed out adding predefined roles to IAM service account, this is most likely due to a replication delay following creation of the service account, please retry")
+						break
+					} else {
+						log.Printf("Unable to add predefined roles to IAM service account, retrying...")
+						time.Sleep(10 * time.Second)
+						continue
+					}
+				}
+
+				return "", errors.Wrap(err, fmt.Sprintf("Failed to add predefined roles for IAM service account %s", serviceAccount.DisplayName))
+			}
+			break
 		}
 
 		// Add member <-> role bindings for the IAM service account
