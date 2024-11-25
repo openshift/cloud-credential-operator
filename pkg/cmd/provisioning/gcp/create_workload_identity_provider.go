@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	iamCloud "cloud.google.com/go/iam"
 	"cloud.google.com/go/storage"
@@ -133,10 +135,28 @@ func createOIDCBucket(ctx context.Context, client gcp.Client, bucketName, region
 				}
 				log.Print("Bucket ", bucketName, " created")
 
-				policy, err := client.GetBucketPolicy(ctx, bucketName)
-				if err != nil {
-					return errors.Wrap(err, fmt.Sprintf("Failed to fetch IAM policy for bucket %s", bucketName))
+				// GetBucketPolicy can fail due to a replication delay after bucket creation
+				// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
+				var policy *iamCloud.Policy3
+				for i := 0; ; i++ {
+					policy, err = client.GetBucketPolicy(ctx, bucketName)
+					if err != nil {
+						if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == http.StatusNotFound {
+							// The bucket just created can't be found yet due to a replication delay so we need to retry.
+							if i >= 23 {
+								log.Fatal("Timed out fetching IAM policy for bucket, this is most likely due to a replication delay following creation of the bucket, please retry")
+								break
+							} else {
+								log.Printf("Unable to fetch IAM policy for bucket, retrying...")
+								time.Sleep(10 * time.Second)
+								continue
+							}
+						}
+						return errors.Wrap(err, fmt.Sprintf("Failed to fetch IAM policy for bucket %s", bucketName))
+					}
+					break
 				}
+
 				role := "roles/storage.objectViewer"
 				policy.Bindings = append(policy.Bindings, &iampb.Binding{
 					Role:    role,
