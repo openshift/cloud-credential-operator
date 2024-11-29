@@ -5,9 +5,12 @@ import (
 	"fmt"
 	"os"
 
+	log "github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const (
@@ -45,4 +48,8 @@ func (a AzurePodIdentity) GetImagePullSpec() string {
 
 func (a AzurePodIdentity) Name() string {
 	return "azure"
+}
+
+func (a AzurePodIdentity) ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger) error {
+	return nil
 }
