@@ -29,9 +29,9 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     ```bash
     CURRENT_ISSUER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
 
-    AZURE_ACCOUNT=$(basename ${CURRENT_ISSUER})
+    AZURE_STORAGE_ACCOUNT=$(basename ${CURRENT_ISSUER})
 
-    AZURE_CONTAINER=$(basename ${CURRENT_ISSUER})
+    AZURE_STORAGE_CONTAINER=$(basename ${CURRENT_ISSUER})
     ```
 
     GCP
@@ -97,7 +97,7 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 
     Azure
     ```bash
-    az storage blob download --container-name ${AZURE_CONTAINER} --account-name ${AZURE_ACCOUNT} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.current.json
+    az storage blob download --container-name ${AZURE_STORAGE_CONTAINER} --account-name ${AZURE_STORAGE_ACCOUNT} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.current.json
     ```
 
     GCP
@@ -124,7 +124,7 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 
     Azure
     ```bash
-    az storage blob upload --overwrite --account-name ${AZURE_ACCOUNT}  --container-name ${AZURE_CONTAINER} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.combined.json
+    az storage blob upload --overwrite --account-name ${AZURE_STORAGE_ACCOUNT}  --container-name ${AZURE_STORAGE_CONTAINER} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.combined.json
     ```
 
     GCP
@@ -163,7 +163,7 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 
     Azure
     ```bash
-    az storage blob upload --overwrite --account-name ${AZURE_ACCOUNT} --container-name ${AZURE_CONTAINER} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.new.json
+    az storage blob upload --overwrite --account-name ${AZURE_STORAGE_ACCOUNT} --container-name ${AZURE_STORAGE_CONTAINER} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.new.json
     ```
 
     GCP
