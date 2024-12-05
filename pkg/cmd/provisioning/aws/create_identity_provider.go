@@ -56,7 +56,7 @@ var (
         "IgnorePublicAcls": true,
         "BlockPublicPolicy": true,
         "RestrictPublicBuckets": true
-    },
+    }
 }`
 
 	// iam identity provider with "openshift" and "sts.amazonaws.com" as static audiences
