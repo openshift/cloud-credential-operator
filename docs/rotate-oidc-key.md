@@ -29,16 +29,16 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     ```bash
     CURRENT_ISSUER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
 
-    AZURE_STORAGE_ACCOUNT=$(basename ${CURRENT_ISSUER})
+    AZURE_STORAGE_ACCOUNT=$(echo ${CURRENT_ISSUER} | cut -d "/" -f3 | cut -d "." -f1)
 
-    AZURE_STORAGE_CONTAINER=$(basename ${CURRENT_ISSUER})
+    AZURE_STORAGE_CONTAINER=$(echo ${CURRENT_ISSUER} | cut -d "/" -f4)
     ```
 
     GCP
     ```bash
     CURRENT_ISSUER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
 
-    GCP_BUCKET=$(basename ${CURRENT_ISSUER})
+    GCP_BUCKET=$(echo ${CURRENT_ISSUER} | cut -d "/" -f4)
     ```
 
 1. Confirm that your cluster is in a stable state.
@@ -50,6 +50,8 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 1. Trigger the kube-apiserver to create a new bound service account signing key.
 
     Deleting the next-bound-service-account-signing-key secret will cause the kube-apserver to generate a new one. At this point, the kube-apiserver will start rolling out the new key. In order to reduce the risk of authentication failures, it is important to complete all steps up to and including ***Upload the combined keys file*** as quickly as possible.
+
+    WARNING: The remaining steps may cause downtime for the cluster.
 
     ```bash
     oc -n openshift-kube-apiserver-operator delete secrets/next-bound-service-account-signing-key
@@ -65,7 +67,7 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 
 1. Create a keys.json using the new public key
 
-    Use the public key downloaded above to create a new keys.json file. We do this by taking advantage of the --dry-run option in order to only output files on disk, including the new keys.json file.
+    Use the public key downloaded above to create a new keys.json file. We do this by taking advantage of the --dry-run option in order to only output files on disk, including the new keys.json file. The actual values of many of the parameters is not important as they do not affect the generation of a new key.
 
     AWS
     ```bash
@@ -85,7 +87,7 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     ```bash
     ccoctl gcp create-workload-identity-provider --dry-run --output-dir=${TEMPDIR} --name fake --project fake --workload-identity-pool fake
 
-    cp ${TEMPDIR}/03-keys.json ${TEMPDIR}/jwks.new.json
+    cp ${TEMPDIR}/04-keys.json ${TEMPDIR}/jwks.new.json
     ```
 
 1. Download the current keys.json from the cloud provider.
@@ -143,6 +145,8 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 1. Reboot all of the nodes
 
     After the kube-apiserver is using the new key, reboot all of the config machine pools. This ensures all of the pods on the cluster are using the new key while maintaining uptime on services configured to be highly-available.
+
+    WARNING: The following step may cause downtime for any services which are not configured for HA across multiple nodes.
 
     ```bash
     oc adm reboot-machine-config-pool mcp/worker mcp/master
