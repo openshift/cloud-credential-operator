@@ -7,6 +7,7 @@ import (
 	"time"
 
 	log "github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
@@ -102,6 +103,7 @@ var (
 )
 
 type PodIdentityManifestSource interface {
+	ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger) error
 	Deployment() string
 	GetImagePullSpec() string
 	Webhook() string
@@ -334,7 +336,15 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 		// Set replicas=1 for deployment on single replica topology clusters
 		requestedDeployment.Spec.Replicas = pointer.Int32(1)
 	}
+
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
+
+	err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger)
+	if err != nil {
+		r.logger.WithError(err).Error("error substituting Deployment")
+		return err
+	}
+
 	resultDeployment, modified, err := resourceapply.ApplyDeployment(ctx, r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration)
 	if err != nil {
 		r.logger.WithError(err).Error("error applying Deployment")
