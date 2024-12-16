@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"os"
 
+	log "github.com/sirupsen/logrus"
+	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/client-go/kubernetes"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
 const gcpFolder = "v4.1.0/gcp-pod-identity-webhook"
@@ -31,4 +34,8 @@ func (a GcpPodIdentity) GetImagePullSpec() string {
 
 func (a GcpPodIdentity) Name() string {
 	return "gcp"
+}
+
+func (a GcpPodIdentity) ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger) error {
+	return nil
 }
