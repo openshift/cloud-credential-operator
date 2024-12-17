@@ -363,7 +363,7 @@ func createRoleAssignment(client *azureclients.AzureClientWrapper, managedIdenti
 	var rawResponse *http.Response
 	// Role assignment can fail due to a replication delay after creating the user-assigned managed identity
 	// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
-	for i := 0; i < 12; i++ {
+	for i := 0; ; i++ {
 		ctxWithResp := runtime.WithCaptureResponse(context.Background(), &rawResponse)
 		roleAssignmentCreateResponse, err := client.RoleAssignmentClient.Create(
 			ctxWithResp,
