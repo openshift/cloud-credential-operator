@@ -91,6 +91,7 @@ spec:
             drop: [ "ALL" ]
         command:
         - /usr/bin/aws-pod-identity-webhook
+        - --aws-default-region=us-east-1
         - --in-cluster=false
         - --tls-cert=/var/run/app/certs/tls.crt
         - --tls-key=/var/run/app/certs/tls.key

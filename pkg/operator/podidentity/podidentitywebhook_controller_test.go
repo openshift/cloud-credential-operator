@@ -19,8 +19,10 @@ package podidentity
 import (
 	"context"
 	"fmt"
-	clientgotesting "k8s.io/client-go/testing"
+	"strings"
 	"testing"
+
+	clientgotesting "k8s.io/client-go/testing"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
@@ -143,6 +145,46 @@ func TestPodIdentityWebhookController(t *testing.T) {
 			expectPDB:        true,
 			podIdentityType:  AzurePodIdentity{},
 		},
+		{
+			name: "AWS platform: Cluster infrastructure object has no AWS region set",
+			existing: []runtime.Object{
+				&configv1.Infrastructure{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "cluster",
+					},
+					Status: configv1.InfrastructureStatus{
+						PlatformStatus: &configv1.PlatformStatus{
+							AWS: &configv1.AWSPlatformStatus{
+								Region: "",
+							},
+						},
+					},
+				}},
+			expectErr:        false,
+			expectedReplicas: 2,
+			expectPDB:        true,
+			podIdentityType:  AwsPodIdentity{},
+		},
+		{
+			name: "AWS platform: Cluster infrastructure object has AWS region",
+			existing: []runtime.Object{
+				&configv1.Infrastructure{
+					ObjectMeta: v1.ObjectMeta{
+						Name: "cluster",
+					},
+					Status: configv1.InfrastructureStatus{
+						PlatformStatus: &configv1.PlatformStatus{
+							AWS: &configv1.AWSPlatformStatus{
+								Region: "us-west-1",
+							},
+						},
+					},
+				}},
+			expectErr:        false,
+			expectedReplicas: 2,
+			expectPDB:        true,
+			podIdentityType:  AwsPodIdentity{},
+		},
 	}
 
 	for _, test := range tests {
@@ -169,9 +211,6 @@ func TestPodIdentityWebhookController(t *testing.T) {
 					Namespace: "testNamespace",
 				},
 			})
-			switch {
-
-			}
 
 			if err != nil && !test.expectErr {
 				require.NoError(t, err, "Unexpected error: %v", err)
@@ -193,6 +232,31 @@ func TestPodIdentityWebhookController(t *testing.T) {
 				}
 
 				assert.Equal(t, podIdentityWebhookDeployment.Spec.Template.Spec.Containers[0].Image, expectedImage, "container image matches expected one")
+
+				// Test ApplyDeploymentSubstitutionsInPlace()
+				switch test.podIdentityType {
+				case AwsPodIdentity{}:
+					infra, ok := test.existing[0].(*configv1.Infrastructure)
+					if !ok || infra.Status.PlatformStatus == nil || infra.Status.PlatformStatus.AWS == nil {
+						// skip
+						break
+					}
+
+					expectedRegion := infra.Status.PlatformStatus.AWS.Region
+					if expectedRegion == "" {
+						expectedRegion = "us-east-1"
+					}
+
+					matchesRegionFlag := false
+					for _, arg := range podIdentityWebhookDeployment.Spec.Template.Spec.Containers[0].Command {
+						if strings.Contains(arg, "--aws-default-region") && arg == fmt.Sprintf("--aws-default-region=%s", expectedRegion) {
+							matchesRegionFlag = true
+							break
+						}
+					}
+
+					assert.Equal(t, matchesRegionFlag, true, "cmd", podIdentityWebhookDeployment.Spec.Template.Spec.Containers[0].Command)
+				}
 
 				podDisruptionBudget, err := getPDB(fakeClientset, "pod-identity-webhook", "openshift-cloud-credential-operator")
 				if test.expectPDB {
