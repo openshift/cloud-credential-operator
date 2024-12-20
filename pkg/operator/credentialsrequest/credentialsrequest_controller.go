@@ -782,6 +782,44 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	} else {
 		crSecretExists = true
 	}
+
+	var credentialsRootSecret *corev1.Secret
+	cloudCredsSecretUpdated := false // in manual and time-based STS modes, we don't have root creds whose rotation would trigger updates.
+	if mode != operatorv1.CloudCredentialsModeManual && !stsDetected {
+		credentialsRootSecret, err = r.Actuator.GetCredentialsRootSecret(ctx, cr)
+		if err != nil {
+			log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
+		}
+		cloudCredsSecretUpdated = credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
+	}
+
+	infra, err := utils.GetInfrastructure(r.Client)
+	if err != nil {
+		log.WithError(err).Debug("unable to retrieve the infrastructure resource")
+	}
+	isInfrastructureUpdated := infra != nil && infra.ResourceVersion != cr.Status.LastSyncInfrastructureResourceVersion
+
+	isStale := cr.Generation != cr.Status.LastSyncGeneration
+	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
+	hasActiveFailureConditions := checkForFailureConditions(cr)
+
+	log.WithFields(log.Fields{
+		"NOT cloudCredsSecretUpdated":    cloudCredsSecretUpdated,
+		"NOT isStale":                    isStale,
+		"NOT isInfrastructureUpdated":    isInfrastructureUpdated,
+		"hasRecentlySynced":              hasRecentlySynced,
+		"crSecretExists":                 crSecretExists,
+		"NOT hasActiveFailureConditions": hasActiveFailureConditions,
+		"cr.Status.Provisioned":          cr.Status.Provisioned,
+	}).Debugf("The above are ANDed together to determine: lastsyncgeneration is current and lastsynctimestamp < %s ago", syncPeriod)
+	if !cloudCredsSecretUpdated && !isStale && !isInfrastructureUpdated && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
+		logger.Debugf("lastsyncgeneration is current and lastsynctimestamp was less than %s ago, so no need to sync", syncPeriod)
+		// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
+		// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
+		// users/permissions/tags/etc.
+		return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+	}
+
 	if stsDetected {
 		// create time-based tokens based on settings in CredentialsRequests
 		logger.Debugf("timed token access cluster detected: %t, so not trying to provision with root secret",
@@ -837,38 +875,6 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			}
 		}
 	} else {
-		credentialsRootSecret, err := r.Actuator.GetCredentialsRootSecret(ctx, cr)
-		if err != nil {
-			log.WithError(err).Debug("error retrieving cloud credentials secret, admin can remove root credentials in mint mode")
-		}
-		cloudCredsSecretUpdated := credentialsRootSecret != nil && credentialsRootSecret.ResourceVersion != cr.Status.LastSyncCloudCredsSecretResourceVersion
-		infra, err := utils.GetInfrastructure(r.Client)
-		if err != nil {
-			log.WithError(err).Debug("unable to retrieve the infrastructure resource")
-		}
-		isInfrastructureUpdated := infra != nil && infra.ResourceVersion != cr.Status.LastSyncInfrastructureResourceVersion
-
-		isStale := cr.Generation != cr.Status.LastSyncGeneration
-		hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
-		hasActiveFailureConditions := checkForFailureConditions(cr)
-
-		log.WithFields(log.Fields{
-			"NOT cloudCredsSecretUpdated":    cloudCredsSecretUpdated,
-			"NOT isStale":                    isStale,
-			"NOT isInfrastructureUpdated":    isInfrastructureUpdated,
-			"hasRecentlySynced":              hasRecentlySynced,
-			"crSecretExists":                 crSecretExists,
-			"NOT hasActiveFailureConditions": hasActiveFailureConditions,
-			"cr.Status.Provisioned":          cr.Status.Provisioned,
-		}).Debugf("The above are ANDed together to determine: lastsyncgeneration is current and lastsynctimestamp < %s ago", syncPeriod)
-		if !cloudCredsSecretUpdated && !isStale && !isInfrastructureUpdated && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
-			logger.Debugf("lastsyncgeneration is current and lastsynctimestamp was less than %s ago, so no need to sync", syncPeriod)
-			// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
-			// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
-			// users/permissions/tags/etc.
-			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
-		}
-
 		credsExists, err := r.Actuator.Exists(ctx, cr)
 		if err != nil {
 			logger.Errorf("error checking whether credentials already exists: %v", err)
