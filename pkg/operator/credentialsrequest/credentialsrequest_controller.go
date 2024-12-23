@@ -859,9 +859,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			"crSecretExists":                 crSecretExists,
 			"NOT hasActiveFailureConditions": hasActiveFailureConditions,
 			"cr.Status.Provisioned":          cr.Status.Provisioned,
-		}).Debug("The above are ANDed together to determine: lastsyncgeneration is current and lastsynctimestamp < an hour ago")
+		}).Debugf("The above are ANDed together to determine: lastsyncgeneration is current and lastsynctimestamp < %s ago", syncPeriod)
 		if !cloudCredsSecretUpdated && !isStale && !isInfrastructureUpdated && hasRecentlySynced && crSecretExists && !hasActiveFailureConditions && cr.Status.Provisioned {
-			logger.Debug("lastsyncgeneration is current and lastsynctimestamp was less than an hour ago, so no need to sync")
+			logger.Debugf("lastsyncgeneration is current and lastsynctimestamp was less than %s ago, so no need to sync", syncPeriod)
 			// Since we get no events for changes made directly to the cloud/platform, set the requeueAfter so that we at
 			// least periodically check that nothing out in the cloud/platform was modified that would require us to fix up
 			// users/permissions/tags/etc.
