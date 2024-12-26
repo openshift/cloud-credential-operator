@@ -853,8 +853,9 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 		hasActiveFailureConditions := checkForFailureConditions(cr)
 
 		log.WithFields(log.Fields{
-			"cloudCredsSecretUpdated":        cloudCredsSecretUpdated,
+			"NOT cloudCredsSecretUpdated":    cloudCredsSecretUpdated,
 			"NOT isStale":                    isStale,
+			"NOT isInfrastructureUpdated":    isInfrastructureUpdated,
 			"hasRecentlySynced":              hasRecentlySynced,
 			"crSecretExists":                 crSecretExists,
 			"NOT hasActiveFailureConditions": hasActiveFailureConditions,
