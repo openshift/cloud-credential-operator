@@ -803,6 +803,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
 	hasActiveFailureConditions := checkForFailureConditions(cr)
 
+	// updating the LastSyncInfrastructureResourceVersion
+	if infra != nil {
+		cr.Status.LastSyncInfrastructureResourceVersion = infra.ResourceVersion
+	}
+
 	log.WithFields(log.Fields{
 		"NOT cloudCredsSecretUpdated":    cloudCredsSecretUpdated,
 		"NOT isStale":                    isStale,
@@ -922,11 +927,6 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			if credentialsRootSecret != nil {
 				cr.Status.LastSyncCloudCredsSecretResourceVersion = credentialsRootSecret.ResourceVersion
 			}
-		}
-
-		// updating the LastSyncInfrastructureResourceVersion
-		if infra != nil {
-			cr.Status.LastSyncInfrastructureResourceVersion = infra.ResourceVersion
 		}
 
 		err = utils.UpdateStatus(r.Client, origCR, cr, logger)
