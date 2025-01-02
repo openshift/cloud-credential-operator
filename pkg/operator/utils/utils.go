@@ -478,7 +478,8 @@ func UpdateStatus(client client.Client, origCR, newCR *minterv1.CredentialsReque
 
 	// Update Credentials Request status if changed:
 	if diff := cmp.Diff(origCR.Status, newCR.Status); diff != "" {
-		logger.Infof("Updating status due to diff: %v", diff)
+		logger.Info("status has changed, updating")
+		logger.Debugf("Status diff: %v", diff)
 		err := client.Status().Update(context.TODO(), newCR)
 		if err != nil {
 			logger.WithError(err).Error("error updating credentials request")
