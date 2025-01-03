@@ -649,6 +649,7 @@ func TestDetectSTS(t *testing.T) {
 			}
 			a := &AWSActuator{
 				Client:         fakeClient,
+				LiveClient:     fakeClient,
 				RootCredClient: fakeAdminClient,
 			}
 			test.wantErr(t, a.sync(context.Background(), test.CredentialsRequest), fmt.Sprintf("sync(%v)", test.CredentialsRequest))

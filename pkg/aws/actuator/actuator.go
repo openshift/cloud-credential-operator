@@ -338,20 +338,14 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		if err != nil {
 			return err
 		}
-		if awsSTSIAMRoleARN == "" {
-			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
-			return nil
-		}
 		cloudTokenPath := cr.Spec.CloudTokenPath
-		if cr.Spec.CloudTokenPath == "" {
+		if awsSTSIAMRoleARN != "" && cloudTokenPath == "" {
 			logger.Debug("CredentialsRequest has no cloudTokenPath, defaulting cloudTokenPath to /var/run/secrets/kubernetes.io/serviceaccount/token")
 			cloudTokenPath = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 		}
-		if awsSTSIAMRoleARN != "" {
-			err = a.syncSTSSecret(awsSTSIAMRoleARN, cloudTokenPath, cr, logger, ctx)
-			if err != nil {
-				return err
-			}
+		err = a.syncSTSSecret(awsSTSIAMRoleARN, cloudTokenPath, cr, logger, ctx)
+		if err != nil {
+			return err
 		}
 	} else {
 		credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
@@ -402,6 +396,10 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 // a path to the JWT token: spec.cloudTokenPath
 // a spec.SecretRef.Name
 // a cr.Spec.SecretRef.Namespace
+//
+// If awsSTSIAMRoleARN or cloudTokenPath are unset, we just set labels
+// and annotations on the Secret, so the label-filtered client
+// informer can find the Secret in the future.
 func (a *AWSActuator) syncSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
@@ -414,7 +412,7 @@ func (a *AWSActuator) syncSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath stri
 			Namespace: cr.Spec.SecretRef.Namespace,
 		},
 	}
-	op, err := controllerutil.CreateOrPatch(ctx, a.Client, secret, func() error {
+	op, err := controllerutil.CreateOrPatch(ctx, a.LiveClient, secret, func() error {
 		if secret.Labels == nil {
 			secret.Labels = map[string]string{}
 		}
@@ -426,8 +424,10 @@ func (a *AWSActuator) syncSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath stri
 		if secret.StringData == nil {
 			secret.StringData = map[string]string{}
 		}
-		secret.StringData["credentials"] = fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath)
-		secret.Type = corev1.SecretTypeOpaque
+		if awsSTSIAMRoleARN != "" && cloudTokenPath != "" {
+			secret.StringData["credentials"] = fmt.Sprintf(awsSTSCredsTemplate, awsSTSIAMRoleARN, cloudTokenPath)
+			secret.Type = corev1.SecretTypeOpaque
+		}
 		return nil
 	})
 	if err != nil {
