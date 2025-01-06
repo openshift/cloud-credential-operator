@@ -3,7 +3,6 @@ package utils
 import (
 	"context"
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 
@@ -17,6 +16,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/google/go-cmp/cmp"
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -477,8 +477,9 @@ func UpdateStatus(client client.Client, origCR, newCR *minterv1.CredentialsReque
 	logger.Debug("updating credentials request status")
 
 	// Update Credentials Request status if changed:
-	if !reflect.DeepEqual(newCR.Status, origCR.Status) {
-		logger.Infof("status has changed, updating")
+	if diff := cmp.Diff(origCR.Status, newCR.Status); diff != "" {
+		logger.Info("status has changed, updating")
+		logger.Debugf("Status diff: %v", diff)
 		err := client.Status().Update(context.TODO(), newCR)
 		if err != nil {
 			logger.WithError(err).Error("error updating credentials request")
