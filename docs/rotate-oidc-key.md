@@ -11,17 +11,15 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 
     Common
     ```bash
-    CLUSTER_ID=$(oc get infrastructures cluster -o jsonpath='{.status.infrastructureName}')
-
-    CLUSTER_NAME=${CLUSTER_ID:0:-6}
-
-    TEMPDIR=${CLUSTER_NAME}-$(date +%Y%m%d%H%M%S)
-
-    mkdir ${TEMPDIR}
+    TEMPDIR=$(mktemp -d)
     ```
 
     AWS
     ```bash
+    INFRA_ID=$(oc get infrastructures cluster -o jsonpath='{.status.infrastructureName}')
+
+    CLUSTER_NAME=${INFRA_ID%-*}
+
     AWS_BUCKET=${CLUSTER_NAME}-oidc
     ```
 
