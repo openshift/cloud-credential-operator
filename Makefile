@@ -157,3 +157,14 @@ build-no-gen: build
 coverage:
 	hack/codecov.sh
 .PHONY: coverage
+
+# Update all non k8s go dependencies
+.PHONY: update-go-dependencies
+update-go-dependencies:
+	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all | grep -v "^k8s.io/" | grep -v "sigs.k8s.io/"); do \
+		go get $$module; \
+	done
+	go mod tidy
+ifneq (,$(wildcard vendor))
+	go mod vendor
+endif
