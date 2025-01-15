@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"net/http"
+	"strings"
 
 	abstractions "github.com/microsoft/kiota-abstractions-go"
 	"go.opentelemetry.io/otel"
@@ -36,7 +36,7 @@ func NewCompressionHandler() *CompressionHandler {
 	return NewCompressionHandlerWithOptions(options)
 }
 
-// NewCompressionHandlerWithOptions creates an instance of the compression middlerware with
+// NewCompressionHandlerWithOptions creates an instance of the compression middleware with
 // specified configurations.
 func NewCompressionHandlerWithOptions(option CompressionOptions) *CompressionHandler {
 	return &CompressionHandler{options: option}
@@ -75,14 +75,14 @@ func (c *CompressionHandler) Intercept(pipeline Pipeline, middlewareIndex int, r
 		req = req.WithContext(ctx)
 	}
 
-	if !reqOption.ShouldCompress() || req.Body == nil {
+	if !reqOption.ShouldCompress() || contentRangeBytesIsPresent(req.Header) || contentEncodingIsPresent(req.Header) || req.Body == nil {
 		return pipeline.Next(req, middlewareIndex)
 	}
 	if span != nil {
 		span.SetAttributes(attribute.Bool("http.request_body_compressed", true))
 	}
 
-	unCompressedBody, err := ioutil.ReadAll(req.Body)
+	unCompressedBody, err := io.ReadAll(req.Body)
 	unCompressedContentLength := req.ContentLength
 	if err != nil {
 		if span != nil {
@@ -116,7 +116,7 @@ func (c *CompressionHandler) Intercept(pipeline Pipeline, middlewareIndex int, r
 	// If response has status 415 retry request with uncompressed body
 	if resp.StatusCode == 415 {
 		delete(req.Header, "Content-Encoding")
-		req.Body = ioutil.NopCloser(bytes.NewBuffer(unCompressedBody))
+		req.Body = io.NopCloser(bytes.NewBuffer(unCompressedBody))
 		req.ContentLength = unCompressedContentLength
 
 		if span != nil {
@@ -130,6 +130,21 @@ func (c *CompressionHandler) Intercept(pipeline Pipeline, middlewareIndex int, r
 	return resp, nil
 }
 
+func contentRangeBytesIsPresent(header http.Header) bool {
+	contentRanges, _ := header["Content-Range"]
+	for _, contentRange := range contentRanges {
+		if strings.Contains(strings.ToLower(contentRange), "bytes") {
+			return true
+		}
+	}
+	return false
+}
+
+func contentEncodingIsPresent(header http.Header) bool {
+	_, ok := header["Content-Encoding"]
+	return ok
+}
+
 func compressReqBody(reqBody []byte) (io.ReadCloser, int, error) {
 	var buffer bytes.Buffer
 	gzipWriter := gzip.NewWriter(&buffer)
@@ -141,5 +156,5 @@ func compressReqBody(reqBody []byte) (io.ReadCloser, int, error) {
 		return nil, 0, err
 	}
 
-	return ioutil.NopCloser(&buffer), buffer.Len(), nil
+	return io.NopCloser(&buffer), buffer.Len(), nil
 }

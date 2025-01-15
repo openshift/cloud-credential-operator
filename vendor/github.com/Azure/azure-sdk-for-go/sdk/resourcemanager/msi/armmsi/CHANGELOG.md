@@ -1,5 +1,17 @@
 # Release History
 
+## 1.2.0 (2023-11-24)
+### Features Added
+
+- Support for test fakes and OpenTelemetry trace spans.
+
+
+## 1.1.0 (2023-03-31)
+### Features Added
+
+- New struct `ClientFactory` which is a client factory used to create any client in this module
+
+
 ## 1.0.0 (2023-02-24)
 ### Breaking Changes
 

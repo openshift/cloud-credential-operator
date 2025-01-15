@@ -9,6 +9,121 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+## [1.4.4] - 2024-08-13
+
+### Changed
+
+- Added `http.request.resend_delay` as a span attribute for the retry handler
+- Changed the `http.retry_count` span attribute to `http.request.resend_count` to conform to OpenTelemetry specs.
+
+## [1.4.3] - 2024-07-22
+
+### Changed
+
+- Fixed a bug to prevent double request compression by the compression handler.
+
+## [1.4.2] - 2024-07-16
+
+### Changed
+
+- Prevent compression if Content-Range header is present.
+- Fix bug which leads to a missing Content-Length header.
+
+## [1.4.1] - 2024-05-09
+
+### Changed
+
+- Allow custom response handlers to return nil result values.
+
+## [1.4.0] - 2024-05-09
+
+- Support retry after as a date.
+
+## [1.3.3] - 2024-03-19
+
+- Fix bug where overriding http.DefaultTransport with an implementation other than http.Transport would result in an interface conversion panic
+
+### Changed
+
+## [1.3.2] - 2024-02-28
+
+### Changed
+
+- Fix bug with headers inspection handler using wrong key.
+
+## [1.3.1] - 2024-02-09
+
+### Changed
+
+- Fix bug that resulted in the error "content is empty" being returned instead of HTTP status information if the request returned no content and an unsuccessful status code.
+
+## [1.3.0] - 2024-01-22
+
+### Added
+
+- Added support to override default middleware with function `GetDefaultMiddlewaresWithOptions`.
+
+## [1.2.1] - 2023-01-22
+
+### Changed
+
+- Fix bug passing no timeout in client as 0 timeout in context  .
+
+## [1.2.0] - 2024-01-22
+
+### Added
+
+- Adds support for XXX status code.
+
+## [1.1.2] - 2024-01-20
+
+### Changed
+
+- Changed the code by replacing ioutil.ReadAll and ioutil.NopCloser with io.ReadAll and io.NopCloser, respectively, due to their deprecation.
+
+## [1.1.1] - 2023-11-22
+
+### Added
+
+- Added response headers and status code to returned error in `throwIfFailedResponse`.
+
+## [1.1.0] - 2023-08-11
+
+### Added
+
+- Added headers inspection middleware and option.
+
+## [1.0.1] - 2023-07-19
+
+### Changed
+
+- Bug Fix: Update Host for Redirect URL in go client.
+
+## [1.0.0] - 2023-05-04
+
+### Changed
+
+- GA Release.
+
+## [0.17.0] - 2023-04-26
+
+### Added
+
+- Adds Response Headers to the ApiError returned on Api requests errors.
+
+## [0.16.2] - 2023-04-17
+
+### Added
+
+- Exit retry handler earlier if context is done.
+- Adds exported method `ReplacePathTokens` that can be used to process url replacement logic globally.
+
+## [0.16.1] - 2023-03-20
+
+### Added
+
+- Context deadline for requests defaults to client timeout when not provided.
+
 ## [0.16.0] - 2023-03-01
 
 ### Added
