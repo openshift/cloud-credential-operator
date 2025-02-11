@@ -69,7 +69,7 @@ func createIAMRoles(client aws.Client, identityProviderARN, PermissionsBoundaryA
 
 func processCredentialsRequests(awsClient aws.Client, credReqs []*credreqv1.CredentialsRequest, identityProviderARN, PermissionsBoundaryARN, name, targetDir string, generateOnly bool) error {
 
-	issuerURL, err := getIssuerURLFromIdentityProvider(awsClient, identityProviderARN)
+	issuerURL, err := getIssuerURLFromIdentityProvider(awsClient, identityProviderARN, generateOnly)
 	if err != nil {
 		return err
 	}
@@ -270,7 +270,11 @@ func createRolePolicyDocument(oidcProviderARN, issuerURL, namespace string, serv
 	return policy, nil
 }
 
-func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string) (string, error) {
+func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string, dryRun bool) (string, error) {
+	if dryRun {
+		return "<enter_issuer_url_here>", nil
+	}
+
 	idProvider, err := awsClient.GetOpenIDConnectProvider(&iam.GetOpenIDConnectProviderInput{
 		OpenIDConnectProviderArn: awssdk.String(idProviderARN),
 	})
