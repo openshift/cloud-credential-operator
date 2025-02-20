@@ -45,6 +45,7 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop: ["ALL"]
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 8443
           name: metrics
@@ -77,6 +78,7 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop: ["ALL"]
+          readOnlyRootFilesystem: true
         resources:
           requests:
             cpu: 10m
