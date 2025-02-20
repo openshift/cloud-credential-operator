@@ -58,16 +58,9 @@ spec:
         volumeMounts:
         - mountPath: /etc/tls/private
           name: cloud-credential-operator-serving-cert
-      - args:
-        - |
-          if [ -s /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem ]; then
-              echo "Copying system trust bundle"
-              cp -f /var/run/configmaps/trusted-ca-bundle/tls-ca-bundle.pem /etc/pki/ca-trust/extracted/pem/tls-ca-bundle.pem
-          fi
-          exec /usr/bin/cloud-credential-operator operator
-        command:
-        - /bin/bash
-        - -ec
+      - command:
+        - /usr/bin/cloud-credential-operator
+        - operator
         env:
         - name: RELEASE_VERSION
           value: 0.0.1-snapshot
@@ -90,7 +83,7 @@ spec:
             memory: 20Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
-        - mountPath: /var/run/configmaps/trusted-ca-bundle
+        - mountPath: /etc/pki/ca-trust/extracted/pem
           name: cco-trusted-ca
       nodeSelector:
         node-role.kubernetes.io/master: ""
