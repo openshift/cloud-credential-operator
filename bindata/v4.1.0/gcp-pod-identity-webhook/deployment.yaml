@@ -42,6 +42,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ "ALL" ]
+            readOnlyRootFilesystem: true
           terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /tmp/k8s-webhook-server/serving-certs/
@@ -67,6 +68,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        readOnlyRootFilesystem: true
       volumes:
         - name: webhook-certs
           secret:
