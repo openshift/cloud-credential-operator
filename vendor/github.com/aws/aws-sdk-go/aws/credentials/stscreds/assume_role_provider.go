@@ -9,7 +9,7 @@ to refresh the credentials will be synchronized. But, the SDK is unable to
 ensure synchronous usage of the AssumeRoleProvider if the value is shared
 between multiple Credentials, Sessions or service clients.
 
-Assume Role
+# Assume Role
 
 To assume an IAM role using STS with the SDK you can create a new Credentials
 with the SDKs's stscreds package.
@@ -27,7 +27,7 @@ with the SDKs's stscreds package.
 	// from assumed role.
 	svc := s3.New(sess, &aws.Config{Credentials: creds})
 
-Assume Role with static MFA Token
+# Assume Role with static MFA Token
 
 To assume an IAM role with a MFA token you can either specify a MFA token code
 directly or provide a function to prompt the user each time the credentials
@@ -49,7 +49,7 @@ credentials.
 	// from assumed role.
 	svc := s3.New(sess, &aws.Config{Credentials: creds})
 
-Assume Role with MFA Token Provider
+# Assume Role with MFA Token Provider
 
 To assume an IAM role with MFA for longer running tasks where the credentials
 may need to be refreshed setting the TokenProvider field of AssumeRoleProvider
@@ -74,7 +74,6 @@ single Credentials with an AssumeRoleProvider can be shared safely.
 	// Create service client value configured for credentials
 	// from assumed role.
 	svc := s3.New(sess, &aws.Config{Credentials: creds})
-
 */
 package stscreds
 
@@ -95,7 +94,7 @@ import (
 // StdinTokenProvider will prompt on stderr and read from stdin for a string value.
 // An error is returned if reading from stdin fails.
 //
-// Use this function go read MFA tokens from stdin. The function makes no attempt
+// Use this function to read MFA tokens from stdin. The function makes no attempt
 // to make atomic prompts from stdin across multiple gorouties.
 //
 // Using StdinTokenProvider with multiple AssumeRoleProviders, or Credentials will
@@ -198,6 +197,10 @@ type AssumeRoleProvider struct {
 	// The value is either the serial number for a hardware device (such as GAHT12345678)
 	// or an Amazon Resource Name (ARN) for a virtual device (such as arn:aws:iam::123456789012:mfa/user).
 	SerialNumber *string
+
+	// The SourceIdentity which is used to identity a persistent identity through the whole session.
+	// For more details see https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_control-access_monitor.html
+	SourceIdentity *string
 
 	// The value provided by the MFA device, if the trust policy of the role being
 	// assumed requires MFA (that is, if the policy includes a condition that tests
@@ -320,6 +323,7 @@ func (p *AssumeRoleProvider) RetrieveWithContext(ctx credentials.Context) (crede
 		Tags:              p.Tags,
 		PolicyArns:        p.PolicyArns,
 		TransitiveTagKeys: p.TransitiveTagKeys,
+		SourceIdentity:    p.SourceIdentity,
 	}
 	if p.Policy != nil {
 		input.Policy = p.Policy
