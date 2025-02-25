@@ -40,6 +40,12 @@ instance roles).
   * If the admin credentials cannot create additional credentials, but do themselves fulfill the requirements of the credentials request, they will be used (with logged warnings and a condition on the credentials request).
   * If the admin credentials fulfill neither of the above requirements, the controller will fail to generate the credentials, report failure back to the Cluster Version Operator, and thus block upgrading. The installer will also perform this check early to inform the user their cluster will not function.
 
+## Building binary from source
+
+```bash
+~[cloud-credential-operator] (master)$ go build -o $(go env GOPATH)/bin/ccoctl cmd/ccoctl/main.go
+```
+
 ## Cloud Providers
 
 Currently the operator supports AWS, Azure, GCP, KubeVirt, OpenStack. oVirt and VMWare.
