@@ -1,8 +1,8 @@
 module github.com/openshift/cloud-credential-operator
 
-go 1.22.3
+go 1.23.0
 
-toolchain go1.22.5
+toolchain go1.23.4
 
 require (
 	cloud.google.com/go/iam v1.1.6
@@ -39,7 +39,7 @@ require (
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.9.0
 	golang.org/x/mod v0.20.0
-	golang.org/x/oauth2 v0.21.0
+	golang.org/x/oauth2 v0.28.0
 	golang.org/x/time v0.5.0
 	google.golang.org/api v0.169.0
 	google.golang.org/genproto v0.0.0-20240311173647-c811ad7063a7
