@@ -37,13 +37,13 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create public/private key pair: %s", err)
 	}
 
-	identityProviderARN, err := createIdentityProvider(awsClient, CreateAllOpts.Name, CreateAllOpts.Region, publicKeyPath, CreateAllOpts.TargetDir, CreateAllOpts.CreatePrivateS3Bucket, false)
+	identityProviderARN, err := createIdentityProvider(awsClient, CreateAllOpts.Name, CreateAllOpts.Region, publicKeyPath, CreateAllOpts.TargetDir, CreateAllOpts.CreatePrivateS3Bucket, CreateAllOpts.DryRun)
 	if err != nil {
 		log.Fatalf("Failed to create Identity provider: %s", err)
 	}
 
 	err = createIAMRoles(awsClient, identityProviderARN, CreateAllOpts.PermissionsBoundaryARN, CreateAllOpts.Name,
-		CreateAllOpts.CredRequestDir, CreateAllOpts.TargetDir, CreateAllOpts.EnableTechPreview, false)
+		CreateAllOpts.CredRequestDir, CreateAllOpts.TargetDir, CreateAllOpts.EnableTechPreview, CreateAllOpts.DryRun)
 	if err != nil {
 		log.Fatalf("Failed to process IAM Roles: %s", err)
 	}
@@ -106,6 +106,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.CreatePrivateS3Bucket, "create-private-s3-bucket", false, "Create private S3 bucket with public CloudFront OIDC endpoint")
+	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 
 	return createAllCmd
 }
