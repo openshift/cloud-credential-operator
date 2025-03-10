@@ -17,3 +17,6 @@ ignore:
     'SNYK-GOLANG-GOOGLEGOLANGORGPROTOBUFINTERNALENCODINGJSON-6393704':
     - '* > google.golang.org/protobuf/internal/encoding/json':
        reason: 'This is a medium vulnerability which would require an attacker to gain access to the cluster. Resolving it requires upgrading to golang beyond the 1.19 build image available for this release. Furthermore, release 4.13 and release-4.14 are EOL in apx 4 months'
+    'SNYK-GOLANG-GOLANGORGXOAUTH2JWS-8749594':
+     - '* > golang.org/x/oauth2/jws':
+        reason: 'The affected code path is not used. The jws package is used by the ccoctl binary via golang.org/x/oauth2/google. Neither ccoctl nor the dependednt oauth2/google call the affected Verify() function.'
