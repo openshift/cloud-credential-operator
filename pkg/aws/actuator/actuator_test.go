@@ -18,6 +18,7 @@ package actuator
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"testing"
@@ -38,6 +39,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
 
 	"github.com/openshift/cloud-credential-operator/pkg/apis"
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -576,6 +578,7 @@ func TestDetectSTS(t *testing.T) {
 		existing           []runtime.Object
 		wantErr            assert.ErrorAssertionFunc
 		CredentialsRequest *minterv1.CredentialsRequest
+		clientInterceptors interceptor.Funcs
 		issuer             string
 	}{
 		{
@@ -635,13 +638,43 @@ func TestDetectSTS(t *testing.T) {
 			issuer:  "non-empty",
 			wantErr: assert.NoError,
 		},
+		{
+			name: "STS mode and with a CloudTokenString and CloudTokenPath set in CredentialsRequest should fail to create a Secret",
+			existing: []runtime.Object{
+				testInfrastructure(),
+				testOperatorConfig(operatorv1.CloudCredentialsModeManual),
+			},
+			CredentialsRequest: func() *minterv1.CredentialsRequest {
+				cr := testCredentialsRequest()
+				var err error
+				cr.Spec.ProviderSpec, err = testAWSProviderConfig("cloud-token")
+				if err != nil {
+					t.FailNow()
+				}
+				cr.Spec.CloudTokenPath = "/var/token"
+				return cr
+			}(),
+			clientInterceptors: interceptor.Funcs{
+				Create: func(ctx context.Context, client client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if _, ok := obj.(*corev1.Secret); !ok {
+						return client.Create(ctx, obj, opts...)
+					}
+					return errors.New("intercepted - won't create any secret")
+				},
+			},
+			issuer: "non-empty",
+			wantErr: func(tt assert.TestingT, err error, i ...interface{}) bool {
+				return assert.ErrorContains(tt, err, "intercepted - won't create any secret", i...)
+			},
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			fakeClient := fake.NewClientBuilder().
 				WithScheme(scheme.Scheme).
 				WithStatusSubresource(&minterv1.CredentialsRequest{}).
-				WithRuntimeObjects(test.existing...).Build()
+				WithRuntimeObjects(test.existing...).
+				WithInterceptorFuncs(test.clientInterceptors).Build()
 			fakeAdminClient := fake.NewClientBuilder().Build()
 			err := fakeClient.Create(context.TODO(), testAuthentication(test.issuer))
 			if err != nil {
