@@ -342,7 +342,7 @@ github.com/ghodss/yaml
 ## explicit
 github.com/go-bindata/go-bindata
 github.com/go-bindata/go-bindata/go-bindata
-# github.com/go-jose/go-jose/v4 v4.0.4
+# github.com/go-jose/go-jose/v4 v4.0.5
 ## explicit; go 1.21
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
