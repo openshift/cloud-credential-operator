@@ -24,6 +24,7 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop: [ "ALL" ]
+          readOnlyRootFilesystem: true
         command:
         - /usr/bin/aws-pod-identity-webhook
         - --aws-default-region=us-east-1
@@ -53,6 +54,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        readOnlyRootFilesystem: true
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
