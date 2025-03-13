@@ -92,6 +92,7 @@ spec:
           allowPrivilegeEscalation: false
           capabilities:
             drop: [ "ALL" ]
+          readOnlyRootFilesystem: true
         command:
         - /usr/bin/aws-pod-identity-webhook
         - --aws-default-region=us-east-1
@@ -121,6 +122,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        readOnlyRootFilesystem: true
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -270,6 +272,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ "ALL" ]
+            readOnlyRootFilesystem: true
           terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /certs
@@ -295,6 +298,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        readOnlyRootFilesystem: true
       volumes:
         - name: webhook-certs
           secret:
@@ -619,6 +623,7 @@ spec:
             allowPrivilegeEscalation: false
             capabilities:
               drop: [ "ALL" ]
+            readOnlyRootFilesystem: true
           terminationMessagePolicy: FallbackToLogsOnError
           volumeMounts:
             - mountPath: /tmp/k8s-webhook-server/serving-certs/
@@ -644,6 +649,7 @@ spec:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
+        readOnlyRootFilesystem: true
       volumes:
         - name: webhook-certs
           secret:
