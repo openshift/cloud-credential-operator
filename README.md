@@ -125,6 +125,7 @@ metadata:
 data:
   clouds.yaml: Base64encodeCloudCreds
   clouds.conf: Base64encodeCloudCredsINI
+  cacert: Base64encodeCACert
 ```
 
 ### Ovirt

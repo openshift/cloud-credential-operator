@@ -23,29 +23,34 @@ import (
 )
 
 const (
-	RootOpenStackCredsSecretKey = "clouds.yaml"
-	OpenStackCloudName          = "openstack"
-	CACertFile                  = "/etc/kubernetes/static-pod-resources/configmaps/cloud-config/ca-bundle.pem"
+	RootOpenStackCredsSecretKey  = "clouds.yaml"
+	RootOpenStackCAFileSecretKey = "cacert"
+	OpenStackCloudName           = "openstack"
+	CACertFile                   = "/etc/kubernetes/static-pod-resources/configmaps/cloud-config/ca-bundle.pem"
 )
 
-func GetRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, logger log.FieldLogger) (string, error) {
-	var clouds string
-
-	keyBytes, ok := cloudCredSecret.Data[RootOpenStackCredsSecretKey]
+func GetRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, logger log.FieldLogger) (string, string, error) {
+	creds, ok := cloudCredSecret.Data[RootOpenStackCredsSecretKey]
 	if !ok {
-		return "", fmt.Errorf("secret did not have expected key: %v", RootOpenStackCredsSecretKey)
+		return "", "", fmt.Errorf("secret did not have expected key: %v", RootOpenStackCredsSecretKey)
 	}
 
-	clouds = string(keyBytes)
+	// cacert is optional, so it's okay if it's not present
+	cacert, _ := cloudCredSecret.Data[RootOpenStackCAFileSecretKey]
+
 	logger.Debug("found clouds.yaml in target secret")
 
-	return clouds, nil
+	return string(creds), string(cacert), nil
 }
 
-func SetRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, clouds string) {
+func SetRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, clouds, cafile string) {
 	if cloudCredSecret.Data == nil {
 		cloudCredSecret.Data = make(map[string][]byte)
 	}
 
 	cloudCredSecret.Data[RootOpenStackCredsSecretKey] = []byte(clouds)
+
+	if len(cafile) > 0 {
+		cloudCredSecret.Data[RootOpenStackCAFileSecretKey] = []byte(cafile)
+	}
 }
