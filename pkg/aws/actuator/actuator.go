@@ -430,11 +430,11 @@ func (a *AWSActuator) syncSTSSecret(awsSTSIAMRoleARN string, cloudTokenPath stri
 		secret.Type = corev1.SecretTypeOpaque
 		return nil
 	})
-	sLog.WithField("operation", op).Info("processed secret")
+	sLog.WithField("operation", op).WithError(err).Info("processed secret")
 	if err != nil {
 		return &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   "error processing secret",
+			Message:   fmt.Sprintf("error processing secret: %v", err),
 		}
 	}
 	return nil
