@@ -8,3 +8,6 @@ ignore:
     'SNYK-GOLANG-K8SIOCLIENTGOTRANSPORT-7538822':
      - '* > k8s.io/client-go/transport':
         reason: 'Snyk mistakenly identifies v1.17.0-alpha.1 as newer than v0.29.7. client-go has a complicated history of versioning. Presumably, v1.20.0-alpha.1 referred to kubernetes-v1.20. kubernetes tags have since been prefaced by "kubernetes", whereas actual client-go versions resumed numbering from 0.x'
+    'SNYK-GOLANG-GOLANGORGXOAUTH2JWS-8749594':
+     - '* > golang.org/x/oauth2/jws':
+        reason: 'The affected code path is not used. The jws package is used by the ccoctl binary via golang.org/x/oauth2/google. Neither ccoctl nor the dependednt oauth2/google call the affected Verify() function.'
