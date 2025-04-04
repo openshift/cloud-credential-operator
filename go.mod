@@ -1,6 +1,8 @@
 module github.com/openshift/cloud-credential-operator
 
-go 1.20
+go 1.21
+
+toolchain go1.23.4
 
 require (
 	cloud.google.com/go v0.115.0 // indirect
@@ -17,7 +19,7 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-openapi/errors v0.21.0 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/golang/glog v1.2.1
+	github.com/golang/glog v1.2.4
 	github.com/golang/mock v1.6.0
 	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
