@@ -106,6 +106,10 @@ var (
 				ImagePullPolicy: corev1.PullIfNotPresent,
 				Name:            "cloud-credential-operator",
 				VolumeMounts: []corev1.VolumeMount{{
+					MountPath: "/etc/pki/ca-trust/extracted/pem",
+					Name:      "cco-trusted-ca",
+					ReadOnly:  true,
+				}, {
 					MountPath: "/etc/kubernetes/secrets",
 					Name:      "secrets",
 					ReadOnly:  true,
@@ -113,6 +117,13 @@ var (
 			}},
 			HostNetwork: true,
 			Volumes: []corev1.Volume{{
+				Name: "cco-trusted-ca",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/etc/pki/ca-trust/extracted/pem",
+					},
+				},
+			}, {
 				Name: "secrets",
 				VolumeSource: corev1.VolumeSource{
 					HostPath: &corev1.HostPathVolumeSource{
@@ -221,6 +232,29 @@ func render() error {
 
 		staticPod.Spec.Containers[0].Image = renderOpts.ccoImage
 
+		if installConfig.Proxy != nil {
+			if installConfig.Proxy.HTTPProxy != "" {
+				staticPod.Spec.Containers[0].Env = append(staticPod.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "HTTP_PROXY",
+					Value: installConfig.Proxy.HTTPProxy,
+				})
+			}
+
+			if installConfig.Proxy.HTTPSProxy != "" {
+				staticPod.Spec.Containers[0].Env = append(staticPod.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "HTTPS_PROXY",
+					Value: installConfig.Proxy.HTTPSProxy,
+				})
+			}
+
+			if installConfig.Proxy.NoProxy != "" {
+				staticPod.Spec.Containers[0].Env = append(staticPod.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "NO_PROXY",
+					Value: installConfig.Proxy.NoProxy,
+				})
+			}
+		}
+
 		podContent, err := sigsyaml.Marshal(&staticPod)
 		if err != nil {
 			return errors.Wrap(err, "failed to encode yaml")
@@ -302,9 +336,23 @@ func isDisabledViaConfigmap() bool {
 	return disabled
 }
 
+type Proxy struct {
+	// +optional
+	HTTPProxy string `json:"httpProxy,omitempty"`
+
+	// +optional
+	HTTPSProxy string `json:"httpsProxy,omitempty"`
+
+	// +optional
+	NoProxy string `json:"noProxy,omitempty"`
+}
+
 type basicInstallConfig struct {
 	CredentialsMode operatorv1.CloudCredentialsMode    `json:"credentialsMode"`
 	Capabilities    *v1.ClusterVersionCapabilitiesSpec `json:"capabilities"`
+
+	// +optional
+	Proxy *Proxy `json:"proxy,omitempty"`
 }
 
 func getInstallConfig() (*basicInstallConfig, error) {
