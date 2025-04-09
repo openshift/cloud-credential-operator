@@ -21,7 +21,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"text/template"
 
 	v1 "github.com/openshift/api/config/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -31,7 +30,9 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	sigsyaml "sigs.k8s.io/yaml"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
@@ -39,36 +40,6 @@ import (
 	assets "github.com/openshift/cloud-credential-operator/pkg/assets/bootstrap"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-)
-
-const (
-	podYamlFilename = "cloud-credential-operator-pod.yaml"
-
-	podTemplate = `apiVersion: v1
-kind: Pod
-metadata:
-  name: cloud-credential-operator
-  namespace: openshift-cloud-credential-operator
-spec:
-  containers:
-  - command:
-    - /usr/bin/cloud-credential-operator
-    args:
-    - operator
-    - --log-level=debug
-    - --kubeconfig=/etc/kubernetes/secrets/kubeconfig
-    image: %s
-    imagePullPolicy: IfNotPresent
-    name: cloud-credential-operator
-    volumeMounts:
-    - mountPath: /etc/kubernetes/secrets
-      name: secrets
-      readOnly: true
-  hostNetwork: true
-  volumes:
-  - hostPath:
-      path: /etc/kubernetes/bootstrap-secrets
-    name: secrets`
 )
 
 const (
@@ -81,15 +52,19 @@ const (
 	installConfigKeyName   = "install-config"
 
 	operatorConfigFilename = "cco-operator-config.yaml"
+	podYamlFilename        = "cloud-credential-operator-pod.yaml"
 )
 
 var (
-	operatorConfigTemplate = template.Must(template.New("operatorConfig").Parse(`apiVersion: operator.openshift.io/v1
-kind: CloudCredential
-metadata:
-  name: cluster
-spec:
-  credentialsMode: "{{ .CredentialsMode }}"`))
+	operatorConfig = &operatorv1.CloudCredential{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "operator.openshift.io/v1",
+			Kind:       "CloudCredential",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name: "cluster",
+		},
+	}
 
 	renderAssets = []string{
 		"bootstrap/cloudcredential_v1_operator_config_custresdef.yaml",
@@ -110,11 +85,44 @@ spec:
 		ccoImage       string
 		logLevel       string
 	}
-)
 
-type operatorTemplateVars struct {
-	CredentialsMode operatorv1.CloudCredentialsMode
-}
+	staticPod = &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cloud-credential-operator",
+			Namespace: "openshift-cloud-credential-operator",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Args: []string{
+					"operator",
+					"--log-level=debug",
+					"--kubeconfig=/etc/kubernetes/secrets/kubeconfig",
+				},
+				Command:         []string{"/usr/bin/cloud-credential-operator"},
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Name:            "cloud-credential-operator",
+				VolumeMounts: []corev1.VolumeMount{{
+					MountPath: "/etc/kubernetes/secrets",
+					Name:      "secrets",
+					ReadOnly:  true,
+				}},
+			}},
+			HostNetwork: true,
+			Volumes: []corev1.Volume{{
+				Name: "secrets",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/etc/kubernetes/bootstrap-secrets",
+					},
+				},
+			}},
+		},
+	}
+)
 
 func NewRenderCommand() *cobra.Command {
 	renderCmd.Flags().StringVar(&renderOpts.manifestsDir, "manifests-dir", "", "The directory where the install-time manifests are located.")
@@ -188,16 +196,18 @@ func render() error {
 	}
 
 	// render operator config
-	var operatorConfig bytes.Buffer
-	templateVars := operatorTemplateVars{
-		CredentialsMode: effectiveMode,
+	operatorConfig.Spec.CredentialsMode = effectiveMode
+
+	log.Info("Rendering operator manifest")
+	operatorPath := filepath.Join(ccoRenderDir, manifestsDir, operatorConfigFilename)
+
+	operatorContent, err := sigsyaml.Marshal(&operatorConfig)
+	if err != nil {
+		return errors.Wrap(err, "failed to encode yaml")
 	}
 
-	if err := operatorConfigTemplate.Execute(&operatorConfig, templateVars); err != nil {
-		return errors.Wrap(err, "failed to execute operator config template")
-	}
-	assetRenderPath := filepath.Join(ccoRenderDir, manifestsDir, operatorConfigFilename)
-	if err := writeFile(assetRenderPath, operatorConfig.Bytes()); err != nil {
+	err = writeFile(operatorPath, operatorContent)
+	if err != nil {
 		return err
 	}
 
@@ -206,13 +216,19 @@ func render() error {
 		return errors.Wrap(err, "error creating bootstrap-manifests directory")
 	}
 	if effectiveMode != operatorv1.CloudCredentialsModeManual {
-		log.Info("Rendering static pod")
+		log.Info("Rendering static pod manifest")
 		podPath := filepath.Join(ccoRenderDir, bootstrapManifestsDir, podYamlFilename)
-		podContent := fmt.Sprintf(podTemplate, renderOpts.ccoImage)
-		log.Infof("writing file: %s", podPath)
-		err := os.WriteFile(podPath, []byte(podContent), 0644)
+
+		staticPod.Spec.Containers[0].Image = renderOpts.ccoImage
+
+		podContent, err := sigsyaml.Marshal(&staticPod)
 		if err != nil {
-			return errors.Wrap(err, "failed to write file")
+			return errors.Wrap(err, "failed to encode yaml")
+		}
+
+		err = writeFile(podPath, podContent)
+		if err != nil {
+			return err
 		}
 	} else {
 		log.Info("CCO disabled, skipping static pod manifest.")
