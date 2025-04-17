@@ -163,13 +163,30 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
+	// Sync the cacert from its legacy location (the 'ca-bundle.pem' key of the
+	// 'openshift-config / cloud-provider-config' CM) to the new place, if present.
+	// TODO(stephenfin): Remove this syncer in a future release once CCM no longer
+	// relies on the legacy place during bootstrapping.
+	config := &corev1.ConfigMap{}
+	err = r.RootCredClient.Get(context.Background(), types.NamespacedName{Namespace: "openshift-config", Name: "cloud-provider-config"}, config)
+	if err != nil {
+		r.Logger.Debugf("cloud provider config not found: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	cacertUpdated := false
+	if ccmCACert := config.Data["ca-bundle.pem"]; ccmCACert != cacert {
+		cacert = ccmCACert
+		cacertUpdated = true
+	}
+
 	clouds, cloudsUpdated, err := r.fixInvalidCACertFile(clouds)
 	if err != nil {
 		r.Logger.WithError(err).Error("errored checking clouds.yaml")
 		return reconcile.Result{}, err
 	}
 
-	if cloudsUpdated {
+	if cloudsUpdated || cacertUpdated {
 		openstack.SetRootCloudCredentialsSecretData(secret, clouds, cacert)
 		err := r.RootCredClient.Update(context.TODO(), secret)
 		if err != nil {
