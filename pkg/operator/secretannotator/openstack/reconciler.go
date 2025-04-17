@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -134,7 +135,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	}
 	if conflict {
 		r.Logger.Error("configuration conflict between legacy configmap and operator config")
-		return reconcile.Result{}, fmt.Errorf("configuration conflict")
+		return reconcile.Result{}, errors.New("configuration conflict")
 	}
 	if mode == operatorv1.CloudCredentialsModeManual {
 		r.Logger.Info("operator in disabled / manual mode")
@@ -146,7 +147,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	default:
 		const msg = "OpenStack only supports Passthrough mode"
 		r.Logger.Error(msg)
-		return reconcile.Result{}, fmt.Errorf(msg)
+		return reconcile.Result{}, errors.New(msg)
 	}
 
 	secret := &corev1.Secret{}
