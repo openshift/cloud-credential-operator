@@ -31,7 +31,9 @@ import (
 	"github.com/spf13/cobra"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/util/yaml"
+	sigsyaml "sigs.k8s.io/yaml"
 
 	operatorv1 "github.com/openshift/api/operator/v1"
 
@@ -39,36 +41,6 @@ import (
 	assets "github.com/openshift/cloud-credential-operator/pkg/assets/bootstrap"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
-)
-
-const (
-	podYamlFilename = "cloud-credential-operator-pod.yaml"
-
-	podTemplate = `apiVersion: v1
-kind: Pod
-metadata:
-  name: cloud-credential-operator
-  namespace: openshift-cloud-credential-operator
-spec:
-  containers:
-  - command:
-    - /usr/bin/cloud-credential-operator
-    args:
-    - operator
-    - --log-level=debug
-    - --kubeconfig=/etc/kubernetes/secrets/kubeconfig
-    image: %s
-    imagePullPolicy: IfNotPresent
-    name: cloud-credential-operator
-    volumeMounts:
-    - mountPath: /etc/kubernetes/secrets
-      name: secrets
-      readOnly: true
-  hostNetwork: true
-  volumes:
-  - hostPath:
-      path: /etc/kubernetes/bootstrap-secrets
-    name: secrets`
 )
 
 const (
@@ -81,6 +53,7 @@ const (
 	installConfigKeyName   = "install-config"
 
 	operatorConfigFilename = "cco-operator-config.yaml"
+	podYamlFilename        = "cloud-credential-operator-pod.yaml"
 )
 
 var (
@@ -109,6 +82,54 @@ spec:
 		destinationDir string
 		ccoImage       string
 		logLevel       string
+	}
+
+	staticPod = &corev1.Pod{
+		TypeMeta: metav1.TypeMeta{
+			APIVersion: "v1",
+			Kind:       "Pod",
+		},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cloud-credential-operator",
+			Namespace: "openshift-cloud-credential-operator",
+		},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Args: []string{
+					"operator",
+					"--log-level=debug",
+					"--kubeconfig=/etc/kubernetes/secrets/kubeconfig",
+				},
+				Command:         []string{"/usr/bin/cloud-credential-operator"},
+				ImagePullPolicy: corev1.PullIfNotPresent,
+				Name:            "cloud-credential-operator",
+				VolumeMounts: []corev1.VolumeMount{{
+					MountPath: "/etc/pki/ca-trust/extracted/pem",
+					Name:      "cco-trusted-ca",
+					ReadOnly:  true,
+				}, {
+					MountPath: "/etc/kubernetes/secrets",
+					Name:      "secrets",
+					ReadOnly:  true,
+				}},
+			}},
+			HostNetwork: true,
+			Volumes: []corev1.Volume{{
+				Name: "cco-trusted-ca",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/etc/pki/ca-trust/extracted/pem",
+					},
+				},
+			}, {
+				Name: "secrets",
+				VolumeSource: corev1.VolumeSource{
+					HostPath: &corev1.HostPathVolumeSource{
+						Path: "/etc/kubernetes/bootstrap-secrets",
+					},
+				},
+			}},
+		},
 	}
 )
 
@@ -208,9 +229,38 @@ func render() error {
 	if effectiveMode != operatorv1.CloudCredentialsModeManual {
 		log.Info("Rendering static pod")
 		podPath := filepath.Join(ccoRenderDir, bootstrapManifestsDir, podYamlFilename)
-		podContent := fmt.Sprintf(podTemplate, renderOpts.ccoImage)
-		log.Infof("writing file: %s", podPath)
-		err := os.WriteFile(podPath, []byte(podContent), 0644)
+
+		staticPod.Spec.Containers[0].Image = renderOpts.ccoImage
+
+		if installConfig.Proxy != nil {
+			if installConfig.Proxy.HTTPProxy != "" {
+				staticPod.Spec.Containers[0].Env = append(staticPod.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "HTTP_PROXY",
+					Value: installConfig.Proxy.HTTPProxy,
+				})
+			}
+
+			if installConfig.Proxy.HTTPSProxy != "" {
+				staticPod.Spec.Containers[0].Env = append(staticPod.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "HTTPS_PROXY",
+					Value: installConfig.Proxy.HTTPSProxy,
+				})
+			}
+
+			if installConfig.Proxy.NoProxy != "" {
+				staticPod.Spec.Containers[0].Env = append(staticPod.Spec.Containers[0].Env, corev1.EnvVar{
+					Name:  "NO_PROXY",
+					Value: installConfig.Proxy.NoProxy,
+				})
+			}
+		}
+
+		podContent, err := sigsyaml.Marshal(&staticPod)
+		if err != nil {
+			return errors.Wrap(err, "failed to encode yaml")
+		}
+
+		err = writeFile(podPath, podContent)
 		if err != nil {
 			return errors.Wrap(err, "failed to write file")
 		}
@@ -286,9 +336,23 @@ func isDisabledViaConfigmap() bool {
 	return disabled
 }
 
+type Proxy struct {
+	// +optional
+	HTTPProxy string `json:"httpProxy,omitempty"`
+
+	// +optional
+	HTTPSProxy string `json:"httpsProxy,omitempty"`
+
+	// +optional
+	NoProxy string `json:"noProxy,omitempty"`
+}
+
 type basicInstallConfig struct {
 	CredentialsMode operatorv1.CloudCredentialsMode    `json:"credentialsMode"`
 	Capabilities    *v1.ClusterVersionCapabilitiesSpec `json:"capabilities"`
+
+	// +optional
+	Proxy *Proxy `json:"proxy,omitempty"`
 }
 
 func getInstallConfig() (*basicInstallConfig, error) {
