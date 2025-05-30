@@ -18,6 +18,7 @@ package openstack
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -52,6 +53,7 @@ func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
 		Client:         c,
 		RootCredClient: mgr.GetClient(),
+		LiveClient:     utils.LiveClient(mgr),
 		Logger:         log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 
@@ -105,6 +107,7 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	Client         client.Client
 	RootCredClient client.Client
+	LiveClient     client.Client
 	Logger         log.FieldLogger
 }
 
@@ -134,7 +137,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	}
 	if conflict {
 		r.Logger.Error("configuration conflict between legacy configmap and operator config")
-		return reconcile.Result{}, fmt.Errorf("configuration conflict")
+		return reconcile.Result{}, errors.New("configuration conflict")
 	}
 	if mode == operatorv1.CloudCredentialsModeManual {
 		r.Logger.Info("operator in disabled / manual mode")
@@ -146,8 +149,10 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	default:
 		const msg = "OpenStack only supports Passthrough mode"
 		r.Logger.Error(msg)
-		return reconcile.Result{}, fmt.Errorf(msg)
+		return reconcile.Result{}, errors.New(msg)
 	}
+
+	r.Logger.Info("verifying clouds.yaml and syncing cacert (if any)")
 
 	secret := &corev1.Secret{}
 	err = r.RootCredClient.Get(context.Background(), request.NamespacedName, secret)
@@ -162,13 +167,30 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
+	// Sync the cacert from its legacy location (the 'ca-bundle.pem' key of the
+	// 'openshift-config / cloud-provider-config' CM) to the new place, if present.
+	// TODO(stephenfin): Remove this syncer in a future release once CCM no longer
+	// relies on the legacy place during bootstrapping.
+	config := &corev1.ConfigMap{}
+	err = r.LiveClient.Get(context.Background(), types.NamespacedName{Namespace: "openshift-config", Name: "cloud-provider-config"}, config)
+	if err != nil {
+		r.Logger.Debugf("cloud provider config not found: %v", err)
+		return reconcile.Result{}, err
+	}
+
+	cacertUpdated := false
+	if ccmCACert := config.Data["ca-bundle.pem"]; ccmCACert != cacert {
+		cacert = ccmCACert
+		cacertUpdated = true
+	}
+
 	clouds, cloudsUpdated, err := r.fixInvalidCACertFile(clouds)
 	if err != nil {
 		r.Logger.WithError(err).Error("errored checking clouds.yaml")
 		return reconcile.Result{}, err
 	}
 
-	if cloudsUpdated {
+	if cloudsUpdated || cacertUpdated {
 		openstack.SetRootCloudCredentialsSecretData(secret, clouds, cacert)
 		err := r.RootCredClient.Update(context.TODO(), secret)
 		if err != nil {

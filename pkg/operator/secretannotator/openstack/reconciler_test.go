@@ -108,6 +108,14 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 		},
 	}
 
+	ccmConfig := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "cloud-provider-config",
+			Namespace: "openshift-config",
+		},
+		Data: map[string]string{},
+	}
+
 	/*
 		Test parsing of CCO configuration and the resulting annotation of the
 		root secret. Most of this is boilerplate behaviour.
@@ -181,11 +189,13 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 				secret := testSecret(fmt.Sprintf(cloudsWithCACert, correctCACertFile))
 				existing := append(tc.existing, infra, testOperatorConfig(tc.mode))
 				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(existing...).Build()
-				fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(secret).Build()
+				fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(secret, ccmConfig).Build()
+				fakeLiveClient := fake.NewClientBuilder().WithRuntimeObjects(ccmConfig).Build()
 
 				r := &ReconcileCloudCredSecret{
 					Client:         fakeClient,
 					RootCredClient: fakeRootCredClient,
+					LiveClient:     fakeLiveClient,
 					Logger:         log.WithField("controller", "testController"),
 				}
 				_, err := r.Reconcile(context.TODO(), reconcile.Request{NamespacedName: types.NamespacedName{
@@ -270,12 +280,14 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				secret := testSecret(tc.cloudsYAML)
 				fakeClient := fake.NewClientBuilder().WithRuntimeObjects(infra, passthrough).Build()
-				fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(secret).Build()
+				fakeRootCredClient := fake.NewClientBuilder().WithRuntimeObjects(secret, ccmConfig).Build()
+				fakeLiveClient := fake.NewClientBuilder().WithRuntimeObjects(ccmConfig).Build()
 
 				t.Logf("clouds.yaml: %s", tc.cloudsYAML)
 				r := &ReconcileCloudCredSecret{
 					Client:         fakeClient,
 					RootCredClient: fakeRootCredClient,
+					LiveClient:     fakeLiveClient,
 					Logger:         log.WithField("controller", "testController"),
 				}
 
