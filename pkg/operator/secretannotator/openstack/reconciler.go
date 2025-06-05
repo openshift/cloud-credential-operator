@@ -53,6 +53,7 @@ func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
 		Client:         c,
 		RootCredClient: mgr.GetClient(),
+		LiveClient:     utils.LiveClient(mgr),
 		Logger:         log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 
@@ -106,6 +107,7 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	Client         client.Client
 	RootCredClient client.Client
+	LiveClient     client.Client
 	Logger         log.FieldLogger
 }
 
@@ -150,6 +152,8 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, errors.New(msg)
 	}
 
+	r.Logger.Info("verifying clouds.yaml and syncing cacert (if any)")
+
 	secret := &corev1.Secret{}
 	err = r.RootCredClient.Get(context.Background(), request.NamespacedName, secret)
 	if err != nil {
@@ -168,7 +172,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	// TODO(stephenfin): Remove this syncer in a future release once CCM no longer
 	// relies on the legacy place during bootstrapping.
 	config := &corev1.ConfigMap{}
-	err = r.RootCredClient.Get(context.Background(), types.NamespacedName{Namespace: "openshift-config", Name: "cloud-provider-config"}, config)
+	err = r.LiveClient.Get(context.Background(), types.NamespacedName{Namespace: "openshift-config", Name: "cloud-provider-config"}, config)
 	if err != nil {
 		r.Logger.Debugf("cloud provider config not found: %v", err)
 		return reconcile.Result{}, err
