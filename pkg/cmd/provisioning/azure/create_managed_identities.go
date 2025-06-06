@@ -277,7 +277,9 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 				if err != nil {
 					return errors.Wrapf(err, "failed to assign role %s to user-assigned managed identity", roleBinding.Role)
 				}
-				shouldExistRoleAssignments = append(shouldExistRoleAssignments, roleAssignment)
+				if roleAssignment != nil {
+					shouldExistRoleAssignments = append(shouldExistRoleAssignments, roleAssignment)
+				}
 			}
 		}
 	}
@@ -285,7 +287,7 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 	for _, existingRoleAssignment := range existingRoleAssignments {
 		found := false
 		for _, shouldExistRoleAssignment := range shouldExistRoleAssignments {
-			if *shouldExistRoleAssignment.Name == *existingRoleAssignment.Name {
+			if shouldExistRoleAssignment != nil && *shouldExistRoleAssignment.Name == *existingRoleAssignment.Name {
 				found = true
 			}
 		}
