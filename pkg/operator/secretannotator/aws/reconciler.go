@@ -38,16 +38,16 @@ const (
 	AwsSecretAccessKeyName = "aws_secret_access_key"
 )
 
-func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(client, rootCredClient, liveClient client.Client) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
-		Client:           c,
-		RootCredClient:   mgr.GetClient(),
-		LiveClient:       utils.LiveClient(mgr),
+		Client:           client,
+		RootCredClient:   rootCredClient,
+		LiveClient:       liveClient,
 		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
 		AWSClientBuilder: awsutils.ClientBuilder,
 	}
 
-	s := status.NewSecretStatusHandler(c)
+	s := status.NewSecretStatusHandler(client)
 	statuscontroller.AddHandler(constants.SecretAnnotatorControllerName, s)
 
 	return r

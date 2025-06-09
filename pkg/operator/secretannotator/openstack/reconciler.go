@@ -49,15 +49,15 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
-func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(client, rootCredClient, liveClient client.Client) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
-		Client:         c,
-		RootCredClient: mgr.GetClient(),
-		LiveClient:     utils.LiveClient(mgr),
+		Client:         client,
+		RootCredClient: rootCredClient,
+		LiveClient:     liveClient,
 		Logger:         log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 
-	s := status.NewSecretStatusHandler(c)
+	s := status.NewSecretStatusHandler(client)
 	statuscontroller.AddHandler(constants.SecretAnnotatorControllerName, s)
 
 	return r

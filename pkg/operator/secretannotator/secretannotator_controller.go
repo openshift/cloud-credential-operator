@@ -26,6 +26,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/openstack"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/vsphere"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -40,19 +41,19 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 
 	switch platformType {
 	case configv1.AzurePlatformType:
-		return azure.Add(mgr, rootCredentialManager, azure.NewReconciler(mgr.GetClient(), rootCredentialManager))
+		return azure.Add(mgr, rootCredentialManager, azure.NewReconciler(mgr.GetClient(), rootCredentialManager.GetClient()))
 	case configv1.AWSPlatformType:
-		return aws.Add(mgr, rootCredentialManager, aws.NewReconciler(mgr.GetClient(), rootCredentialManager))
+		return aws.Add(mgr, rootCredentialManager, aws.NewReconciler(mgr.GetClient(), rootCredentialManager.GetClient(), utils.LiveClient(mgr)))
 	case configv1.GCPPlatformType:
 		if infraStatus.PlatformStatus == nil || infraStatus.PlatformStatus.GCP == nil {
 			log.Fatalf("Missing GCP configuration in infrastructure platform status")
 		}
-		return gcp.Add(mgr, rootCredentialManager, gcp.NewReconciler(mgr.GetClient(), rootCredentialManager, infraStatus.PlatformStatus.GCP.ProjectID))
+		return gcp.Add(mgr, rootCredentialManager, gcp.NewReconciler(mgr.GetClient(), rootCredentialManager.GetClient(), infraStatus.PlatformStatus.GCP.ProjectID))
 	case configv1.VSpherePlatformType:
-		return vsphere.Add(mgr, rootCredentialManager, vsphere.NewReconciler(mgr.GetClient(), rootCredentialManager))
+		return vsphere.Add(mgr, rootCredentialManager, vsphere.NewReconciler(mgr.GetClient(), rootCredentialManager.GetClient()))
 	case configv1.OpenStackPlatformType:
-		return openstack.Add(mgr, rootCredentialManager, openstack.NewReconciler(mgr.GetClient(), rootCredentialManager))
+		return openstack.Add(mgr, rootCredentialManager, openstack.NewReconciler(mgr.GetClient(), rootCredentialManager.GetClient(), utils.LiveClient(mgr)))
 	default: // returning the AWS implementation for default to avoid changing any behavior
-		return aws.Add(mgr, rootCredentialManager, aws.NewReconciler(mgr.GetClient(), rootCredentialManager))
+		return aws.Add(mgr, rootCredentialManager, aws.NewReconciler(mgr.GetClient(), rootCredentialManager.GetClient(), utils.LiveClient(mgr)))
 	}
 }
