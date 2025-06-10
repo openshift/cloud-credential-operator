@@ -199,19 +199,22 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 		return reconcile.Result{}, err
 	}
 
-	if mode != operatorv1.CloudCredentialsModeDefault {
-		annotation, err := utils.ModeToAnnotation(mode)
-		if err != nil {
-			r.Logger.WithError(err).Error("failed to convert operator mode to annotation")
-			return reconcile.Result{}, err
-		}
-		err = r.updateSecretAnnotations(secret, annotation)
-		if err != nil {
-			r.Logger.WithError(err).Error("errored while annotating secret")
-		}
+	// default mode is passthrough; annotate accordingly
+	if mode == operatorv1.CloudCredentialsModeDefault {
+		mode = operatorv1.CloudCredentialsModePassthrough
+	}
+
+	annotation, err := utils.ModeToAnnotation(mode)
+	if err != nil {
+		r.Logger.WithError(err).Error("failed to convert operator mode to annotation")
 		return reconcile.Result{}, err
 	}
 
+	err = r.updateSecretAnnotations(secret, annotation)
+	if err != nil {
+		r.Logger.WithError(err).Error("errored while annotating secret")
+		return reconcile.Result{}, err
+	}
 	return reconcile.Result{}, nil
 }
 
