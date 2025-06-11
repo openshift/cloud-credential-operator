@@ -166,6 +166,7 @@ update-go-dependencies-direct:
 	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all \
 		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
 		| grep -v "github.com/nutanix-cloud-native/prism-go-client" \
+		| grep -v "github.com/microsoftgraph/msgraph-sdk-go" \
 		); do \
 		go get $$module; \
 	done
@@ -178,6 +179,7 @@ update-go-dependencies-indirect:
 	@for module in $$(go list -f '{{ if .Indirect }}{{.Path}}{{end}}' -m -mod=mod all \
 		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
 		| grep -v "github.com/nutanix-cloud-native/prism-go-client" \
+		| grep -v "github.com/microsoftgraph/msgraph-sdk-go" \
 		); do \
 		go get $$module; \
 	done
