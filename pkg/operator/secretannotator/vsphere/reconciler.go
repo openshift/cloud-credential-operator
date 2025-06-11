@@ -160,7 +160,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	if mode != operatorv1.CloudCredentialsModeDefault && mode != operatorv1.CloudCredentialsModePassthrough {
 		msg := fmt.Sprintf("operator config value of \"%s\" is invalid", mode)
 		r.Logger.Error(msg)
-		return fmt.Errorf(msg)
+		return fmt.Errorf("%s", msg)
 	}
 
 	// Check for any expected keys.

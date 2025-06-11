@@ -32,7 +32,7 @@ func TestErrorScrubber(t *testing.T) {
 	}
 	for _, test := range cases {
 		t.Run(test.name, func(t *testing.T) {
-			assert.Equal(t, test.expected, ErrorScrub(fmt.Errorf(test.input)))
+			assert.Equal(t, test.expected, ErrorScrub(fmt.Errorf("%s", test.input)))
 		})
 	}
 }
