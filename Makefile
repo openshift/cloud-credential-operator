@@ -158,13 +158,26 @@ coverage:
 	hack/codecov.sh
 .PHONY: coverage
 
-# Update all non k8s go dependencies
 .PHONY: update-go-dependencies
-update-go-dependencies:
-	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all | grep -v "^k8s.io/" | grep -v "sigs.k8s.io/"); do \
+update-go-dependencies: update-go-dependencies-direct update-go-dependencies-indirect
+
+.PHONY: update-go-dependencies-direct
+update-go-dependencies-direct:
+	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all \
+		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
+		); do \
 		go get $$module; \
 	done
 	go mod tidy
-ifneq (,$(wildcard vendor))
 	go mod vendor
-endif
+
+# Update indirect go dependenceis
+.PHONY: update-go-dependencies-indirect
+update-go-dependencies-indirect:
+	@for module in $$(go list -f '{{ if .Indirect }}{{.Path}}{{end}}' -m -mod=mod all \
+		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
+		); do \
+		go get $$module; \
+	done
+	go mod tidy
+	go mod vendor
