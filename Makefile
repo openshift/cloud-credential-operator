@@ -165,6 +165,7 @@ update-go-dependencies: update-go-dependencies-direct update-go-dependencies-ind
 update-go-dependencies-direct:
 	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all \
 		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
+		| grep -v "github.com/nutanix-cloud-native/prism-go-client" \
 		); do \
 		go get $$module; \
 	done
@@ -176,6 +177,7 @@ update-go-dependencies-direct:
 update-go-dependencies-indirect:
 	@for module in $$(go list -f '{{ if .Indirect }}{{.Path}}{{end}}' -m -mod=mod all \
 		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
+		| grep -v "github.com/nutanix-cloud-native/prism-go-client" \
 		); do \
 		go get $$module; \
 	done
