@@ -39,6 +39,7 @@ import (
 	"k8s.io/client-go/kubernetes"
 	fakeclientgo "k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -198,7 +199,7 @@ func TestPodIdentityWebhookController(t *testing.T) {
 				client:          fakeClient,
 				clientset:       fakeClientset,
 				logger:          logger,
-				eventRecorder:   events.NewInMemoryRecorder(""),
+				eventRecorder:   events.NewInMemoryRecorder("", clock.RealClock{}),
 				cache:           resourceapply.NewResourceCache(),
 				conditions:      []configv1.ClusterOperatorStatusCondition{},
 				imagePullSpec:   test.podIdentityType.GetImagePullSpec(),

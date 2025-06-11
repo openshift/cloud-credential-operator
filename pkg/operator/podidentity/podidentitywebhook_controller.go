@@ -13,6 +13,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/scheme"
+	"k8s.io/utils/clock"
 	"k8s.io/utils/pointer"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -181,7 +182,8 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		Namespace: operatorNamespace,
 		Name:      deploymentName,
 	}
-	eventRecorder := events.NewKubeRecorder(clientset.CoreV1().Events(operatorNamespace), deploymentName, controllerRef)
+
+	eventRecorder := events.NewKubeRecorder(clientset.CoreV1().Events(operatorNamespace), deploymentName, controllerRef, clock.RealClock{})
 
 	imagePullSpec := podIdentityType.GetImagePullSpec()
 	if len(imagePullSpec) == 0 {
