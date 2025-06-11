@@ -6,11 +6,14 @@ linters-settings:
       settings:
         linters:
           enable:
+          - "maxlength"
           - "nobools"
+          - "statussubresource"
         lintersConfig:
           conditions:
             isFirstField: Warn
             useProtobuf: Ignore
+            usePatchStrategy: Ignore
 linters:
   disable-all: true
   enable:
