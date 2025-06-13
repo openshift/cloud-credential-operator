@@ -1,0 +1,23 @@
+# Allow ingress to cloud-credential-operator:8443 (metrics)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-ingress-metrics
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    capability.openshift.io/name: CloudCredential
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+spec:
+  ingress:
+  - ports:
+    - protocol: TCP
+      port: 8443
+  podSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - cloud-credential-operator
+  policyTypes:
+  - Ingress

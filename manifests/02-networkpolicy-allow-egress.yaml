@@ -1,0 +1,33 @@
+# Allow egress from cloud-credential-operator to kube api
+# Allow egress from cloud-credential-operator to DNS
+# Allow egress from cloud-credential-operator to external cloud platforms
+# Allow egress from pod-identity-webhook to DNS
+# Allow egress from pod-identity-webhook to external cloud platforms
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-egress
+  namespace: openshift-cloud-credential-operator
+  annotations:
+    capability.openshift.io/name: CloudCredential
+    include.release.openshift.io/ibm-cloud-managed: "true"
+    include.release.openshift.io/self-managed-high-availability: "true"
+spec:
+  egress:
+  - ports:
+    - protocol: TCP
+      port: 1
+      endPort: 65535
+  - ports:
+    - protocol: UDP
+      port: 1
+      endPort: 65535
+  podSelector:
+    matchExpressions:
+    - key: app
+      operator: In
+      values:
+      - cloud-credential-operator
+      - pod-identity-webhook
+  policyTypes:
+  - Egress
