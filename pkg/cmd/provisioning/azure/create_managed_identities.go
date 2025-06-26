@@ -558,15 +558,39 @@ func ensureFederatedIdentityCredential(client *azureclients.AzureClientWrapper, 
 		return nil
 	}
 
-	federatedIdentityCredential, err := client.FederatedIdentityCredentialsClient.CreateOrUpdate(
-		context.Background(),
-		resourceGroupName,
-		managedIdentityName,
-		serviceAccountName,
-		federatedIdentityCredentialParameters,
-		&armmsi.FederatedIdentityCredentialsClientCreateOrUpdateOptions{})
-	if err != nil {
-		return errors.Wrap(err, "failed to create or update federated identity credential")
+	// Federated identity credential creation can fail due to a replication delay after creating the user-assigned managed identity
+	// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
+	var federatedIdentityCredential armmsi.FederatedIdentityCredentialsClientCreateOrUpdateResponse
+	for i := 0; ; i++ {
+		federatedIdentityCredential, err = client.FederatedIdentityCredentialsClient.CreateOrUpdate(
+			context.Background(),
+			resourceGroupName,
+			managedIdentityName,
+			serviceAccountName,
+			federatedIdentityCredentialParameters,
+			&armmsi.FederatedIdentityCredentialsClientCreateOrUpdateOptions{})
+		if err != nil {
+			var respErr *azcore.ResponseError
+			if errors.As(err, &respErr) {
+				if respErr.ErrorCode == "ParentResourceNotFound" {
+					// The managed identity ccoctl just created can't be found yet due to a replication delay so we need to retry.
+					if i >= 23 {
+						return errors.Wrap(err, "timed out creating federated identity credential, this is most likely due to a replication delay following creation of the user-assigned managed identity, please retry")
+					} else {
+						log.Printf("Unable to create federated identity credential due to parent resource not found, retrying...")
+						time.Sleep(10 * time.Second)
+						continue
+					}
+				} else {
+					return errors.Wrap(err, "failed to create or update federated identity credential")
+				}
+			} else {
+				return errors.Wrap(err, "failed to create or update federated identity credential")
+			}
+		} else {
+			// Success, break out of retry loop
+			break
+		}
 	}
 	verb := "Updated"
 	if needToCreateFederatedIdentityCredential {
