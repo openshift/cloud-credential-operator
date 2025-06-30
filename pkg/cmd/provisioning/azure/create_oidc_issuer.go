@@ -78,7 +78,7 @@ type: Opaque`
 
 // ensureResourceGroup ensures that a resource group with resourceGroupName exists within the provided region and subscription.
 // Resource group tags will be updated to include provided resourceTags if found to be missing from existing resource group tags.
-func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupName, region string, resourceTags map[string]string) error {
+func ensureResourceGroup(client *azureclients.AzureClientWrapper, name, resourceGroupName, region string, resourceTags map[string]string) error {
 	// Check if resource group already exists
 	needToCreateResourceGroup := false
 	var rawResponse *http.Response
@@ -110,7 +110,15 @@ func ensureResourceGroup(client *azureclients.AzureClientWrapper, resourceGroupN
 			region)
 	}
 
-	mergedResourceTags, needToUpdateResourceGroup := mergeResourceTags(resourceTags, getResourceGroupResp.Tags)
+	existingTags := map[string]*string{}
+	if needToCreateResourceGroup {
+		// Add CCO's "owned" tag to resource tags map
+		resourceTags[fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, name)] = ownedAzureResourceTagValue
+	} else {
+		existingTags = getResourceGroupResp.Tags
+	}
+
+	mergedResourceTags, needToUpdateResourceGroup := mergeResourceTags(resourceTags, existingTags)
 
 	// Found and validated existing resource group, return
 	if !needToCreateResourceGroup && !needToUpdateResourceGroup {
@@ -161,7 +169,7 @@ func mergeResourceTags(one map[string]string, two map[string]*string) (map[strin
 
 // ensureStorageAccount ensures that a storage account with storageAccountName exists within the provided resource group.
 // Storage account tags will be updated to include provided resourceTags if found to be missing from existing storage account tags.
-func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccountName, resourceGroupName, region string, resourceTags map[string]string) error {
+func ensureStorageAccount(client *azureclients.AzureClientWrapper, name, storageAccountName, resourceGroupName, region string, resourceTags map[string]string) error {
 	var existingStorageAccount *armstorage.Account
 	listAccounts := client.StorageAccountClient.NewListByResourceGroupPager(resourceGroupName, &armstorage.AccountsClientListByResourceGroupOptions{})
 	for listAccounts.More() {
@@ -182,11 +190,16 @@ func ensureStorageAccount(client *azureclients.AzureClientWrapper, storageAccoun
 	}
 
 	needToCreateStorageAccount := existingStorageAccount == nil
-	mergedResourceTags := map[string]*string{}
-	if !needToCreateStorageAccount {
-		mergedResourceTags = existingStorageAccount.Tags
+
+	existingTags := map[string]*string{}
+	if needToCreateStorageAccount {
+		// Add CCO's "owned" tag to resource tags map
+		resourceTags[fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, name)] = ownedAzureResourceTagValue
+	} else {
+		existingTags = existingStorageAccount.Tags
 	}
-	mergedResourceTags, needToUpdateStorageAccount := mergeResourceTags(resourceTags, mergedResourceTags)
+
+	mergedResourceTags, needToUpdateStorageAccount := mergeResourceTags(resourceTags, existingTags)
 
 	if !needToCreateStorageAccount && !needToUpdateStorageAccount {
 		log.Printf("Found existing storage account %s", *existingStorageAccount.ID)
@@ -408,9 +421,6 @@ func createPodIdentityWebhookConfigSecret(tenantID, outputDir string) error {
 // * storage account
 // * blob container which hosts OIDC documents
 func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oidcResourceGroupName, storageAccountName, blobContainerName, subscriptionID, tenantID, publicKeyPath, outputDir string, resourceTags map[string]string, dryRun bool) (string, error) {
-	// Add CCO's "owned" tag to resource tags map
-	resourceTags[fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, name)] = ownedAzureResourceTagValue
-
 	storageAccountKey := ""
 	if !dryRun {
 		// Ensure that the public key file can be read at the publicKeyPath before continuing
@@ -420,13 +430,13 @@ func createOIDCIssuer(client *azureclients.AzureClientWrapper, name, region, oid
 		}
 
 		// Ensure the resource group exists
-		err = ensureResourceGroup(client, oidcResourceGroupName, region, resourceTags)
+		err = ensureResourceGroup(client, name, oidcResourceGroupName, region, resourceTags)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to ensure resource group")
 		}
 
 		// Ensure storage account exists
-		err = ensureStorageAccount(client, storageAccountName, oidcResourceGroupName, region, resourceTags)
+		err = ensureStorageAccount(client, name, storageAccountName, oidcResourceGroupName, region, resourceTags)
 		if err != nil {
 			return "", errors.Wrap(err, "failed to ensure storage account")
 		}
