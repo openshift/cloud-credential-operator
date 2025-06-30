@@ -73,7 +73,9 @@ type: Opaque`
 func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resourceGroupName, subscriptionID, region, issuerURL, outputDir string, scopingResourceGroupNames []string, resourceTags map[string]string, credentialsRequest *credreqv1.CredentialsRequest, dryRun bool) error {
 	// Write dummy secrets with blank clientID and tenantID when doing a dry run.
 	if dryRun {
-		writeCredReqSecret(credentialsRequest, outputDir, "", "", subscriptionID, region)
+		if err := writeCredReqSecret(credentialsRequest, outputDir, "", "", subscriptionID, region); err != nil {
+			return fmt.Errorf("failed to write credential request secret: %w", err)
+		}
 		return nil
 	}
 
@@ -105,6 +107,11 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		crProviderSpec.RoleBindings = append(crProviderSpec.RoleBindings, credreqv1.RoleBinding{Role: shortenedManagedIdentityName})
 	}
 
+	// Ensure the managed identity has valid properties
+	if userAssignedManagedIdentity.Properties == nil || userAssignedManagedIdentity.Properties.PrincipalID == nil {
+		return fmt.Errorf("user-assigned managed identity has invalid properties")
+	}
+
 	// Ensure roles from CredentialsRequest are assigned to the user-assigned managed identity
 	err = ensureRolesAssignedToManagedIdentity(client, *userAssignedManagedIdentity.Properties.PrincipalID, subscriptionID, crProviderSpec.RoleBindings, scopingResourceGroupNames)
 	if err != nil {
@@ -119,7 +126,14 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 		}
 	}
 
-	writeCredReqSecret(credentialsRequest, outputDir, *userAssignedManagedIdentity.Properties.ClientID, *userAssignedManagedIdentity.Properties.TenantID, subscriptionID, region)
+	// Ensure managed identity has client ID and tenant ID before writing secret
+	if userAssignedManagedIdentity.Properties.ClientID == nil || userAssignedManagedIdentity.Properties.TenantID == nil {
+		return fmt.Errorf("user-assigned managed identity is missing ClientID or TenantID")
+	}
+
+	if err := writeCredReqSecret(credentialsRequest, outputDir, *userAssignedManagedIdentity.Properties.ClientID, *userAssignedManagedIdentity.Properties.TenantID, subscriptionID, region); err != nil {
+		return fmt.Errorf("failed to write credential request secret: %w", err)
+	}
 	return nil
 }
 
@@ -153,7 +167,7 @@ func ensureCustomRole(client *azureclients.AzureClientWrapper, roleName string, 
 		if err != nil {
 			return err
 		}
-		roleDefinitions = append(roleDefinitions, pageResponse.RoleDefinitionListResult.Value...)
+		roleDefinitions = append(roleDefinitions, pageResponse.Value...)
 	}
 
 	var roleID string
@@ -219,7 +233,7 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 		if err != nil {
 			return err
 		}
-		existingRoleAssignments = append(existingRoleAssignments, pageResponse.RoleAssignmentListResult.Value...)
+		existingRoleAssignments = append(existingRoleAssignments, pageResponse.Value...)
 	}
 
 	// shouldExistRoleAssignments are role assignments we validated should exist or were created.
@@ -256,7 +270,8 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 			// at the specified scope
 			roleAssignmentExists := false
 			for _, roleAssignment := range existingRoleAssignments {
-				if *roleDefinition.Properties.RoleName == roleBinding.Role && *roleAssignment.Properties.RoleDefinitionID == *roleDefinition.ID && *roleAssignment.Properties.Scope == scope {
+				if roleAssignment.Properties != nil && roleAssignment.Properties.RoleDefinitionID != nil && roleAssignment.Properties.Scope != nil &&
+					*roleDefinition.Properties.RoleName == roleBinding.Role && *roleAssignment.Properties.RoleDefinitionID == *roleDefinition.ID && *roleAssignment.Properties.Scope == scope {
 					roleAssignmentExists = true
 					log.Printf("Found existing role assignment %s for user-assigned managed identity with principal ID %s at scope %s", roleBinding.Role, managedIdentityPrincipalID, scope)
 					shouldExistRoleAssignments = append(shouldExistRoleAssignments, roleAssignment)
@@ -285,9 +300,15 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 	}
 
 	for _, existingRoleAssignment := range existingRoleAssignments {
+		// Skip role assignments with missing properties
+		if existingRoleAssignment.Properties == nil || existingRoleAssignment.Properties.RoleDefinitionID == nil || existingRoleAssignment.Properties.Scope == nil {
+			log.Printf("Skipping role assignment with missing properties")
+			continue
+		}
+
 		found := false
 		for _, shouldExistRoleAssignment := range shouldExistRoleAssignments {
-			if shouldExistRoleAssignment != nil && *shouldExistRoleAssignment.Name == *existingRoleAssignment.Name {
+			if shouldExistRoleAssignment != nil && existingRoleAssignment.Name != nil && shouldExistRoleAssignment.Name != nil && *shouldExistRoleAssignment.Name == *existingRoleAssignment.Name {
 				found = true
 			}
 		}
@@ -296,6 +317,19 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 			if err != nil {
 				return errors.Wrapf(err, "failed to get role definition with role definition ID %s", *existingRoleAssignment.Properties.RoleDefinitionID)
 			}
+
+			// Check if roleDefinition has valid properties before using them
+			if roleDefinition.Properties == nil || roleDefinition.Properties.RoleName == nil {
+				log.Printf("Skipping deletion of role assignment with invalid role definition properties")
+				continue
+			}
+
+			// Check if existingRoleAssignment.Name is not nil before using it
+			if existingRoleAssignment.Name == nil {
+				log.Printf("Skipping deletion of role assignment with missing name")
+				continue
+			}
+
 			err = deleteRoleAssignment(client,
 				managedIdentityPrincipalID,
 				*existingRoleAssignment.Name,
@@ -329,7 +363,7 @@ func getRoleDefinitionByRoleName(client *azureclients.AzureClientWrapper, roleNa
 		if err != nil {
 			return nil, err
 		}
-		roleDefinitions = append(roleDefinitions, pageResponse.RoleDefinitionListResult.Value...)
+		roleDefinitions = append(roleDefinitions, pageResponse.Value...)
 	}
 	switch len(roleDefinitions) {
 	case 0:
@@ -462,7 +496,11 @@ func ensureUserAssignedManagedIdentity(client *azureclients.AzureClientWrapper, 
 
 	// Found and validated existing user-assigned managed identity
 	if !needToCreateUserAssignedManagedIdentity && !needToUpdateUserAssignedManagedIdentity {
-		log.Printf("Found existing user-assigned managed identity %s", *getUserAssignedManagedIdentityResp.Identity.ID)
+		if getUserAssignedManagedIdentityResp.ID != nil {
+			log.Printf("Found existing user-assigned managed identity %s", *getUserAssignedManagedIdentityResp.ID)
+		} else {
+			log.Printf("Found existing user-assigned managed identity")
+		}
 		return &getUserAssignedManagedIdentityResp.Identity, nil
 	}
 
@@ -485,7 +523,11 @@ func ensureUserAssignedManagedIdentity(client *azureclients.AzureClientWrapper, 
 	if needToCreateUserAssignedManagedIdentity {
 		verb = "Created"
 	}
-	log.Printf("%s user-assigned managed identity %s", verb, *userAssignedManagedIdentity.ID)
+	if userAssignedManagedIdentity.ID != nil {
+		log.Printf("%s user-assigned managed identity %s", verb, *userAssignedManagedIdentity.ID)
+	} else {
+		log.Printf("%s user-assigned managed identity", verb)
+	}
 	return &userAssignedManagedIdentity.Identity, nil
 }
 
@@ -554,7 +596,7 @@ func ensureFederatedIdentityCredential(client *azureclients.AzureClientWrapper, 
 		}
 	}
 	if !needToCreateFederatedIdentityCredential && !needToUpdateFederatedIdentityCredential {
-		log.Printf("Found existing federated identity credential %s", *federatedIdentityCredentialGetResp.FederatedIdentityCredential.ID)
+		log.Printf("Found existing federated identity credential %s", *federatedIdentityCredentialGetResp.ID)
 		return nil
 	}
 
