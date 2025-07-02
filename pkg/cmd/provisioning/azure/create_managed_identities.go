@@ -622,7 +622,7 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 
 	// Ensure the installation resource group exists
 	if !dryRun {
-		err := ensureResourceGroup(client, installationResourceGroupName, region, resourceTags)
+		err := ensureResourceGroup(client, name, installationResourceGroupName, region, resourceTags)
 		if err != nil {
 			return errors.Wrap(err, "failed to ensure resource group")
 		}
