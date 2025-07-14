@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"math"
+	"math/rand"
 	nethttp "net/http"
 	"strconv"
 	"time"
@@ -144,9 +144,8 @@ func (middleware RetryHandler) retryRequest(ctx context.Context, pipeline Pipeli
 			ctx, span := otel.GetTracerProvider().Tracer(observabilityName).Start(ctx, "RetryHandler_Intercept - attempt "+fmt.Sprint(executionCount))
 			span.SetAttributes(attribute.Int("http.request.resend_count", executionCount),
 
-				attribute.Int("http.status_code", resp.StatusCode),
+				httpResponseStatusCodeAttribute.Int(resp.StatusCode),
 				attribute.Float64("http.request.resend_delay", delay.Seconds()),
-
 			)
 			defer span.End()
 			req = req.WithContext(ctx)
@@ -194,5 +193,12 @@ func (middleware RetryHandler) getRetryDelay(req *nethttp.Request, resp *nethttp
 			return t.Sub(time.Now())
 		}
 	}
-	return time.Duration(math.Pow(float64(options.GetDelaySeconds()), float64(executionCount))) * time.Second
+	return exponentialBackOffDelay(options.GetDelaySeconds(), executionCount)
+}
+
+func exponentialBackOffDelay(delaySeconds, executionCount int) time.Duration {
+	exp := executionCount - 1 // executionCount is 1 for first retry
+	delay := time.Duration(delaySeconds*(1<<exp)) * time.Second
+	jitter := time.Duration(rand.Float64()*1000) * time.Millisecond
+	return delay + jitter
 }
