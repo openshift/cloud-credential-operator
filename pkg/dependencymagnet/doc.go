@@ -9,5 +9,6 @@ import (
 	_ "github.com/go-bindata/go-bindata/go-bindata"
 	_ "github.com/openshift/build-machinery-go"
 	_ "k8s.io/code-generator"
+	_ "k8s.io/code-generator/cmd/validation-gen"
 	_ "sigs.k8s.io/controller-tools/cmd/controller-gen"
 )
