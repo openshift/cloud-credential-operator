@@ -5,8 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/aws/aws-sdk-go/service/iam"
-
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 	configv1 "github.com/openshift/api/config/v1"
 
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
@@ -62,7 +61,7 @@ func TestClientSetup(t *testing.T) {
 							Region: testRegion,
 							ServiceEndpoints: []configv1.AWSServiceEndpoint{
 								{
-									Name: iam.ServiceName,
+									Name: iam.ServiceID,
 									URL:  testIAMURL,
 								},
 								{

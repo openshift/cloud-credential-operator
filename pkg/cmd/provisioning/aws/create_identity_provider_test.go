@@ -10,14 +10,16 @@ import (
 	"path/filepath"
 	"testing"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/endpoints"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/golang/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	cftypes "github.com/aws/aws-sdk-go-v2/service/cloudfront/types"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -271,57 +273,57 @@ func TestCreateIdentityProvider(t *testing.T) {
 }
 
 func mockCreateBucketSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().CreateBucket(gomock.Any()).Return(
+	mockAWSClient.EXPECT().CreateBucket(gomock.Any(), gomock.Any()).Return(
 		&s3.CreateBucketOutput{}, nil).AnyTimes()
 }
 
 func mockPutBucketTaggingSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().PutBucketTagging(gomock.Any()).Return(
+	mockAWSClient.EXPECT().PutBucketTagging(gomock.Any(), gomock.Any()).Return(
 		&s3.PutBucketTaggingOutput{}, nil).AnyTimes()
 }
 
 func mockPutObjectSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().PutObject(gomock.Any()).Return(
+	mockAWSClient.EXPECT().PutObject(gomock.Any(), gomock.Any()).Return(
 		&s3.PutObjectOutput{}, nil).AnyTimes()
 }
 
 func mockListOpenIDConnectProviders(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().ListOpenIDConnectProviders(gomock.Any()).Return(
+	mockAWSClient.EXPECT().ListOpenIDConnectProviders(gomock.Any(), gomock.Any()).Return(
 		&iam.ListOpenIDConnectProvidersOutput{
-			OpenIDConnectProviderList: []*iam.OpenIDConnectProviderListEntry{},
+			OpenIDConnectProviderList: []iamtypes.OpenIDConnectProviderListEntry{},
 		}, nil).AnyTimes()
 }
 
 func mockCreateOpenIDConnectProvider(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().CreateOpenIDConnectProvider(gomock.Any()).Return(
+	mockAWSClient.EXPECT().CreateOpenIDConnectProvider(gomock.Any(), gomock.Any()).Return(
 		&iam.CreateOpenIDConnectProviderOutput{
 			OpenIDConnectProviderArn: awssdk.String("provider-arn"),
 		}, nil).AnyTimes()
 }
 
 func mockTagOpenIDConnectProvider(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().TagOpenIDConnectProvider(gomock.Any()).Return(
+	mockAWSClient.EXPECT().TagOpenIDConnectProvider(gomock.Any(), gomock.Any()).Return(
 		&iam.TagOpenIDConnectProviderOutput{}, nil).AnyTimes()
 }
 
 func mockCreateCloudFrontOriginAccessIdentity(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().CreateCloudFrontOriginAccessIdentity(gomock.Any()).Return(
+	mockAWSClient.EXPECT().CreateCloudFrontOriginAccessIdentity(gomock.Any(), gomock.Any()).Return(
 		&cloudfront.CreateCloudFrontOriginAccessIdentityOutput{
-			CloudFrontOriginAccessIdentity: &cloudfront.OriginAccessIdentity{
+			CloudFrontOriginAccessIdentity: &cftypes.CloudFrontOriginAccessIdentity{
 				Id: awssdk.String(testOriginAccessIdentityID),
 			},
 		}, nil).AnyTimes()
 }
 
 func mockPutPublicAccessBlock(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().PutPublicAccessBlock(gomock.Any()).Return(
+	mockAWSClient.EXPECT().PutPublicAccessBlock(gomock.Any(), gomock.Any()).Return(
 		&s3.PutPublicAccessBlockOutput{}, nil).AnyTimes()
 }
 
 func mockCreateCloudFrontDistributionWithTags(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().CreateCloudFrontDistributionWithTags(gomock.Any()).Return(
+	mockAWSClient.EXPECT().CreateDistributionWithTags(gomock.Any(), gomock.Any()).Return(
 		&cloudfront.CreateDistributionWithTagsOutput{
-			Distribution: &cloudfront.Distribution{
+			Distribution: &cftypes.Distribution{
 				Id:         awssdk.String(testCloudFrontDistributionID),
 				DomainName: awssdk.String(testCloudFrontDistributionDomainName),
 			},
@@ -329,9 +331,9 @@ func mockCreateCloudFrontDistributionWithTags(mockAWSClient *mockaws.MockClient)
 }
 
 func mockGetCloudFrontDistribution(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetCloudFrontDistribution(gomock.Any()).Return(
+	mockAWSClient.EXPECT().GetDistribution(gomock.Any(), gomock.Any()).Return(
 		&cloudfront.GetDistributionOutput{
-			Distribution: &cloudfront.Distribution{
+			Distribution: &cftypes.Distribution{
 				Id:         awssdk.String(testCloudFrontDistributionID),
 				Status:     awssdk.String(cloudFrontDistributionDeployedStatus),
 				DomainName: awssdk.String(testCloudFrontDistributionDomainName),
@@ -340,37 +342,6 @@ func mockGetCloudFrontDistribution(mockAWSClient *mockaws.MockClient) {
 }
 
 func mockPutBucketPolicy(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().PutBucketPolicy(gomock.Any()).Return(
+	mockAWSClient.EXPECT().PutBucketPolicy(gomock.Any(), gomock.Any()).Return(
 		&s3.PutBucketPolicyOutput{}, nil).AnyTimes()
-}
-
-func TestDeterminePartitionForRegion(t *testing.T) {
-	tests := []struct {
-		region string
-	}{
-		{
-			region: "us-east-1",
-		},
-		{
-			region: "us-west-1",
-		},
-		{
-			region: "us-gov-east-1",
-		},
-		{
-			region: "us-gov-west-1",
-		},
-		{
-			region: "cn-north-1",
-		},
-		{
-			region: "cn-northwest-1",
-		},
-	}
-	for _, test := range tests {
-		t.Run(test.region, func(t *testing.T) {
-			_, found := endpoints.PartitionForRegion([]endpoints.Partition{endpoints.AwsPartition(), endpoints.AwsCnPartition(), endpoints.AwsUsGovPartition()}, test.region)
-			require.True(t, found, "expected to find partition for region")
-		})
-	}
 }

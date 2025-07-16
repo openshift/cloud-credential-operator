@@ -8,7 +8,6 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
@@ -21,12 +20,10 @@ var (
 )
 
 func createAllCmd(cmd *cobra.Command, args []string) {
-	s, err := awsSession(CreateAllOpts.Region)
+	awsClient, err := newAWSClient(CreateAllOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	awsClient := aws.NewClientFromSession(s)
 
 	publicKeyPath := CreateAllOpts.PublicKeyPath
 	if publicKeyPath == "" {

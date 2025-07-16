@@ -1,16 +1,18 @@
 package aws
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"time"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/cloudfront"
-	"github.com/aws/aws-sdk-go/service/iam"
-	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
+
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
 )
@@ -23,7 +25,7 @@ var (
 
 // deleteOIDCObjectsFromBucket deletes the OIDC objects from the S3 bucket
 func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix string) error {
-	objectsMetadata, err := client.ListObjects(&s3.ListObjectsInput{
+	objectsMetadata, err := client.ListObjects(context.Background(), &s3.ListObjectsInput{
 		Bucket: awssdk.String(bucketName),
 	})
 	if err != nil {
@@ -31,7 +33,7 @@ func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix strin
 	}
 
 	for _, objectMetadata := range objectsMetadata.Contents {
-		objectTags, err := client.GetObjectTagging(&s3.GetObjectTaggingInput{
+		objectTags, err := client.GetObjectTagging(context.Background(), &s3.GetObjectTaggingInput{
 			Key:    objectMetadata.Key,
 			Bucket: awssdk.String(bucketName),
 		})
@@ -41,7 +43,7 @@ func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix strin
 
 		for _, tag := range objectTags.TagSet {
 			if *tag.Key == fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix) {
-				_, err := client.DeleteObject(&s3.DeleteObjectInput{
+				_, err := client.DeleteObject(context.Background(), &s3.DeleteObjectInput{
 					Key:    objectMetadata.Key,
 					Bucket: awssdk.String(bucketName),
 				})
@@ -59,7 +61,7 @@ func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix strin
 
 // deleteOIDCBucket deletes the OIDC S3 bucket
 func deleteOIDCBucket(client aws.Client, bucketName, namePrefix string) error {
-	bucketTags, err := client.GetBucketTagging(&s3.GetBucketTaggingInput{
+	bucketTags, err := client.GetBucketTagging(context.Background(), &s3.GetBucketTaggingInput{
 		Bucket: awssdk.String(bucketName),
 	})
 	if err != nil {
@@ -68,7 +70,7 @@ func deleteOIDCBucket(client aws.Client, bucketName, namePrefix string) error {
 
 	for _, tag := range bucketTags.TagSet {
 		if *tag.Key == fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix) {
-			_, err := client.DeleteBucket(&s3.DeleteBucketInput{
+			_, err := client.DeleteBucket(context.Background(), &s3.DeleteBucketInput{
 				Bucket: awssdk.String(bucketName),
 			})
 			if err != nil {
@@ -83,20 +85,20 @@ func deleteOIDCBucket(client aws.Client, bucketName, namePrefix string) error {
 
 // deleteCloudFrontOriginAccessIdentity deletes the CloudFront origin access identities if created
 func deleteCloudFrontOriginAccessIdentity(client aws.Client, namePrefix string) error {
-	listCloudFrontOriginAccessIdentitiesOutput, err := client.ListCloudFrontOriginAccessIdentities(&cloudfront.ListCloudFrontOriginAccessIdentitiesInput{})
+	listCloudFrontOriginAccessIdentitiesOutput, err := client.ListCloudFrontOriginAccessIdentities(context.Background(), &cloudfront.ListCloudFrontOriginAccessIdentitiesInput{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to fetch a list of CloudFront origin access identities")
 	}
 	for _, originAccessIdentity := range listCloudFrontOriginAccessIdentitiesOutput.CloudFrontOriginAccessIdentityList.Items {
 		if *originAccessIdentity.Comment == fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix) {
-			getCloudFrontOriginAccessIdentityOutput, err := client.GetCloudFrontOriginAccessIdentity(&cloudfront.GetCloudFrontOriginAccessIdentityInput{
+			getCloudFrontOriginAccessIdentityOutput, err := client.GetCloudFrontOriginAccessIdentity(context.Background(), &cloudfront.GetCloudFrontOriginAccessIdentityInput{
 				Id: originAccessIdentity.Id,
 			})
 			if err != nil {
 				return errors.Wrapf(err, "failed to get the CloudFront origin access identity with ID %s", *originAccessIdentity.Id)
 			}
 
-			_, err = client.DeleteCloudFrontOriginAccessIdentity(&cloudfront.DeleteCloudFrontOriginAccessIdentityInput{
+			_, err = client.DeleteCloudFrontOriginAccessIdentity(context.Background(), &cloudfront.DeleteCloudFrontOriginAccessIdentityInput{
 				Id:      originAccessIdentity.Id,
 				IfMatch: getCloudFrontOriginAccessIdentityOutput.ETag,
 			})
@@ -111,12 +113,12 @@ func deleteCloudFrontOriginAccessIdentity(client aws.Client, namePrefix string) 
 
 // deleteCloudFrontDistribution deletes the CloudFront distribution if created
 func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
-	ListCloudFrontDistributionsOutput, err := client.ListCloudFrontDistributions(&cloudfront.ListDistributionsInput{})
+	ListCloudFrontDistributionsOutput, err := client.ListDistributions(context.Background(), &cloudfront.ListDistributionsInput{})
 	if err != nil {
 		return errors.Wrapf(err, "failed to fetch a list of CloudFront distributions")
 	}
 	for _, distribution := range ListCloudFrontDistributionsOutput.DistributionList.Items {
-		listTagsForCloudFrontResourceOutput, err := client.ListTagsForCloudFrontResource(&cloudfront.ListTagsForResourceInput{
+		listTagsForCloudFrontResourceOutput, err := client.ListTagsForResource(context.Background(), &cloudfront.ListTagsForResourceInput{
 			Resource: distribution.ARN,
 		})
 		if err != nil {
@@ -125,7 +127,7 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 
 		for _, tag := range listTagsForCloudFrontResourceOutput.Tags.Items {
 			if *tag.Key == fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, namePrefix) {
-				getCloudFrontDistributionOutput, err := client.GetCloudFrontDistribution(&cloudfront.GetDistributionInput{
+				getCloudFrontDistributionOutput, err := client.GetDistribution(context.Background(), &cloudfront.GetDistributionInput{
 					Id: distribution.Id,
 				})
 				if err != nil {
@@ -134,7 +136,7 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 
 				getCloudFrontDistributionOutput.Distribution.DistributionConfig.Enabled = awssdk.Bool(false)
 
-				updateCloudFrontDistributionOutput, err := client.UpdateCloudFrontDistribution(&cloudfront.UpdateDistributionInput{
+				updateCloudFrontDistributionOutput, err := client.UpdateDistribution(context.Background(), &cloudfront.UpdateDistributionInput{
 					Id:                 distribution.Id,
 					IfMatch:            getCloudFrontDistributionOutput.ETag,
 					DistributionConfig: getCloudFrontDistributionOutput.Distribution.DistributionConfig,
@@ -144,7 +146,7 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 				}
 
 				for {
-					getCloudFrontDistributionOutput, err := client.GetCloudFrontDistribution(&cloudfront.GetDistributionInput{
+					getCloudFrontDistributionOutput, err := client.GetDistribution(context.Background(), &cloudfront.GetDistributionInput{
 						Id: distribution.Id,
 					})
 					if err != nil {
@@ -159,7 +161,7 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 					time.Sleep(cloudFrontDistributionStatusCheckDelay)
 				}
 
-				_, err = client.DeleteCloudFrontDistribution(&cloudfront.DeleteDistributionInput{
+				_, err = client.DeleteDistribution(context.Background(), &cloudfront.DeleteDistributionInput{
 					Id:      distribution.Id,
 					IfMatch: updateCloudFrontDistributionOutput.ETag,
 				})
@@ -179,7 +181,7 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 func deleteIAMRoles(client aws.Client, namePrefix string, paginationMarker *string) error {
 	// iam.ListRolesInput results are paginated to 100 items by default, if result is truncated we need to
 	// fetch next set of items and perform delete operation
-	roleList, err := client.ListRoles(&iam.ListRolesInput{
+	roleList, err := client.ListRoles(context.Background(), &iam.ListRolesInput{
 		Marker: paginationMarker,
 	})
 	if err != nil {
@@ -187,7 +189,7 @@ func deleteIAMRoles(client aws.Client, namePrefix string, paginationMarker *stri
 	}
 
 	for _, roleMetadata := range roleList.Roles {
-		roleOutput, err := client.GetRole(&iam.GetRoleInput{
+		roleOutput, err := client.GetRole(context.Background(), &iam.GetRoleInput{
 			RoleName: roleMetadata.RoleName,
 		})
 		if err != nil {
@@ -200,7 +202,7 @@ func deleteIAMRoles(client aws.Client, namePrefix string, paginationMarker *stri
 					return errors.Wrapf(err, "failed to delete policies associated with IAM Role %s", *roleOutput.Role.RoleName)
 				}
 
-				_, err := client.DeleteRole(&iam.DeleteRoleInput{
+				_, err := client.DeleteRole(context.Background(), &iam.DeleteRoleInput{
 					RoleName: roleOutput.Role.RoleName,
 				})
 				if err != nil {
@@ -212,7 +214,7 @@ func deleteIAMRoles(client aws.Client, namePrefix string, paginationMarker *stri
 		}
 	}
 
-	if *roleList.IsTruncated {
+	if roleList.IsTruncated {
 		return deleteIAMRoles(client, namePrefix, roleList.Marker)
 	}
 
@@ -221,7 +223,7 @@ func deleteIAMRoles(client aws.Client, namePrefix string, paginationMarker *stri
 
 // deleteRolePolicies deletes the Polices associated with IAM Role created by ccoctl
 func deleteRolePolicies(client aws.Client, roleName string) error {
-	policies, err := client.ListRolePolicies(&iam.ListRolePoliciesInput{
+	policies, err := client.ListRolePolicies(context.Background(), &iam.ListRolePoliciesInput{
 		RoleName: awssdk.String(roleName),
 	})
 	if err != nil {
@@ -229,14 +231,14 @@ func deleteRolePolicies(client aws.Client, roleName string) error {
 	}
 
 	for _, policyName := range policies.PolicyNames {
-		_, err := client.DeleteRolePolicy(&iam.DeleteRolePolicyInput{
+		_, err := client.DeleteRolePolicy(context.Background(), &iam.DeleteRolePolicyInput{
 			RoleName:   awssdk.String(roleName),
-			PolicyName: policyName,
+			PolicyName: &policyName,
 		})
 		if err != nil {
-			return errors.Wrapf(err, "failed to delete policy %s associated with IAM Role %s", *policyName, roleName)
+			return errors.Wrapf(err, "failed to delete policy %s associated with IAM Role %s", policyName, roleName)
 		}
-		log.Printf("Policy %s associated with IAM Role %s deleted", *policyName, roleName)
+		log.Printf("Policy %s associated with IAM Role %s deleted", policyName, roleName)
 	}
 
 	return nil
@@ -244,7 +246,7 @@ func deleteRolePolicies(client aws.Client, roleName string) error {
 
 // deleteIAMIdentityProvider deletes the IAM Identity Provider
 func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
-	oidcProviderList, err := client.ListOpenIDConnectProviders(&iam.ListOpenIDConnectProvidersInput{})
+	oidcProviderList, err := client.ListOpenIDConnectProviders(context.Background(), &iam.ListOpenIDConnectProvidersInput{})
 	if err != nil {
 		return errors.Wrap(err, "failed to fetch list of Identity Providers")
 	}
@@ -256,7 +258,7 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 		}
 
 		if ok {
-			_, err := client.DeleteOpenIDConnectProvider(&iam.DeleteOpenIDConnectProviderInput{
+			_, err := client.DeleteOpenIDConnectProvider(context.Background(), &iam.DeleteOpenIDConnectProviderInput{
 				OpenIDConnectProviderArn: awssdk.String(*provider.Arn),
 			})
 			if err != nil {
@@ -271,12 +273,10 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 }
 
 func deleteCmd(cmd *cobra.Command, args []string) {
-	s, err := awsSession(DeleteOpts.Region)
+	awsClient, err := newAWSClient(CreateAllOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	awsClient := aws.NewClientFromSession(s)
 	bucketName := fmt.Sprintf("%s-oidc", DeleteOpts.Name)
 
 	if err := deleteOIDCObjectsFromBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
