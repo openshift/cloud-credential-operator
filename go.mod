@@ -23,7 +23,7 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-jose/go-jose/v4 v4.0.5
 	github.com/go-logr/logr v1.4.2
-	github.com/golang/glog v1.2.4
+	github.com/golang/glog v1.2.5
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
@@ -184,3 +184,6 @@ require (
 
 // Safe to remove this once go.sum shows only v0.38.0 or higher
 replace golang.org/x/net => golang.org/x/net v0.38.0
+
+// Safe to remove this once go.sum shows only v1.2.5 or higher
+replace github.com/golang/glog => github.com/golang/glog v1.2.5
