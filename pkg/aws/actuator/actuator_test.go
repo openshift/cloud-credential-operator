@@ -29,7 +29,6 @@ import (
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
-	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -96,7 +95,7 @@ func TestCredentialsFetching(t *testing.T) {
 				r := &awsClientBuilderRecorder{}
 
 				awsClient := mockaws.NewMockClient(mockCtrl)
-				awsClient.EXPECT().GetUser(gomock.Any()).Return(nil, nil)
+				awsClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 				r.fakeAWSClient = awsClient
 
@@ -138,9 +137,7 @@ func TestCredentialsFetching(t *testing.T) {
 				r := &awsClientBuilderRecorder{}
 
 				awsClient := mockaws.NewMockClient(mockCtrl)
-				awsClient.EXPECT().GetUser(gomock.Any()).Return(nil, &testAWSError{
-					code: "InvalidClientTokenId",
-				})
+				awsClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(nil, ccaws.NewAPIError("InvalidClientTokenId", ""))
 				r.fakeAWSClient = awsClient
 
 				return r
@@ -490,19 +487,6 @@ func testReadOnlySecret() *corev1.Secret {
 	}
 }
 
-func testSecret(namespace, name string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      name,
-			Namespace: namespace,
-		},
-		Data: map[string][]byte{
-			"aws_access_key_id":     []byte(testROAccessKeyID),
-			"aws_secret_access_key": []byte(testROSecretAccessKey),
-		},
-	}
-}
-
 func testRootSecret() *corev1.Secret {
 	return &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -550,28 +534,8 @@ func testCredentialsRequest() *minterv1.CredentialsRequest {
 	}
 }
 
-type testAWSError struct {
-	code string
-}
-
-func (a *testAWSError) Code() string {
-	return a.code
-}
-
-func (a *testAWSError) Message() string {
-	panic("not implemented")
-}
-
-func (a *testAWSError) OrigErr() error {
-	panic("not implemented")
-}
-
-func (a *testAWSError) Error() string {
-	panic("not implemented")
-}
-
 func TestDetectSTS(t *testing.T) {
-	schemeutils.SetupScheme(scheme.Scheme)
+	util.SetupScheme(scheme.Scheme)
 
 	tests := []struct {
 		name               string
