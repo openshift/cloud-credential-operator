@@ -25,6 +25,7 @@ import (
 
 	v1 "github.com/openshift/api/config/v1"
 	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/utils/ptr"
 
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -112,6 +113,9 @@ spec:
 					Name:      "secrets",
 					ReadOnly:  true,
 				}},
+				SecurityContext: &corev1.SecurityContext{
+					ReadOnlyRootFilesystem: ptr.To(true),
+				},
 			}},
 			HostNetwork: true,
 			Volumes: []corev1.Volume{{
