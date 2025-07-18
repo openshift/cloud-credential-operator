@@ -128,6 +128,10 @@ clean:
 	$(RM) ./cloud-credential-operator
 .PHONY: clean
 
+cloud-credential-tests-ext:
+	go build -mod=vendor ./cmd/cloud-credential-tests-ext
+.PHONY: cloud-credential-tests-ext
+
 # Run against the configured cluster in ~/.kube/config
 run: build
 	./cloud-credential-operator operator --log-level=debug
