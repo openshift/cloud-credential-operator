@@ -49,15 +49,14 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
-func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(client, rootCredClient client.Client) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
-		Client:         c,
-		RootCredClient: mgr.GetClient(),
-		LiveClient:     utils.LiveClient(mgr),
+		Client:         client,
+		RootCredClient: rootCredClient,
 		Logger:         log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 
-	s := status.NewSecretStatusHandler(c)
+	s := status.NewSecretStatusHandler(client)
 	statuscontroller.AddHandler(constants.SecretAnnotatorControllerName, s)
 
 	return r
@@ -107,7 +106,6 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	Client         client.Client
 	RootCredClient client.Client
-	LiveClient     client.Client
 	Logger         log.FieldLogger
 }
 
@@ -172,7 +170,7 @@ func (r *ReconcileCloudCredSecret) Reconcile(ctx context.Context, request reconc
 	// TODO(stephenfin): Remove this syncer in a future release once CCM no longer
 	// relies on the legacy place during bootstrapping.
 	config := &corev1.ConfigMap{}
-	err = r.LiveClient.Get(context.Background(), types.NamespacedName{Namespace: "openshift-config", Name: "cloud-provider-config"}, config)
+	err = r.RootCredClient.Get(context.Background(), types.NamespacedName{Namespace: "openshift-config", Name: "cloud-provider-config"}, config)
 	if err != nil {
 		r.Logger.Debugf("cloud provider config not found: %v", err)
 		return reconcile.Result{}, err
