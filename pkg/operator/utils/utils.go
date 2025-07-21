@@ -205,7 +205,8 @@ func GetLegacyConfigMap(kubeClient client.Client) (*corev1.ConfigMap, error) {
 func GetOperatorConfiguration(kubeClient client.Client, logger log.FieldLogger) (
 	effectiveOperatorMode operatorv1.CloudCredentialsMode,
 	configurationConflict bool,
-	err error) {
+	err error,
+) {
 	var operatorMode operatorv1.CloudCredentialsMode
 	operatorMode, err = getOperatorMode(kubeClient, logger)
 	if err != nil {
