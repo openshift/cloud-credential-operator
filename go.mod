@@ -23,7 +23,7 @@ require (
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
 	github.com/go-jose/go-jose/v4 v4.0.5
 	github.com/go-logr/logr v1.4.2
-	github.com/golang/glog v1.2.4
+	github.com/golang/glog v1.2.5
 	github.com/golang/mock v1.6.0
 	github.com/google/go-cmp v0.6.0
 	github.com/google/uuid v1.6.0
@@ -170,3 +170,6 @@ require (
 	sigs.k8s.io/kube-storage-version-migrator v0.0.4 // indirect
 	sigs.k8s.io/structured-merge-diff/v4 v4.4.1 // indirect
 )
+
+// Safe to remove this once go.sum shows only v1.2.5 or higher
+replace github.com/golang/glog => github.com/golang/glog v1.2.5
