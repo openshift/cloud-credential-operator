@@ -120,7 +120,7 @@ func (middleware RedirectHandler) redirectRequest(ctx context.Context, pipeline 
 		if observabilityName != "" {
 			ctx, span := otel.GetTracerProvider().Tracer(observabilityName).Start(ctx, "RedirectHandler_Intercept - redirect "+fmt.Sprint(redirectCount))
 			span.SetAttributes(attribute.Int("com.microsoft.kiota.handler.redirect.count", redirectCount),
-				attribute.Int("http.status_code", response.StatusCode),
+				httpResponseStatusCodeAttribute.Int(response.StatusCode),
 			)
 			defer span.End()
 			redirectRequest = redirectRequest.WithContext(ctx)

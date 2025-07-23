@@ -104,6 +104,9 @@ func (middleware HeadersInspectionHandler) Intercept(pipeline Pipeline, middlewa
 		}
 	}
 	response, err := pipeline.Next(req, middlewareIndex)
+	if err != nil {
+		return response, err
+	}
 	if reqOption.GetInspectResponseHeaders() {
 		for k, v := range response.Header {
 			if len(v) == 1 {
@@ -112,9 +115,6 @@ func (middleware HeadersInspectionHandler) Intercept(pipeline Pipeline, middlewa
 				reqOption.GetResponseHeaders().Add(k, v[0], v[1:]...)
 			}
 		}
-	}
-	if err != nil {
-		return response, err
 	}
 	return response, err
 }

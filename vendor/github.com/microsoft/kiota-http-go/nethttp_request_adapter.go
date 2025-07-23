@@ -148,15 +148,15 @@ func (a *NetHttpRequestAdapter) getHttpResponseMessage(ctx context.Context, requ
 		contentLenHeader := response.Header.Get("Content-Length")
 		if contentLenHeader != "" {
 			contentLen, _ := strconv.Atoi(contentLenHeader)
-			spanForAttributes.SetAttributes(attribute.Int("http.response_content_length", contentLen))
+			spanForAttributes.SetAttributes(httpResponseBodySizeAttribute.Int(contentLen))
 		}
 		contentTypeHeader := response.Header.Get("Content-Type")
 		if contentTypeHeader != "" {
-			spanForAttributes.SetAttributes(attribute.String("http.response_content_type", contentTypeHeader))
+			spanForAttributes.SetAttributes(httpResponseHeaderContentTypeAttribute.String(contentTypeHeader))
 		}
 		spanForAttributes.SetAttributes(
-			attribute.Int("http.status_code", response.StatusCode),
-			attribute.String("http.flavor", response.Proto),
+			httpResponseStatusCodeAttribute.Int(response.StatusCode),
+			networkProtocolNameAttribute.String(response.Proto),
 		)
 	}
 	return a.retryCAEResponseIfRequired(ctx, response, requestInfo, claims, spanForAttributes)
@@ -177,7 +177,7 @@ func (a *NetHttpRequestAdapter) retryCAEResponseIfRequired(ctx context.Context, 
 		authenticateHeaderVal := response.Header.Get("WWW-Authenticate")
 		if authenticateHeaderVal != "" && reBearer.Match([]byte(authenticateHeaderVal)) {
 			span.AddEvent(AuthenticateChallengedEventKey)
-			spanForAttributes.SetAttributes(attribute.Int("http.retry_count", 1))
+			spanForAttributes.SetAttributes(httpRequestResendCountAttribute.Int(1))
 			responseClaims := ""
 			parametersRaw := string(reBearer.ReplaceAll([]byte(authenticateHeaderVal), []byte("")))
 			parameters := strings.Split(parametersRaw, ",")
@@ -253,19 +253,19 @@ func (a *NetHttpRequestAdapter) getRequestFromRequestInformation(ctx context.Con
 	if spanForAttributes == nil {
 		spanForAttributes = span
 	}
-	spanForAttributes.SetAttributes(attribute.String("http.method", requestInfo.Method.String()))
+	spanForAttributes.SetAttributes(httpRequestMethodAttribute.String(requestInfo.Method.String()))
 	uri, err := requestInfo.GetUri()
 	if err != nil {
 		spanForAttributes.RecordError(err)
 		return nil, err
 	}
 	spanForAttributes.SetAttributes(
-		attribute.String("http.scheme", uri.Scheme),
-		attribute.String("http.host", uri.Host),
+		serverAddressAttribute.String(uri.Scheme),
+		urlSchemeAttribute.String(uri.Host),
 	)
 
 	if a.observabilityOptions.IncludeEUIIAttributes {
-		spanForAttributes.SetAttributes(attribute.String("http.uri", uri.String()))
+		spanForAttributes.SetAttributes(urlFullAttribute.String(uri.String()))
 	}
 
 	request, err := nethttp.NewRequestWithContext(ctx, requestInfo.Method.String(), uri.String(), nil)
@@ -290,14 +290,14 @@ func (a *NetHttpRequestAdapter) getRequestFromRequestInformation(ctx context.Con
 		}
 		if request.Header.Get("Content-Type") != "" {
 			spanForAttributes.SetAttributes(
-				attribute.String("http.request_content_type", request.Header.Get("Content-Type")),
+				httpRequestHeaderContentTypeAttribute.String(request.Header.Get("Content-Type")),
 			)
 		}
 		if request.Header.Get("Content-Length") != "" {
 			contentLenVal, _ := strconv.Atoi(request.Header.Get("Content-Length"))
 			request.ContentLength = int64(contentLenVal)
 			spanForAttributes.SetAttributes(
-				attribute.Int("http.request_content_length", contentLenVal),
+				httpRequestBodySizeAttribute.Int(contentLenVal),
 			)
 		}
 	}
@@ -313,7 +313,7 @@ func (a *NetHttpRequestAdapter) startTracingSpan(ctx context.Context, requestInf
 	decodedUriTemplate := decodeUriEncodedString(requestInfo.UrlTemplate, []byte{'-', '.', '~', '$'})
 	telemetryPathValue := queryParametersCleanupRegex.ReplaceAll([]byte(decodedUriTemplate), []byte(""))
 	ctx, span := otel.GetTracerProvider().Tracer(a.observabilityOptions.GetTracerInstrumentationName()).Start(ctx, methodName+" - "+string(telemetryPathValue))
-	span.SetAttributes(attribute.String("http.uri_template", decodedUriTemplate))
+	span.SetAttributes(urlUriTemplateAttribute.String(decodedUriTemplate))
 	return ctx, span
 }
 

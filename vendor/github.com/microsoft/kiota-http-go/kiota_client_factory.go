@@ -98,6 +98,9 @@ func GetDefaultMiddlewaresWithOptions(requestOptions ...abs.RequestOption) ([]Mi
 			middlewareMap[redirectKeyValue] = NewRedirectHandlerWithOptions(*v)
 		case *CompressionOptions:
 			middlewareMap[compressKey] = NewCompressionHandlerWithOptions(*v)
+		case CompressionOptions:
+			println("deprecation notice: function GetDefaultMiddlewaresWithOptions expects a pointer to CompressionOptions. Use the NewCompressionOptionsReference convenience function.")
+			middlewareMap[compressKey] = NewCompressionHandlerWithOptions(v)
 		case *ParametersNameDecodingOptions:
 			middlewareMap[parametersNameDecodingKeyValue] = NewParametersNameDecodingHandlerWithOptions(*v)
 		case *UserAgentHandlerOptions:

@@ -180,6 +180,7 @@ update-go-dependencies-indirect:
 		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
 		| grep -v "github.com/nutanix-cloud-native/prism-go-client" \
 		| grep -v "github.com/microsoftgraph/msgraph-sdk-go" \
+		| grep -v "github.com/google/gnostic-models" \
 		); do \
 		go get $$module; \
 	done

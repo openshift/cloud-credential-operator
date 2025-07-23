@@ -2,16 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## [1.9.2](https://github.com/microsoft/kiota-abstractions-go/compare/v1.9.1...v1.9.2) (2025-04-02)
 
-## [Unreleased]
 
-### Added
+### Bug Fixes
 
-### Changed
+* drop dependency on common-go ([#199](https://github.com/microsoft/kiota-abstractions-go/issues/199)) ([5702488](https://github.com/microsoft/kiota-abstractions-go/commit/57024882f125ff719a2155293d5e28716f2ba9db))
 
-### Changed
+## [1.9.1](https://github.com/microsoft/kiota-abstractions-go/compare/v1.9.0...v1.9.1) (2025-03-24)
+
+
+### Bug Fixes
+
+* upgrades common go dependency to solve triming issues ([5769aa7](https://github.com/microsoft/kiota-abstractions-go/commit/5769aa7c12ddcd01862ded353ffe4b966da25b55))
+* upgrades common go dependency to solve triming issues ([73349ca](https://github.com/microsoft/kiota-abstractions-go/commit/73349ca6ebe5122fad13eb85fd957490ea8cfeea))
+
+## [1.9.0](https://github.com/microsoft/kiota-abstractions-go/compare/v1.8.1...v1.9.0) (2025-03-13)
+
+
+### Features
+
+* upgrades required go version from go1.18 to go 1.22 ([526145f](https://github.com/microsoft/kiota-abstractions-go/commit/526145f3f219287feffe814d2f3efb2d9b7e233d))
 
 ## [1.8.1] - 2024-07-09
 
