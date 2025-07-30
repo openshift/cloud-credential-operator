@@ -153,7 +153,7 @@ func TestReconcileCloudCredSecret_Reconcile(t *testing.T) {
 				name:           "empty string",
 				mode:           "",
 				existing:       nil,
-				wantAnnotation: "",
+				wantAnnotation: "passthrough",
 				wantErr:        false,
 			},
 			{
