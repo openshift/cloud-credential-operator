@@ -79,7 +79,7 @@ type Actuator struct {
 	ProjectName      string
 	Client           client.Client
 	RootCredClient   client.Client
-	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
+	GCPClientBuilder func(string, []byte, []configv1.GCPServiceEndpoint) (ccgcp.Client, error)
 }
 
 // NewActuator initializes and returns a new Actuator for GCP.
@@ -735,8 +735,18 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 		return nil, err
 	}
 
+	infra, err := utils.GetInfrastructure(a.Client)
+	if err != nil {
+		return nil, err
+	}
+
+	endpoints := []configv1.GCPServiceEndpoint{}
+	if infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.GCP != nil {
+		endpoints = infra.Status.PlatformStatus.GCP.ServiceEndpoints
+	}
+
 	logger.Debug("creating read GCP client")
-	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes, endpoints)
 	if err != nil {
 		logger.WithError(err).Warn("could not build a client with read-only creds Secret, falling back to root GCP client")
 		return a.buildRootGCPClient(cr)
@@ -765,8 +775,13 @@ func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 		return nil, err
 	}
 
+	endpoints, err := gcputils.GetServiceEndpoints(a.Client)
+	if err != nil {
+		return nil, err
+	}
+
 	logger.Debug("creating root GCP client")
-	return a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	return a.GCPClientBuilder(a.ProjectName, jsonBytes, endpoints)
 }
 
 func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPProviderStatus) error {

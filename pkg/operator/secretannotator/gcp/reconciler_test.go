@@ -242,7 +242,7 @@ func TestSecretAnnotatorReconcile(t *testing.T) {
 				Client:         fakeClient,
 				RootCredClient: fakeRootCredClient,
 				Logger:         log.WithField("controller", "testController"),
-				GCPClientBuilder: func(projectName string, authJSON []byte) (ccgcp.Client, error) {
+				GCPClientBuilder: func(projectName string, authJSON []byte, endpoints []configv1.GCPServiceEndpoint) (ccgcp.Client, error) {
 					return fakeGCPClient, nil
 				},
 			}
