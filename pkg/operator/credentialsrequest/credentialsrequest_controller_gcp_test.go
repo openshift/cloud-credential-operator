@@ -934,7 +934,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 					ProjectName:    testGCPProjectName,
 					Client:         fakeClient,
 					RootCredClient: fakeAdminClient,
-					GCPClientBuilder: func(name string, jsonAUTH []byte) (mintergcp.Client, error) {
+					GCPClientBuilder: func(name string, jsonAUTH []byte, endpoints []configv1.GCPServiceEndpoint) (mintergcp.Client, error) {
 						if string(jsonAUTH) == testRootGCPAuth {
 							return mockRootGCPClient, nil
 						} else if string(jsonAUTH) == testReadOnlyGCPAuth {
