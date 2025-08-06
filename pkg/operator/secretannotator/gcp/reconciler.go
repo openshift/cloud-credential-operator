@@ -24,6 +24,7 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/metrics"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/status"
@@ -42,12 +43,18 @@ const (
 )
 
 func NewReconciler(c client.Client, mgr manager.Manager, projectName string) reconcile.Reconciler {
+	endpoints, err := gcputils.GetServiceEndpoints(c)
+	if err != nil {
+		return nil
+	}
+
 	r := &ReconcileCloudCredSecret{
 		Client:           c,
 		RootCredClient:   mgr.GetClient(),
 		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
 		GCPClientBuilder: ccgcp.NewClientFromJSON,
 		ProjectName:      projectName,
+		GCPEndpoints:     endpoints,
 	}
 
 	s := status.NewSecretStatusHandler(c)
@@ -103,6 +110,7 @@ type ReconcileCloudCredSecret struct {
 	ProjectName      string
 	Logger           log.FieldLogger
 	GCPClientBuilder func(projectName string, authJSON []byte, endpoints []configv1.GCPServiceEndpoint) (ccgcp.Client, error)
+	GCPEndpoints     []configv1.GCPServiceEndpoint
 }
 
 // Reconcile will typically annotate the cloud cred secret to indicate the capabilities of the cloud credentials:
@@ -176,12 +184,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 	}
 
-	endpoints, err := gcputils.GetServiceEndpoints(r.Client)
-	if err != nil {
-		return err
-	}
-
-	gcpClient, err := r.GCPClientBuilder(r.ProjectName, authJSON, endpoints)
+	gcpClient, err := r.GCPClientBuilder(r.ProjectName, authJSON, r.GCPEndpoints)
 	if err != nil {
 		return fmt.Errorf("error creating gcp client: %v", err)
 	}
