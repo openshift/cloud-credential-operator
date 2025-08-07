@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -48,6 +49,7 @@ import (
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -84,9 +86,19 @@ type Actuator struct {
 
 // NewActuator initializes and returns a new Actuator for GCP.
 func NewActuator(c, rootCredClient client.Client, projectName string) (*Actuator, error) {
-	endpoints, err := gcputils.GetServiceEndpoints(c)
+	featuresGates, err := util.GetEnabledFeatureGates()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error getting enabled feature gates: %v", err)
+	}
+	gcpCustomEndpointsEnabled := featuresGates.Enabled(features.FeatureGateGCPCustomAPIEndpointsInstall)
+
+	endpoints := []configv1.GCPServiceEndpoint{}
+	if gcpCustomEndpointsEnabled {
+		var err error
+		endpoints, err = gcputils.GetServiceEndpoints(c)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return &Actuator{

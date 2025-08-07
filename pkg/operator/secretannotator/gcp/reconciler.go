@@ -21,6 +21,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
@@ -32,6 +33,7 @@ import (
 	statuscontroller "github.com/openshift/cloud-credential-operator/pkg/operator/status"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -43,9 +45,19 @@ const (
 )
 
 func NewReconciler(c client.Client, mgr manager.Manager, projectName string) reconcile.Reconciler {
-	endpoints, err := gcputils.GetServiceEndpoints(c)
+	featuresGates, err := util.GetEnabledFeatureGates()
 	if err != nil {
 		return nil
+	}
+	gcpCustomEndpointsEnabled := featuresGates.Enabled(features.FeatureGateGCPCustomAPIEndpointsInstall)
+
+	endpoints := []configv1.GCPServiceEndpoint{}
+	if gcpCustomEndpointsEnabled {
+		var err error
+		endpoints, err = gcputils.GetServiceEndpoints(c)
+		if err != nil {
+			return nil
+		}
 	}
 
 	r := &ReconcileCloudCredSecret{
