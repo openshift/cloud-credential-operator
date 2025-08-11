@@ -165,8 +165,13 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("tenant-id")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing Azure CredentialsRequests files used to create user-assigned managed identities (can be created by running 'oc adm release extract --credentials-requests --cloud=azure' against an OpenShift release image)")
 	createAllCmd.MarkPersistentFlagRequired("credentials-requests-dir")
-	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.DNSZoneResourceGroupName, "dnszone-resource-group-name", "", "The existing Azure resource group which contains the DNS zone that will be used for the cluster's base domain. The cluster ingress operator will be scoped to allow management of DNS records in the DNS Zone resource group.")
-	createAllCmd.MarkPersistentFlagRequired("dnszone-resource-group-name")
+	createAllCmd.PersistentFlags().StringVar(
+		&CreateAllOpts.DNSZoneResourceGroupName,
+		"dnszone-resource-group-name",
+		"",
+		"The name of the Azure resource group which contains the DNS zone that will be used for the cluster's base domain. The cluster ingress operator will be scoped to allow management of DNS records in the DNS Zone resource group. "+
+			"This is an optional parameter that does not need to be specified when the cluster is a private cluster, or the DNS zone is in the same resource group as the cluster.",
+	)
 
 	// Optional parameters
 	createAllCmd.PersistentFlags().StringVar(
