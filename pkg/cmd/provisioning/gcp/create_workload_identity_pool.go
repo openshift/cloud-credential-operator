@@ -30,6 +30,7 @@ var (
 	// createIdentityPoolScriptName is the name of the script used to create workload identity pool
 	createIdentityPoolScriptName = "01-create-workload-identity-pool.sh"
 	// createIdentityPoolCmd is a gcloud cli command to create workload identity pool
+	// TODO: prior to running the following command the gcloud iam endpoint should be set.
 	createIdentityPoolCmd = "gcloud iam workload-identity-pools create %s --location=global --description=\"Created by OpenShift ccoctl\" --display-name=%s"
 )
 

@@ -48,6 +48,7 @@ const (
 	// createIdentityProviderScriptName is the name of the script used to create workload identity provider in google cloud
 	createIdentityProviderScriptName = "05-create-workload-identity-provider.sh"
 	// createIdentityProviderCmd is gcloud cli command to create workload identity provider
+	// TODO: before the following command is executed, the gcloud iam endpoint must be set.
 	createIdentityProviderCmd = "gcloud iam workload-identity-pools providers create-oidc %s --location=global --workload-identity-pool=%s --display-name=%s --description=\"%s\" --issuer-uri=%s --allowed-audiences=%s --attribute-mapping=\"google.subject=assertion.sub\""
 	// openShiftAudience is the only acceptable value for the `aud` field (audience) in the OIDC token shared by
 	// OpenShift components

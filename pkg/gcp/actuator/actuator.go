@@ -58,12 +58,15 @@ const (
 
 	gcpSecretJSONKey = "service_account.json"
 
+	defaultSTSTokenUrl       = "https://sts.googleapis.com"
+	defaultIAMCredentialsUrl = "https://iamcredentials.googleapis.com"
+
 	gcpSTSCredsTemplate = `{
   "type": "external_account",
   "audience": "%s",
   "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
-  "token_url": "https://sts.googleapis.com/v1/token",
-  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
+  "token_url": "%s/v1/token",
+  "service_account_impersonation_url": "%s/v1/projects/-/serviceAccounts/%s:generateAccessToken",
   "credential_source": {
     "file": "%s",
     "format": {
@@ -334,7 +337,18 @@ func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string
 		if secret.StringData == nil {
 			secret.StringData = map[string]string{}
 		}
-		secret.StringData[gcpSecretJSONKey] = fmt.Sprintf(gcpSTSCredsTemplate, audience, serviceAccount, cloudTokenPath)
+
+		stsEndpoint := defaultSTSTokenUrl
+		if endpoint := gcputils.FindGCPEndpoint(a.GCPEndpoints, configv1.GCPServiceEndpointNameSTS); endpoint != "" {
+			stsEndpoint = endpoint
+		}
+
+		iamCredentaialsEndpoint := defaultIAMCredentialsUrl
+		if endpoint := gcputils.FindGCPEndpoint(a.GCPEndpoints, configv1.GCPServiceEndpointNameIAM); endpoint != "" {
+			iamCredentaialsEndpoint = endpoint
+		}
+
+		secret.StringData[gcpSecretJSONKey] = fmt.Sprintf(gcpSTSCredsTemplate, audience, stsEndpoint, iamCredentaialsEndpoint, serviceAccount, cloudTokenPath)
 		secret.Type = corev1.SecretTypeOpaque
 		return nil
 	})

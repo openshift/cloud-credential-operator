@@ -189,6 +189,16 @@ func filterOutPermissions(gcpClient ccgcp.Client, projectName string, permList [
 	return filteredPerms, nil
 }
 
+func FindGCPEndpoint(endpoints []configv1.GCPServiceEndpoint, name configv1.GCPServiceEndpointName) string {
+	for _, endpoint := range endpoints {
+		if endpoint.Name == name {
+			return endpoint.URL
+		}
+	}
+
+	return ""
+}
+
 // GetServiceEndpoints will retrieve the GCP Service Endpoints from the Infrastructure Status object.
 func GetServiceEndpoints(c client.Client) ([]configv1.GCPServiceEndpoint, error) {
 	infra, err := utils.GetInfrastructure(c)
