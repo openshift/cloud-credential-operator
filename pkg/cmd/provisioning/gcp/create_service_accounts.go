@@ -33,14 +33,17 @@ metadata:
   namespace: %s
 type: Opaque`
 
+	defaultSTSTokenUrl       = "https://sts.googleapis.com"
+	defaultIAMCredentialsUrl = "https://iamcredentials.googleapis.com"
+
 	// credentialsConfigTemplate is a template of the client credentials configuration required to impersonate IAM service
 	// account
 	credentialsConfigTemplate = `{
   	"type": "external_account",
   	"audience": "//iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s/providers/%s",
   	"subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
-  	"token_url": "https://sts.googleapis.com/v1/token",
-  	"service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
+  	"token_url": "%s/v1/token",
+  	"service_account_impersonation_url": "%s/v1/projects/-/serviceAccounts/%s:generateAccessToken",
   	"credential_source": {
     	"file": "%s",
     	"format": {
@@ -319,7 +322,8 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		log.Printf("Updated policy bindings for IAM service account %s", serviceAccount.DisplayName)
 
 		projectNumStr := fmt.Sprint(projectNum)
-		credentialsConfig := fmt.Sprintf(credentialsConfigTemplate, projectNumStr, workloadIdentityPool, workloadIdentityProvider, serviceAccount.Email, provisioning.OidcTokenPath)
+		// TODO: ccoctl will allow users to enter endpoint overrides. In this case the STS and iam endpoints.
+		credentialsConfig := fmt.Sprintf(credentialsConfigTemplate, projectNumStr, workloadIdentityPool, workloadIdentityProvider, defaultSTSTokenUrl, defaultIAMCredentialsUrl, serviceAccount.Email, provisioning.OidcTokenPath)
 		encodedCredentialsConfig = base64.StdEncoding.EncodeToString([]byte(credentialsConfig))
 	}
 
@@ -449,7 +453,8 @@ func createServiceAccountsCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds)
+	// endpoints temporarily set to nil until ccoctl users can pass in endpoints
+	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds, nil)
 	if err != nil {
 		log.Fatal(err)
 	}

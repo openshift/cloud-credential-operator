@@ -40,6 +40,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/api/features"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
@@ -48,6 +49,7 @@ import (
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -56,12 +58,15 @@ const (
 
 	gcpSecretJSONKey = "service_account.json"
 
+	defaultSTSTokenUrl       = "https://sts.googleapis.com"
+	defaultIAMCredentialsUrl = "https://iamcredentials.googleapis.com"
+
 	gcpSTSCredsTemplate = `{
   "type": "external_account",
   "audience": "%s",
   "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
-  "token_url": "https://sts.googleapis.com/v1/token",
-  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
+  "token_url": "%s/v1/token",
+  "service_account_impersonation_url": "%s/v1/projects/-/serviceAccounts/%s:generateAccessToken",
   "credential_source": {
     "file": "%s",
     "format": {
@@ -78,16 +83,33 @@ type Actuator struct {
 	ProjectName      string
 	Client           client.Client
 	RootCredClient   client.Client
-	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
+	GCPClientBuilder func(string, []byte, []configv1.GCPServiceEndpoint) (ccgcp.Client, error)
+	GCPEndpoints     []configv1.GCPServiceEndpoint
 }
 
 // NewActuator initializes and returns a new Actuator for GCP.
 func NewActuator(c, rootCredClient client.Client, projectName string) (*Actuator, error) {
+	featuresGates, err := util.GetEnabledFeatureGates()
+	if err != nil {
+		return nil, fmt.Errorf("error getting enabled feature gates: %v", err)
+	}
+	gcpCustomEndpointsEnabled := featuresGates.Enabled(features.FeatureGateGCPCustomAPIEndpoints)
+
+	endpoints := []configv1.GCPServiceEndpoint{}
+	if gcpCustomEndpointsEnabled {
+		var err error
+		endpoints, err = gcputils.GetServiceEndpoints(c)
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	return &Actuator{
 		ProjectName:      projectName,
 		Client:           c,
 		RootCredClient:   rootCredClient,
 		GCPClientBuilder: ccgcp.NewClientFromJSON,
+		GCPEndpoints:     endpoints,
 	}, nil
 }
 
@@ -315,7 +337,18 @@ func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string
 		if secret.StringData == nil {
 			secret.StringData = map[string]string{}
 		}
-		secret.StringData[gcpSecretJSONKey] = fmt.Sprintf(gcpSTSCredsTemplate, audience, serviceAccount, cloudTokenPath)
+
+		stsEndpoint := defaultSTSTokenUrl
+		if endpoint := gcputils.FindGCPEndpoint(a.GCPEndpoints, configv1.GCPServiceEndpointNameSTS); endpoint != "" {
+			stsEndpoint = endpoint
+		}
+
+		iamCredentaialsEndpoint := defaultIAMCredentialsUrl
+		if endpoint := gcputils.FindGCPEndpoint(a.GCPEndpoints, configv1.GCPServiceEndpointNameIAM); endpoint != "" {
+			iamCredentaialsEndpoint = endpoint
+		}
+
+		secret.StringData[gcpSecretJSONKey] = fmt.Sprintf(gcpSTSCredsTemplate, audience, stsEndpoint, iamCredentaialsEndpoint, serviceAccount, cloudTokenPath)
 		secret.Type = corev1.SecretTypeOpaque
 		return nil
 	})
@@ -730,7 +763,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating read GCP client")
-	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes, a.GCPEndpoints)
 
 	// Test if the read-only client is working, if any error here we will fall back to using
 	// the root client.
@@ -756,7 +789,7 @@ func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating root GCP client")
-	return a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	return a.GCPClientBuilder(a.ProjectName, jsonBytes, a.GCPEndpoints)
 }
 
 func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPProviderStatus) error {

@@ -19,6 +19,8 @@ package gcp
 import (
 	"context"
 	"fmt"
+	configv1 "github.com/openshift/api/config/v1"
+	gcputils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/gcp"
 	"time"
 
 	iamcloud "cloud.google.com/go/iam"
@@ -394,30 +396,48 @@ func (c *gcpClient) DeleteObject(ctx context.Context, bucketName, objectName str
 }
 
 // NewClient creates our client wrapper object for interacting with GCP.
-func NewClient(projectName string, creds *google.Credentials) (Client, error) {
+func NewClient(projectName string, creds *google.Credentials, endpoints []configv1.GCPServiceEndpoint) (Client, error) {
 	ctx := context.TODO()
 
-	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, option.WithCredentials(creds))
+	options := []option.ClientOption{option.WithCredentials(creds)}
+
+	crmOptions := options
+	if crmEndpoint := gcputils.FindGCPEndpoint(endpoints, configv1.GCPServiceEndpointNameCloudResource); crmEndpoint != "" {
+		crmOptions = append(crmOptions, option.WithEndpoint(crmEndpoint))
+	}
+	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, crmOptions...)
 	if err != nil {
 		return nil, err
 	}
 
-	iamClient, err := iamadmin.NewIamClient(ctx, option.WithCredentials(creds))
+	iamOptions := options
+	if iamEndpoint := gcputils.FindGCPEndpoint(endpoints, configv1.GCPServiceEndpointNameIAM); iamEndpoint != "" {
+		iamOptions = append(iamOptions, option.WithEndpoint(iamEndpoint))
+	}
+	iamClient, err := iamadmin.NewIamClient(ctx, iamOptions...)
 	if err != nil {
 		return nil, err
 	}
 
-	iamService, err := iam.NewService(ctx, option.WithCredentials(creds))
+	iamService, err := iam.NewService(ctx, iamOptions...)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceUsageClient, err := serviceusage.NewService(ctx, option.WithCredentials(creds))
+	serviceUsageOptions := options
+	if serviceUsageEndpoint := gcputils.FindGCPEndpoint(endpoints, configv1.GCPServiceEndpointNameServiceUsage); serviceUsageEndpoint != "" {
+		serviceUsageOptions = append(serviceUsageOptions, option.WithEndpoint(serviceUsageEndpoint))
+	}
+	serviceUsageClient, err := serviceusage.NewService(ctx, serviceUsageOptions...)
 	if err != nil {
 		return nil, err
 	}
 
-	storageClient, err := storage.NewClient(ctx, option.WithCredentials(creds))
+	storageOptions := options
+	if storageEndpoint := gcputils.FindGCPEndpoint(endpoints, configv1.GCPServiceEndpointNameStorage); storageEndpoint != "" {
+		storageOptions = append(storageOptions, option.WithEndpoint(storageEndpoint))
+	}
+	storageClient, err := storage.NewClient(ctx, storageOptions...)
 	if err != nil {
 		return nil, err
 	}
@@ -433,7 +453,7 @@ func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 	}, nil
 }
 
-func NewClientFromJSON(projectName string, authJSON []byte) (Client, error) {
+func NewClientFromJSON(projectName string, authJSON []byte, endpoints []configv1.GCPServiceEndpoint) (Client, error) {
 	var creds *google.Credentials
 	var err error
 	// since we're using a single creds var, we should specify all the required scopes when initializing
@@ -441,5 +461,5 @@ func NewClientFromJSON(projectName string, authJSON []byte) (Client, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewClient(projectName, creds)
+	return NewClient(projectName, creds, endpoints)
 }
