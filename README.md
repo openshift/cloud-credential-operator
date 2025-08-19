@@ -1,4 +1,5 @@
 # OpenShift Cloud Credential Operator
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/openshift/cloud-credential-operator)
 
 The cloud credential operator is a controller that will sync on
 CredentialsRequest custom resources. CredentialsRequests allow OpenShift
