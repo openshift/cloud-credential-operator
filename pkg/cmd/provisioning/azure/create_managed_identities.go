@@ -640,7 +640,7 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 		// Scope user-assigned managed identity within the installationResourceGroupName
 		scopingResourceGroupNames := []string{installationResourceGroupName}
 		// Additionally scope the ingress CredentialsRequest within the dnsZoneResourceGroupName
-		if credentialsRequest.Name == ingressCredentialRequestName {
+		if credentialsRequest.Name == ingressCredentialRequestName && dnsZoneResourceGroupName != "" {
 			scopingResourceGroupNames = append(scopingResourceGroupNames, dnsZoneResourceGroupName)
 		}
 		// Additionally scope vnet related CredentialRequest within the networkResourceGroupName,
@@ -764,8 +764,13 @@ func NewCreateManagedIdentitiesCmd() *cobra.Command {
 	createManagedIdentitiesCmd.MarkPersistentFlagRequired("region")
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing Azure CredentialsRequests files used to create user-assigned managed identities (can be created by running 'oc adm release extract --credentials-requests --cloud=azure' against an OpenShift release image)")
 	createManagedIdentitiesCmd.MarkPersistentFlagRequired("credentials-requests-dir")
-	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.DNSZoneResourceGroupName, "dnszone-resource-group-name", "", "The existing Azure resource group which contains the DNS zone that will be used for the cluster's base domain. The cluster ingress operator will be scoped to allow management of DNS records in the DNS Zone resource group.")
-	createManagedIdentitiesCmd.MarkPersistentFlagRequired("dnszone-resource-group-name")
+	createManagedIdentitiesCmd.PersistentFlags().StringVar(
+		&CreateManagedIdentitiesOpts.DNSZoneResourceGroupName,
+		"dnszone-resource-group-name",
+		"",
+		"The name of the Azure resource group which contains the DNS zone that will be used for the cluster's base domain. The cluster ingress operator will be scoped to allow management of DNS records in the DNS Zone resource group. "+
+			"This is an optional parameter that does not need to be specified when the cluster is a private cluster, or the DNS zone is in the same resource group as the cluster.",
+	)
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(
 		&CreateManagedIdentitiesOpts.InstallationResourceGroupName,
 		"installation-resource-group-name",
