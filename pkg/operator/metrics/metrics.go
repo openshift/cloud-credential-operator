@@ -2,7 +2,6 @@ package metrics
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -21,7 +20,6 @@ import (
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/azure"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
@@ -150,11 +148,14 @@ func (mc *Calculator) metricsLoop() {
 		mc.log.WithError(err).Error("failed to fetch cloud secret")
 		return
 	}
+
+	tokenCluster, err := utils.IsTimedTokenCluster(mc.Client, context.TODO(), mc.log)
+
 	setCredentialsMode(&clusterState{
 		mode:                        mode,
 		rootSecret:                  cloudSecret,
 		rootSecretNotFound:          errors.IsNotFound(err),
-		foundPodIdentityCredentials: accumulator.podIdentityCredentials > 0,
+		foundPodIdentityCredentials: tokenCluster,
 	}, mc.log)
 }
 
@@ -219,17 +220,14 @@ type credRequestAccumulator struct {
 	crTotals     map[string]int
 	crConditions map[credreqv1.CredentialsRequestConditionType]int
 	crMode       map[constants.CredentialsMode]int
-
-	podIdentityCredentials int
 }
 
 func newAccumulator(client client.Client, logger log.FieldLogger) *credRequestAccumulator {
 	acc := &credRequestAccumulator{
-		kubeClient:             client,
-		logger:                 logger,
-		crTotals:               map[string]int{},
-		crConditions:           map[credreqv1.CredentialsRequestConditionType]int{},
-		podIdentityCredentials: 0,
+		kubeClient:   client,
+		logger:       logger,
+		crTotals:     map[string]int{},
+		crConditions: map[credreqv1.CredentialsRequestConditionType]int{},
 	}
 
 	// make entries with '0' so we make sure to send updated metrics for any
@@ -249,15 +247,6 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest, cco
 	}
 	cloudKey := cloudProviderSpecToMetricsKey(cloudType)
 	a.crTotals[cloudKey]++
-
-	isPodIdentity, err := credRequestIsPodIdentity(cr, cloudType, a.kubeClient)
-	if err != nil {
-		a.logger.WithError(err).Error("failed to determine whether CredentialsRequest is of type STS")
-	}
-
-	if isPodIdentity {
-		a.podIdentityCredentials++
-	}
 
 	// Skip reporting conditions if CCO is disabled, as we shouldn't be alerting in that case, except for stale credentials.
 	// condition. The stale credentials are removed by cleanup controller. But when CCO is disabled the only way to inform
@@ -361,39 +350,4 @@ func (a *credRequestAccumulator) setMetrics() {
 	for k, v := range a.crConditions {
 		metricCredentialsRequestConditions.WithLabelValues(string(k)).Set(float64(v))
 	}
-}
-
-func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string, kubeClient client.Client) (bool, error) {
-	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
-	secret := &corev1.Secret{}
-
-	err := kubeClient.Get(context.TODO(), secretKey, secret)
-	if errors.IsNotFound(err) {
-		// Secret for CredReq doesn't exist so we can't query it
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
-	switch cloudType {
-	case "AWSProviderSpec":
-		secretData, ok := secret.Data[constants.AWSSecretDataCredentialsKey]
-		if !ok {
-			return false, nil
-		}
-
-		// web_identity_token_file is a clear indicator that the credentials
-		// are configured for pod identity / STS credentials
-		if strings.Contains(string(secretData), "web_identity_token_file") {
-			return true, nil
-		}
-
-		return false, nil
-	case "AzureProviderSpec":
-		_, ok := secret.Data[azure.AzureFederatedTokenFile]
-		return ok, nil
-	default:
-		return false, nil
-	}
-
 }
