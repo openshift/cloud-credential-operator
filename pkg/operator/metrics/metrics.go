@@ -139,6 +139,7 @@ func (mc *Calculator) metricsLoop() {
 		return
 	}
 
+	mc.log.Info("calling func processCR for all CredentialsRequests")
 	accumulator := newAccumulator(mc.Client, mc.log)
 	for _, cr := range credRequests.Items {
 		accumulator.processCR(&cr, ccoDisabled)
@@ -150,6 +151,9 @@ func (mc *Calculator) metricsLoop() {
 		mc.log.WithError(err).Error("failed to fetch cloud secret")
 		return
 	}
+
+	//print the accumulator.podIdentityCredentials for debugging
+	mc.log.Infof("calling func setCredentialsMode with mode = %v, rootSecret = %v, rootSecretNotFound = %v, podIdentityCredentials = %v", mode, cloudSecret, errors.IsNotFound(err), accumulator.podIdentityCredentials)
 	setCredentialsMode(&clusterState{
 		mode:                        mode,
 		rootSecret:                  cloudSecret,
@@ -250,7 +254,8 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest, cco
 	cloudKey := cloudProviderSpecToMetricsKey(cloudType)
 	a.crTotals[cloudKey]++
 
-	isPodIdentity, err := credRequestIsPodIdentity(cr, cloudType, a.kubeClient)
+	isPodIdentity, err := credRequestIsPodIdentity(cr, cloudType, a.kubeClient, a.logger)
+	a.logger.Infof("called func credRequestIsPodIdentity with returned isPodIdentity = %v", isPodIdentity)
 	if err != nil {
 		a.logger.WithError(err).Error("failed to determine whether CredentialsRequest is of type STS")
 	}
@@ -294,11 +299,13 @@ func setCredentialsMode(state *clusterState, logger log.FieldLogger) {
 	}
 
 	detectedMode := determineCredentialsMode(state, logger)
+	logger.Infof("called func determineCredentialsMode with returned detectedMode = %v", detectedMode)
 
 	crMode[detectedMode] = 1
 
 	for k, v := range crMode {
 		if v > 0 {
+			logger.Infof("peg mode metrics with k = %v, v = %v", k, v)
 			metricCredentialsMode.WithLabelValues(string(k)).Set(float64(v))
 		} else {
 			// Ensure unused modes are cleared if we've recently changed mode:
@@ -312,7 +319,7 @@ func determineCredentialsMode(state *clusterState, logger log.FieldLogger) const
 		logger.Error("unexpectedly received a nil state for calculating mode")
 		return constants.ModeUnknown
 	}
-
+	logger.Infof("foundPodIdentityCredentials = %v", state.foundPodIdentityCredentials)
 	if state.mode == operatorv1.CloudCredentialsModeManual {
 
 		// if the accumulator found any Secrets with pod identity credentials data
@@ -363,21 +370,26 @@ func (a *credRequestAccumulator) setMetrics() {
 	}
 }
 
-func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string, kubeClient client.Client) (bool, error) {
+func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string, kubeClient client.Client, logger log.FieldLogger) (bool, error) {
 	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
 	secret := &corev1.Secret{}
+
+	logger.Infof("CR name = %v, CR namespace = %v", cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace)
 
 	err := kubeClient.Get(context.TODO(), secretKey, secret)
 	if errors.IsNotFound(err) {
 		// Secret for CredReq doesn't exist so we can't query it
+		logger.Info("secret not found")
 		return false, nil
 	} else if err != nil {
+		logger.Info("error for getting the secret")
 		return false, err
 	}
 
 	switch cloudType {
 	case "AWSProviderSpec":
 		secretData, ok := secret.Data[constants.AWSSecretDataCredentialsKey]
+		logger.Infof("secretData = %v, ok flag = %v", secretData, ok)
 		if !ok {
 			return false, nil
 		}
@@ -385,6 +397,7 @@ func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string
 		// web_identity_token_file is a clear indicator that the credentials
 		// are configured for pod identity / STS credentials
 		if strings.Contains(string(secretData), "web_identity_token_file") {
+			logger.Info("secretData doesn't contain web_identity_token_file")
 			return true, nil
 		}
 
