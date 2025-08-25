@@ -214,7 +214,7 @@ func TestEnsureResourceGroup(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-			err := ensureResourceGroup(mockAzureClientWrapper, testOIDCResourceGroupName, testRegionName, testUserTags)
+			err := ensureResourceGroup(mockAzureClientWrapper, testInfraName, testOIDCResourceGroupName, testRegionName, testUserTags)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
@@ -279,7 +279,7 @@ func TestEnsureStorageAccount(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-			err := ensureStorageAccount(mockAzureClientWrapper, testStorageAccountName, testOIDCResourceGroupName, testRegionName, testUserTags)
+			err := ensureStorageAccount(mockAzureClientWrapper, testInfraName, testStorageAccountName, testOIDCResourceGroupName, testRegionName, testUserTags)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
