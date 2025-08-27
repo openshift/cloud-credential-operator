@@ -177,7 +177,7 @@ Make sure you clean up the following resources after you uninstall your cluster.
 
 ### Steps to in-place migrate an OpenShift Cluster to Azure AD Workload Identity
 
-NOTE This is just for developers interested in taking an existing cluster to Azure AD Workload Identity. This is explicitly NOT RECOMMENED OR SUPPORTED.
+NOTE This is just for developers interested in taking an existing cluster to Azure AD Workload Identity.
 
 1. Extract the cluster's ServiceAccount public signing key.
 
