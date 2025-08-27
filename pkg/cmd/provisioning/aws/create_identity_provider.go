@@ -496,6 +496,30 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 				switch aerr.Code() {
 				case s3.ErrCodeBucketAlreadyOwnedByYou:
 					log.Printf("Bucket %s already exists and is owned by the user", bucketName)
+					if createPrivateS3 {
+						// find the cloudfront distribution
+						distList, err := client.ListCloudFrontDistributions(&cloudfront.ListDistributionsInput{})
+						if err != nil {
+							return "", errors.Wrap(err, "failed to list cloudfront distributions")
+						}
+
+						if distList.DistributionList == nil {
+							// No distributions found at all
+							return "", errors.New("found S3 bucket but no CloudFront distributions exist")
+						}
+
+						s3OriginDomainName := fmt.Sprintf("%s.s3.%s.%s", bucketName, region, dnsSuffix)
+						for _, dist := range distList.DistributionList.Items {
+							for _, origin := range dist.Origins.Items {
+								if awssdk.StringValue(origin.DomainName) == s3OriginDomainName {
+									log.Printf("Found existing CloudFront distribution %s for S3 bucket %s", awssdk.StringValue(dist.Id), bucketName)
+									cloudFrontURL := fmt.Sprintf("https://%s", awssdk.StringValue(dist.DomainName))
+									return cloudFrontURL, nil
+								}
+							}
+						}
+						return "", fmt.Errorf("found S3 bucket %s but no matching CloudFront distribution", bucketName)
+					}
 				default:
 					return "", errors.Wrap(aerr, "failed to create a bucket to store OpenID Connect configuration")
 				}
