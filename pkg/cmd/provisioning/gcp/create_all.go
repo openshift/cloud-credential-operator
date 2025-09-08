@@ -29,8 +29,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	// endpoints temporarily set to nil until ccoctl users can pass in endpoints
-	gcpClient, err := gcp.NewClient(CreateAllOpts.Project, creds, nil)
+	gcpClient, err := gcp.NewClient(CreateAllOpts.Project, creds, CreateAllOpts.Endpoints.ToGCPServiceEndpoint())
 	if err != nil {
 		log.Fatalf("Failed to initiate GCP client: %s", err)
 	}
@@ -118,6 +117,8 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
-
+	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.Endpoints.IAM, "iam-endpoint", "", "override IAM endpoint")
+	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.Endpoints.CRM, "crm-endpoint", "", "override Cloud Resource Manager endpoint")
+	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.Endpoints.Storage, "storage-endpoint", "", "override Storage endpoint")
 	return createAllCmd
 }

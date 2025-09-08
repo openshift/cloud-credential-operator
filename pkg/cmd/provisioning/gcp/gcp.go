@@ -3,6 +3,8 @@ package gcp
 import (
 	"github.com/spf13/cobra"
 
+	configv1 "github.com/openshift/api/config/v1"
+
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
@@ -17,6 +19,40 @@ type options struct {
 	CredRequestDir           string
 	DryRun                   bool
 	EnableTechPreview        bool
+	Endpoints                endpoints
+}
+
+type endpoints struct {
+	CRM     string
+	IAM     string
+	Storage string
+}
+
+func (e *endpoints) ToGCPServiceEndpoint() []configv1.GCPServiceEndpoint {
+	endpoints := []configv1.GCPServiceEndpoint{}
+
+	if e.CRM != "" {
+		endpoints = append(endpoints, configv1.GCPServiceEndpoint{
+			Name: configv1.GCPServiceEndpointNameCloudResource,
+			URL:  e.CRM,
+		})
+	}
+
+	if e.IAM != "" {
+		endpoints = append(endpoints, configv1.GCPServiceEndpoint{
+			Name: configv1.GCPServiceEndpointNameIAM,
+			URL:  e.IAM,
+		})
+	}
+
+	if e.Storage != "" {
+		endpoints = append(endpoints, configv1.GCPServiceEndpoint{
+			Name: configv1.GCPServiceEndpointNameStorage,
+			URL:  e.Storage,
+		})
+	}
+
+	return endpoints
 }
 
 // NewGCPCmd implements the "gcp" subcommand for the credentials provisioning

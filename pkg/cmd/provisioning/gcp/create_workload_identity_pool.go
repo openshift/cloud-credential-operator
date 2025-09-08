@@ -46,10 +46,9 @@ func createWorkloadIdentityPoolCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	// endpoints temporarily set to nil until ccoctl users can pass in endpoints
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityPoolOpts.Project, creds, nil)
+	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityPoolOpts.Project, creds, CreateAllOpts.Endpoints.ToGCPServiceEndpoint())
 	if err != nil {
-		log.Fatalf("Failed to setup GCP client: %s", err)
+		log.Fatal(err)
 	}
 
 	err = createWorkloadIdentityPool(ctx, gcpClient, CreateWorkloadIdentityPoolOpts.Name, CreateWorkloadIdentityPoolOpts.Project, CreateWorkloadIdentityPoolOpts.TargetDir, CreateWorkloadIdentityPoolOpts.DryRun)
@@ -147,6 +146,7 @@ func NewCreateWorkloadIdentityPool() *cobra.Command {
 	createWorkloadIdentityPoolCmd.MarkPersistentFlagRequired("project")
 	createWorkloadIdentityPoolCmd.PersistentFlags().BoolVar(&CreateWorkloadIdentityPoolOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createWorkloadIdentityPoolCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityPoolOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createWorkloadIdentityPoolCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityPoolOpts.Endpoints.IAM, "iam-endpoint", "", "override IAM endpoint")
 
 	return createWorkloadIdentityPoolCmd
 }

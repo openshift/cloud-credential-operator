@@ -62,8 +62,7 @@ func createWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	// endpoints temporarily set to nil until ccoctl users can pass in endpoints
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds, nil)
+	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds, CreateWorkloadIdentityPoolOpts.Endpoints.ToGCPServiceEndpoint())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -320,6 +319,8 @@ func NewCreateWorkloadIdentityProviderCmd() *cobra.Command {
 	createWorkloadIdentityProviderCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityProviderOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 	createWorkloadIdentityProviderCmd.PersistentFlags().BoolVar(&CreateWorkloadIdentityProviderOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createWorkloadIdentityProviderCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityProviderOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createWorkloadIdentityProviderCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityProviderOpts.Endpoints.IAM, "iam-endpoint", "", "override IAM endpoint")
+	createWorkloadIdentityProviderCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityProviderOpts.Endpoints.Storage, "storage-endpoint", "", "override Storage endpoint")
 
 	return createWorkloadIdentityProviderCmd
 }

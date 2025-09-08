@@ -449,8 +449,7 @@ func createServiceAccountsCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	// endpoints temporarily set to nil until ccoctl users can pass in endpoints
-	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds, nil)
+	gcpClient, err := gcp.NewClient(CreateWorkloadIdentityProviderOpts.Project, creds, CreateAllOpts.Endpoints.ToGCPServiceEndpoint())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -520,6 +519,8 @@ func NewCreateServiceAccountsCmd() *cobra.Command {
 	createServiceAccountsCmd.PersistentFlags().BoolVar(&CreateServiceAccountsOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createServiceAccountsCmd.PersistentFlags().StringVar(&CreateServiceAccountsOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createServiceAccountsCmd.PersistentFlags().BoolVar(&CreateServiceAccountsOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
+	createServiceAccountsCmd.PersistentFlags().StringVar(&CreateServiceAccountsOpts.Endpoints.IAM, "iam-endpoint", "", "override IAM endpoint")
+	createServiceAccountsCmd.PersistentFlags().StringVar(&CreateServiceAccountsOpts.Endpoints.CRM, "crm-endpoint", "", "override Cloud Resource Manager endpoint")
 
 	return createServiceAccountsCmd
 }
