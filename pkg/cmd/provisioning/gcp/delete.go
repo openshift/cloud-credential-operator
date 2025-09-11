@@ -191,7 +191,7 @@ func deleteCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to load credentials: %s", err)
 	}
 
-	gcpClient, err := gcp.NewClient(DeleteOpts.Project, creds)
+	gcpClient, err := gcp.NewClient(DeleteOpts.Project, creds, DeleteOpts.Endpoints.ToGCPServiceEndpoint())
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -245,6 +245,8 @@ func NewDeleteCmd() *cobra.Command {
 	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests to delete IAM Roles for (can be created by running 'oc adm release extract --credentials-requests --cloud=ibmcloud' against an OpenShift release image)")
 	deleteCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	deleteCmd.PersistentFlags().BoolVar(&DeleteOpts.ForceDeleteCustomRoles, "force-delete-custom-roles", false, "Delete per-project custom roles")
+	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Endpoints.IAM, "iam-endpoint", "", "override IAM endpoint")
+	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Endpoints.Storage, "storage-endpoint", "", "override Storage endpoint")
 
 	return deleteCmd
 }
