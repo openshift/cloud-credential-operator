@@ -10,7 +10,7 @@ import (
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
-	"github.com/aws/aws-sdk-go/service/iam"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
 
 	configv1 "github.com/openshift/api/config/v1"
 
@@ -74,7 +74,7 @@ func LoadInfrastructureRegion(c client.Client, logger log.FieldLogger) (string, 
 
 func getIAMEndpoint(infra *configv1.Infrastructure) string {
 	for _, ep := range infra.Status.PlatformStatus.AWS.ServiceEndpoints {
-		if ep.Name == iam.ServiceName {
+		if ep.Name == iam.ServiceID {
 			return ep.URL
 		}
 	}

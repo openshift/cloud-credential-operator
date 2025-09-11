@@ -11,9 +11,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/iam"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	mockaws "github.com/openshift/cloud-credential-operator/pkg/aws/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -292,22 +292,22 @@ func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetS
 }
 
 func mockGetOpenIDConnectProvider(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetOpenIDConnectProvider(gomock.Any()).Return(
+	mockAWSClient.EXPECT().GetOpenIDConnectProvider(gomock.Any(), gomock.Any()).Return(
 		&iam.GetOpenIDConnectProviderOutput{
 			Url: awssdk.String(testIdentityProviderURL),
 		}, nil).AnyTimes()
 }
 
 func mockGetRole(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetRole(gomock.Any()).Return(
-		nil, awserr.New(iam.ErrCodeNoSuchEntityException, "Role does not exist", fmt.Errorf("fake error")),
+	mockAWSClient.EXPECT().GetRole(gomock.Any(), gomock.Any()).Return(
+		nil, &iamtypes.NoSuchEntityException{},
 	).Times(1)
 }
 
 func mockGetRoleExists(mockAWSClient *mockaws.MockClient, roleName string) {
-	mockAWSClient.EXPECT().GetRole(gomock.Any()).Return(
+	mockAWSClient.EXPECT().GetRole(gomock.Any(), gomock.Any()).Return(
 		&iam.GetRoleOutput{
-			Role: &iam.Role{
+			Role: &iamtypes.Role{
 				Arn:      awssdk.String("test-role-arn"),
 				RoleName: awssdk.String(roleName),
 			},
@@ -316,9 +316,9 @@ func mockGetRoleExists(mockAWSClient *mockaws.MockClient, roleName string) {
 }
 
 func mockCreateRole(mockAWSClient *mockaws.MockClient, roleName string) {
-	mockAWSClient.EXPECT().CreateRole(gomock.Any()).Return(
+	mockAWSClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(
 		&iam.CreateRoleOutput{
-			Role: &iam.Role{
+			Role: &iamtypes.Role{
 				Arn:      awssdk.String("test-role-arn"),
 				RoleName: awssdk.String(roleName),
 			},
@@ -327,19 +327,19 @@ func mockCreateRole(mockAWSClient *mockaws.MockClient, roleName string) {
 }
 
 func mockFailedCreateRole(mockAWSClient *mockaws.MockClient, roleName string) {
-	mockAWSClient.EXPECT().CreateRole(gomock.Any()).Return(
+	mockAWSClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(
 		&iam.CreateRoleOutput{}, fmt.Errorf("test error on role create"),
 	).Times(1)
 }
 
 func mockPutRolePolicy(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().PutRolePolicy(gomock.Any()).Return(
+	mockAWSClient.EXPECT().PutRolePolicy(gomock.Any(), gomock.Any()).Return(
 		&iam.PutRolePolicyOutput{}, nil,
 	).Times(1)
 }
 
 func mockUpdateAssumeRolePolicy(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().UpdateAssumeRolePolicy(gomock.Any()).Return(
+	mockAWSClient.EXPECT().UpdateAssumeRolePolicy(gomock.Any(), gomock.Any()).Return(
 		&iam.UpdateAssumeRolePolicyOutput{}, nil,
 	).Times(1)
 }

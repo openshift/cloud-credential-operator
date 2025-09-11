@@ -191,7 +191,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	}
 
 	// Can we mint new creds?
-	cloudCheckResult, err := ccaws.CheckCloudCredCreation(awsClient, r.Logger)
+	cloudCheckResult, err := ccaws.CheckCloudCredCreation(context.Background(), awsClient, r.Logger)
 	if err != nil {
 		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 		return fmt.Errorf("failed checking create cloud creds: %v", err)
@@ -210,7 +210,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 	simParams := &ccaws.SimulateParams{
 		Region: region,
 	}
-	cloudCheckResult, err = ccaws.CheckCloudCredPassthrough(awsClient, simParams, r.Logger)
+	cloudCheckResult, err = ccaws.CheckCloudCredPassthrough(context.Background(), awsClient, simParams, r.Logger)
 	if err != nil {
 		r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 		return fmt.Errorf("failed checking passthrough cloud creds: %v", err)

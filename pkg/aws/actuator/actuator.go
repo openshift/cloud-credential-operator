@@ -18,6 +18,7 @@ package actuator
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -25,15 +26,15 @@ import (
 	log "github.com/sirupsen/logrus"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/iam"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
@@ -42,7 +43,6 @@ import (
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
-	minteraws "github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	actuatoriface "github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest/actuator"
 	awsannotator "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/aws"
@@ -131,7 +131,7 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 	existingSecret := &corev1.Secret{}
 	err = a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			logger.Debug("target secret does not exist")
 			return false, nil
 		}
@@ -188,23 +188,19 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		}
 
 		// If AWS user defined (ie minted creds instead of passthrough) check whether user is tagged
-		user, err := readAWSClient.GetUser(&iam.GetUserInput{
-			UserName: aws.String(awsStatus.User),
+		user, err := readAWSClient.GetUser(ctx, &iam.GetUserInput{
+			UserName: awssdk.String(awsStatus.User),
 		})
 		if err != nil {
-			if aerr, ok := err.(awserr.Error); ok {
-				switch aerr.Code() {
-				case iam.ErrCodeNoSuchEntityException:
-					// Current user does not exist, we unset the user in the status and create a new one
-					logger.Errorf("user %s does not exist, creating a new user", awsStatus.User)
-					awsStatus.User = ""
-					return true, nil
-				default:
-					return true, formatAWSErr(aerr)
-				}
+			var aerr *iamtypes.NoSuchEntityException
+			if errors.As(err, &aerr) {
+				// Current user does not exist, we unset the user in the status and create a new one
+				logger.Errorf("user %s does not exist, creating a new user", awsStatus.User)
+				awsStatus.User = ""
+				return true, nil
 			}
-			logger.WithError(err).Errorf("unknown error getting user: %s", user)
-			return true, fmt.Errorf("unable to read info for username %v: %v", user, err)
+			logger.WithError(err).Errorf("unknown error getting user: %s", awsStatus.User)
+			return true, fmt.Errorf("unable to read info for username %v: %v", awsStatus.User, err)
 		}
 
 		clusterUUID, err := a.loadClusterUUID(logger)
@@ -222,7 +218,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 		// Does the access key in the secret still exist?
 		logger.Debug("NeedsUpdate ListAccessKeys")
-		allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
+		allUserKeys, err := readAWSClient.ListAccessKeys(ctx, &iam.ListAccessKeysInput{UserName: awssdk.String(awsStatus.User)})
 		if err != nil {
 			logger.WithError(err).Error("error listing all access keys for user")
 			return false, err
@@ -242,7 +238,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 			return false, err
 		}
 
-		policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, user.User, readAWSClient, logger)
+		policyEqual, err := a.awsPolicyEqualsDesiredPolicy(ctx, desiredUserPolicy, awsStatus, readAWSClient, logger)
 		if err != nil {
 			return true, err
 		}
@@ -281,7 +277,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 				Region: region,
 			}
 
-			goodEnough, err := ccaws.CheckPermissionsAgainstStatementList(awsClient, awsSpec.StatementEntries, simParams, logger)
+			goodEnough, err := ccaws.CheckPermissionsAgainstStatementList(ctx, awsClient, awsSpec.StatementEntries, simParams, logger)
 			if err != nil {
 				return true, fmt.Errorf("error validating whether current creds are good enough: %v", err)
 			}
@@ -490,7 +486,7 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 				Message:   fmt.Sprintf("%v: %v", msg, err),
 			}
 		}
-		goodEnough, err := ccaws.CheckPermissionsAgainstStatementList(awsClient, awsSpec.StatementEntries, simParams, logger)
+		goodEnough, err := ccaws.CheckPermissionsAgainstStatementList(ctx, awsClient, awsSpec.StatementEntries, simParams, logger)
 		if err != nil {
 			msg := "error validating whether root creds are good enough"
 			logger.WithError(err).Error(msg)
@@ -580,27 +576,22 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 
 	// Check if the user already exists:
-	var userOut *iam.User
-	getUserOut, err := readAWSClient.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
+	var userOut *iamtypes.User
+	getUserOut, err := readAWSClient.GetUser(ctx, &iam.GetUserInput{UserName: awssdk.String(awsStatus.User)})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case iam.ErrCodeNoSuchEntityException:
-				logger.WithField("userName", awsStatus.User).Debug("user does not exist, creating")
-				if rootAWSClient == nil {
-					return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
-				}
-
-				createOut, err := a.createUser(logger, rootAWSClient, awsStatus.User)
-				if err != nil {
-					return err
-				}
-				logger.WithField("userName", awsStatus.User).Info("user created successfully")
-				userOut = createOut.User
-
-			default:
-				return formatAWSErr(aerr)
+		var aerr *iamtypes.NoSuchEntityException
+		if errors.As(err, &aerr) {
+			logger.WithField("userName", awsStatus.User).Debug("user does not exist, creating")
+			if rootAWSClient == nil {
+				return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 			}
+
+			createOut, err := a.createUser(ctx, logger, rootAWSClient, awsStatus.User)
+			if err != nil {
+				return err
+			}
+			logger.WithField("userName", awsStatus.User).Info("user created successfully")
+			userOut = createOut.User
 		} else {
 			return fmt.Errorf("unknown error getting user from AWS: %v", err)
 		}
@@ -620,7 +611,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 		}
 
-		err = a.tagUser(logger, rootAWSClient, awsStatus.User, string(clusterUUID), infra)
+		err = a.tagUser(ctx, logger, rootAWSClient, awsStatus.User, string(clusterUUID), infra)
 		if err != nil {
 			return err
 		}
@@ -632,12 +623,12 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		return err
 	}
 
-	policyEqual, err := a.awsPolicyEqualsDesiredPolicy(desiredUserPolicy, awsSpec, awsStatus, userOut, readAWSClient, logger)
+	policyEqual, err := a.awsPolicyEqualsDesiredPolicy(ctx, desiredUserPolicy, awsStatus, readAWSClient, logger)
 	if !policyEqual {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 		}
-		err = a.setUserPolicy(logger, rootAWSClient, awsStatus.User, awsStatus.Policy, desiredUserPolicy)
+		err = a.setUserPolicy(ctx, rootAWSClient, awsStatus.User, awsStatus.Policy, desiredUserPolicy)
 		if err != nil {
 			return err
 		}
@@ -645,7 +636,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 
 	logger.Debug("sync ListAccessKeys")
-	allUserKeys, err := readAWSClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
+	allUserKeys, err := readAWSClient.ListAccessKeys(ctx, &iam.ListAccessKeysInput{UserName: awssdk.String(awsStatus.User)})
 	if err != nil {
 		logger.WithError(err).Error("error listing all access keys for user")
 		return err
@@ -653,7 +644,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 
 	existingSecret, existingAccessKeyID, _, _ := a.loadExistingSecret(cr)
 
-	var accessKey *iam.AccessKey
+	var accessKey *iamtypes.AccessKey
 	// TODO: also check if the access key ID on the request is still valid in AWS
 	accessKeyExists, err := a.accessKeyExists(logger, allUserKeys, existingAccessKeyID)
 	if err != nil {
@@ -678,12 +669,12 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
 		}
-		err := a.deleteAllAccessKeys(logger, rootAWSClient, awsStatus.User, allUserKeys)
+		err := a.deleteAllAccessKeys(ctx, logger, rootAWSClient, awsStatus.User, allUserKeys)
 		if err != nil {
 			return err
 		}
 
-		accessKey, err = a.createAccessKey(logger, rootAWSClient, awsStatus.User)
+		accessKey, err = a.createAccessKey(ctx, logger, rootAWSClient, awsStatus.User)
 		if err != nil {
 			logger.WithError(err).Error("error creating AWS access key")
 			return err
@@ -705,9 +696,9 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	return nil
 }
 
-func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, awsSpec *minterv1.AWSProviderSpec, awsStatus *minterv1.AWSProviderStatus, awsUser *iam.User, readAWSClient ccaws.Client, logger log.FieldLogger) (bool, error) {
+func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(ctx context.Context, desiredUserPolicy string, awsStatus *minterv1.AWSProviderStatus, readAWSClient ccaws.Client, logger log.FieldLogger) (bool, error) {
 
-	currentUserPolicy, err := a.getCurrentUserPolicy(logger, readAWSClient, awsStatus.User, awsStatus.Policy)
+	currentUserPolicy, err := a.getCurrentUserPolicy(ctx, logger, readAWSClient, awsStatus.User, awsStatus.Policy)
 	if err != nil {
 		return false, err
 	}
@@ -721,7 +712,7 @@ func (a *AWSActuator) awsPolicyEqualsDesiredPolicy(desiredUserPolicy string, aws
 	return true, nil
 }
 
-func userHasExpectedTags(logger log.FieldLogger, user *iam.User, clusterUUID string, infraResource *configv1.Infrastructure) bool {
+func userHasExpectedTags(logger log.FieldLogger, user *iamtypes.User, clusterUUID string, infraResource *configv1.Infrastructure) bool {
 	// Check if the user has the expected tags:
 	if user == nil {
 		return false
@@ -804,60 +795,45 @@ func (a *AWSActuator) Delete(ctx context.Context, cr *minterv1.CredentialsReques
 	if err != nil {
 		return err
 	}
-	_, err = awsClient.DeleteUserPolicy(&iam.DeleteUserPolicyInput{
-		UserName:   aws.String(awsStatus.User),
-		PolicyName: aws.String(awsStatus.Policy),
+	_, err = awsClient.DeleteUserPolicy(ctx, &iam.DeleteUserPolicyInput{
+		UserName:   awssdk.String(awsStatus.User),
+		PolicyName: awssdk.String(awsStatus.Policy),
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case iam.ErrCodeNoSuchEntityException:
-				logger.Warn("user policy does not exist, ignoring error")
-			default:
-				return formatAWSErr(aerr)
-			}
-		} else {
+		var aerr *iamtypes.NoSuchEntityException
+		if !errors.As(err, &aerr) {
 			return fmt.Errorf("unknown error deleting user policy from AWS: %v", err)
 		}
+		logger.Warn("user policy does not exist, ignoring error")
 	}
 	logger.Info("user policy deleted")
 
 	logger.Debug("Delete ListAccessKeys")
-	allUserKeys, err := awsClient.ListAccessKeys(&iam.ListAccessKeysInput{UserName: aws.String(awsStatus.User)})
+	allUserKeys, err := awsClient.ListAccessKeys(ctx, &iam.ListAccessKeysInput{UserName: awssdk.String(awsStatus.User)})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case iam.ErrCodeNoSuchEntityException:
-				logger.Warn("error listing access keys, user does not exist, returning success")
-				return nil
-			default:
-				logger.WithError(err).Error("error listing all access keys for user")
-				return formatAWSErr(aerr)
-			}
+		var aerr *iamtypes.NoSuchEntityException
+		if !errors.As(err, &aerr) {
+			logger.WithError(err).Error("error listing all access keys for user")
+			return err
 		}
-		logger.WithError(err).Error("error listing all access keys for user")
-		return err
+		logger.Warn("error listing access keys, user does not exist, returning success")
+		return nil
 	}
 
-	err = a.deleteAllAccessKeys(logger, awsClient, awsStatus.User, allUserKeys)
+	err = a.deleteAllAccessKeys(ctx, logger, awsClient, awsStatus.User, allUserKeys)
 	if err != nil {
 		return err
 	}
 
-	_, err = awsClient.DeleteUser(&iam.DeleteUserInput{
-		UserName: aws.String(awsStatus.User),
+	_, err = awsClient.DeleteUser(ctx, &iam.DeleteUserInput{
+		UserName: awssdk.String(awsStatus.User),
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case iam.ErrCodeNoSuchEntityException:
-				logger.Warn("user does not exist, returning success")
-			default:
-				return formatAWSErr(aerr)
-			}
-		} else {
+		var aerr *iamtypes.NoSuchEntityException
+		if !errors.As(err, &aerr) {
 			return fmt.Errorf("unknown error deleting user from AWS: %v", err)
 		}
+		logger.Warn("user does not exist, returning success")
 	}
 	logger.Info("user deleted")
 
@@ -874,7 +850,7 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	existingSecret := &corev1.Secret{}
 	err := a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			logger.Debug("secret does not exist")
 		}
 	} else {
@@ -906,18 +882,18 @@ func (a *AWSActuator) loadExistingSecret(cr *minterv1.CredentialsRequest) (*core
 	return existingSecret, existingAccessKeyID, existingSecretAccessKey, existingCredentialsKey
 }
 
-func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client, username, clusterUUID string, infra *configv1.Infrastructure) error {
+func (a *AWSActuator) tagUser(ctx context.Context, logger log.FieldLogger, awsClient ccaws.Client, username, clusterUUID string, infra *configv1.Infrastructure) error {
 	logger.WithField("infraName", infra.Status.InfrastructureName).Info("tagging user with infrastructure name")
-	tags := []*iam.Tag{}
+	tags := []iamtypes.Tag{}
 	if infra.Status.InfrastructureName != "" {
-		tags = append(tags, &iam.Tag{
-			Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", infra.Status.InfrastructureName)),
-			Value: aws.String("owned"),
+		tags = append(tags, iamtypes.Tag{
+			Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", infra.Status.InfrastructureName)),
+			Value: awssdk.String("owned"),
 		})
 	} else {
-		tags = append(tags, &iam.Tag{
-			Key:   aws.String(openshiftClusterIDKey),
-			Value: aws.String(clusterUUID),
+		tags = append(tags, iamtypes.Tag{
+			Key:   awssdk.String(openshiftClusterIDKey),
+			Value: awssdk.String(clusterUUID),
 		})
 	}
 	// appending the tags present in the Infrastructure CR
@@ -925,15 +901,15 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 		logger.WithField("userTags", infra.Status.PlatformStatus.AWS.ResourceTags).
 			Info("tagging the user with the tags present in the infrastructure object")
 		for _, userTag := range infra.Status.PlatformStatus.AWS.ResourceTags {
-			tags = append(tags, &iam.Tag{
-				Key:   aws.String(userTag.Key),
-				Value: aws.String(userTag.Value),
+			tags = append(tags, iamtypes.Tag{
+				Key:   awssdk.String(userTag.Key),
+				Value: awssdk.String(userTag.Value),
 			})
 		}
 	}
 
-	_, err := awsClient.TagUser(&iam.TagUserInput{
-		UserName: aws.String(username),
+	_, err := awsClient.TagUser(ctx, &iam.TagUserInput{
+		UserName: awssdk.String(username),
 		Tags:     tags,
 	})
 	if err != nil {
@@ -945,7 +921,7 @@ func (a *AWSActuator) tagUser(logger log.FieldLogger, awsClient minteraws.Client
 
 // buildRootAWSClient will return an AWS client using the "root" AWS creds which are expected to
 // live in kube-system/aws-creds.
-func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
+func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (ccaws.Client, error) {
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName))
 
 	logger.Debug("loading AWS credentials from secret")
@@ -967,7 +943,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (minte
 //
 // If these are not available but root creds are, we will use the root creds instead.
 // This allows us to create the read creds initially.
-func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minteraws.Client, error) {
+func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (ccaws.Client, error) {
 	logger := a.getLogger(cr).WithField("secret", fmt.Sprintf("%s/%s", roAWSCredsSecretNamespace, roAWSCredsSecret))
 	logger.Debug("loading AWS credentials from secret")
 
@@ -978,7 +954,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	// cluster, we need to load different secrets for each cluster.
 	accessKeyID, secretAccessKey, err = utils.LoadCredsFromSecret(a.Client, roAWSCredsSecretNamespace, roAWSCredsSecret)
 	if err != nil {
-		if errors.IsNotFound(err) {
+		if k8serrors.IsNotFound(err) {
 			logger.Warn("read-only creds not found, using root creds client")
 			return a.buildRootAWSClient(cr)
 		}
@@ -1000,17 +976,12 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (minte
 	if err != nil {
 		return nil, err
 	}
-	_, err = client.GetUser(&iam.GetUserInput{UserName: aws.String(awsStatus.User)})
-	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case "InvalidClientTokenId":
-				logger.Warn("InvalidClientTokenId for read-only AWS account, likely a propagation delay, falling back to root AWS client")
-				return a.buildRootAWSClient(cr)
-			}
-			// Any other error we just let following code sort out.
-		}
+	_, err = client.GetUser(context.Background(), &iam.GetUserInput{UserName: awssdk.String(awsStatus.User)})
+	if err != nil && ccaws.ErrCodeEquals(err, "InvalidClientTokenId") {
+		logger.Warn("InvalidClientTokenId for read-only AWS account, likely a propagation delay, falling back to root AWS client")
+		return a.buildRootAWSClient(cr)
 	}
+	// Any other error we just let following code sort out.
 	return client, nil
 }
 
@@ -1130,7 +1101,7 @@ func (a *AWSActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1
 		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
+			Message:   "cannot proceed without cloud cred secret annotation",
 		}
 	}
 
@@ -1158,24 +1129,18 @@ func addGetUserStatement(policyDoc *PolicyDocument, userARN string) {
 	})
 }
 
-func (a *AWSActuator) getCurrentUserPolicy(logger log.FieldLogger, awsReadClient minteraws.Client, userName, policyName string) (string, error) {
-	cupOut, err := awsReadClient.GetUserPolicy(&iam.GetUserPolicyInput{
-		UserName:   aws.String(userName),
-		PolicyName: aws.String(policyName),
+func (a *AWSActuator) getCurrentUserPolicy(ctx context.Context, logger log.FieldLogger, awsReadClient ccaws.Client, userName, policyName string) (string, error) {
+	cupOut, err := awsReadClient.GetUserPolicy(ctx, &iam.GetUserPolicyInput{
+		UserName:   awssdk.String(userName),
+		PolicyName: awssdk.String(policyName),
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case iam.ErrCodeNoSuchEntityException:
-				logger.Warn("policy does not exist, creating")
-				// Policy doesn't exist, it needs to be created so we will just return empty string.
-				// This will not match the desired policy triggering an update.
-				return "", nil
-			default:
-				err = formatAWSErr(aerr)
-				logger.WithError(err).Errorf("AWS error getting user policy")
-				return "", err
-			}
+		var aerr *iamtypes.NoSuchEntityException
+		if errors.As(err, &aerr) {
+			logger.Warn("policy does not exist, creating")
+			// Policy doesn't exist, it needs to be created so we will just return empty string.
+			// This will not match the desired policy triggering an update.
+			return "", nil
 		} else {
 			logger.WithError(err).Error("error getting current user policy")
 			return "", err
@@ -1189,18 +1154,15 @@ func (a *AWSActuator) getCurrentUserPolicy(logger log.FieldLogger, awsReadClient
 	return currentUserPolicy, err
 }
 
-func (a *AWSActuator) setUserPolicy(logger log.FieldLogger, awsClient minteraws.Client, userName, policyName, userPolicy string) error {
+func (a *AWSActuator) setUserPolicy(ctx context.Context, awsClient ccaws.Client, userName, policyName, userPolicy string) error {
 
 	// This call appears to be idempotent:
-	_, err := awsClient.PutUserPolicy(&iam.PutUserPolicyInput{
-		UserName:       aws.String(userName),
-		PolicyDocument: aws.String(userPolicy),
-		PolicyName:     aws.String(policyName),
+	_, err := awsClient.PutUserPolicy(ctx, &iam.PutUserPolicyInput{
+		UserName:       awssdk.String(userName),
+		PolicyDocument: awssdk.String(userPolicy),
+		PolicyName:     awssdk.String(policyName),
 	})
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			return formatAWSErr(aerr)
-		}
 		return fmt.Errorf("unknown error setting user policy in AWS: %v", err)
 	}
 
@@ -1221,14 +1183,14 @@ func (a *AWSActuator) accessKeyExists(logger log.FieldLogger, allUserKeys *iam.L
 	return false, nil
 }
 
-func (a *AWSActuator) deleteAllAccessKeys(logger log.FieldLogger, awsClient minteraws.Client, username string, allUserKeys *iam.ListAccessKeysOutput) error {
+func (a *AWSActuator) deleteAllAccessKeys(ctx context.Context, logger log.FieldLogger, awsClient ccaws.Client, username string, allUserKeys *iam.ListAccessKeysOutput) error {
 	logger.Info("deleting all AWS access keys")
 	for _, kmd := range allUserKeys.AccessKeyMetadata {
 		akLog := logger.WithFields(log.Fields{
 			"accessKeyID": *kmd.AccessKeyId,
 		})
 		akLog.Info("deleting access key")
-		_, err := awsClient.DeleteAccessKey(&iam.DeleteAccessKeyInput{AccessKeyId: kmd.AccessKeyId, UserName: aws.String(username)})
+		_, err := awsClient.DeleteAccessKey(ctx, &iam.DeleteAccessKeyInput{AccessKeyId: kmd.AccessKeyId, UserName: awssdk.String(username)})
 		if err != nil {
 			akLog.WithError(err).Error("error deleting access key")
 			return err
@@ -1238,10 +1200,10 @@ func (a *AWSActuator) deleteAllAccessKeys(logger log.FieldLogger, awsClient mint
 	return nil
 }
 
-func (a *AWSActuator) createAccessKey(logger log.FieldLogger, awsClient minteraws.Client, username string) (*iam.AccessKey, error) {
+func (a *AWSActuator) createAccessKey(ctx context.Context, logger log.FieldLogger, awsClient ccaws.Client, username string) (*iamtypes.AccessKey, error) {
 	// Check if we need to generate an access key:
 	// Create secret and access key for user:
-	accessKeyResult, err := awsClient.CreateAccessKey(&iam.CreateAccessKeyInput{
+	accessKeyResult, err := awsClient.CreateAccessKey(ctx, &iam.CreateAccessKeyInput{
 		UserName: &username,
 	})
 	if err != nil {
@@ -1251,7 +1213,7 @@ func (a *AWSActuator) createAccessKey(logger log.FieldLogger, awsClient minteraw
 	return accessKeyResult.AccessKey, err
 }
 
-func userHasTag(user *iam.User, key, val string) bool {
+func userHasTag(user *iamtypes.User, key, val string) bool {
 	for _, t := range user.Tags {
 		if *t.Key == key && *t.Value == val {
 			return true
@@ -1260,37 +1222,31 @@ func userHasTag(user *iam.User, key, val string) bool {
 	return false
 }
 
-func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Client, username string) (*iam.CreateUserOutput, error) {
+func (a *AWSActuator) createUser(ctx context.Context, logger log.FieldLogger, awsClient ccaws.Client, username string) (*iam.CreateUserOutput, error) {
 	userInput := &iam.GetUserInput{}
-	currentUser, err := awsClient.GetUser(userInput)
+	currentUser, err := awsClient.GetUser(ctx, userInput)
 
 	var input *iam.CreateUserInput
 	if currentUser != nil && currentUser.User.PermissionsBoundary != nil {
 		input = &iam.CreateUserInput{
-			UserName:            aws.String(username),
+			UserName:            awssdk.String(username),
 			PermissionsBoundary: currentUser.User.PermissionsBoundary.PermissionsBoundaryArn,
 		}
 	} else {
 		input = &iam.CreateUserInput{
-			UserName: aws.String(username),
+			UserName: awssdk.String(username),
 		}
 	}
 
 	uLog := logger.WithField("userName", username)
 	uLog.Info("creating user")
-	userOut, err := awsClient.CreateUser(input)
+	userOut, err := awsClient.CreateUser(ctx, input)
 
 	if err != nil {
-		if aerr, ok := err.(awserr.Error); ok {
-			switch aerr.Code() {
-			case iam.ErrCodeEntityAlreadyExistsException:
-				uLog.Warn("user already exist")
-				return nil, nil
-			default:
-				err = formatAWSErr(aerr)
-				uLog.WithError(err).Errorf("AWS error creating user")
-				return nil, err
-			}
+		var aerr *iamtypes.EntityAlreadyExistsException
+		if errors.As(err, &aerr) {
+			uLog.Warn("user already exist")
+			return nil, nil
 		}
 		uLog.WithError(err).Errorf("unknown error creating user in AWS")
 		return nil, fmt.Errorf("unknown error creating user in AWS: %v", err)
@@ -1299,23 +1255,6 @@ func (a *AWSActuator) createUser(logger log.FieldLogger, awsClient minteraws.Cli
 	}
 
 	return userOut, nil
-}
-
-func formatAWSErr(aerr awserr.Error) error {
-	switch aerr.Code() {
-	case iam.ErrCodeLimitExceededException:
-		log.Error(iam.ErrCodeLimitExceededException, aerr.Error())
-		return fmt.Errorf("AWS Error: %s - %s", iam.ErrCodeLimitExceededException, aerr.Error())
-	case iam.ErrCodeEntityAlreadyExistsException:
-		return fmt.Errorf("AWS Error: %s - %s", iam.ErrCodeEntityAlreadyExistsException, aerr.Error())
-	case iam.ErrCodeNoSuchEntityException:
-		return fmt.Errorf("AWS Error: %s - %s", iam.ErrCodeNoSuchEntityException, aerr.Error())
-	case iam.ErrCodeServiceFailureException:
-		return fmt.Errorf("AWS Error: %s - %s", iam.ErrCodeServiceFailureException, aerr.Error())
-	default:
-		log.Error(aerr.Error())
-		return fmt.Errorf("AWS Error: %v", aerr)
-	}
 }
 
 // generateUserName generates a unique user name for AWS and will truncate the credential name

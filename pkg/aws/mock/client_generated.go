@@ -5,11 +5,12 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
-	cloudfront "github.com/aws/aws-sdk-go/service/cloudfront"
-	iam "github.com/aws/aws-sdk-go/service/iam"
-	s3 "github.com/aws/aws-sdk-go/service/s3"
+	cloudfront "github.com/aws/aws-sdk-go-v2/service/cloudfront"
+	iam "github.com/aws/aws-sdk-go-v2/service/iam"
+	s3 "github.com/aws/aws-sdk-go-v2/service/s3"
 	gomock "github.com/golang/mock/gomock"
 )
 
@@ -37,690 +38,901 @@ func (m *MockClient) EXPECT() *MockClientMockRecorder {
 }
 
 // CreateAccessKey mocks base method.
-func (m *MockClient) CreateAccessKey(arg0 *iam.CreateAccessKeyInput) (*iam.CreateAccessKeyOutput, error) {
+func (m *MockClient) CreateAccessKey(arg0 context.Context, arg1 *iam.CreateAccessKeyInput, arg2 ...func(*iam.Options)) (*iam.CreateAccessKeyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateAccessKey", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateAccessKey", varargs...)
 	ret0, _ := ret[0].(*iam.CreateAccessKeyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateAccessKey indicates an expected call of CreateAccessKey.
-func (mr *MockClientMockRecorder) CreateAccessKey(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) CreateAccessKey(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccessKey", reflect.TypeOf((*MockClient)(nil).CreateAccessKey), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateAccessKey", reflect.TypeOf((*MockClient)(nil).CreateAccessKey), varargs...)
 }
 
 // CreateBucket mocks base method.
-func (m *MockClient) CreateBucket(arg0 *s3.CreateBucketInput) (*s3.CreateBucketOutput, error) {
+func (m *MockClient) CreateBucket(arg0 context.Context, arg1 *s3.CreateBucketInput, arg2 ...func(*s3.Options)) (*s3.CreateBucketOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateBucket", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateBucket", varargs...)
 	ret0, _ := ret[0].(*s3.CreateBucketOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateBucket indicates an expected call of CreateBucket.
-func (mr *MockClientMockRecorder) CreateBucket(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) CreateBucket(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), arg0)
-}
-
-// CreateCloudFrontDistributionWithTags mocks base method.
-func (m *MockClient) CreateCloudFrontDistributionWithTags(input *cloudfront.CreateDistributionWithTagsInput) (*cloudfront.CreateDistributionWithTagsOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateCloudFrontDistributionWithTags", input)
-	ret0, _ := ret[0].(*cloudfront.CreateDistributionWithTagsOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// CreateCloudFrontDistributionWithTags indicates an expected call of CreateCloudFrontDistributionWithTags.
-func (mr *MockClientMockRecorder) CreateCloudFrontDistributionWithTags(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudFrontDistributionWithTags", reflect.TypeOf((*MockClient)(nil).CreateCloudFrontDistributionWithTags), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateBucket", reflect.TypeOf((*MockClient)(nil).CreateBucket), varargs...)
 }
 
 // CreateCloudFrontOriginAccessIdentity mocks base method.
-func (m *MockClient) CreateCloudFrontOriginAccessIdentity(input *cloudfront.CreateCloudFrontOriginAccessIdentityInput) (*cloudfront.CreateCloudFrontOriginAccessIdentityOutput, error) {
+func (m *MockClient) CreateCloudFrontOriginAccessIdentity(arg0 context.Context, arg1 *cloudfront.CreateCloudFrontOriginAccessIdentityInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.CreateCloudFrontOriginAccessIdentityOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateCloudFrontOriginAccessIdentity", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateCloudFrontOriginAccessIdentity", varargs...)
 	ret0, _ := ret[0].(*cloudfront.CreateCloudFrontOriginAccessIdentityOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateCloudFrontOriginAccessIdentity indicates an expected call of CreateCloudFrontOriginAccessIdentity.
-func (mr *MockClientMockRecorder) CreateCloudFrontOriginAccessIdentity(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) CreateCloudFrontOriginAccessIdentity(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).CreateCloudFrontOriginAccessIdentity), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).CreateCloudFrontOriginAccessIdentity), varargs...)
+}
+
+// CreateDistributionWithTags mocks base method.
+func (m *MockClient) CreateDistributionWithTags(arg0 context.Context, arg1 *cloudfront.CreateDistributionWithTagsInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.CreateDistributionWithTagsOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateDistributionWithTags", varargs...)
+	ret0, _ := ret[0].(*cloudfront.CreateDistributionWithTagsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CreateDistributionWithTags indicates an expected call of CreateDistributionWithTags.
+func (mr *MockClientMockRecorder) CreateDistributionWithTags(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateDistributionWithTags", reflect.TypeOf((*MockClient)(nil).CreateDistributionWithTags), varargs...)
 }
 
 // CreateOpenIDConnectProvider mocks base method.
-func (m *MockClient) CreateOpenIDConnectProvider(arg0 *iam.CreateOpenIDConnectProviderInput) (*iam.CreateOpenIDConnectProviderOutput, error) {
+func (m *MockClient) CreateOpenIDConnectProvider(arg0 context.Context, arg1 *iam.CreateOpenIDConnectProviderInput, arg2 ...func(*iam.Options)) (*iam.CreateOpenIDConnectProviderOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateOpenIDConnectProvider", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateOpenIDConnectProvider", varargs...)
 	ret0, _ := ret[0].(*iam.CreateOpenIDConnectProviderOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateOpenIDConnectProvider indicates an expected call of CreateOpenIDConnectProvider.
-func (mr *MockClientMockRecorder) CreateOpenIDConnectProvider(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) CreateOpenIDConnectProvider(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).CreateOpenIDConnectProvider), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).CreateOpenIDConnectProvider), varargs...)
 }
 
 // CreateRole mocks base method.
-func (m *MockClient) CreateRole(arg0 *iam.CreateRoleInput) (*iam.CreateRoleOutput, error) {
+func (m *MockClient) CreateRole(arg0 context.Context, arg1 *iam.CreateRoleInput, arg2 ...func(*iam.Options)) (*iam.CreateRoleOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateRole", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateRole", varargs...)
 	ret0, _ := ret[0].(*iam.CreateRoleOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateRole indicates an expected call of CreateRole.
-func (mr *MockClientMockRecorder) CreateRole(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) CreateRole(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRole", reflect.TypeOf((*MockClient)(nil).CreateRole), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRole", reflect.TypeOf((*MockClient)(nil).CreateRole), varargs...)
 }
 
 // CreateUser mocks base method.
-func (m *MockClient) CreateUser(arg0 *iam.CreateUserInput) (*iam.CreateUserOutput, error) {
+func (m *MockClient) CreateUser(arg0 context.Context, arg1 *iam.CreateUserInput, arg2 ...func(*iam.Options)) (*iam.CreateUserOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateUser", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "CreateUser", varargs...)
 	ret0, _ := ret[0].(*iam.CreateUserOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateUser indicates an expected call of CreateUser.
-func (mr *MockClientMockRecorder) CreateUser(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) CreateUser(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockClient)(nil).CreateUser), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateUser", reflect.TypeOf((*MockClient)(nil).CreateUser), varargs...)
 }
 
 // DeleteAccessKey mocks base method.
-func (m *MockClient) DeleteAccessKey(arg0 *iam.DeleteAccessKeyInput) (*iam.DeleteAccessKeyOutput, error) {
+func (m *MockClient) DeleteAccessKey(arg0 context.Context, arg1 *iam.DeleteAccessKeyInput, arg2 ...func(*iam.Options)) (*iam.DeleteAccessKeyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteAccessKey", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteAccessKey", varargs...)
 	ret0, _ := ret[0].(*iam.DeleteAccessKeyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteAccessKey indicates an expected call of DeleteAccessKey.
-func (mr *MockClientMockRecorder) DeleteAccessKey(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteAccessKey(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAccessKey", reflect.TypeOf((*MockClient)(nil).DeleteAccessKey), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAccessKey", reflect.TypeOf((*MockClient)(nil).DeleteAccessKey), varargs...)
 }
 
 // DeleteBucket mocks base method.
-func (m *MockClient) DeleteBucket(input *s3.DeleteBucketInput) (*s3.DeleteBucketOutput, error) {
+func (m *MockClient) DeleteBucket(arg0 context.Context, arg1 *s3.DeleteBucketInput, arg2 ...func(*s3.Options)) (*s3.DeleteBucketOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteBucket", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteBucket", varargs...)
 	ret0, _ := ret[0].(*s3.DeleteBucketOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteBucket indicates an expected call of DeleteBucket.
-func (mr *MockClientMockRecorder) DeleteBucket(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteBucket(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBucket", reflect.TypeOf((*MockClient)(nil).DeleteBucket), input)
-}
-
-// DeleteCloudFrontDistribution mocks base method.
-func (m *MockClient) DeleteCloudFrontDistribution(input *cloudfront.DeleteDistributionInput) (*cloudfront.DeleteDistributionOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteCloudFrontDistribution", input)
-	ret0, _ := ret[0].(*cloudfront.DeleteDistributionOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// DeleteCloudFrontDistribution indicates an expected call of DeleteCloudFrontDistribution.
-func (mr *MockClientMockRecorder) DeleteCloudFrontDistribution(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCloudFrontDistribution", reflect.TypeOf((*MockClient)(nil).DeleteCloudFrontDistribution), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteBucket", reflect.TypeOf((*MockClient)(nil).DeleteBucket), varargs...)
 }
 
 // DeleteCloudFrontOriginAccessIdentity mocks base method.
-func (m *MockClient) DeleteCloudFrontOriginAccessIdentity(input *cloudfront.DeleteCloudFrontOriginAccessIdentityInput) (*cloudfront.DeleteCloudFrontOriginAccessIdentityOutput, error) {
+func (m *MockClient) DeleteCloudFrontOriginAccessIdentity(arg0 context.Context, arg1 *cloudfront.DeleteCloudFrontOriginAccessIdentityInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.DeleteCloudFrontOriginAccessIdentityOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteCloudFrontOriginAccessIdentity", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteCloudFrontOriginAccessIdentity", varargs...)
 	ret0, _ := ret[0].(*cloudfront.DeleteCloudFrontOriginAccessIdentityOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteCloudFrontOriginAccessIdentity indicates an expected call of DeleteCloudFrontOriginAccessIdentity.
-func (mr *MockClientMockRecorder) DeleteCloudFrontOriginAccessIdentity(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteCloudFrontOriginAccessIdentity(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).DeleteCloudFrontOriginAccessIdentity), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).DeleteCloudFrontOriginAccessIdentity), varargs...)
+}
+
+// DeleteDistribution mocks base method.
+func (m *MockClient) DeleteDistribution(arg0 context.Context, arg1 *cloudfront.DeleteDistributionInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.DeleteDistributionOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteDistribution", varargs...)
+	ret0, _ := ret[0].(*cloudfront.DeleteDistributionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteDistribution indicates an expected call of DeleteDistribution.
+func (mr *MockClientMockRecorder) DeleteDistribution(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteDistribution", reflect.TypeOf((*MockClient)(nil).DeleteDistribution), varargs...)
 }
 
 // DeleteObject mocks base method.
-func (m *MockClient) DeleteObject(input *s3.DeleteObjectInput) (*s3.DeleteObjectOutput, error) {
+func (m *MockClient) DeleteObject(arg0 context.Context, arg1 *s3.DeleteObjectInput, arg2 ...func(*s3.Options)) (*s3.DeleteObjectOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteObject", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteObject", varargs...)
 	ret0, _ := ret[0].(*s3.DeleteObjectOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteObject indicates an expected call of DeleteObject.
-func (mr *MockClientMockRecorder) DeleteObject(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteObject(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteObject", reflect.TypeOf((*MockClient)(nil).DeleteObject), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteObject", reflect.TypeOf((*MockClient)(nil).DeleteObject), varargs...)
 }
 
 // DeleteOpenIDConnectProvider mocks base method.
-func (m *MockClient) DeleteOpenIDConnectProvider(input *iam.DeleteOpenIDConnectProviderInput) (*iam.DeleteOpenIDConnectProviderOutput, error) {
+func (m *MockClient) DeleteOpenIDConnectProvider(arg0 context.Context, arg1 *iam.DeleteOpenIDConnectProviderInput, arg2 ...func(*iam.Options)) (*iam.DeleteOpenIDConnectProviderOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteOpenIDConnectProvider", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteOpenIDConnectProvider", varargs...)
 	ret0, _ := ret[0].(*iam.DeleteOpenIDConnectProviderOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteOpenIDConnectProvider indicates an expected call of DeleteOpenIDConnectProvider.
-func (mr *MockClientMockRecorder) DeleteOpenIDConnectProvider(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteOpenIDConnectProvider(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).DeleteOpenIDConnectProvider), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).DeleteOpenIDConnectProvider), varargs...)
 }
 
 // DeleteRole mocks base method.
-func (m *MockClient) DeleteRole(input *iam.DeleteRoleInput) (*iam.DeleteRoleOutput, error) {
+func (m *MockClient) DeleteRole(arg0 context.Context, arg1 *iam.DeleteRoleInput, arg2 ...func(*iam.Options)) (*iam.DeleteRoleOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteRole", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteRole", varargs...)
 	ret0, _ := ret[0].(*iam.DeleteRoleOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteRole indicates an expected call of DeleteRole.
-func (mr *MockClientMockRecorder) DeleteRole(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteRole(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRole", reflect.TypeOf((*MockClient)(nil).DeleteRole), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRole", reflect.TypeOf((*MockClient)(nil).DeleteRole), varargs...)
 }
 
 // DeleteRolePolicy mocks base method.
-func (m *MockClient) DeleteRolePolicy(input *iam.DeleteRolePolicyInput) (*iam.DeleteRolePolicyOutput, error) {
+func (m *MockClient) DeleteRolePolicy(arg0 context.Context, arg1 *iam.DeleteRolePolicyInput, arg2 ...func(*iam.Options)) (*iam.DeleteRolePolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteRolePolicy", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteRolePolicy", varargs...)
 	ret0, _ := ret[0].(*iam.DeleteRolePolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteRolePolicy indicates an expected call of DeleteRolePolicy.
-func (mr *MockClientMockRecorder) DeleteRolePolicy(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteRolePolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolePolicy", reflect.TypeOf((*MockClient)(nil).DeleteRolePolicy), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRolePolicy", reflect.TypeOf((*MockClient)(nil).DeleteRolePolicy), varargs...)
 }
 
 // DeleteUser mocks base method.
-func (m *MockClient) DeleteUser(arg0 *iam.DeleteUserInput) (*iam.DeleteUserOutput, error) {
+func (m *MockClient) DeleteUser(arg0 context.Context, arg1 *iam.DeleteUserInput, arg2 ...func(*iam.Options)) (*iam.DeleteUserOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUser", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteUser", varargs...)
 	ret0, _ := ret[0].(*iam.DeleteUserOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteUser indicates an expected call of DeleteUser.
-func (mr *MockClientMockRecorder) DeleteUser(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteUser(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUser", reflect.TypeOf((*MockClient)(nil).DeleteUser), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUser", reflect.TypeOf((*MockClient)(nil).DeleteUser), varargs...)
 }
 
 // DeleteUserPolicy mocks base method.
-func (m *MockClient) DeleteUserPolicy(arg0 *iam.DeleteUserPolicyInput) (*iam.DeleteUserPolicyOutput, error) {
+func (m *MockClient) DeleteUserPolicy(arg0 context.Context, arg1 *iam.DeleteUserPolicyInput, arg2 ...func(*iam.Options)) (*iam.DeleteUserPolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteUserPolicy", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "DeleteUserPolicy", varargs...)
 	ret0, _ := ret[0].(*iam.DeleteUserPolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // DeleteUserPolicy indicates an expected call of DeleteUserPolicy.
-func (mr *MockClientMockRecorder) DeleteUserPolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) DeleteUserPolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserPolicy", reflect.TypeOf((*MockClient)(nil).DeleteUserPolicy), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteUserPolicy", reflect.TypeOf((*MockClient)(nil).DeleteUserPolicy), varargs...)
 }
 
 // GetBucketTagging mocks base method.
-func (m *MockClient) GetBucketTagging(input *s3.GetBucketTaggingInput) (*s3.GetBucketTaggingOutput, error) {
+func (m *MockClient) GetBucketTagging(arg0 context.Context, arg1 *s3.GetBucketTaggingInput, arg2 ...func(*s3.Options)) (*s3.GetBucketTaggingOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetBucketTagging", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetBucketTagging", varargs...)
 	ret0, _ := ret[0].(*s3.GetBucketTaggingOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetBucketTagging indicates an expected call of GetBucketTagging.
-func (mr *MockClientMockRecorder) GetBucketTagging(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetBucketTagging(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBucketTagging", reflect.TypeOf((*MockClient)(nil).GetBucketTagging), input)
-}
-
-// GetCloudFrontDistribution mocks base method.
-func (m *MockClient) GetCloudFrontDistribution(input *cloudfront.GetDistributionInput) (*cloudfront.GetDistributionOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCloudFrontDistribution", input)
-	ret0, _ := ret[0].(*cloudfront.GetDistributionOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetCloudFrontDistribution indicates an expected call of GetCloudFrontDistribution.
-func (mr *MockClientMockRecorder) GetCloudFrontDistribution(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudFrontDistribution", reflect.TypeOf((*MockClient)(nil).GetCloudFrontDistribution), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetBucketTagging", reflect.TypeOf((*MockClient)(nil).GetBucketTagging), varargs...)
 }
 
 // GetCloudFrontOriginAccessIdentity mocks base method.
-func (m *MockClient) GetCloudFrontOriginAccessIdentity(input *cloudfront.GetCloudFrontOriginAccessIdentityInput) (*cloudfront.GetCloudFrontOriginAccessIdentityOutput, error) {
+func (m *MockClient) GetCloudFrontOriginAccessIdentity(arg0 context.Context, arg1 *cloudfront.GetCloudFrontOriginAccessIdentityInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.GetCloudFrontOriginAccessIdentityOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetCloudFrontOriginAccessIdentity", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetCloudFrontOriginAccessIdentity", varargs...)
 	ret0, _ := ret[0].(*cloudfront.GetCloudFrontOriginAccessIdentityOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetCloudFrontOriginAccessIdentity indicates an expected call of GetCloudFrontOriginAccessIdentity.
-func (mr *MockClientMockRecorder) GetCloudFrontOriginAccessIdentity(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetCloudFrontOriginAccessIdentity(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).GetCloudFrontOriginAccessIdentity), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCloudFrontOriginAccessIdentity", reflect.TypeOf((*MockClient)(nil).GetCloudFrontOriginAccessIdentity), varargs...)
+}
+
+// GetDistribution mocks base method.
+func (m *MockClient) GetDistribution(arg0 context.Context, arg1 *cloudfront.GetDistributionInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.GetDistributionOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetDistribution", varargs...)
+	ret0, _ := ret[0].(*cloudfront.GetDistributionOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetDistribution indicates an expected call of GetDistribution.
+func (mr *MockClientMockRecorder) GetDistribution(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetDistribution", reflect.TypeOf((*MockClient)(nil).GetDistribution), varargs...)
 }
 
 // GetObjectTagging mocks base method.
-func (m *MockClient) GetObjectTagging(input *s3.GetObjectTaggingInput) (*s3.GetObjectTaggingOutput, error) {
+func (m *MockClient) GetObjectTagging(arg0 context.Context, arg1 *s3.GetObjectTaggingInput, arg2 ...func(*s3.Options)) (*s3.GetObjectTaggingOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetObjectTagging", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetObjectTagging", varargs...)
 	ret0, _ := ret[0].(*s3.GetObjectTaggingOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetObjectTagging indicates an expected call of GetObjectTagging.
-func (mr *MockClientMockRecorder) GetObjectTagging(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetObjectTagging(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetObjectTagging", reflect.TypeOf((*MockClient)(nil).GetObjectTagging), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetObjectTagging", reflect.TypeOf((*MockClient)(nil).GetObjectTagging), varargs...)
 }
 
 // GetOpenIDConnectProvider mocks base method.
-func (m *MockClient) GetOpenIDConnectProvider(input *iam.GetOpenIDConnectProviderInput) (*iam.GetOpenIDConnectProviderOutput, error) {
+func (m *MockClient) GetOpenIDConnectProvider(arg0 context.Context, arg1 *iam.GetOpenIDConnectProviderInput, arg2 ...func(*iam.Options)) (*iam.GetOpenIDConnectProviderOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetOpenIDConnectProvider", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetOpenIDConnectProvider", varargs...)
 	ret0, _ := ret[0].(*iam.GetOpenIDConnectProviderOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetOpenIDConnectProvider indicates an expected call of GetOpenIDConnectProvider.
-func (mr *MockClientMockRecorder) GetOpenIDConnectProvider(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetOpenIDConnectProvider(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).GetOpenIDConnectProvider), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).GetOpenIDConnectProvider), varargs...)
 }
 
 // GetRole mocks base method.
-func (m *MockClient) GetRole(input *iam.GetRoleInput) (*iam.GetRoleOutput, error) {
+func (m *MockClient) GetRole(arg0 context.Context, arg1 *iam.GetRoleInput, arg2 ...func(*iam.Options)) (*iam.GetRoleOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetRole", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetRole", varargs...)
 	ret0, _ := ret[0].(*iam.GetRoleOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetRole indicates an expected call of GetRole.
-func (mr *MockClientMockRecorder) GetRole(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetRole(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRole", reflect.TypeOf((*MockClient)(nil).GetRole), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRole", reflect.TypeOf((*MockClient)(nil).GetRole), varargs...)
 }
 
 // GetUser mocks base method.
-func (m *MockClient) GetUser(arg0 *iam.GetUserInput) (*iam.GetUserOutput, error) {
+func (m *MockClient) GetUser(arg0 context.Context, arg1 *iam.GetUserInput, arg2 ...func(*iam.Options)) (*iam.GetUserOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUser", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetUser", varargs...)
 	ret0, _ := ret[0].(*iam.GetUserOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetUser indicates an expected call of GetUser.
-func (mr *MockClientMockRecorder) GetUser(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetUser(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockClient)(nil).GetUser), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUser", reflect.TypeOf((*MockClient)(nil).GetUser), varargs...)
 }
 
 // GetUserPolicy mocks base method.
-func (m *MockClient) GetUserPolicy(arg0 *iam.GetUserPolicyInput) (*iam.GetUserPolicyOutput, error) {
+func (m *MockClient) GetUserPolicy(arg0 context.Context, arg1 *iam.GetUserPolicyInput, arg2 ...func(*iam.Options)) (*iam.GetUserPolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetUserPolicy", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "GetUserPolicy", varargs...)
 	ret0, _ := ret[0].(*iam.GetUserPolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetUserPolicy indicates an expected call of GetUserPolicy.
-func (mr *MockClientMockRecorder) GetUserPolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) GetUserPolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserPolicy", reflect.TypeOf((*MockClient)(nil).GetUserPolicy), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUserPolicy", reflect.TypeOf((*MockClient)(nil).GetUserPolicy), varargs...)
 }
 
 // ListAccessKeys mocks base method.
-func (m *MockClient) ListAccessKeys(arg0 *iam.ListAccessKeysInput) (*iam.ListAccessKeysOutput, error) {
+func (m *MockClient) ListAccessKeys(arg0 context.Context, arg1 *iam.ListAccessKeysInput, arg2 ...func(*iam.Options)) (*iam.ListAccessKeysOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListAccessKeys", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListAccessKeys", varargs...)
 	ret0, _ := ret[0].(*iam.ListAccessKeysOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListAccessKeys indicates an expected call of ListAccessKeys.
-func (mr *MockClientMockRecorder) ListAccessKeys(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListAccessKeys(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAccessKeys", reflect.TypeOf((*MockClient)(nil).ListAccessKeys), arg0)
-}
-
-// ListCloudFrontDistributions mocks base method.
-func (m *MockClient) ListCloudFrontDistributions(input *cloudfront.ListDistributionsInput) (*cloudfront.ListDistributionsOutput, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListCloudFrontDistributions", input)
-	ret0, _ := ret[0].(*cloudfront.ListDistributionsOutput)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ListCloudFrontDistributions indicates an expected call of ListCloudFrontDistributions.
-func (mr *MockClientMockRecorder) ListCloudFrontDistributions(input interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudFrontDistributions", reflect.TypeOf((*MockClient)(nil).ListCloudFrontDistributions), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListAccessKeys", reflect.TypeOf((*MockClient)(nil).ListAccessKeys), varargs...)
 }
 
 // ListCloudFrontOriginAccessIdentities mocks base method.
-func (m *MockClient) ListCloudFrontOriginAccessIdentities(input *cloudfront.ListCloudFrontOriginAccessIdentitiesInput) (*cloudfront.ListCloudFrontOriginAccessIdentitiesOutput, error) {
+func (m *MockClient) ListCloudFrontOriginAccessIdentities(arg0 context.Context, arg1 *cloudfront.ListCloudFrontOriginAccessIdentitiesInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.ListCloudFrontOriginAccessIdentitiesOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListCloudFrontOriginAccessIdentities", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListCloudFrontOriginAccessIdentities", varargs...)
 	ret0, _ := ret[0].(*cloudfront.ListCloudFrontOriginAccessIdentitiesOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListCloudFrontOriginAccessIdentities indicates an expected call of ListCloudFrontOriginAccessIdentities.
-func (mr *MockClientMockRecorder) ListCloudFrontOriginAccessIdentities(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListCloudFrontOriginAccessIdentities(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudFrontOriginAccessIdentities", reflect.TypeOf((*MockClient)(nil).ListCloudFrontOriginAccessIdentities), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListCloudFrontOriginAccessIdentities", reflect.TypeOf((*MockClient)(nil).ListCloudFrontOriginAccessIdentities), varargs...)
+}
+
+// ListDistributions mocks base method.
+func (m *MockClient) ListDistributions(arg0 context.Context, arg1 *cloudfront.ListDistributionsInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.ListDistributionsOutput, error) {
+	m.ctrl.T.Helper()
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListDistributions", varargs...)
+	ret0, _ := ret[0].(*cloudfront.ListDistributionsOutput)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListDistributions indicates an expected call of ListDistributions.
+func (mr *MockClientMockRecorder) ListDistributions(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListDistributions", reflect.TypeOf((*MockClient)(nil).ListDistributions), varargs...)
 }
 
 // ListObjects mocks base method.
-func (m *MockClient) ListObjects(input *s3.ListObjectsInput) (*s3.ListObjectsOutput, error) {
+func (m *MockClient) ListObjects(arg0 context.Context, arg1 *s3.ListObjectsInput, arg2 ...func(*s3.Options)) (*s3.ListObjectsOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListObjects", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListObjects", varargs...)
 	ret0, _ := ret[0].(*s3.ListObjectsOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListObjects indicates an expected call of ListObjects.
-func (mr *MockClientMockRecorder) ListObjects(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListObjects(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListObjects", reflect.TypeOf((*MockClient)(nil).ListObjects), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListObjects", reflect.TypeOf((*MockClient)(nil).ListObjects), varargs...)
 }
 
 // ListOpenIDConnectProviders mocks base method.
-func (m *MockClient) ListOpenIDConnectProviders(arg0 *iam.ListOpenIDConnectProvidersInput) (*iam.ListOpenIDConnectProvidersOutput, error) {
+func (m *MockClient) ListOpenIDConnectProviders(arg0 context.Context, arg1 *iam.ListOpenIDConnectProvidersInput, arg2 ...func(*iam.Options)) (*iam.ListOpenIDConnectProvidersOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListOpenIDConnectProviders", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListOpenIDConnectProviders", varargs...)
 	ret0, _ := ret[0].(*iam.ListOpenIDConnectProvidersOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListOpenIDConnectProviders indicates an expected call of ListOpenIDConnectProviders.
-func (mr *MockClientMockRecorder) ListOpenIDConnectProviders(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListOpenIDConnectProviders(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOpenIDConnectProviders", reflect.TypeOf((*MockClient)(nil).ListOpenIDConnectProviders), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListOpenIDConnectProviders", reflect.TypeOf((*MockClient)(nil).ListOpenIDConnectProviders), varargs...)
 }
 
 // ListRolePolicies mocks base method.
-func (m *MockClient) ListRolePolicies(input *iam.ListRolePoliciesInput) (*iam.ListRolePoliciesOutput, error) {
+func (m *MockClient) ListRolePolicies(arg0 context.Context, arg1 *iam.ListRolePoliciesInput, arg2 ...func(*iam.Options)) (*iam.ListRolePoliciesOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRolePolicies", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListRolePolicies", varargs...)
 	ret0, _ := ret[0].(*iam.ListRolePoliciesOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListRolePolicies indicates an expected call of ListRolePolicies.
-func (mr *MockClientMockRecorder) ListRolePolicies(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListRolePolicies(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolePolicies", reflect.TypeOf((*MockClient)(nil).ListRolePolicies), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRolePolicies", reflect.TypeOf((*MockClient)(nil).ListRolePolicies), varargs...)
 }
 
 // ListRoles mocks base method.
-func (m *MockClient) ListRoles(input *iam.ListRolesInput) (*iam.ListRolesOutput, error) {
+func (m *MockClient) ListRoles(arg0 context.Context, arg1 *iam.ListRolesInput, arg2 ...func(*iam.Options)) (*iam.ListRolesOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListRoles", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListRoles", varargs...)
 	ret0, _ := ret[0].(*iam.ListRolesOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListRoles indicates an expected call of ListRoles.
-func (mr *MockClientMockRecorder) ListRoles(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListRoles(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoles", reflect.TypeOf((*MockClient)(nil).ListRoles), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRoles", reflect.TypeOf((*MockClient)(nil).ListRoles), varargs...)
 }
 
-// ListTagsForCloudFrontResource mocks base method.
-func (m *MockClient) ListTagsForCloudFrontResource(input *cloudfront.ListTagsForResourceInput) (*cloudfront.ListTagsForResourceOutput, error) {
+// ListTagsForResource mocks base method.
+func (m *MockClient) ListTagsForResource(arg0 context.Context, arg1 *cloudfront.ListTagsForResourceInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.ListTagsForResourceOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListTagsForCloudFrontResource", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListTagsForResource", varargs...)
 	ret0, _ := ret[0].(*cloudfront.ListTagsForResourceOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListTagsForCloudFrontResource indicates an expected call of ListTagsForCloudFrontResource.
-func (mr *MockClientMockRecorder) ListTagsForCloudFrontResource(input interface{}) *gomock.Call {
+// ListTagsForResource indicates an expected call of ListTagsForResource.
+func (mr *MockClientMockRecorder) ListTagsForResource(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTagsForCloudFrontResource", reflect.TypeOf((*MockClient)(nil).ListTagsForCloudFrontResource), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListTagsForResource", reflect.TypeOf((*MockClient)(nil).ListTagsForResource), varargs...)
 }
 
 // ListUserPolicies mocks base method.
-func (m *MockClient) ListUserPolicies(arg0 *iam.ListUserPoliciesInput) (*iam.ListUserPoliciesOutput, error) {
+func (m *MockClient) ListUserPolicies(arg0 context.Context, arg1 *iam.ListUserPoliciesInput, arg2 ...func(*iam.Options)) (*iam.ListUserPoliciesOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListUserPolicies", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "ListUserPolicies", varargs...)
 	ret0, _ := ret[0].(*iam.ListUserPoliciesOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // ListUserPolicies indicates an expected call of ListUserPolicies.
-func (mr *MockClientMockRecorder) ListUserPolicies(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) ListUserPolicies(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserPolicies", reflect.TypeOf((*MockClient)(nil).ListUserPolicies), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListUserPolicies", reflect.TypeOf((*MockClient)(nil).ListUserPolicies), varargs...)
 }
 
 // PutBucketPolicy mocks base method.
-func (m *MockClient) PutBucketPolicy(input *s3.PutBucketPolicyInput) (*s3.PutBucketPolicyOutput, error) {
+func (m *MockClient) PutBucketPolicy(arg0 context.Context, arg1 *s3.PutBucketPolicyInput, arg2 ...func(*s3.Options)) (*s3.PutBucketPolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutBucketPolicy", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PutBucketPolicy", varargs...)
 	ret0, _ := ret[0].(*s3.PutBucketPolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PutBucketPolicy indicates an expected call of PutBucketPolicy.
-func (mr *MockClientMockRecorder) PutBucketPolicy(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) PutBucketPolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketPolicy", reflect.TypeOf((*MockClient)(nil).PutBucketPolicy), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketPolicy", reflect.TypeOf((*MockClient)(nil).PutBucketPolicy), varargs...)
 }
 
 // PutBucketTagging mocks base method.
-func (m *MockClient) PutBucketTagging(arg0 *s3.PutBucketTaggingInput) (*s3.PutBucketTaggingOutput, error) {
+func (m *MockClient) PutBucketTagging(arg0 context.Context, arg1 *s3.PutBucketTaggingInput, arg2 ...func(*s3.Options)) (*s3.PutBucketTaggingOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutBucketTagging", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PutBucketTagging", varargs...)
 	ret0, _ := ret[0].(*s3.PutBucketTaggingOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PutBucketTagging indicates an expected call of PutBucketTagging.
-func (mr *MockClientMockRecorder) PutBucketTagging(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) PutBucketTagging(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketTagging", reflect.TypeOf((*MockClient)(nil).PutBucketTagging), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutBucketTagging", reflect.TypeOf((*MockClient)(nil).PutBucketTagging), varargs...)
 }
 
 // PutObject mocks base method.
-func (m *MockClient) PutObject(arg0 *s3.PutObjectInput) (*s3.PutObjectOutput, error) {
+func (m *MockClient) PutObject(arg0 context.Context, arg1 *s3.PutObjectInput, arg2 ...func(*s3.Options)) (*s3.PutObjectOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutObject", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PutObject", varargs...)
 	ret0, _ := ret[0].(*s3.PutObjectOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PutObject indicates an expected call of PutObject.
-func (mr *MockClientMockRecorder) PutObject(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) PutObject(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutObject", reflect.TypeOf((*MockClient)(nil).PutObject), varargs...)
 }
 
 // PutPublicAccessBlock mocks base method.
-func (m *MockClient) PutPublicAccessBlock(input *s3.PutPublicAccessBlockInput) (*s3.PutPublicAccessBlockOutput, error) {
+func (m *MockClient) PutPublicAccessBlock(arg0 context.Context, arg1 *s3.PutPublicAccessBlockInput, arg2 ...func(*s3.Options)) (*s3.PutPublicAccessBlockOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutPublicAccessBlock", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PutPublicAccessBlock", varargs...)
 	ret0, _ := ret[0].(*s3.PutPublicAccessBlockOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PutPublicAccessBlock indicates an expected call of PutPublicAccessBlock.
-func (mr *MockClientMockRecorder) PutPublicAccessBlock(input interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) PutPublicAccessBlock(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPublicAccessBlock", reflect.TypeOf((*MockClient)(nil).PutPublicAccessBlock), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutPublicAccessBlock", reflect.TypeOf((*MockClient)(nil).PutPublicAccessBlock), varargs...)
 }
 
 // PutRolePolicy mocks base method.
-func (m *MockClient) PutRolePolicy(arg0 *iam.PutRolePolicyInput) (*iam.PutRolePolicyOutput, error) {
+func (m *MockClient) PutRolePolicy(arg0 context.Context, arg1 *iam.PutRolePolicyInput, arg2 ...func(*iam.Options)) (*iam.PutRolePolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutRolePolicy", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PutRolePolicy", varargs...)
 	ret0, _ := ret[0].(*iam.PutRolePolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PutRolePolicy indicates an expected call of PutRolePolicy.
-func (mr *MockClientMockRecorder) PutRolePolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) PutRolePolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutRolePolicy", reflect.TypeOf((*MockClient)(nil).PutRolePolicy), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutRolePolicy", reflect.TypeOf((*MockClient)(nil).PutRolePolicy), varargs...)
 }
 
 // PutUserPolicy mocks base method.
-func (m *MockClient) PutUserPolicy(arg0 *iam.PutUserPolicyInput) (*iam.PutUserPolicyOutput, error) {
+func (m *MockClient) PutUserPolicy(arg0 context.Context, arg1 *iam.PutUserPolicyInput, arg2 ...func(*iam.Options)) (*iam.PutUserPolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "PutUserPolicy", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "PutUserPolicy", varargs...)
 	ret0, _ := ret[0].(*iam.PutUserPolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // PutUserPolicy indicates an expected call of PutUserPolicy.
-func (mr *MockClientMockRecorder) PutUserPolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) PutUserPolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutUserPolicy", reflect.TypeOf((*MockClient)(nil).PutUserPolicy), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutUserPolicy", reflect.TypeOf((*MockClient)(nil).PutUserPolicy), varargs...)
 }
 
 // SimulatePrincipalPolicy mocks base method.
-func (m *MockClient) SimulatePrincipalPolicy(arg0 *iam.SimulatePrincipalPolicyInput) (*iam.SimulatePolicyResponse, error) {
+func (m *MockClient) SimulatePrincipalPolicy(arg0 context.Context, arg1 *iam.SimulatePrincipalPolicyInput, arg2 ...func(*iam.Options)) (*iam.SimulatePrincipalPolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SimulatePrincipalPolicy", arg0)
-	ret0, _ := ret[0].(*iam.SimulatePolicyResponse)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "SimulatePrincipalPolicy", varargs...)
+	ret0, _ := ret[0].(*iam.SimulatePrincipalPolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // SimulatePrincipalPolicy indicates an expected call of SimulatePrincipalPolicy.
-func (mr *MockClientMockRecorder) SimulatePrincipalPolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) SimulatePrincipalPolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SimulatePrincipalPolicy", reflect.TypeOf((*MockClient)(nil).SimulatePrincipalPolicy), arg0)
-}
-
-// SimulatePrincipalPolicyPages mocks base method.
-func (m *MockClient) SimulatePrincipalPolicyPages(arg0 *iam.SimulatePrincipalPolicyInput, arg1 func(*iam.SimulatePolicyResponse, bool) bool) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SimulatePrincipalPolicyPages", arg0, arg1)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SimulatePrincipalPolicyPages indicates an expected call of SimulatePrincipalPolicyPages.
-func (mr *MockClientMockRecorder) SimulatePrincipalPolicyPages(arg0, arg1 interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SimulatePrincipalPolicyPages", reflect.TypeOf((*MockClient)(nil).SimulatePrincipalPolicyPages), arg0, arg1)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SimulatePrincipalPolicy", reflect.TypeOf((*MockClient)(nil).SimulatePrincipalPolicy), varargs...)
 }
 
 // TagOpenIDConnectProvider mocks base method.
-func (m *MockClient) TagOpenIDConnectProvider(arg0 *iam.TagOpenIDConnectProviderInput) (*iam.TagOpenIDConnectProviderOutput, error) {
+func (m *MockClient) TagOpenIDConnectProvider(arg0 context.Context, arg1 *iam.TagOpenIDConnectProviderInput, arg2 ...func(*iam.Options)) (*iam.TagOpenIDConnectProviderOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TagOpenIDConnectProvider", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "TagOpenIDConnectProvider", varargs...)
 	ret0, _ := ret[0].(*iam.TagOpenIDConnectProviderOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // TagOpenIDConnectProvider indicates an expected call of TagOpenIDConnectProvider.
-func (mr *MockClientMockRecorder) TagOpenIDConnectProvider(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) TagOpenIDConnectProvider(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).TagOpenIDConnectProvider), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagOpenIDConnectProvider", reflect.TypeOf((*MockClient)(nil).TagOpenIDConnectProvider), varargs...)
 }
 
 // TagUser mocks base method.
-func (m *MockClient) TagUser(arg0 *iam.TagUserInput) (*iam.TagUserOutput, error) {
+func (m *MockClient) TagUser(arg0 context.Context, arg1 *iam.TagUserInput, arg2 ...func(*iam.Options)) (*iam.TagUserOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "TagUser", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "TagUser", varargs...)
 	ret0, _ := ret[0].(*iam.TagUserOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // TagUser indicates an expected call of TagUser.
-func (mr *MockClientMockRecorder) TagUser(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) TagUser(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagUser", reflect.TypeOf((*MockClient)(nil).TagUser), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "TagUser", reflect.TypeOf((*MockClient)(nil).TagUser), varargs...)
 }
 
 // UpdateAssumeRolePolicy mocks base method.
-func (m *MockClient) UpdateAssumeRolePolicy(arg0 *iam.UpdateAssumeRolePolicyInput) (*iam.UpdateAssumeRolePolicyOutput, error) {
+func (m *MockClient) UpdateAssumeRolePolicy(arg0 context.Context, arg1 *iam.UpdateAssumeRolePolicyInput, arg2 ...func(*iam.Options)) (*iam.UpdateAssumeRolePolicyOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateAssumeRolePolicy", arg0)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateAssumeRolePolicy", varargs...)
 	ret0, _ := ret[0].(*iam.UpdateAssumeRolePolicyOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // UpdateAssumeRolePolicy indicates an expected call of UpdateAssumeRolePolicy.
-func (mr *MockClientMockRecorder) UpdateAssumeRolePolicy(arg0 interface{}) *gomock.Call {
+func (mr *MockClientMockRecorder) UpdateAssumeRolePolicy(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAssumeRolePolicy", reflect.TypeOf((*MockClient)(nil).UpdateAssumeRolePolicy), arg0)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateAssumeRolePolicy", reflect.TypeOf((*MockClient)(nil).UpdateAssumeRolePolicy), varargs...)
 }
 
-// UpdateCloudFrontDistribution mocks base method.
-func (m *MockClient) UpdateCloudFrontDistribution(input *cloudfront.UpdateDistributionInput) (*cloudfront.UpdateDistributionOutput, error) {
+// UpdateDistribution mocks base method.
+func (m *MockClient) UpdateDistribution(arg0 context.Context, arg1 *cloudfront.UpdateDistributionInput, arg2 ...func(*cloudfront.Options)) (*cloudfront.UpdateDistributionOutput, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateCloudFrontDistribution", input)
+	varargs := []interface{}{arg0, arg1}
+	for _, a := range arg2 {
+		varargs = append(varargs, a)
+	}
+	ret := m.ctrl.Call(m, "UpdateDistribution", varargs...)
 	ret0, _ := ret[0].(*cloudfront.UpdateDistributionOutput)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// UpdateCloudFrontDistribution indicates an expected call of UpdateCloudFrontDistribution.
-func (mr *MockClientMockRecorder) UpdateCloudFrontDistribution(input interface{}) *gomock.Call {
+// UpdateDistribution indicates an expected call of UpdateDistribution.
+func (mr *MockClientMockRecorder) UpdateDistribution(arg0, arg1 interface{}, arg2 ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateCloudFrontDistribution", reflect.TypeOf((*MockClient)(nil).UpdateCloudFrontDistribution), input)
+	varargs := append([]interface{}{arg0, arg1}, arg2...)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateDistribution", reflect.TypeOf((*MockClient)(nil).UpdateDistribution), varargs...)
 }

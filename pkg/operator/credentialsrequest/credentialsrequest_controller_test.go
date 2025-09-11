@@ -29,9 +29,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/iam"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	"github.com/aws/smithy-go"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -666,7 +667,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				// will simulate to check that the creds in the target secret actually satisfy the requested perms
-				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
+				mockSimulatePrincipalPolicySuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -697,7 +698,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
-				mockSimulatePrincipalPolicyPagesFailure(mockAWSClient)
+				mockSimulatePrincipalPolicyFailure(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -732,7 +733,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				// will simulate to check that the creds in the target secret actually satisfy the requested perms
-				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
+				mockSimulatePrincipalPolicySuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -764,7 +765,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				mockAWSClient := mockaws.NewMockClient(mockCtrl)
 				mockGetUser(mockAWSClient)
 				// will simulate to check that the creds in the target secret actually satisfy the requested perms
-				mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient)
+				mockSimulatePrincipalPolicySuccess(mockAWSClient)
 				return mockAWSClient
 			},
 			validate: func(c client.Client, t *testing.T) {
@@ -1739,40 +1740,43 @@ aws_secret_access_key = %s`, accessKeyID, secretAccessKey))
 }
 
 func genericAWSError() error {
-	return awserr.New("GenericFailure", "An error besides NotFound", fmt.Errorf("Just a generic AWS error for test purposes"))
+	return &smithy.GenericAPIError{
+		Code:    "GenericFailure",
+		Message: "An error besides NotFound",
+	}
 }
 
 func mockFailedGetUser(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, genericAWSError()).AnyTimes()
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(nil, genericAWSError()).AnyTimes()
 }
 
 func mockGetUserNotFound(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such entity", nil)).AnyTimes()
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(nil, &iamtypes.NoSuchEntityException{}).AnyTimes()
 }
 
 func mockGetUserWithPermissionsBoundary(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(
 		&iam.GetUserOutput{
-			User: &iam.User{
-				PermissionsBoundary: &iam.AttachedPermissionsBoundary{
-					PermissionsBoundaryArn:  aws.String(testPermissionsBoundaryARN),
-					PermissionsBoundaryType: aws.String(testPermissionBoundaryType),
+			User: &iamtypes.User{
+				PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+					PermissionsBoundaryArn:  awssdk.String(testPermissionsBoundaryARN),
+					PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentType(testPermissionBoundaryType),
 				},
 			},
 		}, nil)
 }
 
 func mockGetUser(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(
 		&iam.GetUserOutput{
-			User: &iam.User{
-				UserId:   aws.String(testAWSUserID),
-				UserName: aws.String(testAWSUser),
-				Arn:      aws.String(testAWSARN),
-				Tags: []*iam.Tag{
+			User: &iamtypes.User{
+				UserId:   awssdk.String(testAWSUserID),
+				UserName: awssdk.String(testAWSUser),
+				Arn:      awssdk.String(testAWSARN),
+				Tags: []iamtypes.Tag{
 					{
-						Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
-						Value: aws.String("owned"),
+						Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
+						Value: awssdk.String("owned"),
 					},
 				},
 			},
@@ -1780,20 +1784,20 @@ func mockGetUser(mockAWSClient *mockaws.MockClient) {
 }
 
 func mockGetUserTagged(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(
 		&iam.GetUserOutput{
-			User: &iam.User{
-				UserId:   aws.String(testAWSUserID),
-				UserName: aws.String(testAWSUser),
-				Arn:      aws.String(testAWSARN),
-				Tags: []*iam.Tag{
+			User: &iamtypes.User{
+				UserId:   awssdk.String(testAWSUserID),
+				UserName: awssdk.String(testAWSUser),
+				Arn:      awssdk.String(testAWSARN),
+				Tags: []iamtypes.Tag{
 					{
-						Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
-						Value: aws.String("owned"),
+						Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
+						Value: awssdk.String("owned"),
 					},
 					{
-						Key:   aws.String(infraResourceTagTestKey),
-						Value: aws.String(infraResourceTagTestValue),
+						Key:   awssdk.String(infraResourceTagTestKey),
+						Value: awssdk.String(infraResourceTagTestValue),
 					},
 				},
 			},
@@ -1801,126 +1805,126 @@ func mockGetUserTagged(mockAWSClient *mockaws.MockClient) {
 }
 
 func mockGetUserUntagged(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(gomock.Any()).Return(
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(
 		&iam.GetUserOutput{
-			User: &iam.User{
-				UserId:   aws.String(testAWSUserID),
-				UserName: aws.String(testAWSUser),
-				Arn:      aws.String(testAWSARN),
+			User: &iamtypes.User{
+				UserId:   awssdk.String(testAWSUserID),
+				UserName: awssdk.String(testAWSUser),
+				Arn:      awssdk.String(testAWSARN),
 			},
 		}, nil).AnyTimes()
 }
 
 func mockDeleteUserFailure(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().DeleteUser(gomock.Any()).Return(nil, genericAWSError())
+	mockAWSClient.EXPECT().DeleteUser(gomock.Any(), gomock.Any()).Return(nil, genericAWSError())
 }
 
 func mockDeleteUser(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().DeleteUser(gomock.Any()).Return(
+	mockAWSClient.EXPECT().DeleteUser(gomock.Any(), gomock.Any()).Return(
 		&iam.DeleteUserOutput{}, nil)
 }
 
 func mockDeleteUserPolicy(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().DeleteUserPolicy(gomock.Any()).Return(
+	mockAWSClient.EXPECT().DeleteUserPolicy(gomock.Any(), gomock.Any()).Return(
 		&iam.DeleteUserPolicyOutput{}, nil)
 }
 
 func mockListAccessKeysEmpty(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().ListAccessKeys(
+	mockAWSClient.EXPECT().ListAccessKeys(gomock.Any(),
 		&iam.ListAccessKeysInput{
-			UserName: aws.String(testAWSUser),
+			UserName: awssdk.String(testAWSUser),
 		}).Return(
 		&iam.ListAccessKeysOutput{
-			AccessKeyMetadata: []*iam.AccessKeyMetadata{},
+			AccessKeyMetadata: []iamtypes.AccessKeyMetadata{},
 		}, nil)
 }
 
 func mockListAccessKeys(mockAWSClient *mockaws.MockClient, accessKeyID string) {
-	mockAWSClient.EXPECT().ListAccessKeys(
+	mockAWSClient.EXPECT().ListAccessKeys(gomock.Any(),
 		&iam.ListAccessKeysInput{
-			UserName: aws.String(testAWSUser),
+			UserName: awssdk.String(testAWSUser),
 		}).Return(
 		&iam.ListAccessKeysOutput{
-			AccessKeyMetadata: []*iam.AccessKeyMetadata{
+			AccessKeyMetadata: []iamtypes.AccessKeyMetadata{
 				{
-					AccessKeyId: aws.String(accessKeyID),
+					AccessKeyId: awssdk.String(accessKeyID),
 				},
 			},
 		}, nil)
 }
 
 func mockCreateUserWithPermissionsBoundary(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().CreateUser(
+	mockAWSClient.EXPECT().CreateUser(gomock.Any(),
 		&iam.CreateUserInput{
-			UserName:            aws.String(testAWSUser),
-			PermissionsBoundary: aws.String(testPermissionsBoundaryARN),
+			UserName:            awssdk.String(testAWSUser),
+			PermissionsBoundary: awssdk.String(testPermissionsBoundaryARN),
 		}).Return(
 		&iam.CreateUserOutput{
-			User: &iam.User{
-				UserName: aws.String(testAWSUser),
-				UserId:   aws.String(testAWSUserID),
-				Arn:      aws.String(testAWSARN),
-				PermissionsBoundary: &iam.AttachedPermissionsBoundary{
-					PermissionsBoundaryArn:  aws.String(testPermissionsBoundaryARN),
-					PermissionsBoundaryType: aws.String(testPermissionBoundaryType),
+			User: &iamtypes.User{
+				UserName: awssdk.String(testAWSUser),
+				UserId:   awssdk.String(testAWSUserID),
+				Arn:      awssdk.String(testAWSARN),
+				PermissionsBoundary: &iamtypes.AttachedPermissionsBoundary{
+					PermissionsBoundaryArn:  awssdk.String(testPermissionsBoundaryARN),
+					PermissionsBoundaryType: iamtypes.PermissionsBoundaryAttachmentType(testPermissionBoundaryType),
 				},
 			},
 		}, nil)
 }
 
 func mockCreateUser(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().CreateUser(
+	mockAWSClient.EXPECT().CreateUser(gomock.Any(),
 		&iam.CreateUserInput{
-			UserName: aws.String(testAWSUser),
+			UserName: awssdk.String(testAWSUser),
 			// TODO: tags?
 		}).Return(
 		&iam.CreateUserOutput{
-			User: &iam.User{
-				UserName: aws.String(testAWSUser),
-				UserId:   aws.String(testAWSUserID),
-				Arn:      aws.String(testAWSARN),
+			User: &iamtypes.User{
+				UserName: awssdk.String(testAWSUser),
+				UserId:   awssdk.String(testAWSUserID),
+				Arn:      awssdk.String(testAWSARN),
 			},
 		}, nil)
 }
 
 func mockCreateAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID, secretAccessKey string) {
-	mockAWSClient.EXPECT().CreateAccessKey(
+	mockAWSClient.EXPECT().CreateAccessKey(gomock.Any(),
 		&iam.CreateAccessKeyInput{
-			UserName: aws.String(testAWSUser),
+			UserName: awssdk.String(testAWSUser),
 		}).Return(
 		&iam.CreateAccessKeyOutput{
-			AccessKey: &iam.AccessKey{
-				AccessKeyId:     aws.String(accessKeyID),
-				SecretAccessKey: aws.String(secretAccessKey),
+			AccessKey: &iamtypes.AccessKey{
+				AccessKeyId:     awssdk.String(accessKeyID),
+				SecretAccessKey: awssdk.String(secretAccessKey),
 			},
 		}, nil)
 }
 
 func mockTagUser(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().TagUser(
+	mockAWSClient.EXPECT().TagUser(gomock.Any(),
 		&iam.TagUserInput{
-			UserName: aws.String(testAWSUser),
-			Tags: []*iam.Tag{
+			UserName: awssdk.String(testAWSUser),
+			Tags: []iamtypes.Tag{
 				{
-					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
-					Value: aws.String("owned"),
+					Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
+					Value: awssdk.String("owned"),
 				},
 			},
 		}).Return(&iam.TagUserOutput{}, nil)
 }
 
 func mockUpdatedTagUser(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().TagUser(
+	mockAWSClient.EXPECT().TagUser(gomock.Any(),
 		&iam.TagUserInput{
-			UserName: aws.String(testAWSUser),
-			Tags: []*iam.Tag{
+			UserName: awssdk.String(testAWSUser),
+			Tags: []iamtypes.Tag{
 				{
-					Key:   aws.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
-					Value: aws.String("owned"),
+					Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", testInfraName)),
+					Value: awssdk.String("owned"),
 				},
 				{
-					Key:   aws.String(infraResourceTagTestKey),
-					Value: aws.String(infraResourceTagTestValue),
+					Key:   awssdk.String(infraResourceTagTestKey),
+					Value: awssdk.String(infraResourceTagTestValue),
 				},
 			},
 		}).Return(&iam.TagUserOutput{}, nil)
@@ -1928,47 +1932,47 @@ func mockUpdatedTagUser(mockAWSClient *mockaws.MockClient) {
 
 // mockTagUserLegacy should be used when infraname is not set in the cluster.
 func mockTagUserLegacy(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().TagUser(
+	mockAWSClient.EXPECT().TagUser(gomock.Any(),
 		&iam.TagUserInput{
-			UserName: aws.String(testAWSUser),
-			Tags: []*iam.Tag{
+			UserName: awssdk.String(testAWSUser),
+			Tags: []iamtypes.Tag{
 				{
-					Key:   aws.String(openshiftClusterIDKey),
-					Value: aws.String(testClusterID),
+					Key:   awssdk.String(openshiftClusterIDKey),
+					Value: awssdk.String(testClusterID),
 				},
 			},
 		}).Return(&iam.TagUserOutput{}, nil)
 }
 
 func mockDeleteAccessKey(mockAWSClient *mockaws.MockClient, accessKeyID string) {
-	mockAWSClient.EXPECT().DeleteAccessKey(
+	mockAWSClient.EXPECT().DeleteAccessKey(gomock.Any(),
 		&iam.DeleteAccessKeyInput{
-			UserName:    aws.String(testAWSUser),
-			AccessKeyId: aws.String(accessKeyID),
+			UserName:    awssdk.String(testAWSUser),
+			AccessKeyId: awssdk.String(accessKeyID),
 		}).Return(&iam.DeleteAccessKeyOutput{}, nil)
 }
 
 func mockPutUserPolicyWithExpectedPolicy(mockAWSClient *mockaws.MockClient, policyDoc string) {
-	mockAWSClient.EXPECT().PutUserPolicy(&iam.PutUserPolicyInput{
-		UserName:       aws.String(testAWSUser),
-		PolicyName:     aws.String(testAWSUser + "-policy"),
-		PolicyDocument: aws.String(policyDoc),
+	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any(), &iam.PutUserPolicyInput{
+		UserName:       awssdk.String(testAWSUser),
+		PolicyName:     awssdk.String(testAWSUser + "-policy"),
+		PolicyDocument: awssdk.String(policyDoc),
 	}).Return(&iam.PutUserPolicyOutput{}, nil)
 }
 
 func mockPutUserPolicy(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any()).Return(&iam.PutUserPolicyOutput{}, nil)
+	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any(), gomock.Any()).Return(&iam.PutUserPolicyOutput{}, nil)
 }
 
 func mockGetUserPolicy(mockAWSClient *mockaws.MockClient, policyDoc string) {
 	policyDoc = url.QueryEscape(policyDoc)
-	mockAWSClient.EXPECT().GetUserPolicy(gomock.Any()).Return(&iam.GetUserPolicyOutput{
-		PolicyDocument: aws.String(policyDoc),
+	mockAWSClient.EXPECT().GetUserPolicy(gomock.Any(), gomock.Any()).Return(&iam.GetUserPolicyOutput{
+		PolicyDocument: awssdk.String(policyDoc),
 	}, nil)
 }
 
 func mockGetUserPolicyMissing(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUserPolicy(gomock.Any()).Return(nil, awserr.New(iam.ErrCodeNoSuchEntityException, "no such policy", nil))
+	mockAWSClient.EXPECT().GetUserPolicy(gomock.Any(), gomock.Any()).Return(nil, &iamtypes.NoSuchEntityException{})
 }
 
 func testClusterVersion() *configv1.ClusterVersion {
@@ -1983,24 +1987,28 @@ func testClusterVersion() *configv1.ClusterVersion {
 }
 
 // fake a successful permissions check but where the permissions aren't good enough
-func mockSimulatePrincipalPolicyPagesFailure(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Do(
-		func(input *iam.SimulatePrincipalPolicyInput, f func(resp *iam.SimulatePolicyResponse, lastPage bool) bool) {
-			response := &iam.SimulatePolicyResponse{
-				EvaluationResults: []*iam.EvaluationResult{
-					{
-						EvalActionName: aws.String("ec2:DeniedAction"),
-						EvalDecision:   aws.String("notallowed"),
-					},
+func mockSimulatePrincipalPolicyFailure(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.SimulatePrincipalPolicyOutput{
+			EvaluationResults: []iamtypes.EvaluationResult{
+				{
+					EvalActionName: awssdk.String("ec2:DeniedAction"),
+					EvalDecision:   iamtypes.PolicyEvaluationDecisionTypeImplicitDeny,
 				},
-			}
-
-			f(response, false)
-		}).Return(nil)
+			},
+		}, nil)
 }
 
-func mockSimulatePrincipalPolicyPagesSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil)
+func mockSimulatePrincipalPolicySuccess(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.SimulatePrincipalPolicyOutput{
+			EvaluationResults: []iamtypes.EvaluationResult{
+				{
+					EvalActionName: awssdk.String("ec2:AllowedAction"),
+					EvalDecision:   iamtypes.PolicyEvaluationDecisionTypeAllowed,
+				},
+			},
+		}, nil)
 }
 
 func testInfrastructure(infraName string) *configv1.Infrastructure {
