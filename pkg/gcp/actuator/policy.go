@@ -22,7 +22,6 @@ import (
 	log "github.com/sirupsen/logrus"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iam/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
@@ -68,7 +67,7 @@ func EnsurePolicyBindingsForProject(rootClient ccgcp.Client, roles []string, mem
 }
 
 // EnsurePolicyBindingsForServiceAccount ensures that given roles and member, appropriate binding is added to IAM service account
-func EnsurePolicyBindingsForServiceAccount(rootClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount, roles []string, member string) error {
+func EnsurePolicyBindingsForServiceAccount(rootClient ccgcp.Client, svcAcct *iam.ServiceAccount, roles []string, member string) error {
 	needPolicyUpdate := false
 
 	projectName := rootClient.GetProjectName()

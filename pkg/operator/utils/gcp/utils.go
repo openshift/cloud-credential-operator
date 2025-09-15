@@ -25,7 +25,7 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	iam "google.golang.org/api/iam/v1"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
@@ -134,7 +134,7 @@ func refreshTestablePermissions(gcpClient ccgcp.Client, projectName string, logg
 	projectNamePath := fmt.Sprintf(`//cloudresourcemanager.googleapis.com/projects/%s`, projectName)
 	newPermSet := sets.NewString()
 
-	request := &iamadminpb.QueryTestablePermissionsRequest{
+	request := &iam.QueryTestablePermissionsRequest{
 		FullResourceName: projectNamePath,
 	}
 

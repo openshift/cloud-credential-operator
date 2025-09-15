@@ -22,9 +22,7 @@ import (
 	"time"
 
 	iamcloud "cloud.google.com/go/iam"
-	iamadmin "cloud.google.com/go/iam/admin/apiv1"
 	storage "cloud.google.com/go/storage"
-	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	compute "google.golang.org/api/compute/v1"
@@ -32,7 +30,6 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	serviceusage "google.golang.org/api/serviceusage/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 )
 
 //go:generate mockgen -source=./client.go -destination=./mock/client_generated.go -package=mock
@@ -40,20 +37,20 @@ import (
 // Client is a wrapper object for actual GCP libraries to allow for easier mocking/testing.
 type Client interface {
 	//IAM
-	CreateServiceAccount(context.Context, *iamadminpb.CreateServiceAccountRequest) (*iamadminpb.ServiceAccount, error)
-	CreateServiceAccountKey(context.Context, *iamadminpb.CreateServiceAccountKeyRequest) (*iamadminpb.ServiceAccountKey, error)
-	DeleteServiceAccount(context.Context, *iamadminpb.DeleteServiceAccountRequest) error
-	DeleteServiceAccountKey(context.Context, *iamadminpb.DeleteServiceAccountKeyRequest) error
-	GetRole(context.Context, *iamadminpb.GetRoleRequest) (*iamadminpb.Role, error)
-	CreateRole(context.Context, *iamadminpb.CreateRoleRequest) (*iamadminpb.Role, error)
-	UpdateRole(context.Context, *iamadminpb.UpdateRoleRequest) (*iamadminpb.Role, error)
-	DeleteRole(context.Context, *iamadminpb.DeleteRoleRequest) (*iamadminpb.Role, error)
-	UndeleteRole(context.Context, *iamadminpb.UndeleteRoleRequest) (*iamadminpb.Role, error)
-	ListRoles(context.Context, *iamadminpb.ListRolesRequest) (*iamadminpb.ListRolesResponse, error)
-	GetServiceAccount(context.Context, *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error)
-	ListServiceAccountKeys(context.Context, *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error)
-	ListServiceAccounts(context.Context, *iamadminpb.ListServiceAccountsRequest) ([]*iamadminpb.ServiceAccount, error)
-	QueryTestablePermissions(context.Context, *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error)
+	CreateServiceAccount(context.Context, string, *iam.CreateServiceAccountRequest) (*iam.ServiceAccount, error)
+	CreateServiceAccountKey(context.Context, string, *iam.CreateServiceAccountKeyRequest) (*iam.ServiceAccountKey, error)
+	DeleteServiceAccount(context.Context, string) error
+	DeleteServiceAccountKey(context.Context, string) error
+	GetRole(context.Context, string) (*iam.Role, error)
+	CreateRole(context.Context, string, *iam.CreateRoleRequest) (*iam.Role, error)
+	UpdateRole(context.Context, string, *iam.Role) (*iam.Role, error)
+	DeleteRole(context.Context, string) (*iam.Role, error)
+	UndeleteRole(context.Context, string, *iam.UndeleteRoleRequest) (*iam.Role, error)
+	ListRoles(context.Context, string, string) (*iam.ListRolesResponse, error)
+	GetServiceAccount(context.Context, string) (*iam.ServiceAccount, error)
+	ListServiceAccountKeys(context.Context, string, string) (*iam.ListServiceAccountKeysResponse, error)
+	ListServiceAccounts(context.Context, string, string) (*iam.ListServiceAccountsResponse, error)
+	QueryTestablePermissions(context.Context, *iam.QueryTestablePermissionsRequest) (*iam.QueryTestablePermissionsResponse, error)
 	CreateWorkloadIdentityPool(context.Context, string, string, *iam.WorkloadIdentityPool) (*iam.Operation, error)
 	GetWorkloadIdentityPool(context.Context, string) (*iam.WorkloadIdentityPool, error)
 	DeleteWorkloadIdentityPool(context.Context, string) (*iam.Operation, error)
@@ -88,7 +85,6 @@ type gcpClient struct {
 	projectName                string
 	creds                      *google.Credentials
 	cloudResourceManagerClient *cloudresourcemanager.Service
-	iamClient                  *iamadmin.IamClient
 	iamService                 *iam.Service
 	serviceUsageClient         *serviceusage.Service
 	storageClient              *storage.Client
@@ -102,95 +98,84 @@ func contextWithTimeout(ctx context.Context) (context.Context, context.CancelFun
 	return context.WithTimeout(ctx, defaultCallTimeout)
 }
 
-func (c *gcpClient) CreateServiceAccount(ctx context.Context, request *iamadminpb.CreateServiceAccountRequest) (*iamadminpb.ServiceAccount, error) {
+func (c *gcpClient) CreateServiceAccount(ctx context.Context, name string, request *iam.CreateServiceAccountRequest) (*iam.ServiceAccount, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	svcAcct, err := c.iamClient.CreateServiceAccount(ctx, request)
-	return svcAcct, err
+	return c.iamService.Projects.ServiceAccounts.Create(name, request).Context(ctx).Do()
 }
 
-func (c *gcpClient) CreateServiceAccountKey(ctx context.Context, request *iamadminpb.CreateServiceAccountKeyRequest) (*iamadminpb.ServiceAccountKey, error) {
+func (c *gcpClient) CreateServiceAccountKey(ctx context.Context, name string, request *iam.CreateServiceAccountKeyRequest) (*iam.ServiceAccountKey, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.CreateServiceAccountKey(ctx, request)
+	return c.iamService.Projects.ServiceAccounts.Keys.Create(name, request).Context(ctx).Do()
 }
 
-func (c *gcpClient) DeleteServiceAccount(ctx context.Context, request *iamadminpb.DeleteServiceAccountRequest) error {
+func (c *gcpClient) DeleteServiceAccount(ctx context.Context, name string) error {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.DeleteServiceAccount(ctx, request)
+	_, err := c.iamService.Projects.ServiceAccounts.Delete(name).Context(ctx).Do()
+	return err
 }
 
-func (c *gcpClient) DeleteServiceAccountKey(ctx context.Context, request *iamadminpb.DeleteServiceAccountKeyRequest) error {
+func (c *gcpClient) DeleteServiceAccountKey(ctx context.Context, name string) error {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.DeleteServiceAccountKey(ctx, request)
+	_, err := c.iamService.Projects.ServiceAccounts.Keys.Delete(name).Context(ctx).Do()
+	return err
 }
 
-func (c *gcpClient) GetRole(ctx context.Context, request *iamadminpb.GetRoleRequest) (*iamadminpb.Role, error) {
+func (c *gcpClient) GetRole(ctx context.Context, name string) (*iam.Role, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.GetRole(ctx, request)
+	return c.iamService.Projects.Roles.Get(name).Context(ctx).Do()
 }
 
-func (c *gcpClient) CreateRole(ctx context.Context, request *iamadminpb.CreateRoleRequest) (*iamadminpb.Role, error) {
+func (c *gcpClient) CreateRole(ctx context.Context, name string, request *iam.CreateRoleRequest) (*iam.Role, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.CreateRole(ctx, request)
+	return c.iamService.Projects.Roles.Create(name, request).Context(ctx).Do()
 }
 
-func (c *gcpClient) UpdateRole(ctx context.Context, request *iamadminpb.UpdateRoleRequest) (*iamadminpb.Role, error) {
+func (c *gcpClient) UpdateRole(ctx context.Context, name string, request *iam.Role) (*iam.Role, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.UpdateRole(ctx, request)
+	return c.iamService.Projects.Roles.Patch(name, request).Context(ctx).Do()
 }
 
-func (c *gcpClient) DeleteRole(ctx context.Context, request *iamadminpb.DeleteRoleRequest) (*iamadminpb.Role, error) {
+func (c *gcpClient) DeleteRole(ctx context.Context, name string) (*iam.Role, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.DeleteRole(ctx, request)
+	return c.iamService.Projects.Roles.Delete(name).Context(ctx).Do()
 }
 
-func (c *gcpClient) UndeleteRole(ctx context.Context, request *iamadminpb.UndeleteRoleRequest) (*iamadminpb.Role, error) {
+func (c *gcpClient) UndeleteRole(ctx context.Context, name string, request *iam.UndeleteRoleRequest) (*iam.Role, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.UndeleteRole(ctx, request)
+	return c.iamService.Projects.Roles.Undelete(name, request).Context(ctx).Do()
 }
 
-func (c *gcpClient) ListRoles(ctx context.Context, request *iamadminpb.ListRolesRequest) (*iamadminpb.ListRolesResponse, error) {
+func (c *gcpClient) ListRoles(ctx context.Context, name string, pageToken string) (*iam.ListRolesResponse, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.ListRoles(ctx, request)
+	return c.iamService.Projects.Roles.List(name).Context(ctx).PageToken(pageToken).Do()
 }
 
-func (c *gcpClient) GetServiceAccount(ctx context.Context, request *iamadminpb.GetServiceAccountRequest) (*iamadminpb.ServiceAccount, error) {
+func (c *gcpClient) GetServiceAccount(ctx context.Context, name string) (*iam.ServiceAccount, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.GetServiceAccount(ctx, request)
+	return c.iamService.Projects.ServiceAccounts.Get(name).Context(ctx).Do()
 }
 
-func (c *gcpClient) ListServiceAccountKeys(ctx context.Context, request *iamadminpb.ListServiceAccountKeysRequest) (*iamadminpb.ListServiceAccountKeysResponse, error) {
+func (c *gcpClient) ListServiceAccountKeys(ctx context.Context, name, keyTypes string) (*iam.ListServiceAccountKeysResponse, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.ListServiceAccountKeys(ctx, request)
+	return c.iamService.Projects.ServiceAccounts.Keys.List(name).KeyTypes(keyTypes).Context(ctx).Do()
 }
 
-func (c *gcpClient) ListServiceAccounts(ctx context.Context, request *iamadminpb.ListServiceAccountsRequest) ([]*iamadminpb.ServiceAccount, error) {
+func (c *gcpClient) ListServiceAccounts(ctx context.Context, name string, pageToken string) (*iam.ListServiceAccountsResponse, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	it := c.iamClient.ListServiceAccounts(ctx, request)
-	var svcAcctList []*iamadminpb.ServiceAccount
-	for {
-		svcAcct, err := it.Next()
-		if err == iterator.Done {
-			break
-		}
-		if err != nil {
-			return svcAcctList, errors.Wrapf(err, "Failed to fetch list of service accounts")
-		}
-		svcAcctList = append(svcAcctList, svcAcct)
-	}
-	return svcAcctList, nil
+	return c.iamService.Projects.ServiceAccounts.List(name).Context(ctx).PageToken(pageToken).Do()
 }
 
 func (c *gcpClient) GetProjectIamPolicy(projectName string, request *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error) {
@@ -237,10 +222,10 @@ func (c *gcpClient) TestIamPermissions(projectName string, permRequest *cloudres
 	return response, nil
 }
 
-func (c *gcpClient) QueryTestablePermissions(ctx context.Context, request *iamadminpb.QueryTestablePermissionsRequest) (*iamadminpb.QueryTestablePermissionsResponse, error) {
+func (c *gcpClient) QueryTestablePermissions(ctx context.Context, request *iam.QueryTestablePermissionsRequest) (*iam.QueryTestablePermissionsResponse, error) {
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
-	return c.iamClient.QueryTestablePermissions(ctx, request)
+	return c.iamService.Permissions.QueryTestablePermissions(request).Context(ctx).Do()
 }
 
 func (c *gcpClient) CreateWorkloadIdentityPool(ctx context.Context, parent, poolID string, pool *iam.WorkloadIdentityPool) (*iam.Operation, error) {
@@ -402,11 +387,6 @@ func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 		return nil, err
 	}
 
-	iamClient, err := iamadmin.NewIamClient(ctx, option.WithCredentials(creds))
-	if err != nil {
-		return nil, err
-	}
-
 	iamService, err := iam.NewService(ctx, option.WithCredentials(creds))
 	if err != nil {
 		return nil, err
@@ -426,7 +406,6 @@ func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 		projectName:                projectName,
 		creds:                      creds,
 		cloudResourceManagerClient: cloudResourceManagerClient,
-		iamClient:                  iamClient,
 		iamService:                 iamService,
 		serviceUsageClient:         serviceUsageClient,
 		storageClient:              storageClient,
