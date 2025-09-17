@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -170,7 +169,7 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		createSvcAcctScriptName := fmt.Sprintf(createIAMServiceAccountScriptName, serviceAccountNum, serviceAccountName)
 		createSvcAcctScriptFullPath := filepath.Join(targetDir, createSvcAcctScriptName)
 		log.Printf("Saving script to create service account %s locally at %s", serviceAccountName, createSvcAcctScriptFullPath)
-		if err := ioutil.WriteFile(createSvcAcctScriptFullPath, []byte(createSvcAcctScript), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(createSvcAcctScriptFullPath, []byte(createSvcAcctScript), fileModeCcoctlDryRun); err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save script to create service account %s locally at %s", serviceAccountName, createSvcAcctScriptFullPath))
 		}
 
@@ -183,7 +182,7 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 			createCustomRoleScriptName := fmt.Sprintf(createIAMCustomRoleScriptName, serviceAccountNum, serviceAccountName)
 			createCustomRoleScriptFullPath := filepath.Join(targetDir, createCustomRoleScriptName)
 			log.Printf("Saving script to create custom role %s locally at %s", roleName, createCustomRoleScriptFullPath)
-			if err := ioutil.WriteFile(createCustomRoleScriptFullPath, []byte(createCustomRoleScript), fileModeCcoctlDryRun); err != nil {
+			if err := os.WriteFile(createCustomRoleScriptFullPath, []byte(createCustomRoleScript), fileModeCcoctlDryRun); err != nil {
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to save script to create custom role %s locally at %s", roleName, createCustomRoleScriptFullPath))
 			}
 			// add full resource name of the role
@@ -204,7 +203,7 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		addPolicyBindingScriptName := fmt.Sprintf(addIAMPolicyBindingScriptName, serviceAccountNum, serviceAccountName)
 		addPolicyBindingScriptFullPath := filepath.Join(targetDir, addPolicyBindingScriptName)
 		log.Printf("Saving script to add policy bindings for service account %s locally at %s", serviceAccountName, addPolicyBindingScriptFullPath)
-		if err := ioutil.WriteFile(addPolicyBindingScriptFullPath, []byte(addPolicyBindingScript), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(addPolicyBindingScriptFullPath, []byte(addPolicyBindingScript), fileModeCcoctlDryRun); err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save script to add policy bindings for service account %s locally at %s", serviceAccountName, addPolicyBindingScriptFullPath))
 		}
 
@@ -217,7 +216,7 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		generateCredentialsConfigScriptName := fmt.Sprintf(generateCredentialsConfigScriptName, serviceAccountNum, serviceAccountName)
 		generateCredentialsConfigScriptFullPath := filepath.Join(targetDir, generateCredentialsConfigScriptName)
 		log.Printf("Saving script to generate credentials config for service account %s locally at %s", serviceAccountName, generateCredentialsConfigScriptFullPath)
-		if err := ioutil.WriteFile(generateCredentialsConfigScriptFullPath, []byte(generateCredentialsConfigScript), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(generateCredentialsConfigScriptFullPath, []byte(generateCredentialsConfigScript), fileModeCcoctlDryRun); err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save script to generate credentials config for service account %s locally at %s", serviceAccountName, generateCredentialsConfigScriptFullPath))
 		}
 
@@ -432,7 +431,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, encodedCred
 		fileData = fileData + fmt.Sprintf("\nPOPULATE service_account.json FIELD WITH BASE 64 ENCODED CREDENTIALS CONFIG JSON GENERATED FROM SCRIPT %s", generateCredentialsConfigScriptPath)
 	}
 
-	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
+	if err := os.WriteFile(filePath, []byte(fileData), 0600); err != nil {
 		return errors.Wrap(err, "Failed to save Secret file")
 	}
 

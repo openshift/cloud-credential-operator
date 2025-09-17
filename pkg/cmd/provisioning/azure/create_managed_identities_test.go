@@ -3,7 +3,6 @@ package azure
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -141,11 +140,11 @@ func TestCreateManagedIdentities(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
 
-				files, err = ioutil.ReadDir(filepath.Join(targetDir, provisioning.ManifestsDirName))
+				files, err = os.ReadDir(filepath.Join(targetDir, provisioning.ManifestsDirName))
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -199,12 +198,12 @@ func TestCreateManagedIdentities(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
-				files, err := ioutil.ReadDir(tempDirName)
+				files, err := os.ReadDir(tempDirName)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files in targetDir")
 
 				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
-				files, err = ioutil.ReadDir(manifestsDirPath)
+				files, err = os.ReadDir(manifestsDirPath)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -235,12 +234,12 @@ func TestCreateManagedIdentities(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
-				files, err := ioutil.ReadDir(tempDirName)
+				files, err := os.ReadDir(tempDirName)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files in targetDir")
 
 				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
-				files, err = ioutil.ReadDir(manifestsDirPath)
+				files, err = os.ReadDir(manifestsDirPath)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -295,12 +294,12 @@ func TestCreateManagedIdentities(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
-				files, err := ioutil.ReadDir(tempDirName)
+				files, err := os.ReadDir(tempDirName)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files in targetDir")
 
 				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
-				files, err = ioutil.ReadDir(manifestsDirPath)
+				files, err = os.ReadDir(manifestsDirPath)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -333,11 +332,11 @@ func TestCreateManagedIdentities(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
 
-				files, err = ioutil.ReadDir(filepath.Join(targetDir, provisioning.ManifestsDirName))
+				files, err = os.ReadDir(filepath.Join(targetDir, provisioning.ManifestsDirName))
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -395,12 +394,12 @@ func TestCreateManagedIdentities(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
-				files, err := ioutil.ReadDir(tempDirName)
+				files, err := os.ReadDir(tempDirName)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files in targetDir")
 
 				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
-				files, err = ioutil.ReadDir(manifestsDirPath)
+				files, err = os.ReadDir(manifestsDirPath)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -455,12 +454,12 @@ func TestCreateManagedIdentities(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
-				files, err := ioutil.ReadDir(tempDirName)
+				files, err := os.ReadDir(tempDirName)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files in targetDir")
 
 				manifestsDirPath := filepath.Join(tempDirName, provisioning.ManifestsDirName)
-				files, err = ioutil.ReadDir(manifestsDirPath)
+				files, err = os.ReadDir(manifestsDirPath)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 
@@ -826,7 +825,7 @@ func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetS
 		credReq = fmt.Sprintf(credReqTemplate, crName, targetSecretName, targetSecretNamespace)
 	}
 
-	f, err := ioutil.TempFile(targetDir, "testCredReq*.yaml")
+	f, err := os.CreateTemp(targetDir, "testCredReq*.yaml")
 	require.NoError(t, err, "error creating temp file for CredentialsRequest")
 	defer f.Close()
 

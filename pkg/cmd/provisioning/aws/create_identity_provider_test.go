@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -71,7 +70,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
@@ -92,10 +91,10 @@ func TestCreateIdentityProvider(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				err = os.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
 				require.NoError(t, err, "errored while setting up environment for test")
 
 				return tempDirName
@@ -122,10 +121,10 @@ func TestCreateIdentityProvider(t *testing.T) {
 			},
 			createPrivateS3: true,
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				err = os.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
 				require.NoError(t, err, "errored while setting up environment for test")
 
 				return tempDirName
@@ -140,17 +139,17 @@ func TestCreateIdentityProvider(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				err = os.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
 				require.NoError(t, err, "errored while setting up environment for test")
 
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
 				// Validating the issuer URL in the discovery document
-				discoveryDocument, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcConfigurationFilename))
+				discoveryDocument, err := os.ReadFile(filepath.Join(tempDirName, oidcConfigurationFilename))
 				require.NoError(t, err, "error reading in discovery document")
 
 				var discoveryDocumentJSON map[string]interface{}
@@ -167,7 +166,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 				assert.Equal(t, fmt.Sprintf("%s/%s", issuerURL, provisioning.KeysURI), jwksURI, "unexpected jwks uri")
 
 				// Comparing key ID from the JSON web key with the one generated from the public key
-				jwks, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcKeysFilename))
+				jwks, err := os.ReadFile(filepath.Join(tempDirName, oidcKeysFilename))
 				require.NoError(t, err, "error reading in JSON web key set (JWKS)")
 
 				var jwksJSON map[string]interface{}
@@ -196,17 +195,17 @@ func TestCreateIdentityProvider(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
-				err = ioutil.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				err = os.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
 				require.NoError(t, err, "errored while setting up environment for test")
 
 				return tempDirName
 			},
 			verify: func(t *testing.T, tempDirName string) {
 				// Validating the issuer URL in the discovery document
-				discoveryDocument, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcConfigurationFilename))
+				discoveryDocument, err := os.ReadFile(filepath.Join(tempDirName, oidcConfigurationFilename))
 				require.NoError(t, err, "error reading in discovery document")
 
 				var discoveryDocumentJSON map[string]interface{}
@@ -222,7 +221,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 				assert.Equal(t, fmt.Sprintf("%s/%s", placeholderCloudFrontURL, provisioning.KeysURI), jwksURI, "unexpected jwks uri")
 
 				// Comparing key ID from the JSON web key with the one generated from the public key
-				jwks, err := ioutil.ReadFile(filepath.Join(tempDirName, oidcKeysFilename))
+				jwks, err := os.ReadFile(filepath.Join(tempDirName, oidcKeysFilename))
 				require.NoError(t, err, "error reading in JSON web key set (JWKS)")
 
 				var jwksJSON map[string]interface{}

@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -56,16 +55,16 @@ func TestCreateServiceAccounts(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
 				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err = os.ReadDir(manifestsDir)
 				require.NoError(t, err, "Unexpected error listing files in manifestsDir")
 				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -80,7 +79,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
@@ -89,11 +88,11 @@ func TestCreateServiceAccounts(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
 				assert.Equal(t, 4, countNonDirectoryFiles(files), "Should be exactly 4 shell scripts")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err = os.ReadDir(manifestsDir)
 				require.NoError(t, err, "Unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -116,7 +115,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
@@ -125,11 +124,11 @@ func TestCreateServiceAccounts(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
 				assert.Zero(t, countNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err = os.ReadDir(manifestsDir)
 				require.NoError(t, err, "Unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -147,7 +146,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
@@ -174,7 +173,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, testCredReqName, testTargetNamespaceName, testTargetSecretName, tempDirName)
@@ -196,7 +195,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			credReqDir := test.setup(t)
 			defer os.RemoveAll(credReqDir)
 
-			targetDir, err := ioutil.TempDir(os.TempDir(), "create_service_account_test")
+			targetDir, err := os.MkdirTemp(os.TempDir(), "create_service_account_test")
 			require.NoError(t, err, "Unexpected error creating target dir for test")
 			defer os.RemoveAll(targetDir)
 
@@ -244,7 +243,7 @@ spec:
 
 	credReq := fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
 
-	f, err := ioutil.TempFile(targetDir, "testCredReq*.yaml")
+	f, err := os.CreateTemp(targetDir, "testCredReq*.yaml")
 	require.NoError(t, err, "error creating temp file for CredentialsRequest")
 	defer f.Close()
 
@@ -255,7 +254,7 @@ spec:
 }
 
 // countNonDirectoryFiles counts files which are not a directory
-func countNonDirectoryFiles(files []os.FileInfo) int {
+func countNonDirectoryFiles(files []os.DirEntry) int {
 	NonDirectoryFiles := 0
 	for _, f := range files {
 		if !f.IsDir() {
