@@ -2,7 +2,6 @@ package ibmcloud
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -51,7 +50,7 @@ func TestCreateSecretsCmd(t *testing.T) {
 			name: "CreateSharedSecretsCmd with unset API key environment variable should fail",
 			setup: func(t *testing.T) string {
 				os.Setenv(APIKeyEnvVars[0], "")
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -73,7 +72,7 @@ func TestCreateSecretsCmd(t *testing.T) {
 			credReqDir := test.setup(t)
 			defer os.RemoveAll(credReqDir)
 
-			targetDir, err := ioutil.TempDir(os.TempDir(), "ibmcloudcreatetest")
+			targetDir, err := os.MkdirTemp(os.TempDir(), "ibmcloudcreatetest")
 			require.NoError(t, err, "Unexpected error creating temp dir for test")
 
 			manifestsDir := filepath.Join(targetDir, manifestsDirName)
@@ -116,12 +115,12 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, countNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -138,7 +137,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -146,7 +145,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -163,7 +162,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequestPowerVS(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -171,7 +170,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -190,7 +189,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -199,7 +198,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				//TODO(mkumatag): add validation to check for the rules created for the resource group if mentioned
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -213,7 +212,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -222,7 +221,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
 				//TODO(mkumatag): add validation to check for the rules created for the resource group if mentioned
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 0, countNonDirectoryFiles(files), "Should not any secret in manifestsDir")
 			},
@@ -237,7 +236,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -254,7 +253,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequestNonIBM(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -262,7 +261,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 0, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -278,7 +277,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return "non-existingdir"
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 0, countNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -293,7 +292,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -314,7 +313,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -336,7 +335,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -358,7 +357,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -376,7 +375,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -394,7 +393,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -415,7 +414,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 			credReqDir := tt.setup(t)
 			defer os.RemoveAll(credReqDir)
 
-			targetDir, err := ioutil.TempDir(os.TempDir(), "iamroletest")
+			targetDir, err := os.MkdirTemp(os.TempDir(), "iamroletest")
 			require.NoError(t, err, "unexpected error creating target dir for test")
 			defer os.RemoveAll(targetDir)
 
@@ -454,7 +453,7 @@ func TestCreateSharedSecretsInvalidTargetDir(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName)
@@ -485,7 +484,7 @@ func TestCreateSharedSecretsInvalidTargetDir(t *testing.T) {
 }
 
 func writeToTempFile(t *testing.T, targetDir, content string) {
-	f, err := ioutil.TempFile(targetDir, "testCredReq*.yaml")
+	f, err := os.CreateTemp(targetDir, "testCredReq*.yaml")
 	require.NoError(t, err, "error creating temp file for CredentialsRequest")
 	defer f.Close()
 
@@ -697,7 +696,7 @@ func mockDeleteAPIKey(client *mockibmcloud.MockClient, fail bool, times int) {
 
 // countNonDirectoryFiles counts files which are not a directory
 // TODO(mkumatag): duplicate code from aws tests, need to explore moving to some common location
-func countNonDirectoryFiles(files []os.FileInfo) int {
+func countNonDirectoryFiles(files []os.DirEntry) int {
 	NonDirectoryFiles := 0
 	for _, f := range files {
 		if !f.IsDir() {

@@ -2,7 +2,6 @@ package aws
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
@@ -86,16 +85,16 @@ func TestIAMRoles(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in targetDir when no CredReqs to process")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err = os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -109,7 +108,7 @@ func TestIAMRoles(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
@@ -118,11 +117,11 @@ func TestIAMRoles(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Equal(t, 2, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 IAM Role JSON and 1 IAM Role Policy file for each CredReq")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err = os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -140,7 +139,7 @@ func TestIAMRoles(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
@@ -149,11 +148,11 @@ func TestIAMRoles(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err = os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -171,7 +170,7 @@ func TestIAMRoles(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, "validcredreq", "namespace1", "secretName1", tempDirName, false)
@@ -183,11 +182,11 @@ func TestIAMRoles(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir, manifestsDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 
-				files, err = ioutil.ReadDir(manifestsDir)
+				files, err = os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one valid CredReq, CredReq marked for deletion should be ignored")
 			},
@@ -205,7 +204,7 @@ func TestIAMRoles(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
@@ -227,7 +226,7 @@ func TestIAMRoles(t *testing.T) {
 				return mockAWSClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				err = testCredentialsRequest(t, "firstcredreq", "namespace1", "secretName1", tempDirName, false)
@@ -236,7 +235,7 @@ func TestIAMRoles(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 secret in manifestsDir for one CredReq")
 			},
@@ -253,7 +252,7 @@ func TestIAMRoles(t *testing.T) {
 			credReqDir := test.setup(t)
 			defer os.RemoveAll(credReqDir)
 
-			targetDir, err := ioutil.TempDir(os.TempDir(), "iamroletest")
+			targetDir, err := os.MkdirTemp(os.TempDir(), "iamroletest")
 			require.NoError(t, err, "unexpected error creating target dir for test")
 			defer os.RemoveAll(targetDir)
 
@@ -281,7 +280,7 @@ func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetS
 		credReq = fmt.Sprintf(credReqTemplate, crName, targetSecretNamespace, targetSecretName)
 	}
 
-	f, err := ioutil.TempFile(targetDir, "testCredReq*.yaml")
+	f, err := os.CreateTemp(targetDir, "testCredReq*.yaml")
 	require.NoError(t, err, "error creating temp file for CredentialsRequest")
 	defer f.Close()
 

@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -68,19 +67,19 @@ func TestCreateSharedSecrets(t *testing.T) {
 		{
 			name: "No CredentialsRequest manifests in directory",
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
-				credReqDir, err := ioutil.TempDir(os.TempDir(), testCredReqDirPrefix)
+				credReqDir, err := os.MkdirTemp(os.TempDir(), testCredReqDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
-				targetDir, err = ioutil.TempDir(os.TempDir(), testTargetDirPrefix)
+				targetDir, err = os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
-				credentialsDir, err := ioutil.TempDir(os.TempDir(), testCredentialsDirPrefix)
+				credentialsDir, err := os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials")
 				credentialsSourceFilepath = testBasicAuthCredentials(t, "username", "password", credentialsDir)
 				return
 			},
 			verify: func(t *testing.T, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, len(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -89,20 +88,20 @@ func TestCreateSharedSecrets(t *testing.T) {
 		{
 			name: "One CredentialsRequest manifests in directory",
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
-				credReqDir, err := ioutil.TempDir(os.TempDir(), testCredReqDirPrefix)
+				credReqDir, err := os.MkdirTemp(os.TempDir(), testCredReqDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 				testCredentialsRequest(t, "credreq-test", "NutanixProviderSpec", "secret-ns", "secret-name", credReqDir)
 
-				targetDir, err = ioutil.TempDir(os.TempDir(), testTargetDirPrefix)
+				targetDir, err = os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
-				credentialsDir, err := ioutil.TempDir(os.TempDir(), testCredentialsDirPrefix)
+				credentialsDir, err := os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials")
 				credentialsSourceFilepath = testBasicAuthCredentials(t, "username", "password", credentialsDir)
 				return
 			},
 			verify: func(t *testing.T, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Len(t, files, 1, "Should be exactly one files in manifestsDir when one CredReq to process")
 			},
@@ -111,20 +110,20 @@ func TestCreateSharedSecrets(t *testing.T) {
 		{
 			name: "Credential generated based on credentials source file with only Prism Central Credentials",
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
-				credReqDir, err := ioutil.TempDir(os.TempDir(), testCredReqDirPrefix)
+				credReqDir, err := os.MkdirTemp(os.TempDir(), testCredReqDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 				testCredentialsRequest(t, "credreq-test", "NutanixProviderSpec", "secret-ns", "secret-name", credReqDir)
 
-				targetDir, err = ioutil.TempDir(os.TempDir(), testTargetDirPrefix)
+				targetDir, err = os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
-				credentialsDir, err := ioutil.TempDir(os.TempDir(), testCredentialsDirPrefix)
+				credentialsDir, err := os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials")
 				credentialsSourceFilepath = testBasicAuthCredentials(t, "username", "password", credentialsDir)
 				return
 			},
 			verify: func(t *testing.T, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Len(t, files, 1, "Should be exactly one files in manifestsDir when one CredReq to process")
 				contents := getSecretFromFileContents(t, filepath.Join(manifestsDir, files[0].Name()))
@@ -137,20 +136,20 @@ func TestCreateSharedSecrets(t *testing.T) {
 		{
 			name: "Credential generated based on credentials source file with Prism Element Credentials included",
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
-				credReqDir, err := ioutil.TempDir(os.TempDir(), testCredReqDirPrefix)
+				credReqDir, err := os.MkdirTemp(os.TempDir(), testCredReqDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 				testCredentialsRequest(t, "credreq-test", "NutanixProviderSpec", "secret-ns", "secret-name", credReqDir)
 
-				targetDir, err = ioutil.TempDir(os.TempDir(), testTargetDirPrefix)
+				targetDir, err = os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
-				credentialsDir, err := ioutil.TempDir(os.TempDir(), testCredentialsDirPrefix)
+				credentialsDir, err := os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials")
 				credentialsSourceFilepath = testBasicAuthCredentialsWithPE(t, "username", "password", "pe", "username", "password", credentialsDir)
 				return
 			},
 			verify: func(t *testing.T, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Len(t, files, 1, "Should be exactly one files in manifestsDir when one CredReq to process")
 				contents := getSecretFromFileContents(t, filepath.Join(manifestsDir, files[0].Name()))
@@ -166,17 +165,17 @@ func TestCreateSharedSecrets(t *testing.T) {
 		{
 			name: "Non-existent source credentials file",
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
-				credReqDir, err := ioutil.TempDir(os.TempDir(), testCredReqDirPrefix)
+				credReqDir, err := os.MkdirTemp(os.TempDir(), testCredReqDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
-				targetDir, err = ioutil.TempDir(os.TempDir(), testTargetDirPrefix)
+				targetDir, err = os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
 				credentialsSourceFilepath = "does/not/exist"
 				return
 			},
 			verify: func(t *testing.T, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, len(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -187,16 +186,16 @@ func TestCreateSharedSecrets(t *testing.T) {
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
 				credReqDir = "does/not/exist"
 
-				targetDir, err := ioutil.TempDir(os.TempDir(), testTargetDirPrefix)
+				targetDir, err := os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials requests")
 
-				credentialsDir, err := ioutil.TempDir(os.TempDir(), testCredentialsDirPrefix)
+				credentialsDir, err := os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials")
 				credentialsSourceFilepath = testBasicAuthCredentials(t, "username", "password", credentialsDir)
 				return
 			},
 			verify: func(t *testing.T, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Zero(t, len(files), "Should be no files in manifestsDir when no CredReqs to process")
 			},
@@ -205,7 +204,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 		{
 			name: "Same directory for credentials requests, credentials source, and credentials",
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
-				tmpDir, err := ioutil.TempDir(os.TempDir(), testCredentialsDirPrefix)
+				tmpDir, err := os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory for credentials")
 				credReqDir = tmpDir
 				targetDir = tmpDir
@@ -214,7 +213,7 @@ func TestCreateSharedSecrets(t *testing.T) {
 				return
 			},
 			verify: func(t *testing.T, manifestsDir string) {
-				files, err := ioutil.ReadDir(manifestsDir)
+				files, err := os.ReadDir(manifestsDir)
 				require.NoError(t, err, "unexpected error listing files in manifestsDir")
 				assert.Len(t, files, 1, "Should be exactly one files in manifestsDir when one CredReq to process")
 				contents := getSecretFromFileContents(t, filepath.Join(manifestsDir, files[0].Name()))
@@ -283,7 +282,7 @@ func getBasicAuthCredentialsWithPE(pcUsername, pcPassword, peName, peUsername, p
 
 func writeToTempFile(t *testing.T, targetDir, content, prefix, extension string) string {
 	filePattern := fmt.Sprintf("%s*.%s", prefix, extension)
-	f, err := ioutil.TempFile(targetDir, filePattern)
+	f, err := os.CreateTemp(targetDir, filePattern)
 	require.NoError(t, err, "error creating temp file for %s", filePattern)
 	defer f.Close()
 
@@ -293,7 +292,7 @@ func writeToTempFile(t *testing.T, targetDir, content, prefix, extension string)
 }
 
 func getSecretFromFileContents(t *testing.T, path string) *kubernetes.BasicAuthCredential {
-	contents, err := ioutil.ReadFile(path)
+	contents, err := os.ReadFile(path)
 	require.NoError(t, err, "should be able to real contents of file")
 
 	data := struct {

@@ -3,7 +3,6 @@ package aws
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -144,7 +143,7 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		roleFilename := fmt.Sprintf(roleFilenameFormat, roleNum, roleName)
 		roleFullPath := filepath.Join(targetDir, roleFilename)
 		log.Printf("Saving %s locally at %s", roleDescription, roleFullPath)
-		if err := ioutil.WriteFile(roleFullPath, roleJSON, fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(roleFullPath, roleJSON, fileModeCcoctlDryRun); err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save %s locally at %s", roleDescription, roleFullPath))
 		}
 
@@ -162,7 +161,7 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		rolePolicyFilename := fmt.Sprintf(rolePolicyFilenameFormat, roleNum, roleName)
 		rolePolicyFullPath := filepath.Join(targetDir, rolePolicyFilename)
 		log.Printf("Saving policy for %s locally at %s", roleDescription, rolePolicyFullPath)
-		if err := ioutil.WriteFile(rolePolicyFullPath, rolePolicyJSON, fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(rolePolicyFullPath, rolePolicyJSON, fileModeCcoctlDryRun); err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save policy for %s locally at %s", roleDescription, rolePolicyFullPath))
 		}
 
@@ -358,7 +357,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir, roleARN str
 		fileData = fileData + "\nPOPULATE ROLE ARN AND DELETE THIS LINE"
 	}
 
-	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
+	if err := os.WriteFile(filePath, []byte(fileData), 0600); err != nil {
 		return errors.Wrap(err, "Failed to save Secret file")
 	}
 
