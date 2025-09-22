@@ -37,8 +37,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/iam"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccaws "github.com/openshift/cloud-credential-operator/pkg/aws"
@@ -61,19 +62,19 @@ const (
 )
 
 var (
-	failedSimulationResponse = &iam.SimulatePolicyResponse{
-		EvaluationResults: []*iam.EvaluationResult{
+	failedSimulationResponse = &iam.SimulatePrincipalPolicyOutput{
+		EvaluationResults: []iamtypes.EvaluationResult{
 			{
-				EvalDecision:   aws.String("notallowed"),
-				EvalActionName: aws.String("SomeAWSAction"),
+				EvalDecision:   iamtypes.PolicyEvaluationDecisionTypeImplicitDeny,
+				EvalActionName: awssdk.String("SomeAWSAction"),
 			},
 		},
 	}
-	successfulSimulateResponse = &iam.SimulatePolicyResponse{
-		EvaluationResults: []*iam.EvaluationResult{
+	successfulSimulateResponse = &iam.SimulatePrincipalPolicyOutput{
+		EvaluationResults: []iamtypes.EvaluationResult{
 			{
-				EvalDecision:   aws.String("allowed"),
-				EvalActionName: aws.String("SomeAWSAction"),
+				EvalDecision:   iamtypes.PolicyEvaluationDecisionTypeAllowed,
+				EvalActionName: awssdk.String("SomeAWSAction"),
 			},
 		},
 	}
@@ -389,48 +390,40 @@ func testInfrastructure(platformType configv1.PlatformType) *configv1.Infrastruc
 func mockGetRootUser(mockAWSClient *mockaws.MockClient) {
 	rootAcctNum := "123456789012"
 
-	mockAWSClient.EXPECT().GetUser(nil).Return(&iam.GetUserOutput{
-		User: &iam.User{
-			UserName: aws.String("name-of-aws-account"),
-			Arn:      aws.String("arn:aws:iam::" + rootAcctNum + ":root"),
-			UserId:   aws.String(rootAcctNum),
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(&iam.GetUserOutput{
+		User: &iamtypes.User{
+			UserName: awssdk.String("name-of-aws-account"),
+			Arn:      awssdk.String("arn:aws:iam::" + rootAcctNum + ":root"),
+			UserId:   awssdk.String(rootAcctNum),
 		},
 	}, nil)
 }
 
 func mockGetUser(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().GetUser(nil).Return(&iam.GetUserOutput{
-		User: &iam.User{
-			UserName: aws.String(testAWSUser),
-			Arn:      aws.String(testAWSUserARN),
-			UserId:   aws.String(testAWSAccessKeyID),
+	mockAWSClient.EXPECT().GetUser(gomock.Any(), gomock.Any()).Return(&iam.GetUserOutput{
+		User: &iamtypes.User{
+			UserName: awssdk.String(testAWSUser),
+			Arn:      awssdk.String(testAWSUserARN),
+			UserId:   awssdk.String(testAWSAccessKeyID),
 		},
 	}, nil)
 }
 
 func mockSimulatePrincipalPolicyCredMinterSuccess(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
-		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
-			f(successfulSimulateResponse, true)
-		})
+	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(successfulSimulateResponse, nil)
 }
 
 func mockSimulatePrincipalPolicyCredMinterFail(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
-		// Now in the Do() receive the lambda function f() so we can send it the failed result
-		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
-			f(failedSimulationResponse, true)
-		})
+	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(failedSimulationResponse, nil)
 }
 
 func mockSimulatePrincipalPolicyCredPassthrough(mockAWSClient *mockaws.MockClient, expectedRegion string) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
-		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
+	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any(), gomock.Any(), gomock.Any()).
+		DoAndReturn(func(ctx context.Context, input *iam.SimulatePrincipalPolicyInput, options ...func(*iam.Options)) (*iam.SimulatePrincipalPolicyOutput, error) {
 			if checkRegionParamSet(input, expectedRegion) {
-				f(successfulSimulateResponse, true)
-			} else {
-				f(failedSimulationResponse, true)
+				return successfulSimulateResponse, nil
 			}
+			return failedSimulationResponse, nil
 		})
 }
 
@@ -438,7 +431,7 @@ func checkRegionParamSet(input *iam.SimulatePrincipalPolicyInput, expectedRegion
 	for _, ctx := range input.ContextEntries {
 		if *ctx.ContextKeyName == "aws:RequestedRegion" {
 			for _, value := range ctx.ContextKeyValues {
-				if *value == expectedRegion {
+				if value == expectedRegion {
 					return true
 				}
 			}
@@ -448,11 +441,7 @@ func checkRegionParamSet(input *iam.SimulatePrincipalPolicyInput, expectedRegion
 }
 
 func mockSimulatePrincipalPolicyCredPassthroughFail(mockAWSClient *mockaws.MockClient) {
-	mockAWSClient.EXPECT().SimulatePrincipalPolicyPages(gomock.Any(), gomock.Any()).Return(nil).
-		// Now in the Do() receive the lambda function f() so we can send it the failed result
-		Do(func(input *iam.SimulatePrincipalPolicyInput, f func(*iam.SimulatePolicyResponse, bool) bool) {
-			f(failedSimulationResponse, true)
-		})
+	mockAWSClient.EXPECT().SimulatePrincipalPolicy(gomock.Any(), gomock.Any(), gomock.Any()).Return(failedSimulationResponse, nil)
 }
 
 func validateSecretAnnotation(c client.Client, t *testing.T, value string) {

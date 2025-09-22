@@ -1,6 +1,7 @@
 package aws
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,9 +12,9 @@ import (
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/awserr"
-	"github.com/aws/aws-sdk-go/service/iam"
+	awssdk "github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/iam"
+	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
@@ -173,51 +174,44 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 		return "", nil
 
 	default:
-		var role *iam.Role
-		outRole, err := awsClient.GetRole(&iam.GetRoleInput{
+		var role *iamtypes.Role
+		outRole, err := awsClient.GetRole(context.Background(), &iam.GetRoleInput{
 			RoleName: awssdk.String(shortenedRoleName),
 		})
 
 		if err != nil {
-			var aerr awserr.Error
-			if errors.As(err, &aerr) {
-				switch aerr.Code() {
-				case iam.ErrCodeNoSuchEntityException:
+			var aerr *iamtypes.NoSuchEntityException
+			if !errors.As(err, &aerr) {
+				return "", err
+			}
+			roleInput := &iam.CreateRoleInput{
+				RoleName:                 awssdk.String(shortenedRoleName),
+				Description:              awssdk.String(roleDescription),
+				AssumeRolePolicyDocument: awssdk.String(rolePolicyDocument),
+				Tags: []iamtypes.Tag{
+					{
+						Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name)),
+						Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
+					},
+					{
+						Key:   awssdk.String(nameTagKey),
+						Value: awssdk.String(name),
+					},
+				},
+			}
+			if PermissionsBoundaryARN != "" {
+				roleInput.PermissionsBoundary = awssdk.String(PermissionsBoundaryARN)
+			}
+			roleOutput, err := awsClient.CreateRole(context.Background(), roleInput)
+			if err != nil {
+				return "", errors.Wrap(err, "Failed to create role")
+			}
 
-					roleInput := &iam.CreateRoleInput{
-						RoleName:                 awssdk.String(shortenedRoleName),
-						Description:              awssdk.String(roleDescription),
-						AssumeRolePolicyDocument: awssdk.String(rolePolicyDocument),
-						Tags: []*iam.Tag{
-							{
-								Key:   awssdk.String(fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name)),
-								Value: awssdk.String(ownedCcoctlAWSResourceTagValue),
-							},
-							{
-								Key:   awssdk.String(nameTagKey),
-								Value: awssdk.String(name),
-							},
-						},
-					}
-					if PermissionsBoundaryARN != "" {
-						roleInput.PermissionsBoundary = awssdk.String(PermissionsBoundaryARN)
-					}
-					roleOutput, err := awsClient.CreateRole(roleInput)
-					if err != nil {
-						return "", errors.Wrap(err, "Failed to create role")
-					}
+			role = roleOutput.Role
+			log.Printf("Role %s created", *role.Arn)
 
-					role = roleOutput.Role
-					log.Printf("Role %s created", *role.Arn)
-
-					if err := writeCredReqSecret(credReq, targetDir, *role.Arn); err != nil {
-						return "", errors.Wrap(err, "failed to save Secret for install manifests")
-					}
-
-				default:
-					return "", err
-				}
-
+			if err := writeCredReqSecret(credReq, targetDir, *role.Arn); err != nil {
+				return "", errors.Wrap(err, "failed to save Secret for install manifests")
 			}
 		} else {
 			role = outRole.Role
@@ -229,7 +223,7 @@ func createRole(awsClient aws.Client, name string, credReq *credreqv1.Credential
 			}
 		}
 
-		_, err = awsClient.PutRolePolicy(&iam.PutRolePolicyInput{
+		_, err = awsClient.PutRolePolicy(context.Background(), &iam.PutRolePolicyInput{
 			PolicyName:     awssdk.String(shortenedRoleName),
 			RoleName:       role.RoleName,
 			PolicyDocument: awssdk.String(rolePolicy),
@@ -275,7 +269,7 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 		return "<enter_issuer_url_here>", nil
 	}
 
-	idProvider, err := awsClient.GetOpenIDConnectProvider(&iam.GetOpenIDConnectProviderInput{
+	idProvider, err := awsClient.GetOpenIDConnectProvider(context.Background(), &iam.GetOpenIDConnectProviderInput{
 		OpenIDConnectProviderArn: awssdk.String(idProviderARN),
 	})
 
@@ -287,12 +281,10 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 }
 
 func createIAMRolesCmd(cmd *cobra.Command, args []string) {
-	s, err := awsSession(CreateIAMRolesOpts.Region)
+	awsClient, err := newAWSClient(CreateAllOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
-
-	awsClient := aws.NewClientFromSession(s)
 
 	err = createIAMRoles(awsClient, CreateIAMRolesOpts.IdentityProviderARN, CreateIAMRolesOpts.PermissionsBoundaryARN, CreateIAMRolesOpts.Name,
 		CreateIAMRolesOpts.CredRequestDir, CreateIAMRolesOpts.TargetDir, CreateIAMRolesOpts.EnableTechPreview, CreateIAMRolesOpts.DryRun)
