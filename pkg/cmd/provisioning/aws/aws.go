@@ -1,11 +1,13 @@
 package aws
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 
-	awssdk "github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go-v2/config"
 
+	"github.com/openshift/cloud-credential-operator/pkg/aws"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 )
 
@@ -39,13 +41,16 @@ func NewAWSCmd() *cobra.Command {
 	return createCmd
 }
 
-func awsSession(region string) (*session.Session, error) {
-	cfg := awssdk.Config{
-		Region: awssdk.String(region),
+func newAWSClient(region string) (aws.Client, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion(region))
+	if err != nil {
+		return nil, err
 	}
 
-	return session.NewSessionWithOptions(session.Options{
-		Config:            cfg,
-		SharedConfigState: session.SharedConfigEnable,
-	})
+	awsClient, err := aws.NewClientFromConfig(cfg, "")
+	if err != nil {
+		return nil, err
+	}
+
+	return awsClient, nil
 }
