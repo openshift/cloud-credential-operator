@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/cloudresourcemanager/v1"
 	"google.golang.org/api/iam/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
@@ -266,29 +265,31 @@ func countNonDirectoryFiles(files []os.FileInfo) int {
 }
 
 func mockListServiceAccountsEmpty(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().ListServiceAccounts(gomock.Any(), gomock.Any()).Return(
-		[]*iamadminpb.ServiceAccount{}, nil).Times(1)
+	mockGCPClient.EXPECT().ListServiceAccounts(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.ListServiceAccountsResponse{}, nil).Times(1)
 }
 
 func mockListServiceAccountsNotEmpty(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().ListServiceAccounts(gomock.Any(), gomock.Any()).Return(
-		[]*iamadminpb.ServiceAccount{
-			{
-				DisplayName: fmt.Sprintf("%s-%s", testName, testCredReqName),
-				Email:       fmt.Sprintf("%s-%s@test.domain.com", testName, testCredReqName),
+	mockGCPClient.EXPECT().ListServiceAccounts(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.ListServiceAccountsResponse{
+			Accounts: []*iam.ServiceAccount{
+				{
+					DisplayName: fmt.Sprintf("%s-%s", testName, testCredReqName),
+					Email:       fmt.Sprintf("%s-%s@test.domain.com", testName, testCredReqName),
+				},
 			},
 		}, nil).Times(1)
 }
 
 func mockListRolesEmpty(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().ListRoles(gomock.Any(), gomock.Any()).Return(
-		&iamadminpb.ListRolesResponse{}, nil).Times(1)
+	mockGCPClient.EXPECT().ListRoles(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.ListRolesResponse{}, nil).Times(1)
 }
 
 func mockListRolesNotEmpty(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().ListRoles(gomock.Any(), gomock.Any()).Return(
-		&iamadminpb.ListRolesResponse{
-			Roles: []*iamadminpb.Role{
+	mockGCPClient.EXPECT().ListRoles(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.ListRolesResponse{
+			Roles: []*iam.Role{
 				{
 					Title: fmt.Sprintf("%s-%s", testProject, testCredReqName),
 				},
@@ -297,15 +298,15 @@ func mockListRolesNotEmpty(mockGCPClient *mockgcp.MockClient) {
 }
 
 func mockCreateServiceAccountSuccessful(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any()).Return(
-		&iamadminpb.ServiceAccount{
+	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any(), gomock.Any()).Return(
+		&iam.ServiceAccount{
 			DisplayName: fmt.Sprintf("%s-service-account", testName),
 			Email:       fmt.Sprintf("%s-service-account@test.domain.com", testName),
 		}, nil).Times(1)
 }
 
 func mockCreateServiceAccountFailed(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any()).Return(
+	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any(), gomock.Any()).Return(
 		nil, fmt.Errorf("failed to create service account")).Times(1)
 }
 
@@ -341,14 +342,14 @@ func mockSetServiceAccountIamPolicy(mockGCPClient *mockgcp.MockClient) {
 }
 
 func mockCreateRole(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+	mockGCPClient.EXPECT().CreateRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.Role{
 		Name:                testCustomRoleName,
 		IncludedPermissions: testCustomRolePermissions,
 	}, nil)
 }
 
 func mockUpdateRole(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().UpdateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+	mockGCPClient.EXPECT().UpdateRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.Role{
 		Name:                testCustomRoleName,
 		IncludedPermissions: testCustomRolePermissions,
 	}, nil)

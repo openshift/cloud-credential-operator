@@ -28,7 +28,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	"google.golang.org/api/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -55,17 +55,20 @@ import (
 )
 
 const (
-	testRootGCPAuth                  = "ROOTAUTH"
-	testReadOnlyGCPAuth              = "READONLYAUTH"
-	testServiceAccountKeyPrivateData = "SECRET SERVICE ACCOUNT KEY DATA"
-	testOldPassthroughPrivateData    = "OLD SERVICE ACCOUNT KEY DATA"
-	testGCPServiceAccountID          = "a-test-svc-acct"
-	testCustomRoleID                 = "a-test-role-id"
-	testRoleName                     = "roles/appengine.appAdmin"
-	testCustomRoleName               = "projects/test-GCP-project/roles/a-test-role-id"
-	testServiceAPIName               = "appengine.googleapis.com"
-	testGCPProjectName               = "test-GCP-project"
-	testServiceAccountKeyName        = "testGCPKeyName"
+	testRootGCPAuth                    = "ROOTAUTH"
+	testReadOnlyGCPAuth                = "READONLYAUTH"
+	testServiceAccountKeyData          = "SECRET SERVICE ACCOUNT KEY DATA"
+	testServiceAccountKeyDataBase64    = "U0VDUkVUIFNFUlZJQ0UgQUNDT1VOVCBLRVkgREFUQQ=="
+	testServiceAccountKeyDataNew       = "NEW SECRET SERVICE ACCOUNT KEY DATA"
+	testServiceAccountKeyDataNewBase64 = "TkVXIFNFQ1JFVCBTRVJWSUNFIEFDQ09VTlQgS0VZIERBVEE="
+	testOldPassthroughPrivateData      = "OLD SERVICE ACCOUNT KEY DATA"
+	testGCPServiceAccountID            = "a-test-svc-acct"
+	testCustomRoleID                   = "a-test-role-id"
+	testRoleName                       = "roles/appengine.appAdmin"
+	testCustomRoleName                 = "projects/test-GCP-project/roles/a-test-role-id"
+	testServiceAPIName                 = "appengine.googleapis.com"
+	testGCPProjectName                 = "test-GCP-project"
+	testServiceAccountKeyName          = "testGCPKeyName"
 )
 
 var (
@@ -140,7 +143,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
 				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
-				assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				assert.Equal(t, testServiceAccountKeyData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -187,7 +190,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
 				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
-				assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				assert.Equal(t, testServiceAccountKeyData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -230,7 +233,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
 				require.NotNil(t, targetSecret)
-				assert.Equal(t, testServiceAccountKeyPrivateData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				assert.Equal(t, testServiceAccountKeyData, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				cr := getCredRequest(c)
 				assert.NotNil(t, cr)
 				assert.True(t, cr.Status.Provisioned)
@@ -341,7 +344,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				mockGetProjectIamPolicy(mockGCPClient, testValidPolicyBindings)
 				mockListServiceAccountKeys(mockGCPClient, testServiceAccountKeyName)
 				mockDeleteServiceAccountKey(mockGCPClient, testServiceAccountKeyName)
-				mockCreateServiceAccountKey(mockGCPClient, "NEW PRIVATE DATA")
+				mockCreateServiceAccountKey(mockGCPClient, "TkVXIFBSSVZBVEUgREFUQQ==")
 
 				return mockGCPClient
 			},
@@ -362,7 +365,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequest(t),
-				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -384,14 +387,14 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				mockGetServiceAccount(mockGCPClient)
 				mockGetProjectIamPolicy(mockGCPClient, testValidPolicyBindings)
 				mockListServiceAccountKeysEmpty(mockGCPClient)
-				mockCreateServiceAccountKey(mockGCPClient, "NEW AUTH KEY DATA")
+				mockCreateServiceAccountKey(mockGCPClient, testServiceAccountKeyDataNewBase64)
 
 				return mockGCPClient
 			},
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
 				require.NotNil(t, targetSecret)
-				assert.Equal(t, "NEW AUTH KEY DATA", string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				assert.Equal(t, testServiceAccountKeyDataNew, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
 				assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				cr := getCredRequest(c)
@@ -407,7 +410,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				testProvisionedGCPCredentialsRequest(t),
 				testGCPCredsSecret("kube-system", constants.GCPCloudCredSecretName, testRootGCPAuth),
 				testGCPCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-gcp-ro-creds", testReadOnlyGCPAuth),
-				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -432,7 +435,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				mockCreateServiceAccount(mockGCPClient)
 				mockSetProjectIamPolicy(mockGCPClient)
 				mockDeleteServiceAccountKey(mockGCPClient, testServiceAccountKeyName)
-				mockCreateServiceAccountKey(mockGCPClient, "NEW AUTH KEY DATA")
+				mockCreateServiceAccountKey(mockGCPClient, testServiceAccountKeyDataNewBase64)
 
 				return mockGCPClient
 			},
@@ -448,7 +451,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 			validate: func(c client.Client, t *testing.T) {
 				targetSecret := getCredRequestTargetSecret(c)
 				require.NotNil(t, targetSecret)
-				assert.Equal(t, "NEW AUTH KEY DATA", string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
+				assert.Equal(t, testServiceAccountKeyDataNew, string(targetSecret.Data[gcpconst.GCPAuthJSONKey]))
 				annotation := fmt.Sprintf("%s/%s", testNamespace, testCRName)
 				assert.Equal(t, annotation, targetSecret.Annotations[minterv1.AnnotationCredentialsRequest])
 				cr := getCredRequest(c)
@@ -641,7 +644,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithDeletionTimestamp(t),
-				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -670,7 +673,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 				createTestNamespace(testNamespace),
 				createTestNamespace(testSecretNamespace),
 				testGCPCredentialsRequestWithPermissionsWithDeletionTimestamp(t),
-				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyPrivateData),
+				testGCPCredsSecret(testSecretNamespace, testSecretName, testServiceAccountKeyData),
 				testClusterVersion(),
 				testInfrastructure(testInfraName),
 			},
@@ -1146,7 +1149,7 @@ func mockGetProjectName(mockGCPClient *mockgcp.MockClient) {
 }
 
 func mockGetServiceAccount(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).AnyTimes().Return(&iamadminpb.ServiceAccount{
+	mockGCPClient.EXPECT().GetServiceAccount(gomock.Any(), gomock.Any()).AnyTimes().Return(&iam.ServiceAccount{
 		Name:  testGCPServiceAccountID,
 		Email: fmt.Sprintf("%s@%s.iam.gserviceaccount.com", testGCPServiceAccountID, testGCPProjectName),
 	}, nil)
@@ -1172,18 +1175,14 @@ func mockGetProjectIamPolicy(mockGCPClient *mockgcp.MockClient, bindings []*clou
 }
 
 func mockGetRole(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().GetRole(gomock.Any(), &iamadminpb.GetRoleRequest{
-		Name: testRoleName,
-	}).Return(&iamadminpb.Role{
+	mockGCPClient.EXPECT().GetRole(gomock.Any(), testRoleName).Return(&iam.Role{
 		Name:                testRoleName,
 		IncludedPermissions: testRolePermissions,
 	}, nil).MaxTimes(2)
 }
 
 func mockGetCustomRoleSuccess(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().GetRole(gomock.Any(), &iamadminpb.GetRoleRequest{
-		Name: testCustomRoleName,
-	}).Return(&iamadminpb.Role{
+	mockGCPClient.EXPECT().GetRole(gomock.Any(), testCustomRoleName).Return(&iam.Role{
 		Name:                testCustomRoleName,
 		IncludedPermissions: testRolePermissions,
 	}, nil)
@@ -1195,14 +1194,14 @@ func mockGetRoleFailed(mockGCPClient *mockgcp.MockClient) {
 }
 
 func mockCreateRole(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+	mockGCPClient.EXPECT().CreateRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.Role{
 		Name:                testCustomRoleName,
 		IncludedPermissions: testRolePermissions,
 	}, nil)
 }
 
 func mockUpdateRole(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().UpdateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{
+	mockGCPClient.EXPECT().UpdateRole(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.Role{
 		Name:                testCustomRoleName,
 		IncludedPermissions: testRolePermissions,
 	}, nil)
@@ -1219,12 +1218,12 @@ func mockListServicesEnabled(mockGCPClient *mockgcp.MockClient) {
 }
 
 func mockQueryableTestablePermissions(mockGCPClient *mockgcp.MockClient) {
-	permResponse := []*iamadminpb.Permission{}
+	permResponse := []*iam.Permission{}
 
 	for _, perm := range testRolePermissions {
-		permResponse = append(permResponse, &iamadminpb.Permission{Name: perm})
+		permResponse = append(permResponse, &iam.Permission{Name: perm})
 	}
-	mockGCPClient.EXPECT().QueryTestablePermissions(gomock.Any(), gomock.Any()).Return(&iamadminpb.QueryTestablePermissionsResponse{
+	mockGCPClient.EXPECT().QueryTestablePermissions(gomock.Any(), gomock.Any()).Return(&iam.QueryTestablePermissionsResponse{
 		Permissions: permResponse,
 	}, nil)
 }
@@ -1252,11 +1251,11 @@ func mockDeleteServiceAccountKey(mockGCPClient *mockgcp.MockClient, customName s
 	if customName != "" {
 		keyName = customName
 	}
-	mockGCPClient.EXPECT().DeleteServiceAccountKey(gomock.Any(), &iamadminpb.DeleteServiceAccountKeyRequest{Name: keyName}).Return(nil)
+	mockGCPClient.EXPECT().DeleteServiceAccountKey(gomock.Any(), keyName).Return(nil)
 }
 
 func mockListServiceAccountKeysEmpty(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().ListServiceAccountKeys(gomock.Any(), gomock.Any()).Return(&iamadminpb.ListServiceAccountKeysResponse{}, nil)
+	mockGCPClient.EXPECT().ListServiceAccountKeys(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.ListServiceAccountKeysResponse{}, nil)
 }
 
 func mockListServiceAccountKeys(mockGCPClient *mockgcp.MockClient, customName string) {
@@ -1264,8 +1263,8 @@ func mockListServiceAccountKeys(mockGCPClient *mockgcp.MockClient, customName st
 	if customName != "" {
 		keyName = customName
 	}
-	mockGCPClient.EXPECT().ListServiceAccountKeys(gomock.Any(), gomock.Any()).Return(&iamadminpb.ListServiceAccountKeysResponse{
-		Keys: []*iamadminpb.ServiceAccountKey{
+	mockGCPClient.EXPECT().ListServiceAccountKeys(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.ListServiceAccountKeysResponse{
+		Keys: []*iam.ServiceAccountKey{
 			{
 				Name: keyName,
 			},
@@ -1278,17 +1277,17 @@ func mockDeleteServiceAccount(mockGCPClient *mockgcp.MockClient) {
 }
 
 func mockCreateServiceAccount(mockGCPClient *mockgcp.MockClient) {
-	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any()).Return(&iamadminpb.ServiceAccount{
+	mockGCPClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.ServiceAccount{
 		DisplayName: testServiceAccountKeyName,
 	}, nil)
 }
 
 func mockCreateServiceAccountKey(mockGCPClient *mockgcp.MockClient, privateKeyData string) {
 	if privateKeyData == "" {
-		privateKeyData = testServiceAccountKeyPrivateData
+		privateKeyData = testServiceAccountKeyDataBase64
 	}
-	mockGCPClient.EXPECT().CreateServiceAccountKey(gomock.Any(), gomock.Any()).Return(&iamadminpb.ServiceAccountKey{
-		PrivateKeyData: []byte(privateKeyData),
+	mockGCPClient.EXPECT().CreateServiceAccountKey(gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.ServiceAccountKey{
+		PrivateKeyData: privateKeyData,
 	}, nil)
 }
 

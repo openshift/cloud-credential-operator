@@ -13,7 +13,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	iam "google.golang.org/api/iam/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
@@ -233,7 +233,7 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 	} else {
 		createdByCcoctlForSvcAcct := fmt.Sprintf("%s for service account %s", createdByCcoctl, serviceAccountName)
 
-		var serviceAccount *iamadminpb.ServiceAccount
+		var serviceAccount *iam.ServiceAccount
 		serviceAccount, err = getServiceAccountByName(ctx, client, serviceAccountName)
 		if err != nil {
 			if strings.Contains(err.Error(), "not found") {
@@ -354,52 +354,41 @@ func getIdentityProviderBindingNames(projectNum int64, workloadIdentityPool, nam
 }
 
 // getServiceAccountByName fetches the IAM service account based on the given name
-func getServiceAccountByName(ctx context.Context, client gcp.Client, serviceAccountName string) (*iamadminpb.ServiceAccount, error) {
+func getServiceAccountByName(ctx context.Context, client gcp.Client, serviceAccountName string) (*iam.ServiceAccount, error) {
 	projectName := client.GetProjectName()
 	projectResourceName := fmt.Sprintf("projects/%s", projectName)
-	listServiceAccountsRequest := &iamadminpb.ListServiceAccountsRequest{
-		Name: projectResourceName,
-	}
 
-	svcAcctList, err := client.ListServiceAccounts(ctx, listServiceAccountsRequest)
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to fetch list of service accounts")
-	}
-
-	for _, svcAcct := range svcAcctList {
-		if svcAcct.DisplayName == serviceAccountName {
-			return svcAcct, nil
+	nextPageToken := ""
+	for {
+		svcAcctList, err := client.ListServiceAccounts(ctx, projectResourceName, nextPageToken)
+		if err != nil {
+			return nil, errors.Wrapf(err, "Failed to fetch list of service accounts")
 		}
+
+		for _, svcAcct := range svcAcctList.Accounts {
+			if svcAcct.DisplayName == serviceAccountName {
+				return svcAcct, nil
+			}
+		}
+
+		if svcAcctList.NextPageToken == "" {
+			break
+		}
+
+		nextPageToken = svcAcctList.NextPageToken
 	}
 
 	return nil, fmt.Errorf("IAM service account with name %s not found", serviceAccountName)
 }
 
 // getRoleByName fetches the IAM role based on the given name
-func getRoleByName(ctx context.Context, client gcp.Client, roleName string) (*iamadminpb.Role, error) {
+func getRoleByName(ctx context.Context, client gcp.Client, roleName string) (*iam.Role, error) {
 	projectName := client.GetProjectName()
 	projectResourceName := fmt.Sprintf("projects/%s", projectName)
 
-	listRolesResponse, err := client.ListRoles(ctx, &iamadminpb.ListRolesRequest{
-		Parent: projectResourceName,
-		View:   iamadminpb.RoleView_FULL,
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "Failed to fetch list of IAM roles")
-	}
-
-	for _, role := range listRolesResponse.Roles {
-		if role.Title == roleName {
-			return role, nil
-		}
-	}
-	nextPageToken := listRolesResponse.NextPageToken
-
-	for nextPageToken != "" {
-		listRolesResponse, err := client.ListRoles(ctx, &iamadminpb.ListRolesRequest{
-			Parent:    projectResourceName,
-			PageToken: nextPageToken,
-		})
+	nextPageToken := ""
+	for {
+		listRolesResponse, err := client.ListRoles(ctx, projectResourceName, nextPageToken)
 		if err != nil {
 			return nil, errors.Wrapf(err, "Failed to fetch list of IAM roles")
 		}
@@ -409,6 +398,11 @@ func getRoleByName(ctx context.Context, client gcp.Client, roleName string) (*ia
 				return role, nil
 			}
 		}
+
+		if listRolesResponse.NextPageToken == "" {
+			break
+		}
+
 		nextPageToken = listRolesResponse.NextPageToken
 	}
 

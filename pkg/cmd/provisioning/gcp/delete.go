@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/openshift/cloud-credential-operator/pkg/gcp"
@@ -78,27 +77,34 @@ func deleteServiceAccounts(ctx context.Context, client gcp.Client, namePrefix, c
 			return errors.Wrapf(err, "Failed to generate service account name from credentils request %s", cr.Name)
 		}
 
-		listServiceAccountsRequest := &iamadminpb.ListServiceAccountsRequest{
-			Name: projectResourceName,
-		}
-		svcAcctList, err := client.ListServiceAccounts(ctx, listServiceAccountsRequest)
-		if err != nil {
-			return errors.Wrapf(err, "Failed to fetch list of service accounts")
-		}
-		for _, svcAcct := range svcAcctList {
-			if svcAcct.DisplayName == serviceAccountNameFromCredReq {
-				svcAcctBindingName := actuator.ServiceAccountBindingName(svcAcct)
-				err := actuator.RemovePolicyBindingsForProject(client, svcAcctBindingName)
-				if err != nil {
-					return errors.Wrapf(err, "Failed to remove project policy bindings for service account")
-				}
+		nextPageToken := ""
 
-				if err := actuator.DeleteServiceAccount(client, svcAcct); err != nil {
-					return errors.Wrapf(err, "Failed to delete service account")
-				}
-
-				log.Printf("IAM service account %s deleted", svcAcct.DisplayName)
+		for {
+			svcAcctList, err := client.ListServiceAccounts(ctx, projectResourceName, nextPageToken)
+			if err != nil {
+				return errors.Wrapf(err, "Failed to fetch list of service accounts")
 			}
+			for _, svcAcct := range svcAcctList.Accounts {
+				if svcAcct.DisplayName == serviceAccountNameFromCredReq {
+					svcAcctBindingName := actuator.ServiceAccountBindingName(svcAcct)
+					err := actuator.RemovePolicyBindingsForProject(client, svcAcctBindingName)
+					if err != nil {
+						return errors.Wrapf(err, "Failed to remove project policy bindings for service account")
+					}
+
+					if err := actuator.DeleteServiceAccount(client, svcAcct); err != nil {
+						return errors.Wrapf(err, "Failed to delete service account")
+					}
+
+					log.Printf("IAM service account %s deleted", svcAcct.DisplayName)
+				}
+			}
+
+			if svcAcctList.NextPageToken == "" {
+				break
+			}
+
+			nextPageToken = svcAcctList.NextPageToken
 		}
 	}
 	return nil
@@ -125,28 +131,9 @@ func deleteCustomRoles(ctx context.Context, client gcp.Client, credReqDir string
 			return errors.Wrapf(err, "Failed to generate custom role name from credentils request %s", cr.Name)
 		}
 
-		listRolesResponse, err := client.ListRoles(ctx, &iamadminpb.ListRolesRequest{
-			Parent: projectResourceName,
-		})
-		if err != nil {
-			return errors.Wrapf(err, "Failed to fetch list of IAM roles")
-		}
-
-		for _, role := range listRolesResponse.Roles {
-			if role.Title == roleNameFromCredReq {
-				if _, err := actuator.DeleteRole(client, role.Name); err != nil {
-					return errors.Wrapf(err, "Failed to delete custom role")
-				}
-				log.Printf("IAM custom role %s deleted", role.Title)
-			}
-		}
-		nextPageToken := listRolesResponse.NextPageToken
-
-		for nextPageToken != "" {
-			listRolesResponse, err := client.ListRoles(ctx, &iamadminpb.ListRolesRequest{
-				Parent:    projectResourceName,
-				PageToken: nextPageToken,
-			})
+		nextPageToken := ""
+		for {
+			listRolesResponse, err := client.ListRoles(ctx, projectResourceName, nextPageToken)
 			if err != nil {
 				return errors.Wrapf(err, "Failed to fetch list of IAM roles")
 			}
@@ -158,6 +145,10 @@ func deleteCustomRoles(ctx context.Context, client gcp.Client, credReqDir string
 					}
 					log.Printf("IAM custom role %s deleted", role.Title)
 				}
+			}
+
+			if listRolesResponse.NextPageToken == "" {
+				break
 			}
 			nextPageToken = listRolesResponse.NextPageToken
 		}

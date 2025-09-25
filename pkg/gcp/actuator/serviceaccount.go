@@ -23,7 +23,7 @@ import (
 
 	log "github.com/sirupsen/logrus"
 
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	iam "google.golang.org/api/iam/v1"
 
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
@@ -34,43 +34,36 @@ var (
 	keyIDFromKeyName = regexp.MustCompile(`.*/`)
 )
 
-func GetServiceAccount(gcpClient ccgcp.Client, svcAcctID string) (*iamadminpb.ServiceAccount, error) {
+func GetServiceAccount(gcpClient ccgcp.Client, svcAcctID string) (*iam.ServiceAccount, error) {
 	projectName := gcpClient.GetProjectName()
 
 	restString := fmt.Sprintf("projects/%s/serviceAccounts/%s@%s.iam.gserviceaccount.com", projectName, svcAcctID, projectName)
-	request := &iamadminpb.GetServiceAccountRequest{
-		Name: restString,
-	}
-	svcAcct, err := gcpClient.GetServiceAccount(context.TODO(), request)
+	svcAcct, err := gcpClient.GetServiceAccount(context.TODO(), restString)
 	if err != nil {
 		return nil, err
 	}
 	return svcAcct, nil
 }
 
-func CreateServiceAccount(gcpClient ccgcp.Client, svcAcctID, svcAcctName, svcAcctDescription, projectName string) (*iamadminpb.ServiceAccount, error) {
-	request := &iamadminpb.CreateServiceAccountRequest{
-		Name:      fmt.Sprintf("projects/%s", projectName),
+func CreateServiceAccount(gcpClient ccgcp.Client, svcAcctID, svcAcctName, svcAcctDescription, projectName string) (*iam.ServiceAccount, error) {
+	request := &iam.CreateServiceAccountRequest{
 		AccountId: svcAcctID,
-		ServiceAccount: &iamadminpb.ServiceAccount{
+		ServiceAccount: &iam.ServiceAccount{
 			DisplayName: svcAcctName,
 			Description: svcAcctDescription,
 		},
 	}
-	svcAcct, err := gcpClient.CreateServiceAccount(context.TODO(), request)
+	svcAcct, err := gcpClient.CreateServiceAccount(context.TODO(), fmt.Sprintf("projects/%s", projectName), request)
 	if err != nil {
 		return nil, err
 	}
 	return svcAcct, nil
 }
 
-func ensureServiceAccountKeys(rootClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount, projectName, keyID string, logger log.FieldLogger) (*iamadminpb.ServiceAccountKey, error) {
+func ensureServiceAccountKeys(rootClient ccgcp.Client, svcAcct *iam.ServiceAccount, projectName, keyID string, logger log.FieldLogger) (*iam.ServiceAccountKey, error) {
 	restString := fmt.Sprintf("projects/%s/serviceAccounts/%s", projectName, svcAcct.UniqueId)
-	listKeysRequest := &iamadminpb.ListServiceAccountKeysRequest{
-		Name: restString,
-	}
 
-	listKeysResponse, err := rootClient.ListServiceAccountKeys(context.TODO(), listKeysRequest)
+	listKeysResponse, err := rootClient.ListServiceAccountKeys(context.TODO(), restString, "USER_MANAGED")
 	if err != nil {
 		return nil, fmt.Errorf("error getting list of keys for service account: %v", err)
 	}
@@ -89,19 +82,14 @@ func ensureServiceAccountKeys(rootClient ccgcp.Client, svcAcct *iamadminpb.Servi
 
 	// Create a key, but first remove any extra keys on the service account
 	for _, key := range listKeysResponse.Keys {
-		deleteKeyRequest := &iamadminpb.DeleteServiceAccountKeyRequest{
-			Name: key.Name,
-		}
-		if err := rootClient.DeleteServiceAccountKey(context.TODO(), deleteKeyRequest); err != nil {
+		if err := rootClient.DeleteServiceAccountKey(context.TODO(), key.Name); err != nil {
 			// GCP will return an extra hidden key that we cannot delete
 			logger.Warningf("failed to remove extra service account key: %v", err)
 		}
 	}
 
-	createKeyRequest := &iamadminpb.CreateServiceAccountKeyRequest{
-		Name: restString,
-	}
-	key, err := rootClient.CreateServiceAccountKey(context.TODO(), createKeyRequest)
+	createKeyRequest := &iam.CreateServiceAccountKeyRequest{}
+	key, err := rootClient.CreateServiceAccountKey(context.TODO(), restString, createKeyRequest)
 	if err != nil {
 		return nil, fmt.Errorf("error creating key: %v", err)
 	}
@@ -120,11 +108,7 @@ func serviceAccountKeyExists(gcpClient ccgcp.Client, svcAcctID, keyID string, lo
 	svcAcctEmail := serviceAccountEmail(svcAcctID, projectName)
 	restString := fmt.Sprintf("projects/%s/serviceAccounts/%s", projectName, svcAcctEmail)
 
-	listKeysRequest := &iamadminpb.ListServiceAccountKeysRequest{
-		Name: restString,
-	}
-
-	listKeysResponse, err := gcpClient.ListServiceAccountKeys(context.TODO(), listKeysRequest)
+	listKeysResponse, err := gcpClient.ListServiceAccountKeys(context.TODO(), restString, "USER_MANAGED")
 	if err != nil {
 		return false, fmt.Errorf("error getting list of keys for service account: %v", err)
 	}
@@ -139,18 +123,15 @@ func serviceAccountKeyExists(gcpClient ccgcp.Client, svcAcctID, keyID string, lo
 	return false, nil
 }
 
-func DeleteServiceAccount(gcpClient ccgcp.Client, svcAcct *iamadminpb.ServiceAccount) error {
-	req := &iamadminpb.DeleteServiceAccountRequest{
-		Name: svcAcct.Name,
-	}
-	if err := gcpClient.DeleteServiceAccount(context.TODO(), req); err != nil {
+func DeleteServiceAccount(gcpClient ccgcp.Client, svcAcct *iam.ServiceAccount) error {
+	if err := gcpClient.DeleteServiceAccount(context.TODO(), svcAcct.Name); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-func ServiceAccountBindingName(svcAccount *iamadminpb.ServiceAccount) string {
+func ServiceAccountBindingName(svcAccount *iam.ServiceAccount) string {
 	return fmt.Sprintf("serviceAccount:%s", svcAccount.Email)
 }
 

@@ -42,7 +42,7 @@ import (
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 
 	"google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	iam "google.golang.org/api/iam/v1"
 
 	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
 	anngcp "github.com/openshift/cloud-credential-operator/pkg/operator/secretannotator/gcp"
@@ -328,13 +328,13 @@ func mockGetProjectName(mockGCPClient *mockgcp.MockClient) {
 
 func mockTestMintQueryTestablePermissionsSuccess(mockGCPClient *mockgcp.MockClient) {
 
-	permResponse := []*iamadminpb.Permission{}
+	permResponse := []*iam.Permission{}
 
 	for _, perm := range gcputils.CredMintingPermissions {
-		permResponse = append(permResponse, &iamadminpb.Permission{Name: perm})
+		permResponse = append(permResponse, &iam.Permission{Name: perm})
 	}
 
-	mockGCPClient.EXPECT().QueryTestablePermissions(gomock.Any(), gomock.Any()).Return(&iamadminpb.QueryTestablePermissionsResponse{
+	mockGCPClient.EXPECT().QueryTestablePermissions(gomock.Any(), gomock.Any()).Return(&iam.QueryTestablePermissionsResponse{
 		Permissions: permResponse,
 	}, nil)
 }
