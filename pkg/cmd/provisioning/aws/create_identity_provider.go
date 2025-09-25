@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
@@ -310,7 +309,7 @@ func createIAMIdentityProvider(client aws.Client, issuerURL, name, targetDir str
 		oidcIdentityProviderJSON := fmt.Sprintf(iamIdentityProviderTemplate, issuerURL, "<enter_tls_fingerprint_for_issuer_url_here>")
 		iamIdentityProviderFullPath := filepath.Join(targetDir, iamIdentityProviderFilename)
 		log.Printf("Saving AWS IAM Identity Provider locally at %s", iamIdentityProviderFullPath)
-		if err := ioutil.WriteFile(iamIdentityProviderFullPath, []byte(oidcIdentityProviderJSON), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(iamIdentityProviderFullPath, []byte(oidcIdentityProviderJSON), fileModeCcoctlDryRun); err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save AWS IAM Identity Provider locally at %s", iamIdentityProviderFullPath))
 		}
 
@@ -387,7 +386,7 @@ func createJSONWebKeySet(client aws.Client, publicKeyFilepath, bucketName, name,
 	if generateOnly {
 		oidcKeysFullPath := filepath.Join(targetDir, oidcKeysFilename)
 		log.Printf("Saving JSON web key set (JWKS) locally at %s", oidcKeysFullPath)
-		if err := ioutil.WriteFile(oidcKeysFullPath, jwks, fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(oidcKeysFullPath, jwks, fileModeCcoctlDryRun); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("Failed to save JSON web key set (JWKS) locally at %s", oidcKeysFullPath))
 		}
 	} else {
@@ -411,7 +410,7 @@ func createOIDCConfiguration(client aws.Client, bucketName, issuerURL, name, tar
 	if generateOnly {
 		oidcConfigurationFullPath := filepath.Join(targetDir, oidcConfigurationFilename)
 		log.Printf("Saving discovery document locally at %s", oidcConfigurationFullPath)
-		if err := ioutil.WriteFile(oidcConfigurationFullPath, []byte(discoveryDocumentJSON), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(oidcConfigurationFullPath, []byte(discoveryDocumentJSON), fileModeCcoctlDryRun); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("Failed to save discovery document locally at %s", oidcConfigurationFullPath))
 		}
 	} else {
@@ -480,7 +479,7 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 		}
 
 		log.Printf("Saving OIDC S3 bucket locally at %s", oidcBucketFilepath)
-		if err := ioutil.WriteFile(oidcBucketFilepath, []byte(oidcBucketJSON), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(oidcBucketFilepath, []byte(oidcBucketJSON), fileModeCcoctlDryRun); err != nil {
 			return "", errors.Wrap(err, fmt.Sprintf("Failed to save OIDC S3 bucket locally at %s", oidcBucketFilepath))
 		}
 
@@ -488,28 +487,28 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 			cloudFrontOriginAccessIdentityFilepath := filepath.Join(targetDir, cloudFrontOriginAccessIdentityFilename)
 			cloudFrontOriginAccessIdentityJSON := fmt.Sprintf(cloudFrontOriginAccessIdentityTemplate, name, fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name))
 			log.Printf("Saving JSON to create CloudFront Origin Access Identity locally at %s", cloudFrontOriginAccessIdentityFilepath)
-			if err := ioutil.WriteFile(cloudFrontOriginAccessIdentityFilepath, []byte(cloudFrontOriginAccessIdentityJSON), fileModeCcoctlDryRun); err != nil {
+			if err := os.WriteFile(cloudFrontOriginAccessIdentityFilepath, []byte(cloudFrontOriginAccessIdentityJSON), fileModeCcoctlDryRun); err != nil {
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to create CloudFront Origin Access Identity locally at %s", cloudFrontOriginAccessIdentityFilepath))
 			}
 
 			putBucketPolicyToAllowOriginAccessIdentityFilepath := filepath.Join(targetDir, putBucketPolicyToAllowOriginAccessIdentityFilename)
 			putBucketPolicyToAllowOriginAccessIdentityJSON := fmt.Sprintf(putBucketPolicyToAllowOriginAccessIdentityTemplate, bucketName, bucketName)
 			log.Printf("Saving JSON to put bucket policy allowing access from CloudFront Origin Access Identity locally at %s", putBucketPolicyToAllowOriginAccessIdentityFilepath)
-			if err := ioutil.WriteFile(putBucketPolicyToAllowOriginAccessIdentityFilepath, []byte(putBucketPolicyToAllowOriginAccessIdentityJSON), fileModeCcoctlDryRun); err != nil {
+			if err := os.WriteFile(putBucketPolicyToAllowOriginAccessIdentityFilepath, []byte(putBucketPolicyToAllowOriginAccessIdentityJSON), fileModeCcoctlDryRun); err != nil {
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to put bucket policy allowing access from CloudFront Origin Access Identity locally at %s", putBucketPolicyToAllowOriginAccessIdentityFilepath))
 			}
 
 			blockPublicAccessToOidcBucketFilepath := filepath.Join(targetDir, blockPublicAccessToOidcBucketFilename)
 			blockPublicAccessToOidcBucketJSON := fmt.Sprintf(blockPublicAccessToOidcBucketTemplate, bucketName)
 			log.Printf("Saving JSON to block public access to OIDC S3 bucket locally at %s", oidcBucketFilepath)
-			if err := ioutil.WriteFile(blockPublicAccessToOidcBucketFilepath, []byte(blockPublicAccessToOidcBucketJSON), fileModeCcoctlDryRun); err != nil {
+			if err := os.WriteFile(blockPublicAccessToOidcBucketFilepath, []byte(blockPublicAccessToOidcBucketJSON), fileModeCcoctlDryRun); err != nil {
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to block public access to OIDC S3 bucket locally at %s", blockPublicAccessToOidcBucketFilepath))
 			}
 
 			cloudFrontDistributionFilepath := filepath.Join(targetDir, cloudFrontDistributionFilename)
 			cloudFrontDistributionJSON := fmt.Sprintf(cloudFrontDistributionWithTagsTemplate, name, bucketName, region, dnsSuffix, bucketName, region, dnsSuffix, bucketName, region, dnsSuffix, fmt.Sprintf("%s/%s", ccoctlAWSResourceTagKeyPrefix, name), name)
 			log.Printf("Saving JSON to create CloudFront Distribution locally at %s", cloudFrontDistributionFilepath)
-			if err := ioutil.WriteFile(cloudFrontDistributionFilepath, []byte(cloudFrontDistributionJSON), fileModeCcoctlDryRun); err != nil {
+			if err := os.WriteFile(cloudFrontDistributionFilepath, []byte(cloudFrontDistributionJSON), fileModeCcoctlDryRun); err != nil {
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to save JSON to create CloudFront Distribution locally at %s", cloudFrontDistributionFilepath))
 			}
 

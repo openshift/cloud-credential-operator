@@ -2,7 +2,6 @@ package ibmcloud
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -62,7 +61,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
@@ -77,7 +76,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secret-name-0", tempDirName)
@@ -96,7 +95,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secret-name", tempDirName)
@@ -117,7 +116,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secret-name", tempDirName)
@@ -134,7 +133,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secret-name-0", tempDirName)
@@ -153,7 +152,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secret-name-0", tempDirName)
@@ -172,7 +171,7 @@ func Test_deleteServiceIDs(t *testing.T) {
 				return mockIBMCloudClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, "firstcredreq", "namespace1", "secret-name-0", tempDirName)

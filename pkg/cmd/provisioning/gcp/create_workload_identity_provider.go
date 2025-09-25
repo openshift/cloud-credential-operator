@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -116,7 +115,7 @@ func createOIDCBucket(ctx context.Context, client gcp.Client, bucketName, region
 		createOidcBucketScriptFilepath := filepath.Join(targetDir, createOidcBucketScriptName)
 		script := fmt.Sprintf(createOidcBucketScript, region, project, bucketName, bucketName)
 		log.Printf("Saving shell script to create OIDC bucket locally at %s", createOidcBucketScriptFilepath)
-		if err := ioutil.WriteFile(createOidcBucketScriptFilepath, []byte(script), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(createOidcBucketScriptFilepath, []byte(script), fileModeCcoctlDryRun); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("Failed to save shell script to create OIDC bucket locally at %s", createOidcBucketScriptFilepath))
 		}
 	} else {
@@ -182,7 +181,7 @@ func createOIDCConfiguration(ctx context.Context, client gcp.Client, bucketName,
 	if generateOnly {
 		discoveryDocumentFilepath := filepath.Join(targetDir, gcpOidcConfigurationFilename)
 		log.Printf("Saving discovery document locally at %s", discoveryDocumentFilepath)
-		if err := ioutil.WriteFile(discoveryDocumentFilepath, []byte(discoveryDocumentJSON), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(discoveryDocumentFilepath, []byte(discoveryDocumentJSON), fileModeCcoctlDryRun); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("Failed to save discovery document locally at %s", discoveryDocumentFilepath))
 		}
 	} else {
@@ -204,7 +203,7 @@ func createJSONWebKeySet(ctx context.Context, client gcp.Client, publicKeyFilepa
 	if generateOnly {
 		JWKSFilePath := filepath.Join(targetDir, gcpOidcKeysFilename)
 		log.Printf("Saving JSON web key set (JWKS) locally at %s", JWKSFilePath)
-		if err := ioutil.WriteFile(JWKSFilePath, jwks, fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(JWKSFilePath, jwks, fileModeCcoctlDryRun); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("Failed to save JSON web key set (JWKS) locally at %s", JWKSFilePath))
 		}
 	} else {
@@ -223,7 +222,7 @@ func createIdentityProvider(ctx context.Context, client gcp.Client, name, projec
 		createIdentityProviderScriptFilepath := filepath.Join(targetDir, createIdentityProviderScriptName)
 		script := fmt.Sprintf(createIdentityProviderScript, name, workloadIdentityPool, name, createdByCcoctl, issuerURL, openShiftAudience)
 		log.Printf("Saving shell script to create workload identity provider locally at %s", createIdentityProviderScriptFilepath)
-		if err := ioutil.WriteFile(createIdentityProviderScriptFilepath, []byte(script), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(createIdentityProviderScriptFilepath, []byte(script), fileModeCcoctlDryRun); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("Failed to save shell script to create workload identity provider locally at %s", createIdentityProviderScriptFilepath))
 		}
 	} else {

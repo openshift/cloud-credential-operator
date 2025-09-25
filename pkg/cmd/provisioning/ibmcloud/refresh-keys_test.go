@@ -2,7 +2,6 @@ package ibmcloud
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -59,7 +58,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fakeClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -78,7 +77,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fake.NewSimpleClientset()
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -107,7 +106,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fakeClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -128,7 +127,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fake.NewSimpleClientset()
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -148,7 +147,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fake.NewSimpleClientset()
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -169,7 +168,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fake.NewSimpleClientset()
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -195,7 +194,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fakeClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -220,7 +219,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fakeClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
@@ -247,7 +246,7 @@ func Test_refreshKeys(t *testing.T) {
 				return fakeClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 
 				testCredentialsRequest(t, testCRName, targetNamespace, targetSecretName, tempDirName)
