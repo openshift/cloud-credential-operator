@@ -345,12 +345,6 @@ func NewClientFromConfig(cfg awssdk.Config, endpoint string) (Client, error) {
 		iamOpts = append(iamOpts, func(o *iam.Options) {
 			o.BaseEndpoint = &endpoint
 		})
-		s3Opts = append(s3Opts, func(o *s3.Options) {
-			o.BaseEndpoint = &endpoint
-		})
-		cfOpts = append(cfOpts, func(o *cloudfront.Options) {
-			o.BaseEndpoint = &endpoint
-		})
 	}
 
 	return &awsClient{
