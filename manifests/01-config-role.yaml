@@ -16,5 +16,3 @@ rules:
   - cloud-provider-config
   verbs:
   - get
-  - list
-  - watch
