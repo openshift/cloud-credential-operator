@@ -22,7 +22,7 @@ import (
 	"log"
 	"regexp"
 
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -33,9 +33,7 @@ func getPermissionsFromRoles(gcpClient ccgcp.Client, roles []string) ([]string, 
 	permList := []string{}
 
 	for _, roleName := range roles {
-		role, err := gcpClient.GetRole(context.TODO(), &iamadminpb.GetRoleRequest{
-			Name: roleName,
-		})
+		role, err := gcpClient.GetRole(context.TODO(), roleName)
 		if status.Code(err) == codes.NotFound {
 			return permList, fmt.Errorf("role %s not found: %v", roleName, err)
 		} else if err != nil {
@@ -49,24 +47,21 @@ func getPermissionsFromRoles(gcpClient ccgcp.Client, roles []string) ([]string, 
 }
 
 // GetRole fetches the role created to satisfy a credentials request
-func GetRole(gcpClient ccgcp.Client, roleID, projectName string) (*iamadminpb.Role, error) {
+func GetRole(gcpClient ccgcp.Client, roleID, projectName string) (*iam.Role, error) {
 	log.Printf("role id %v", roleID)
-	role, err := gcpClient.GetRole(context.TODO(), &iamadminpb.GetRoleRequest{
-		Name: fmt.Sprintf("projects/%s/roles/%s", projectName, roleID),
-	})
+	role, err := gcpClient.GetRole(context.TODO(), fmt.Sprintf("projects/%s/roles/%s", projectName, roleID))
 	return role, err
 }
 
 // CreateRole creates a new role given permissions
-func CreateRole(gcpClient ccgcp.Client, permissions []string, roleName, roleID, roleDescription, projectName string) (*iamadminpb.Role, error) {
-	role, err := gcpClient.CreateRole(context.TODO(), &iamadminpb.CreateRoleRequest{
-		Role: &iamadminpb.Role{
+func CreateRole(gcpClient ccgcp.Client, permissions []string, roleName, roleID, roleDescription, projectName string) (*iam.Role, error) {
+	role, err := gcpClient.CreateRole(context.TODO(), fmt.Sprintf("projects/%s", projectName), &iam.CreateRoleRequest{
+		Role: &iam.Role{
 			Title:               roleName,
 			Description:         roleDescription,
 			IncludedPermissions: permissions,
-			Stage:               iamadminpb.Role_GA,
+			Stage:               "GA",
 		},
-		Parent: fmt.Sprintf("projects/%s", projectName),
 		RoleId: roleID,
 	})
 	if err != nil {
@@ -76,11 +71,8 @@ func CreateRole(gcpClient ccgcp.Client, permissions []string, roleName, roleID, 
 }
 
 // UpdateRole updates an existing role given permissions
-func UpdateRole(gcpClient ccgcp.Client, role *iamadminpb.Role, roleName string) (*iamadminpb.Role, error) {
-	role, err := gcpClient.UpdateRole(context.TODO(), &iamadminpb.UpdateRoleRequest{
-		Name: roleName,
-		Role: role,
-	})
+func UpdateRole(gcpClient ccgcp.Client, role *iam.Role, roleName string) (*iam.Role, error) {
+	role, err := gcpClient.UpdateRole(context.TODO(), roleName, role)
 	if err != nil {
 		return nil, err
 	}
@@ -88,18 +80,14 @@ func UpdateRole(gcpClient ccgcp.Client, role *iamadminpb.Role, roleName string) 
 }
 
 // DeleteRole deletes the role created to satisfy a credentials request
-func DeleteRole(gcpClient ccgcp.Client, roleName string) (*iamadminpb.Role, error) {
-	role, err := gcpClient.DeleteRole(context.TODO(), &iamadminpb.DeleteRoleRequest{
-		Name: roleName,
-	})
+func DeleteRole(gcpClient ccgcp.Client, roleName string) (*iam.Role, error) {
+	role, err := gcpClient.DeleteRole(context.TODO(), roleName)
 	return role, err
 }
 
 // UndeleteRole undeletes a previously deleted role that has not yet been pruned
-func UndeleteRole(gcpClient ccgcp.Client, roleName string) (*iamadminpb.Role, error) {
-	role, err := gcpClient.UndeleteRole(context.TODO(), &iamadminpb.UndeleteRoleRequest{
-		Name: roleName,
-	})
+func UndeleteRole(gcpClient ccgcp.Client, roleName string) (*iam.Role, error) {
+	role, err := gcpClient.UndeleteRole(context.TODO(), roleName, &iam.UndeleteRoleRequest{})
 	return role, err
 }
 

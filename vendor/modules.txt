@@ -33,10 +33,7 @@ cloud.google.com/go/compute/metadata
 # cloud.google.com/go/iam v1.5.2
 ## explicit; go 1.23.0
 cloud.google.com/go/iam
-cloud.google.com/go/iam/admin/apiv1
-cloud.google.com/go/iam/admin/apiv1/adminpb
 cloud.google.com/go/iam/apiv1/iampb
-cloud.google.com/go/iam/internal
 # cloud.google.com/go/monitoring v1.24.2
 ## explicit; go 1.23.0
 cloud.google.com/go/monitoring/apiv3/v2
@@ -719,7 +716,7 @@ github.com/nutanix-cloud-native/prism-go-client/environment/types
 github.com/oklog/ulid
 # github.com/onsi/ginkgo/v2 v2.23.4
 ## explicit; go 1.23.0
-# github.com/openshift/api v0.0.0-20250710082954-674ad74beffc
+# github.com/openshift/api v0.0.0-20250806102053-6a7223edb2fc
 ## explicit; go 1.24.0
 github.com/openshift/api
 github.com/openshift/api/apiserver
@@ -805,7 +802,7 @@ github.com/openshift/build-machinery-go/scripts
 ## explicit; go 1.24.0
 github.com/openshift/client-go/operator/applyconfigurations/internal
 github.com/openshift/client-go/operator/applyconfigurations/operator/v1
-# github.com/openshift/library-go v0.0.0-20250711143941-47604345e7ea
+# github.com/openshift/library-go v0.0.0-20250729191057-91376e1b394e
 ## explicit; go 1.24.0
 github.com/openshift/library-go/pkg/apiserver/jsonpatch
 github.com/openshift/library-go/pkg/controller/factory
@@ -1107,7 +1104,6 @@ google.golang.org/api/transport/grpc
 google.golang.org/api/transport/http
 # google.golang.org/genproto v0.0.0-20250707201910-8d1bb00bc6a7
 ## explicit; go 1.23.0
-google.golang.org/genproto/googleapis/iam/admin/v1
 google.golang.org/genproto/googleapis/iam/v1
 google.golang.org/genproto/googleapis/type/calendarperiod
 google.golang.org/genproto/googleapis/type/date

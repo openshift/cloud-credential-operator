@@ -18,6 +18,7 @@ package actuator
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -27,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	// GCP packages
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	iam "google.golang.org/api/iam/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -78,16 +79,23 @@ type Actuator struct {
 	ProjectName      string
 	Client           client.Client
 	RootCredClient   client.Client
-	GCPClientBuilder func(string, []byte) (ccgcp.Client, error)
+	GCPClientBuilder func(string, []byte, []configv1.GCPServiceEndpoint) (ccgcp.Client, error)
+	GCPEndpoints     []configv1.GCPServiceEndpoint
 }
 
 // NewActuator initializes and returns a new Actuator for GCP.
 func NewActuator(c, rootCredClient client.Client, projectName string) (*Actuator, error) {
+	endpoints, err := gcputils.GetServiceEndpoints(c)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Actuator{
 		ProjectName:      projectName,
 		Client:           c,
 		RootCredClient:   rootCredClient,
 		GCPClientBuilder: ccgcp.NewClientFromJSON,
+		GCPEndpoints:     endpoints,
 	}, nil
 }
 
@@ -458,7 +466,7 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	}
 
 	// Create service account if necessary
-	var serviceAccount *iamadminpb.ServiceAccount
+	var serviceAccount *iam.ServiceAccount
 	projectName := rootGCPClient.GetProjectName()
 	getServiceAccount, err := GetServiceAccount(rootGCPClient, gcpStatus.ServiceAccountID)
 	if err != nil {
@@ -556,12 +564,17 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 		return err
 	}
 
-	// Save key into secret
-	if key != nil {
-		err = a.syncSecret(ctx, cr, key.PrivateKeyData, logger)
+	if key == nil {
+		logger.Debug("returned service account key is empty and cannot be saved to the secret")
+		return nil
 	}
 
-	return err
+	decodedKey, err := base64.StdEncoding.DecodeString(key.PrivateKeyData)
+	if err != nil {
+		return err
+	}
+
+	return a.syncSecret(ctx, cr, decodedKey, logger)
 }
 
 // needsUpdate will return a bool indicated that all the applicable service APIs are enabled,
@@ -730,7 +743,11 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating read GCP client")
-	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes, a.GCPEndpoints)
+	if err != nil {
+		logger.WithError(err).Warn("could not build a client with read-only creds Secret, falling back to root GCP client")
+		return a.buildRootGCPClient(cr)
+	}
 
 	// Test if the read-only client is working, if any error here we will fall back to using
 	// the root client.
@@ -740,7 +757,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 	_, err = GetServiceAccount(client, gcpStatus.ServiceAccountID)
 	if err != nil {
-		logger.Warn("could not find read-only service account, falling back to root GCP client")
+		logger.WithError(err).Warn("could not find read-only service account, falling back to root GCP client")
 		return a.buildRootGCPClient(cr)
 	}
 	return client, nil
@@ -756,7 +773,7 @@ func (a *Actuator) buildRootGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating root GCP client")
-	return a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	return a.GCPClientBuilder(a.ProjectName, jsonBytes, a.GCPEndpoints)
 }
 
 func (a *Actuator) updateProviderStatus(ctx context.Context, logger log.FieldLogger, cr *minterv1.CredentialsRequest, gcpStatus *minterv1.GCPProviderStatus) error {
