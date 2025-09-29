@@ -52,6 +52,10 @@ type azureOptions struct {
 	// (cluster-network-operator, machine-api-operator, and cluster-storage-operator(file)) will be
 	// scoped to the NetworkResourceGroupName.
 	NetworkResourceGroupName string
+
+	// PreserveExistingRoles is a bool indicating that ccoctl should not remove existing role assignments
+	// from a managed identity.
+	PreserveExistingRoles bool
 }
 
 // NewAzureCmd implements the "azure" subcommand for credentials provisioning
