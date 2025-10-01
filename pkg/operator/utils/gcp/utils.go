@@ -25,13 +25,18 @@ import (
 	log "github.com/sirupsen/logrus"
 
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
-	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
+	iam "google.golang.org/api/iam/v1"
+
+	configv1 "github.com/openshift/api/config/v1"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/util/sets"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	ccgcp "github.com/openshift/cloud-credential-operator/pkg/gcp"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 type testablePermissions struct {
@@ -134,7 +139,7 @@ func refreshTestablePermissions(gcpClient ccgcp.Client, projectName string, logg
 	projectNamePath := fmt.Sprintf(`//cloudresourcemanager.googleapis.com/projects/%s`, projectName)
 	newPermSet := sets.NewString()
 
-	request := &iamadminpb.QueryTestablePermissionsRequest{
+	request := &iam.QueryTestablePermissionsRequest{
 		FullResourceName: projectNamePath,
 	}
 
@@ -182,6 +187,20 @@ func filterOutPermissions(gcpClient ccgcp.Client, projectName string, permList [
 		}
 	}
 	return filteredPerms, nil
+}
+
+// GetServiceEndpoints will retrieve the GCP Service Endpoints from the Infrastructure Status object.
+func GetServiceEndpoints(c client.Client) ([]configv1.GCPServiceEndpoint, error) {
+	infra, err := utils.GetInfrastructure(c)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving infrastructure containing service endpoints: %v", err)
+	}
+
+	endpoints := []configv1.GCPServiceEndpoint{}
+	if infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.GCP != nil {
+		endpoints = infra.Status.PlatformStatus.GCP.ServiceEndpoints
+	}
+	return endpoints, nil
 }
 
 // CheckPermissionsAgainstPermissionList will take the passsed-in list of permissions to check whether the provided
