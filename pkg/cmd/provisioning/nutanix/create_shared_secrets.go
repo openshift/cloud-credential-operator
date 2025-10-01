@@ -4,7 +4,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
@@ -92,7 +91,7 @@ func getCredentialsFromFile(filePath string) (*kubernetes.NutanixCredentials, er
 		return nil, errors.Wrapf(err, "source credentials file %s does not exist", filePath)
 	}
 
-	bytes, err := ioutil.ReadFile(filePath)
+	bytes, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to read the credentials file %s", filePath)
 	}
@@ -163,7 +162,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, targetDir string, cred
 
 	b64CredsJson := base64.StdEncoding.EncodeToString(credsJsonBytes)
 	fileData := fmt.Sprintf(secretManifestsTemplate, cr.Spec.SecretRef.Name, cr.Spec.SecretRef.Namespace, b64CredsJson)
-	if err := ioutil.WriteFile(filePath, []byte(fileData), 0600); err != nil {
+	if err := os.WriteFile(filePath, []byte(fileData), 0600); err != nil {
 		return errors.Wrap(err, "failed to save secret manifest")
 	}
 

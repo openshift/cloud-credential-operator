@@ -3,7 +3,6 @@ package gcp
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -92,7 +91,7 @@ func createWorkloadIdentityPool(ctx context.Context, client gcp.Client, name, pr
 		})
 		createIdentityPoolScriptFullPath := filepath.Join(targetDir, createIdentityPoolScriptName)
 		log.Printf("Saving script to create workload identity pool %s locally at %s", name, createIdentityPoolScriptFullPath)
-		if err := ioutil.WriteFile(createIdentityPoolScriptFullPath, []byte(createWorkloadIdentityPoolScript), fileModeCcoctlDryRun); err != nil {
+		if err := os.WriteFile(createIdentityPoolScriptFullPath, []byte(createWorkloadIdentityPoolScript), fileModeCcoctlDryRun); err != nil {
 			return errors.Wrap(err, fmt.Sprintf("Failed to save script to create workload identity pool %s locally at %s", name, createIdentityPoolScriptFullPath))
 		}
 	} else {
