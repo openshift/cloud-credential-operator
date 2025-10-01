@@ -47,7 +47,7 @@ func (appClient *appClient) List(ctx context.Context, filter string) ([]models.A
 }
 
 func (appClient *appClient) Delete(ctx context.Context, applicationObjectID string) error {
-	return appClient.client.ApplicationsById(applicationObjectID).Delete(ctx, nil)
+	return appClient.client.Applications().ByApplicationId(applicationObjectID).Delete(ctx, nil)
 }
 
 var _ AppClient = &appClient{}
