@@ -80,7 +80,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
       labels:
         app: pod-identity-webhook
     spec:
@@ -118,11 +118,11 @@ spec:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
       serviceAccountName: pod-identity-webhook
+      hostUsers: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-        readOnlyRootFilesystem: true
       tolerations:
       - effect: NoSchedule
         key: node-role.kubernetes.io/master
@@ -217,7 +217,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
       labels:
         app: pod-identity-webhook
     spec:
@@ -294,11 +294,11 @@ spec:
           tolerationSeconds: 120
       priorityClassName: system-cluster-critical
       serviceAccountName: pod-identity-webhook
+      hostUsers: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-        readOnlyRootFilesystem: true
       volumes:
         - name: webhook-certs
           secret:
@@ -593,7 +593,7 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
       labels:
         app: pod-identity-webhook
     spec:
@@ -645,11 +645,11 @@ spec:
           tolerationSeconds: 120
       priorityClassName: system-cluster-critical
       serviceAccountName: pod-identity-webhook
+      hostUsers: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
           type: RuntimeDefault
-        readOnlyRootFilesystem: true
       volumes:
         - name: webhook-certs
           secret:
