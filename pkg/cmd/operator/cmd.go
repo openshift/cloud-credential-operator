@@ -19,7 +19,6 @@ package cmd
 import (
 	"context"
 	"flag"
-	"io/ioutil"
 	golog "log"
 	"os"
 	"os/signal"
@@ -380,7 +379,7 @@ func terminateWhenProxyChanges(path string, cancel context.CancelFunc, done <-ch
 	// read the contents of the configmap
 	fileContents := map[string][]byte{}
 	var filenames []string
-	fileBytes, err := ioutil.ReadFile(path)
+	fileBytes, err := os.ReadFile(path)
 	if err != nil {
 		log.WithError(err).Fatal("Unable to read proxy CA config map")
 	}

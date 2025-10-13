@@ -1,7 +1,6 @@
 package provisioning
 
 import (
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -203,7 +202,7 @@ func saveCredReq(t *testing.T, credReq *credreqv1.CredentialsRequest) {
 	out, err := re.MarshalJSON()
 	require.NoError(t, err, "error marshaling CredReq")
 
-	f, err := ioutil.TempFile(testDirPath, "credreq-testing-*.yaml")
+	f, err := os.CreateTemp(testDirPath, "credreq-testing-*.yaml")
 	require.NoError(t, err, "error creating temp file")
 	defer f.Close()
 
