@@ -2,7 +2,6 @@ package gcp
 
 import (
 	"context"
-	"io/ioutil"
 	"os"
 	"testing"
 
@@ -40,12 +39,12 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
 				assert.Equal(t, 1, provisioning.CountNonDirectoryFiles(files), "Should be exactly 1 shell script")
 			},
@@ -60,12 +59,12 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 			},
@@ -81,12 +80,12 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 			},
@@ -102,12 +101,12 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string) {
-				files, err := ioutil.ReadDir(targetDir)
+				files, err := os.ReadDir(targetDir)
 				require.NoError(t, err, "Unexpected error listing files in targetDir")
 				assert.Zero(t, provisioning.CountNonDirectoryFiles(files), "Should be no generated files when not in generate mode")
 			},
@@ -123,7 +122,7 @@ func TestCreateWorkloadIdentityPool(t *testing.T) {
 				return mockGCPClient
 			},
 			setup: func(t *testing.T) string {
-				tempDirName, err := ioutil.TempDir(os.TempDir(), testDirPrefix)
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
 				require.NoError(t, err, "Failed to create temp directory")
 				return tempDirName
 			},
