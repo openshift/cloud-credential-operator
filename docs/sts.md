@@ -138,7 +138,7 @@ NOTE This is just for developers interested in taking an existing cluster to STS
 
 5. Extract the OIDC issuer URL from the generated manifests in the output directory and patch the cluster `authentication` config, setting `spec.serviceAccountIssuer`.
    ```bash
-   OIDC_ISSUER_URL=`awk '/serviceAccountIssuer/ { print $2 }' output_dir/manifests/cluster-authentication-02-config.yaml`
+   OIDC_ISSUER_URL=`awk '/serviceAccountIssuer/ { print $2 }' newstscluster/manifests/cluster-authentication-02-config.yaml`
 
    oc patch authentication cluster --type=merge -p "{\"spec\":{\"serviceAccountIssuer\":\"${OIDC_ISSUER_URL}\"}}"
    ```
