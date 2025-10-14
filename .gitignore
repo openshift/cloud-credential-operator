@@ -1,5 +1,6 @@
 /cloud-credential-operator
 /ccoctl
+/cloud-credential-tests-ext
 .vscode/
 /_output/
 .idea/
