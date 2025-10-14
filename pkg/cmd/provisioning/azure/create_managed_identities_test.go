@@ -498,6 +498,7 @@ func TestCreateManagedIdentities(t *testing.T) {
 				testNetworkResourceGroupName,
 				testUserTags,
 				test.enableTechPreview,
+				false, // preserveExistingRoles
 				test.dryRun)
 			if test.expectError {
 				require.Error(t, err, "expected error")
@@ -639,6 +640,7 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 	tests := []struct {
 		name                   string
 		mockAzureClientWrapper func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper
+		preserveExistingRoles  bool
 		roleBindings           []credreqv1.RoleBinding
 		expectError            bool
 	}{
@@ -797,13 +799,59 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 				return wrapper
 			},
 		},
+		{
+			name: "Extra role assignments preserved when preserve-existing-roles",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			preserveExistingRoles: true,
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						// This existing role assignment isn't enumerated in the credreqv1.RoleBindings
+						{
+							Name: to.Ptr("DNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "DNSZoneContributorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			mockAzureClientWrapper := test.mockAzureClientWrapper(mockCtrl)
-			err := ensureRolesAssignedToManagedIdentity(mockAzureClientWrapper, testManagedIdentityPrincipalID, testSubscriptionID, test.roleBindings, testScopingResourceGroupNames)
+			err := ensureRolesAssignedToManagedIdentity(mockAzureClientWrapper, testManagedIdentityPrincipalID, testSubscriptionID, test.roleBindings, testScopingResourceGroupNames, test.preserveExistingRoles)
 			if test.expectError {
 				require.Error(t, err, "expected error")
 			} else {
