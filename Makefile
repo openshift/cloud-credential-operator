@@ -158,11 +158,11 @@ coverage:
 	hack/codecov.sh
 .PHONY: coverage
 
-.PHONY: update-go-dependencies
-update-go-dependencies: update-go-dependencies-direct update-go-dependencies-indirect
+.PHONY: update-go-modules
+update-go-modules: update-go-modules-direct update-go-modules-indirect
 
-.PHONY: update-go-dependencies-direct
-update-go-dependencies-direct:
+.PHONY: update-go-modules-direct
+update-go-modules-direct:
 	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all \
 		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
 		| grep -v "github.com/nutanix-cloud-native/prism-go-client" \
@@ -172,9 +172,8 @@ update-go-dependencies-direct:
 	go mod tidy
 	go mod vendor
 
-# Update indirect go dependenceis
-.PHONY: update-go-dependencies-indirect
-update-go-dependencies-indirect:
+.PHONY: update-go-modules-indirect
+update-go-modules-indirect:
 	@for module in $$(go list -f '{{ if .Indirect }}{{.Path}}{{end}}' -m -mod=mod all \
 		| grep -v "^k8s.io/" | grep -v "sigs.k8s.io/" \
 		| grep -v "github.com/nutanix-cloud-native/prism-go-client" \
@@ -185,8 +184,11 @@ update-go-dependencies-indirect:
 	go mod tidy
 	go mod vendor
 
-.PHONY: update-go-dependencies-k8s
-update-go-dependencies-k8s:
+# This will update the explicit k8s go modules to the latest versions.
+# This can be used to upgrade the kubernetes modules as long as the
+# desired version is also the latest version available.
+.PHONY: update-go-modules-k8s
+update-go-modules-k8s:
 	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all \
 		| grep "^k8s.io/" \
 		); do \
