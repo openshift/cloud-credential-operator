@@ -141,7 +141,7 @@ func (e *CannotChangeImmutablePublicKeyFields) ErrorFault() smithy.ErrorFault {
 	return smithy.FaultClient
 }
 
-// The key value store entity cannot be deleted while it is in use.
+// The entity cannot be deleted while it is in use.
 type CannotDeleteEntityWhileInUse struct {
 	Message *string
 
@@ -166,6 +166,32 @@ func (e *CannotDeleteEntityWhileInUse) ErrorCode() string {
 	return *e.ErrorCodeOverride
 }
 func (e *CannotDeleteEntityWhileInUse) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
+
+// The entity cannot be updated while it is in use.
+type CannotUpdateEntityWhileInUse struct {
+	Message *string
+
+	ErrorCodeOverride *string
+
+	noSmithyDocumentSerde
+}
+
+func (e *CannotUpdateEntityWhileInUse) Error() string {
+	return fmt.Sprintf("%s: %s", e.ErrorCode(), e.ErrorMessage())
+}
+func (e *CannotUpdateEntityWhileInUse) ErrorMessage() string {
+	if e.Message == nil {
+		return ""
+	}
+	return *e.Message
+}
+func (e *CannotUpdateEntityWhileInUse) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "CannotUpdateEntityWhileInUse"
+	}
+	return *e.ErrorCodeOverride
+}
+func (e *CannotUpdateEntityWhileInUse) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // If the CallerReference is a value you already sent in a previous request to
 // create an identity but the content of the CloudFrontOriginAccessIdentityConfig
@@ -361,8 +387,7 @@ func (e *DistributionNotDisabled) ErrorCode() string {
 }
 func (e *DistributionNotDisabled) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The key value store entity already exists. You must provide a unique key value
-// store entity.
+// The entity already exists. You must provide a unique entity.
 type EntityAlreadyExists struct {
 	Message *string
 
@@ -388,7 +413,7 @@ func (e *EntityAlreadyExists) ErrorCode() string {
 }
 func (e *EntityAlreadyExists) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The key value store entity limit has been exceeded.
+// The entity limit has been exceeded.
 type EntityLimitExceeded struct {
 	Message *string
 
@@ -414,7 +439,7 @@ func (e *EntityLimitExceeded) ErrorCode() string {
 }
 func (e *EntityLimitExceeded) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The key value store entity was not found.
+// The entity was not found.
 type EntityNotFound struct {
 	Message *string
 
@@ -440,7 +465,7 @@ func (e *EntityNotFound) ErrorCode() string {
 }
 func (e *EntityNotFound) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// The key value store entity size limit was exceeded.
+// The entity size limit was exceeded.
 type EntitySizeLimitExceeded struct {
 	Message *string
 
@@ -685,7 +710,7 @@ func (e *FunctionSizeLimitExceeded) ErrorCode() string {
 }
 func (e *FunctionSizeLimitExceeded) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// You cannot delete a managed policy.
+// Deletion is not allowed for this entity.
 type IllegalDelete struct {
 	Message *string
 
@@ -844,6 +869,32 @@ func (e *InvalidArgument) ErrorCode() string {
 	return *e.ErrorCodeOverride
 }
 func (e *InvalidArgument) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
+
+// The specified CloudFront resource can't be associated.
+type InvalidAssociation struct {
+	Message *string
+
+	ErrorCodeOverride *string
+
+	noSmithyDocumentSerde
+}
+
+func (e *InvalidAssociation) Error() string {
+	return fmt.Sprintf("%s: %s", e.ErrorCode(), e.ErrorMessage())
+}
+func (e *InvalidAssociation) ErrorMessage() string {
+	if e.Message == nil {
+		return ""
+	}
+	return *e.Message
+}
+func (e *InvalidAssociation) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "InvalidAssociation"
+	}
+	return *e.ErrorCodeOverride
+}
+func (e *InvalidAssociation) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // The default root object file name is too big or contains an invalid character.
 type InvalidDefaultRootObject struct {
@@ -2355,6 +2406,32 @@ func (e *ResourceInUse) ErrorCode() string {
 	return *e.ErrorCodeOverride
 }
 func (e *ResourceInUse) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
+
+// The specified CloudFront resource hasn't been disabled yet.
+type ResourceNotDisabled struct {
+	Message *string
+
+	ErrorCodeOverride *string
+
+	noSmithyDocumentSerde
+}
+
+func (e *ResourceNotDisabled) Error() string {
+	return fmt.Sprintf("%s: %s", e.ErrorCode(), e.ErrorMessage())
+}
+func (e *ResourceNotDisabled) ErrorMessage() string {
+	if e.Message == nil {
+		return ""
+	}
+	return *e.Message
+}
+func (e *ResourceNotDisabled) ErrorCode() string {
+	if e == nil || e.ErrorCodeOverride == nil {
+		return "ResourceNotDisabled"
+	}
+	return *e.ErrorCodeOverride
+}
+func (e *ResourceNotDisabled) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
 // A response headers policy with this name already exists. You must provide a
 // unique name. To modify an existing response headers policy, use
@@ -4105,7 +4182,7 @@ func (e *TrustedSignerDoesNotExist) ErrorCode() string {
 }
 func (e *TrustedSignerDoesNotExist) ErrorFault() smithy.ErrorFault { return smithy.FaultClient }
 
-// This operation is not supported in this region.
+// This operation is not supported in this Amazon Web Services Region.
 type UnsupportedOperation struct {
 	Message *string
 
