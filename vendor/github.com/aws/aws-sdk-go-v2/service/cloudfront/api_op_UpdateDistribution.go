@@ -25,12 +25,13 @@ import (
 //   - Update the distribution configuration that was returned in the response.
 //     Note the following important requirements and restrictions:
 //
-//   - You must rename the ETag field to IfMatch , leaving the value unchanged.
-//     (Set the value of IfMatch to the value of ETag , then remove the ETag field.)
+//   - You must copy the ETag field value from the response. (You'll use it for the
+//     IfMatch parameter in your request.) Then, remove the ETag field from the
+//     distribution configuration.
 //
 //   - You can't change the value of CallerReference .
 //
-//   - Submit an UpdateDistribution request, providing the distribution
+//   - Submit an UpdateDistribution request, providing the updated distribution
 //     configuration. The new configuration replaces the existing configuration. The
 //     values that you specify in an UpdateDistribution request are not merged into
 //     your existing configuration. Make sure to include all fields: the ones that you
@@ -149,6 +150,9 @@ func (c *Client) addOperationUpdateDistributionMiddlewares(stack *middleware.Sta
 	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
+	if err = addCredentialSource(stack, options); err != nil {
+		return err
+	}
 	if err = addOpUpdateDistributionValidationMiddleware(stack); err != nil {
 		return err
 	}
@@ -168,6 +172,36 @@ func (c *Client) addOperationUpdateDistributionMiddlewares(stack *middleware.Sta
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {

@@ -58,7 +58,7 @@ type UpdateDistributionWithStagingConfigInput struct {
 	// The current versions ( ETag values) of both primary and staging distributions.
 	// Provide these in the following format:
 	//
-	//     ,
+	//     <primary ETag>, <staging ETag>
 	IfMatch *string
 
 	// The identifier of the staging distribution whose configuration you are copying
@@ -147,6 +147,9 @@ func (c *Client) addOperationUpdateDistributionWithStagingConfigMiddlewares(stac
 	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
+	if err = addCredentialSource(stack, options); err != nil {
+		return err
+	}
 	if err = addOpUpdateDistributionWithStagingConfigValidationMiddleware(stack); err != nil {
 		return err
 	}
@@ -166,6 +169,36 @@ func (c *Client) addOperationUpdateDistributionWithStagingConfigMiddlewares(stac
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {
