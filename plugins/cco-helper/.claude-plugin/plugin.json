@@ -1,0 +1,5 @@
+{
+  "name": "cco-helper",
+  "description": "AI-assisted helper for OpenShift Cloud Credential Operator",
+  "version": "0.1.0"
+}

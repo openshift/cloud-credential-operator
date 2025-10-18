@@ -1,0 +1,13 @@
+{
+  "name": "cloud-credential-operator",
+  "owner": {
+    "name": "openshift"
+  },
+  "plugins": [
+    {
+      "name": "cco-helper",
+      "source": "./plugins/cco-helper",
+      "description": "AI-assisted helper for OpenShift Cloud Credential Operator"
+    }
+  ]
+}
