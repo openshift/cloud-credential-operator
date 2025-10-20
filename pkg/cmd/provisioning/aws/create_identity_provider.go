@@ -751,7 +751,7 @@ func isExistingIdentifyProvider(client aws.Client, providerARN, namePrefix strin
 }
 
 func createIdentityProviderCmd(cmd *cobra.Command, args []string) {
-	awsClient, err := newAWSClient(CreateAllOpts.Region)
+	awsClient, err := newAWSClient(CreateIdentityProviderOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
