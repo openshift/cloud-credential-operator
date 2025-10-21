@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0](https://github.com/microsoftgraph/msgraph-sdk-go-core/compare/v1.3.2...v1.4.0) (2025-09-11)
+
+
+### Features
+
+* identity dep update ([e7d3b49](https://github.com/microsoftgraph/msgraph-sdk-go-core/commit/e7d3b4932d7b59092347221830d85ad53f30362b))
+
 ## [1.3.2](https://github.com/microsoftgraph/msgraph-sdk-go-core/compare/v1.3.1...v1.3.2) (2025-04-02)
 
 

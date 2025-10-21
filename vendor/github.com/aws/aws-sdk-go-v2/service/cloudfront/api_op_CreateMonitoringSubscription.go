@@ -11,8 +11,8 @@ import (
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
 
-// Enables additional CloudWatch metrics for the specified CloudFront
-// distribution. The additional metrics incur an additional cost.
+// Enables or disables additional Amazon CloudWatch metrics for the specified
+// CloudFront distribution. The additional metrics incur an additional cost.
 //
 // For more information, see [Viewing additional CloudFront distribution metrics] in the Amazon CloudFront Developer Guide.
 //
@@ -124,6 +124,9 @@ func (c *Client) addOperationCreateMonitoringSubscriptionMiddlewares(stack *midd
 	if err = addUserAgentRetryMode(stack, options); err != nil {
 		return err
 	}
+	if err = addCredentialSource(stack, options); err != nil {
+		return err
+	}
 	if err = addOpCreateMonitoringSubscriptionValidationMiddleware(stack); err != nil {
 		return err
 	}
@@ -143,6 +146,36 @@ func (c *Client) addOperationCreateMonitoringSubscriptionMiddlewares(stack *midd
 		return err
 	}
 	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeRetryLoop(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAttempt(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptExecution(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSerialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterSigning(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptTransmit(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
+		return err
+	}
+	if err = addInterceptAfterDeserialization(stack, options); err != nil {
 		return err
 	}
 	if err = addSpanInitializeStart(stack); err != nil {
