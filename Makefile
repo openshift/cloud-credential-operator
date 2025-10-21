@@ -184,3 +184,13 @@ update-go-dependencies-indirect:
 	done
 	go mod tidy
 	go mod vendor
+
+.PHONY: update-go-dependencies-k8s
+update-go-dependencies-k8s:
+	@for module in $$(go list -f '{{ if and (not .Main) (not .Indirect) }}{{.Path}}{{end}}' -m -mod=mod all \
+		| grep "^k8s.io/" \
+		); do \
+		go get $$module; \
+	done
+	go mod tidy
+	go mod vendor
