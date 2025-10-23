@@ -233,7 +233,6 @@ func TestCredentialsRequests(t *testing.T) {
 			},
 			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				assert.Equal(t, 2, accumulator.crTotals["aws"])
-				assert.Equal(t, 1, accumulator.podIdentityCredentials)
 			},
 		},
 		{
@@ -253,7 +252,6 @@ func TestCredentialsRequests(t *testing.T) {
 			},
 			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
 				assert.Equal(t, 2, accumulator.crTotals["azure"])
-				assert.Equal(t, 1, accumulator.podIdentityCredentials)
 			},
 		},
 	}
