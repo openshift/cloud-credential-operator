@@ -95,6 +95,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		CreateAllOpts.NetworkResourceGroupName,
 		CreateAllOpts.UserTags,
 		CreateAllOpts.EnableTechPreview,
+		CreateAllOpts.PreserveExistingRoles,
 		// dryRun may only be invoked by subcommands create-oidc-issuer and create-managed-identities
 		false)
 	if err != nil {
@@ -223,6 +224,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.OutputDir, "output-dir", "", "Directory to place generated manifest files. Defaults to the current directory.")
 	createAllCmd.PersistentFlags().StringToStringVar(&CreateAllOpts.UserTags, "user-tags", map[string]string{}, "User tags to be applied to Azure resources, multiple tags may be specified comma-separated for example: --user-tags key1=value1,key2=value2")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests annotated with TechPreviewNoUpgrade")
+	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.PreserveExistingRoles, "preserve-existing-roles", false, "Do not remove existing role assignments from managed identities")
 
 	return createAllCmd
 }
