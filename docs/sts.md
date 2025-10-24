@@ -119,7 +119,11 @@ NOTE This is just for developers interested in taking an existing cluster to STS
 1. Extract the cluster's ServiceAccount public signing key:
 
    ```bash
-   $ oc get configmap --namespace openshift-kube-apiserver bound-sa-token-signing-certs --output json | jq --raw-output '.data["service-account-001.pub"]' > serviceaccount-signer.public
+   oc get secret/next-bound-service-account-signing-key \
+   --namespace openshift-kube-apiserver-operator \
+   -o jsonpath='{ .data.service-account\.pub }' \
+   | base64 -d \
+   > serviceaccount-signer.public
    ```
 
 2. Create an output directory for `ccoctl` generated manifests and move the public key file to the output directory.
