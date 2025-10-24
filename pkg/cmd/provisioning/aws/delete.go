@@ -273,7 +273,7 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 }
 
 func deleteCmd(cmd *cobra.Command, args []string) {
-	awsClient, err := newAWSClient(CreateAllOpts.Region)
+	awsClient, err := newAWSClient(DeleteOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}

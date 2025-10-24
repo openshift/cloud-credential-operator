@@ -280,7 +280,7 @@ func getIssuerURLFromIdentityProvider(awsClient aws.Client, idProviderARN string
 }
 
 func createIAMRolesCmd(cmd *cobra.Command, args []string) {
-	awsClient, err := newAWSClient(CreateAllOpts.Region)
+	awsClient, err := newAWSClient(CreateIAMRolesOpts.Region)
 	if err != nil {
 		log.Fatal(err)
 	}
