@@ -1,3 +1,196 @@
+# v1.55.1 (2025-10-16)
+
+* **Dependency Update**: Bump minimum Go version to 1.23.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.55.0 (2025-10-10)
+
+* **Feature**: Added new viewer security policy, TLSv1.2_2025, for CloudFront.
+
+# v1.54.4 (2025-09-26)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.54.3 (2025-09-23)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.54.2 (2025-09-10)
+
+* No change notes available for this release.
+
+# v1.54.1 (2025-09-08)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.54.0 (2025-09-03)
+
+* **Feature**: Adding an optional field IpAddressType in CustomOriginConfig
+
+# v1.53.2 (2025-08-29)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.53.1 (2025-08-27)
+
+* **Dependency Update**: Update to smithy-go v1.23.0.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.53.0 (2025-08-21)
+
+* **Feature**: Remove incorrect endpoint tests
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.52.1 (2025-08-20)
+
+* **Bug Fix**: Remove unused deserialization code.
+
+# v1.52.0 (2025-08-11)
+
+* **Feature**: Add support for configuring per-service Options via callback on global config.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.51.0 (2025-08-07)
+
+* **Feature**: Added new viewer security policy, TLSv1.3_2025, for CloudFront.
+
+# v1.50.0 (2025-08-04)
+
+* **Feature**: Support configurable auth scheme preferences in service clients via AWS_AUTH_SCHEME_PREFERENCE in the environment, auth_scheme_preference in the config file, and through in-code settings on LoadDefaultConfig and client constructor methods.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.49.0 (2025-07-30)
+
+* **Feature**: This release adds new origin timeout options: 1) ResponseCompletionTimeout and 2) OriginReadTimeout (for S3 origins)
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.48.0 (2025-07-28)
+
+* **Feature**: Add support for HTTP interceptors.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.47.0 (2025-07-21)
+
+* **Feature**: Add dualstack endpoint support
+
+# v1.46.5 (2025-07-19)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.46.4 (2025-07-17)
+
+* **Documentation**: Doc only update for CloudFront that fixes some customer-reported issues
+
+# v1.46.3 (2025-06-17)
+
+* **Dependency Update**: Update to smithy-go v1.22.4.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.46.2 (2025-06-10)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.46.1 (2025-05-08)
+
+* **Documentation**: Doc-only update for CloudFront. These changes include customer-reported issues.
+
+# v1.46.0 (2025-04-28)
+
+* **Feature**: Add distribution tenant, connection group, and multi-tenant distribution APIs to the CloudFront SDK.
+
+# v1.45.3 (2025-04-03)
+
+* No change notes available for this release.
+
+# v1.45.2 (2025-03-07)
+
+* **Documentation**: Documentation updates for Amazon CloudFront.
+
+# v1.45.1 (2025-03-04.2)
+
+* **Bug Fix**: Add assurance test for operation order.
+
+# v1.45.0 (2025-02-27)
+
+* **Feature**: Track credential providers via User-Agent Feature ids
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.12 (2025-02-26)
+
+* **Documentation**: Documentation update for VPC origin config.
+
+# v1.44.11 (2025-02-18)
+
+* **Bug Fix**: Bump go version to 1.22
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.10 (2025-02-10)
+
+* **Documentation**: Doc-only update that adds defaults for CloudFront VpcOriginEndpointConfig values.
+
+# v1.44.9 (2025-02-05)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.8 (2025-01-31)
+
+* **Dependency Update**: Switch to code-generated waiter matchers, removing the dependency on go-jmespath.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.7 (2025-01-30)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.6 (2025-01-24)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+* **Dependency Update**: Upgrade to smithy-go v1.22.2.
+
+# v1.44.5 (2025-01-17)
+
+* **Bug Fix**: Fix bug where credentials weren't refreshed during retry loop.
+
+# v1.44.4 (2025-01-15)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.3 (2025-01-14)
+
+* **Bug Fix**: Fix issue where waiters were not failing on unmatched errors as they should. This may have breaking behavioral changes for users in fringe cases. See [this announcement](https://github.com/aws/aws-sdk-go-v2/discussions/2954) for more information.
+
+# v1.44.2 (2025-01-09)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.1 (2024-12-19)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.44.0 (2024-12-17)
+
+* **Feature**: Adds support for OriginReadTimeout and OriginKeepaliveTimeout to create CloudFront Distributions with VPC Origins.
+
+# v1.43.1 (2024-12-02)
+
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.43.0 (2024-11-21)
+
+* **Feature**: Adds support for Origin Selection between EMPv2 origins based on media quality score.
+
+# v1.42.0 (2024-11-20)
+
+* **Feature**: Add support for gRPC, VPC origins, and Anycast IP Lists. Allow LoggingConfig IncludeCookies to be set regardless of whether the LoggingConfig is enabled.
+
+# v1.41.1 (2024-11-18)
+
+* **Dependency Update**: Update to smithy-go v1.22.1.
+* **Dependency Update**: Updated to the latest SDK module versions
+
+# v1.41.0 (2024-11-11)
+
+* **Feature**: No API changes from previous release. This release migrated the model to Smithy keeping all features unchanged.
+
 # v1.40.4 (2024-11-06)
 
 * **Dependency Update**: Updated to the latest SDK module versions
