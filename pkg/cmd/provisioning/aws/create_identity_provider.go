@@ -534,23 +534,26 @@ func createOIDCEndpoint(client aws.Client, bucketName, name, region, targetDir s
 			log.Printf("Bucket %s already exists and is owned by the user", bucketName)
 			if createPrivateS3 {
 				// find the cloudfront distribution
-				distList, err := client.ListDistributions(context.TODO(), &cloudfront.ListDistributionsInput{})
-				if err != nil {
-					return "", errors.Wrap(err, "failed to list cloudfront distributions")
-				}
+				paginator := cloudfront.NewListDistributionsPaginator(client, &cloudfront.ListDistributionsInput{})
+				for paginator.HasMorePages() {
+					distList, err := paginator.NextPage(context.TODO())
+					if err != nil {
+						return "", errors.Wrap(err, "failed to list cloudfront distributions")
+					}
 
-				if distList.DistributionList == nil {
-					// No distributions found at all
-					return "", errors.New("found S3 bucket but no CloudFront distributions exist")
-				}
+					if distList.DistributionList == nil {
+						// No distributions found at all
+						break
+					}
 
-				s3OriginDomainName := fmt.Sprintf("%s.s3.%s.%s", bucketName, region, dnsSuffix)
-				for _, dist := range distList.DistributionList.Items {
-					for _, origin := range dist.Origins.Items {
-						if awssdk.ToString(origin.DomainName) == s3OriginDomainName {
-							log.Printf("Found existing CloudFront distribution %s for S3 bucket %s", awssdk.ToString(dist.Id), bucketName)
-							cloudFrontURL := fmt.Sprintf("https://%s", awssdk.ToString(dist.DomainName))
-							return cloudFrontURL, nil
+					s3OriginDomainName := fmt.Sprintf("%s.s3.%s.%s", bucketName, region, dnsSuffix)
+					for _, dist := range distList.DistributionList.Items {
+						for _, origin := range dist.Origins.Items {
+							if awssdk.ToString(origin.DomainName) == s3OriginDomainName {
+								log.Printf("Found existing CloudFront distribution %s for S3 bucket %s", awssdk.ToString(dist.Id), bucketName)
+								cloudFrontURL := fmt.Sprintf("https://%s", awssdk.ToString(dist.DomainName))
+								return cloudFrontURL, nil
+							}
 						}
 					}
 				}
