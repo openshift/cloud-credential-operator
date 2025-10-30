@@ -4,3 +4,5 @@
 /_output/
 .idea/
 coverage.out
+/cloud-credential-tests-ext
+

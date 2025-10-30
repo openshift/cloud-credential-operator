@@ -1,6 +1,8 @@
 all: build
 .PHONY: all
 
+GO_PACKAGE=github.com/openshift/cloud-credential-operator
+
 # Include the library makefile
 include $(addprefix ./vendor/github.com/openshift/build-machinery-go/make/, \
 	golang.mk \
@@ -127,6 +129,16 @@ verify-vendored-crds:
 clean:
 	$(RM) ./cloud-credential-operator
 .PHONY: clean
+
+# Build OpenShift test extension following OTE requirements:
+# - Static linking (CGO_ENABLED=0)
+# - ART compliance exemption (GO_COMPLIANCE_POLICY=exempt_all)
+cloud-credential-tests-ext:
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO_COMPLIANCE_POLICY=exempt_all \
+		go build -mod=vendor \
+		-ldflags "-X $(GO_PACKAGE)/pkg/version.versionFromGit=$$(git describe --long --tags --abbrev=7 --match 'v[0-9]*' )" \
+		./cmd/cloud-credential-tests-ext
+.PHONY: cloud-credential-tests-ext
 
 # Run against the configured cluster in ~/.kube/config
 run: build
