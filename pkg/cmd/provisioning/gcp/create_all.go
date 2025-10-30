@@ -37,10 +37,9 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 	publicKeyPath := CreateAllOpts.PublicKeyPath
 	if publicKeyPath == "" {
 		publicKeyPath = path.Join(CreateAllOpts.TargetDir, provisioning.PublicKeyFile)
-	}
-
-	if err := provisioning.CreateKeys(CreateAllOpts.TargetDir); err != nil {
-		log.Fatalf("Failed to create public/private key pair: %s", err)
+		if err := provisioning.CreateKeys(CreateAllOpts.TargetDir); err != nil {
+			log.Fatalf("Failed to create public/private key pair: %s", err)
+		}
 	}
 
 	if err = createWorkloadIdentityPool(ctx, gcpClient, CreateAllOpts.Name, CreateAllOpts.Project, CreateAllOpts.TargetDir, false); err != nil {
@@ -117,6 +116,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.MarkPersistentFlagRequired("credentials-requests-dir")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
+	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 
 	return createAllCmd
 }
