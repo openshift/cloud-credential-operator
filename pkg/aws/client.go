@@ -72,7 +72,7 @@ type Client interface {
 	GetBucketTagging(context.Context, *s3.GetBucketTaggingInput, ...func(*s3.Options)) (*s3.GetBucketTaggingOutput, error)
 	DeleteBucket(context.Context, *s3.DeleteBucketInput, ...func(*s3.Options)) (*s3.DeleteBucketOutput, error)
 	PutObject(context.Context, *s3.PutObjectInput, ...func(*s3.Options)) (*s3.PutObjectOutput, error)
-	ListObjects(context.Context, *s3.ListObjectsInput, ...func(*s3.Options)) (*s3.ListObjectsOutput, error)
+	ListObjectsV2(context.Context, *s3.ListObjectsV2Input, ...func(*s3.Options)) (*s3.ListObjectsV2Output, error)
 	GetObjectTagging(context.Context, *s3.GetObjectTaggingInput, ...func(*s3.Options)) (*s3.GetObjectTaggingOutput, error)
 	DeleteObject(context.Context, *s3.DeleteObjectInput, ...func(*s3.Options)) (*s3.DeleteObjectOutput, error)
 	PutPublicAccessBlock(context.Context, *s3.PutPublicAccessBlockInput, ...func(*s3.Options)) (*s3.PutPublicAccessBlockOutput, error)
@@ -225,8 +225,8 @@ func (c *awsClient) PutObject(ctx context.Context, input *s3.PutObjectInput, opt
 	return c.s3Client.PutObject(ctx, input, opts...)
 }
 
-func (c *awsClient) ListObjects(ctx context.Context, input *s3.ListObjectsInput, opts ...func(*s3.Options)) (*s3.ListObjectsOutput, error) {
-	return c.s3Client.ListObjects(ctx, input, opts...)
+func (c *awsClient) ListObjectsV2(ctx context.Context, input *s3.ListObjectsV2Input, opts ...func(*s3.Options)) (*s3.ListObjectsV2Output, error) {
+	return c.s3Client.ListObjectsV2(ctx, input, opts...)
 }
 
 func (c *awsClient) GetObjectTagging(ctx context.Context, input *s3.GetObjectTaggingInput, opts ...func(*s3.Options)) (*s3.GetObjectTaggingOutput, error) {
