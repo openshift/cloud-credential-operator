@@ -272,13 +272,13 @@ $ curl https://${CLOUDFRONT_HOST}/keys.json
 
 - Extract the service account signer public key, to generate the IdP by `ccoctl`:
 
-```bash
-oc get configmap bound-sa-token-signing-certs \
-    --namespace openshift-kube-apiserver \
-    --output json \
-    | jq --raw-output '.data["service-account-001.pub"]' \
-    > serviceaccount-signer.public
-```
+   ```bash
+   oc get secret/next-bound-service-account-signing-key \
+   --namespace openshift-kube-apiserver-operator \
+   -o jsonpath='{ .data.service-account\.pub }' \
+   | base64 -d \
+   > serviceaccount-signer.public
+   ```
 
 - Generate the IdP files into the local directory `new-oidc`:
 
