@@ -4,3 +4,4 @@
 /_output/
 .idea/
 coverage.out
+.claude/settings.local.json
