@@ -70,7 +70,7 @@ type: Opaque`
 //
 // A secret containing user-assigned managed identity details will be written to the outputDir
 // once the user-assigned managed identity is created and configured.
-func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resourceGroupName, subscriptionID, region, issuerURL, outputDir string, scopingResourceGroupNames []string, resourceTags map[string]string, credentialsRequest *credreqv1.CredentialsRequest, dryRun bool) error {
+func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resourceGroupName, subscriptionID, region, issuerURL, outputDir string, scopingResourceGroupNames []string, resourceTags map[string]string, credentialsRequest *credreqv1.CredentialsRequest, preserveExistingRoles, dryRun bool) error {
 	// Write dummy secrets with blank clientID and tenantID when doing a dry run.
 	if dryRun {
 		writeCredReqSecret(credentialsRequest, outputDir, "", "", subscriptionID, region)
@@ -106,7 +106,7 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 	}
 
 	// Ensure roles from CredentialsRequest are assigned to the user-assigned managed identity
-	err = ensureRolesAssignedToManagedIdentity(client, *userAssignedManagedIdentity.Properties.PrincipalID, subscriptionID, crProviderSpec.RoleBindings, scopingResourceGroupNames)
+	err = ensureRolesAssignedToManagedIdentity(client, *userAssignedManagedIdentity.Properties.PrincipalID, subscriptionID, crProviderSpec.RoleBindings, scopingResourceGroupNames, preserveExistingRoles)
 	if err != nil {
 		return err
 	}
@@ -204,7 +204,7 @@ func ensureCustomRole(client *azureclients.AzureClientWrapper, roleName string, 
 //
 // Roles which are assigned to pre-existing user-assigned managed identities will be removed if
 // not enumerated within roleBindings.
-func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrapper, managedIdentityPrincipalID, subscriptionID string, roleBindings []credreqv1.RoleBinding, scopingResourceGroupNames []string) error {
+func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrapper, managedIdentityPrincipalID, subscriptionID string, roleBindings []credreqv1.RoleBinding, scopingResourceGroupNames []string, preserveExistingRoles bool) error {
 	// List role assignments by the user-assigned managed identity principal ID
 	// This list of role assignments are roles which are assigned to the user-assigned managed identity
 	existingRoleAssignments := []*armauthorization.RoleAssignment{}
@@ -282,6 +282,9 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 				}
 			}
 		}
+	}
+	if preserveExistingRoles {
+		return nil
 	}
 
 	for _, existingRoleAssignment := range existingRoleAssignments {
@@ -640,7 +643,7 @@ func writeCredReqSecret(cr *credreqv1.CredentialsRequest, outputDir, clientID, t
 // additionally scoped within the resource group identified by dnsZoneResourceGroupName.
 //
 // Kubernetes secrets containing the user-assigned managed identity's clientID will be generated and written to the outputDir.
-func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, installationResourceGroupName, dnsZoneResourceGroupName, networkResourceGroupName string, resourceTags map[string]string, enableTechPreview, dryRun bool) error {
+func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, installationResourceGroupName, dnsZoneResourceGroupName, networkResourceGroupName string, resourceTags map[string]string, enableTechPreview, preserveExistingRoles, dryRun bool) error {
 	// Add CCO's "owned" tag to resource tags map
 	resourceTags[fmt.Sprintf("%s_%s", ownedAzureResourceTagKeyPrefix, name)] = ownedAzureResourceTagValue
 
@@ -682,7 +685,7 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 				scopingResourceGroupNames = append(scopingResourceGroupNames, networkResourceGroupName)
 			}
 		}
-		err := createManagedIdentity(client, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, scopingResourceGroupNames, resourceTags, credentialsRequest, dryRun)
+		err := createManagedIdentity(client, name, oidcResourceGroupName, subscriptionID, region, issuerURL, outputDir, scopingResourceGroupNames, resourceTags, credentialsRequest, preserveExistingRoles, dryRun)
 		if err != nil {
 			return err
 		}
@@ -730,6 +733,7 @@ func createManagedIdentitiesCmd(cmd *cobra.Command, args []string) {
 		CreateManagedIdentitiesOpts.NetworkResourceGroupName,
 		CreateManagedIdentitiesOpts.UserTags,
 		CreateManagedIdentitiesOpts.EnableTechPreview,
+		CreateManagedIdentitiesOpts.PreserveExistingRoles,
 		CreateManagedIdentitiesOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
@@ -832,6 +836,7 @@ func NewCreateManagedIdentitiesCmd() *cobra.Command {
 	createManagedIdentitiesCmd.PersistentFlags().StringVar(&CreateManagedIdentitiesOpts.OutputDir, "output-dir", "", "Directory to place generated files. Defaults to the current directory.")
 	createManagedIdentitiesCmd.PersistentFlags().StringToStringVar(&CreateManagedIdentitiesOpts.UserTags, "user-tags", map[string]string{}, "User tags to be applied to Azure resources, multiple tags may be specified comma-separated for example: --user-tags key1=value1,key2=value2")
 	createManagedIdentitiesCmd.PersistentFlags().BoolVar(&CreateManagedIdentitiesOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests annotated with TechPreviewNoUpgrade")
+	createManagedIdentitiesCmd.PersistentFlags().BoolVar(&CreateManagedIdentitiesOpts.PreserveExistingRoles, "preserve-existing-roles", false, "Do not remove existing role assignments from managed identities")
 
 	return createManagedIdentitiesCmd
 }
