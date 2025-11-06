@@ -507,6 +507,10 @@ func createOIDCIssuerCmd(cmd *cobra.Command, args []string) {
 		log.Printf("No --blob-container-name provided, defaulting blob container name to %s", CreateOIDCIssuerOpts.BlobContainerName)
 	}
 
+	publicKeyPath := CreateOIDCIssuerOpts.PublicKeyPath
+	if publicKeyPath == "" {
+		publicKeyPath = filepath.Join(CreateOIDCIssuerOpts.OutputDir, provisioning.PublicKeyFile)
+	}
 	_, err = createOIDCIssuer(azureClientWrapper,
 		CreateOIDCIssuerOpts.Name,
 		CreateOIDCIssuerOpts.Region,
@@ -515,7 +519,7 @@ func createOIDCIssuerCmd(cmd *cobra.Command, args []string) {
 		CreateOIDCIssuerOpts.BlobContainerName,
 		CreateOIDCIssuerOpts.SubscriptionID,
 		CreateOIDCIssuerOpts.TenantID,
-		CreateOIDCIssuerOpts.PublicKeyPath,
+		publicKeyPath,
 		CreateOIDCIssuerOpts.OutputDir,
 		CreateOIDCIssuerOpts.UserTags,
 		CreateOIDCIssuerOpts.DryRun)
@@ -587,7 +591,6 @@ func NewCreateOIDCIssuerCmd() *cobra.Command {
 	createOIDCIssuerCmd.PersistentFlags().StringVar(&CreateOIDCIssuerOpts.TenantID, "tenant-id", "", "Azure Tenant ID in which identity provider infrastructure will be created")
 	createOIDCIssuerCmd.MarkPersistentFlagRequired("tenant-id")
 	createOIDCIssuerCmd.PersistentFlags().StringVar(&CreateOIDCIssuerOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
-	createOIDCIssuerCmd.MarkPersistentFlagRequired("public-key-file")
 
 	// Optional parameters
 	createOIDCIssuerCmd.PersistentFlags().StringVar(
