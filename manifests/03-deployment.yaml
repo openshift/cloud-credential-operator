@@ -21,13 +21,14 @@ spec:
     metadata:
       annotations:
         target.workload.openshift.io/management: '{"effect": "PreferredDuringScheduling"}'
-        openshift.io/required-scc: restricted-v2
+        openshift.io/required-scc: restricted-v3
         kubectl.kubernetes.io/default-container: cloud-credential-operator
       labels:
         app: cloud-credential-operator
         control-plane: controller-manager
         controller-tools.k8s.io: "1.0"
     spec:
+      hostUsers: false
       securityContext:
         runAsNonRoot: true
         seccompProfile:
