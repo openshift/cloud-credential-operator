@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 //go:build (linux || aix || zos) && !js && !wasi
+=======
+//go:build (linux || aix || zos) && !js
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // +build linux aix zos
 // +build !js
 // +build !wasi

@@ -4,16 +4,21 @@
 package places
 
 import (
+<<<<<<< HEAD
     "context"
     i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f "github.com/microsoft/kiota-abstractions-go"
     iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242 "github.com/microsoftgraph/msgraph-sdk-go/models"
     ia572726a95efa92ddd544552cd950653dc691023836923576b2f4bf716cf204a "github.com/microsoftgraph/msgraph-sdk-go/models/odataerrors"
+=======
+	i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f "github.com/microsoft/kiota-abstractions-go"
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 )
 
 // PlacesRequestBuilder provides operations to manage the collection of place entities.
 type PlacesRequestBuilder struct {
-    i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
+	i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.BaseRequestBuilder
 }
+<<<<<<< HEAD
 // PlacesRequestBuilderPostRequestConfiguration configuration for the request such as headers, query parameters, and middleware options.
 type PlacesRequestBuilderPostRequestConfiguration struct {
     // Request headers
@@ -21,36 +26,43 @@ type PlacesRequestBuilderPostRequestConfiguration struct {
     // Request options
     Options []i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestOption
 }
+=======
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // ByPlaceId provides operations to manage the collection of place entities.
 // returns a *PlaceItemRequestBuilder when successful
-func (m *PlacesRequestBuilder) ByPlaceId(placeId string)(*PlaceItemRequestBuilder) {
-    urlTplParams := make(map[string]string)
-    for idx, item := range m.BaseRequestBuilder.PathParameters {
-        urlTplParams[idx] = item
-    }
-    if placeId != "" {
-        urlTplParams["place%2Did"] = placeId
-    }
-    return NewPlaceItemRequestBuilderInternal(urlTplParams, m.BaseRequestBuilder.RequestAdapter)
+func (m *PlacesRequestBuilder) ByPlaceId(placeId string) *PlaceItemRequestBuilder {
+	urlTplParams := make(map[string]string)
+	for idx, item := range m.BaseRequestBuilder.PathParameters {
+		urlTplParams[idx] = item
+	}
+	if placeId != "" {
+		urlTplParams["place%2Did"] = placeId
+	}
+	return NewPlaceItemRequestBuilderInternal(urlTplParams, m.BaseRequestBuilder.RequestAdapter)
 }
+
 // NewPlacesRequestBuilderInternal instantiates a new PlacesRequestBuilder and sets the default values.
-func NewPlacesRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*PlacesRequestBuilder) {
-    m := &PlacesRequestBuilder{
-        BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/places", pathParameters),
-    }
-    return m
+func NewPlacesRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter) *PlacesRequestBuilder {
+	m := &PlacesRequestBuilder{
+		BaseRequestBuilder: *i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewBaseRequestBuilder(requestAdapter, "{+baseurl}/places", pathParameters),
+	}
+	return m
 }
+
 // NewPlacesRequestBuilder instantiates a new PlacesRequestBuilder and sets the default values.
-func NewPlacesRequestBuilder(rawUrl string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*PlacesRequestBuilder) {
-    urlParams := make(map[string]string)
-    urlParams["request-raw-url"] = rawUrl
-    return NewPlacesRequestBuilderInternal(urlParams, requestAdapter)
+func NewPlacesRequestBuilder(rawUrl string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter) *PlacesRequestBuilder {
+	urlParams := make(map[string]string)
+	urlParams["request-raw-url"] = rawUrl
+	return NewPlacesRequestBuilderInternal(urlParams, requestAdapter)
 }
+
 // Count provides operations to count the resources in the collection.
 // returns a *CountRequestBuilder when successful
-func (m *PlacesRequestBuilder) Count()(*CountRequestBuilder) {
-    return NewCountRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+func (m *PlacesRequestBuilder) Count() *CountRequestBuilder {
+	return NewCountRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
+<<<<<<< HEAD
 // GraphBuilding casts the previous resource to building.
 // returns a *GraphBuildingRequestBuilder when successful
 func (m *PlacesRequestBuilder) GraphBuilding()(*GraphBuildingRequestBuilder) {
@@ -66,15 +78,19 @@ func (m *PlacesRequestBuilder) GraphDesk()(*GraphDeskRequestBuilder) {
 func (m *PlacesRequestBuilder) GraphFloor()(*GraphFloorRequestBuilder) {
     return NewGraphFloorRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
+=======
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // GraphRoom casts the previous resource to room.
 // returns a *GraphRoomRequestBuilder when successful
-func (m *PlacesRequestBuilder) GraphRoom()(*GraphRoomRequestBuilder) {
-    return NewGraphRoomRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+func (m *PlacesRequestBuilder) GraphRoom() *GraphRoomRequestBuilder {
+	return NewGraphRoomRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
+
 // GraphRoomList casts the previous resource to roomList.
 // returns a *GraphRoomListRequestBuilder when successful
-func (m *PlacesRequestBuilder) GraphRoomList()(*GraphRoomListRequestBuilder) {
-    return NewGraphRoomListRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+func (m *PlacesRequestBuilder) GraphRoomList() *GraphRoomListRequestBuilder {
+	return NewGraphRoomListRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
 // GraphSection casts the previous resource to section.
 // returns a *GraphSectionRequestBuilder when successful

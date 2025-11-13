@@ -14,11 +14,11 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	"github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob"
-	"github.com/golang/mock/gomock"
 	azureclients "github.com/openshift/cloud-credential-operator/pkg/azure"
 	mockazure "github.com/openshift/cloud-credential-operator/pkg/azure/mock"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/mock/gomock"
 )
 
 var (

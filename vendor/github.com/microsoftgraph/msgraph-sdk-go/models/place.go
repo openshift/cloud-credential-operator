@@ -4,21 +4,24 @@
 package models
 
 import (
-    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
 type Place struct {
-    Entity
+	Entity
 }
+
 // NewPlace instantiates a new Place and sets the default values.
-func NewPlace()(*Place) {
-    m := &Place{
-        Entity: *NewEntity(),
-    }
-    return m
+func NewPlace() *Place {
+	m := &Place{
+		Entity: *NewEntity(),
+	}
+	return m
 }
+
 // CreatePlaceFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
 // returns a Parsable when successful
+<<<<<<< HEAD
 func CreatePlaceFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
     if parseNode != nil {
         mappingValueNode, err := parseNode.GetChildNode("@odata.type")
@@ -53,17 +56,45 @@ func CreatePlaceFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487e
     return NewPlace(), nil
 }
 // GetAddress gets the address property value. The physical address of the place, including the street, city, state, country or region, and postal code.
-// returns a PhysicalAddressable when successful
-func (m *Place) GetAddress()(PhysicalAddressable) {
-    val, err := m.GetBackingStore().Get("address")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(PhysicalAddressable)
-    }
-    return nil
+=======
+func CreatePlaceFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) (i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
+	if parseNode != nil {
+		mappingValueNode, err := parseNode.GetChildNode("@odata.type")
+		if err != nil {
+			return nil, err
+		}
+		if mappingValueNode != nil {
+			mappingValue, err := mappingValueNode.GetStringValue()
+			if err != nil {
+				return nil, err
+			}
+			if mappingValue != nil {
+				switch *mappingValue {
+				case "#microsoft.graph.room":
+					return NewRoom(), nil
+				case "#microsoft.graph.roomList":
+					return NewRoomList(), nil
+				}
+			}
+		}
+	}
+	return NewPlace(), nil
 }
+
+// GetAddress gets the address property value. The street address of the place.
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
+// returns a PhysicalAddressable when successful
+func (m *Place) GetAddress() PhysicalAddressable {
+	val, err := m.GetBackingStore().Get("address")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.(PhysicalAddressable)
+	}
+	return nil
+}
+<<<<<<< HEAD
 // GetCheckIns gets the checkIns property value. A subresource of a place object that indicates the check-in status of an Outlook calendar event booked at the place.
 // returns a []CheckInClaimable when successful
 func (m *Place) GetCheckIns()([]CheckInClaimable) {
@@ -77,19 +108,25 @@ func (m *Place) GetCheckIns()([]CheckInClaimable) {
     return nil
 }
 // GetDisplayName gets the displayName property value. The name that is associated with the place.
+=======
+
+// GetDisplayName gets the displayName property value. The name associated with the place.
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // returns a *string when successful
-func (m *Place) GetDisplayName()(*string) {
-    val, err := m.GetBackingStore().Get("displayName")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(*string)
-    }
-    return nil
+func (m *Place) GetDisplayName() *string {
+	val, err := m.GetBackingStore().Get("displayName")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.(*string)
+	}
+	return nil
 }
+
 // GetFieldDeserializers the deserialization information for the current model
 // returns a map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error) when successful
+<<<<<<< HEAD
 func (m *Place) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error)) {
     res := m.Entity.GetFieldDeserializers()
     res["address"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
@@ -195,19 +232,66 @@ func (m *Place) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388
         return nil
     }
     return res
+=======
+func (m *Place) GetFieldDeserializers() map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+	res := m.Entity.GetFieldDeserializers()
+	res["address"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetObjectValue(CreatePhysicalAddressFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			m.SetAddress(val.(PhysicalAddressable))
+		}
+		return nil
+	}
+	res["displayName"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetStringValue()
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			m.SetDisplayName(val)
+		}
+		return nil
+	}
+	res["geoCoordinates"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetObjectValue(CreateOutlookGeoCoordinatesFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			m.SetGeoCoordinates(val.(OutlookGeoCoordinatesable))
+		}
+		return nil
+	}
+	res["phone"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetStringValue()
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			m.SetPhone(val)
+		}
+		return nil
+	}
+	return res
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
+
 // GetGeoCoordinates gets the geoCoordinates property value. Specifies the place location in latitude, longitude, and (optionally) altitude coordinates.
 // returns a OutlookGeoCoordinatesable when successful
-func (m *Place) GetGeoCoordinates()(OutlookGeoCoordinatesable) {
-    val, err := m.GetBackingStore().Get("geoCoordinates")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(OutlookGeoCoordinatesable)
-    }
-    return nil
+func (m *Place) GetGeoCoordinates() OutlookGeoCoordinatesable {
+	val, err := m.GetBackingStore().Get("geoCoordinates")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.(OutlookGeoCoordinatesable)
+	}
+	return nil
 }
+<<<<<<< HEAD
 // GetIsWheelChairAccessible gets the isWheelChairAccessible property value. Indicates whether the place is wheelchair accessible.
 // returns a *bool when successful
 func (m *Place) GetIsWheelChairAccessible()(*bool) {
@@ -244,18 +328,22 @@ func (m *Place) GetParentId()(*string) {
     }
     return nil
 }
+=======
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // GetPhone gets the phone property value. The phone number of the place.
 // returns a *string when successful
-func (m *Place) GetPhone()(*string) {
-    val, err := m.GetBackingStore().Get("phone")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(*string)
-    }
-    return nil
+func (m *Place) GetPhone() *string {
+	val, err := m.GetBackingStore().Get("phone")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.(*string)
+	}
+	return nil
 }
+<<<<<<< HEAD
 // GetTags gets the tags property value. Custom tags that are associated with the place for categorization or filtering.
 // returns a []string when successful
 func (m *Place) GetTags()([]string) {
@@ -356,14 +444,66 @@ func (m *Place) SetDisplayName(value *string)() {
     if err != nil {
         panic(err)
     }
+=======
+
+// Serialize serializes information the current object
+func (m *Place) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter) error {
+	err := m.Entity.Serialize(writer)
+	if err != nil {
+		return err
+	}
+	{
+		err = writer.WriteObjectValue("address", m.GetAddress())
+		if err != nil {
+			return err
+		}
+	}
+	{
+		err = writer.WriteStringValue("displayName", m.GetDisplayName())
+		if err != nil {
+			return err
+		}
+	}
+	{
+		err = writer.WriteObjectValue("geoCoordinates", m.GetGeoCoordinates())
+		if err != nil {
+			return err
+		}
+	}
+	{
+		err = writer.WriteStringValue("phone", m.GetPhone())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
+// SetAddress sets the address property value. The street address of the place.
+func (m *Place) SetAddress(value PhysicalAddressable) {
+	err := m.GetBackingStore().Set("address", value)
+	if err != nil {
+		panic(err)
+	}
+}
+
+// SetDisplayName sets the displayName property value. The name associated with the place.
+func (m *Place) SetDisplayName(value *string) {
+	err := m.GetBackingStore().Set("displayName", value)
+	if err != nil {
+		panic(err)
+	}
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
+}
+
 // SetGeoCoordinates sets the geoCoordinates property value. Specifies the place location in latitude, longitude, and (optionally) altitude coordinates.
-func (m *Place) SetGeoCoordinates(value OutlookGeoCoordinatesable)() {
-    err := m.GetBackingStore().Set("geoCoordinates", value)
-    if err != nil {
-        panic(err)
-    }
+func (m *Place) SetGeoCoordinates(value OutlookGeoCoordinatesable) {
+	err := m.GetBackingStore().Set("geoCoordinates", value)
+	if err != nil {
+		panic(err)
+	}
 }
+<<<<<<< HEAD
 // SetIsWheelChairAccessible sets the isWheelChairAccessible property value. Indicates whether the place is wheelchair accessible.
 func (m *Place) SetIsWheelChairAccessible(value *bool)() {
     err := m.GetBackingStore().Set("isWheelChairAccessible", value)
@@ -385,13 +525,17 @@ func (m *Place) SetParentId(value *string)() {
         panic(err)
     }
 }
+=======
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // SetPhone sets the phone property value. The phone number of the place.
-func (m *Place) SetPhone(value *string)() {
-    err := m.GetBackingStore().Set("phone", value)
-    if err != nil {
-        panic(err)
-    }
+func (m *Place) SetPhone(value *string) {
+	err := m.GetBackingStore().Set("phone", value)
+	if err != nil {
+		panic(err)
+	}
 }
+<<<<<<< HEAD
 // SetTags sets the tags property value. Custom tags that are associated with the place for categorization or filtering.
 func (m *Place) SetTags(value []string)() {
     err := m.GetBackingStore().Set("tags", value)
@@ -420,4 +564,18 @@ type Placeable interface {
     SetParentId(value *string)()
     SetPhone(value *string)()
     SetTags(value []string)()
+=======
+
+type Placeable interface {
+	Entityable
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
+	GetAddress() PhysicalAddressable
+	GetDisplayName() *string
+	GetGeoCoordinates() OutlookGeoCoordinatesable
+	GetPhone() *string
+	SetAddress(value PhysicalAddressable)
+	SetDisplayName(value *string)
+	SetGeoCoordinates(value OutlookGeoCoordinatesable)
+	SetPhone(value *string)
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }

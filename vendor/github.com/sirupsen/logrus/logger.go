@@ -77,10 +77,17 @@ func (mw *MutexWrap) Disable() {
 // instantiate your own:
 //
 //	var log = &logrus.Logger{
+<<<<<<< HEAD
 //	  Out:       os.Stderr,
 //	  Formatter: new(logrus.TextFormatter),
 //	  Hooks:     make(logrus.LevelHooks),
 //	  Level:     logrus.DebugLevel,
+=======
+//	  Out: os.Stderr,
+//	  Formatter: new(logrus.TextFormatter),
+//	  Hooks: make(logrus.LevelHooks),
+//	  Level: logrus.DebugLevel,
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 //	}
 //
 // It's recommended to make this a global instance called `log`.
@@ -347,9 +354,15 @@ func (logger *Logger) Exit(code int) {
 	logger.ExitFunc(code)
 }
 
+<<<<<<< HEAD
 // SetNoLock disables the lock for situations where a file is opened with
 // appending mode, and safe for concurrent writes to the file (within 4k
 // message on Linux). In these cases user can choose to disable the lock.
+=======
+// When file is opened with appending mode, it's safe to
+// write concurrently to a file (within 4k message on Linux).
+// In these cases user can choose to disable the lock.
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 func (logger *Logger) SetNoLock() {
 	logger.mu.Disable()
 }

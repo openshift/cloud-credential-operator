@@ -2,9 +2,11 @@
 // Changes may cause incorrect behavior and will be lost if the code is regenerated.
 
 package models
+
 type ProtectionRuleStatus int
 
 const (
+<<<<<<< HEAD
     DRAFT_PROTECTIONRULESTATUS ProtectionRuleStatus = iota
     ACTIVE_PROTECTIONRULESTATUS
     COMPLETED_PROTECTIONRULESTATUS
@@ -38,14 +40,43 @@ func ParseProtectionRuleStatus(v string) (any, error) {
             return nil, nil
     }
     return &result, nil
+=======
+	DRAFT_PROTECTIONRULESTATUS ProtectionRuleStatus = iota
+	ACTIVE_PROTECTIONRULESTATUS
+	COMPLETED_PROTECTIONRULESTATUS
+	COMPLETEDWITHERRORS_PROTECTIONRULESTATUS
+	UNKNOWNFUTUREVALUE_PROTECTIONRULESTATUS
+)
+
+func (i ProtectionRuleStatus) String() string {
+	return []string{"draft", "active", "completed", "completedWithErrors", "unknownFutureValue"}[i]
+}
+func ParseProtectionRuleStatus(v string) (any, error) {
+	result := DRAFT_PROTECTIONRULESTATUS
+	switch v {
+	case "draft":
+		result = DRAFT_PROTECTIONRULESTATUS
+	case "active":
+		result = ACTIVE_PROTECTIONRULESTATUS
+	case "completed":
+		result = COMPLETED_PROTECTIONRULESTATUS
+	case "completedWithErrors":
+		result = COMPLETEDWITHERRORS_PROTECTIONRULESTATUS
+	case "unknownFutureValue":
+		result = UNKNOWNFUTUREVALUE_PROTECTIONRULESTATUS
+	default:
+		return nil, nil
+	}
+	return &result, nil
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
 func SerializeProtectionRuleStatus(values []ProtectionRuleStatus) []string {
-    result := make([]string, len(values))
-    for i, v := range values {
-        result[i] = v.String()
-    }
-    return result
+	result := make([]string, len(values))
+	for i, v := range values {
+		result[i] = v.String()
+	}
+	return result
 }
 func (i ProtectionRuleStatus) isMultiValue() bool {
-    return false
+	return false
 }

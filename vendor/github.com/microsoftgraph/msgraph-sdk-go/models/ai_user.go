@@ -4,26 +4,30 @@
 package models
 
 import (
-    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
 type AiUser struct {
-    Entity
+	Entity
 }
+
 // NewAiUser instantiates a new AiUser and sets the default values.
-func NewAiUser()(*AiUser) {
-    m := &AiUser{
-        Entity: *NewEntity(),
-    }
-    return m
+func NewAiUser() *AiUser {
+	m := &AiUser{
+		Entity: *NewEntity(),
+	}
+	return m
 }
+
 // CreateAiUserFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
 // returns a Parsable when successful
-func CreateAiUserFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
-    return NewAiUser(), nil
+func CreateAiUserFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) (i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
+	return NewAiUser(), nil
 }
+
 // GetFieldDeserializers the deserialization information for the current model
 // returns a map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error) when successful
+<<<<<<< HEAD
 func (m *AiUser) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error)) {
     res := m.Entity.GetFieldDeserializers()
     res["interactionHistory"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
@@ -53,19 +57,36 @@ func (m *AiUser) GetFieldDeserializers()(map[string]func(i878a80d2330e89d2689638
         return nil
     }
     return res
+=======
+func (m *AiUser) GetFieldDeserializers() map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+	res := m.Entity.GetFieldDeserializers()
+	res["interactionHistory"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetObjectValue(CreateAiInteractionHistoryFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			m.SetInteractionHistory(val.(AiInteractionHistoryable))
+		}
+		return nil
+	}
+	return res
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
+
 // GetInteractionHistory gets the interactionHistory property value. The interactionHistory property
 // returns a AiInteractionHistoryable when successful
-func (m *AiUser) GetInteractionHistory()(AiInteractionHistoryable) {
-    val, err := m.GetBackingStore().Get("interactionHistory")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(AiInteractionHistoryable)
-    }
-    return nil
+func (m *AiUser) GetInteractionHistory() AiInteractionHistoryable {
+	val, err := m.GetBackingStore().Get("interactionHistory")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.(AiInteractionHistoryable)
+	}
+	return nil
 }
+<<<<<<< HEAD
 // GetOnlineMeetings gets the onlineMeetings property value. The onlineMeetings property
 // returns a []AiOnlineMeetingable when successful
 func (m *AiUser) GetOnlineMeetings()([]AiOnlineMeetingable) {
@@ -103,14 +124,32 @@ func (m *AiUser) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c
         }
     }
     return nil
+=======
+
+// Serialize serializes information the current object
+func (m *AiUser) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter) error {
+	err := m.Entity.Serialize(writer)
+	if err != nil {
+		return err
+	}
+	{
+		err = writer.WriteObjectValue("interactionHistory", m.GetInteractionHistory())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
+
 // SetInteractionHistory sets the interactionHistory property value. The interactionHistory property
-func (m *AiUser) SetInteractionHistory(value AiInteractionHistoryable)() {
-    err := m.GetBackingStore().Set("interactionHistory", value)
-    if err != nil {
-        panic(err)
-    }
+func (m *AiUser) SetInteractionHistory(value AiInteractionHistoryable) {
+	err := m.GetBackingStore().Set("interactionHistory", value)
+	if err != nil {
+		panic(err)
+	}
 }
+<<<<<<< HEAD
 // SetOnlineMeetings sets the onlineMeetings property value. The onlineMeetings property
 func (m *AiUser) SetOnlineMeetings(value []AiOnlineMeetingable)() {
     err := m.GetBackingStore().Set("onlineMeetings", value)
@@ -125,4 +164,12 @@ type AiUserable interface {
     GetOnlineMeetings()([]AiOnlineMeetingable)
     SetInteractionHistory(value AiInteractionHistoryable)()
     SetOnlineMeetings(value []AiOnlineMeetingable)()
+=======
+
+type AiUserable interface {
+	Entityable
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
+	GetInteractionHistory() AiInteractionHistoryable
+	SetInteractionHistory(value AiInteractionHistoryable)
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
