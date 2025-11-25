@@ -140,61 +140,73 @@ func ensureCustomRole(client *azureclients.AzureClientWrapper, roleName string, 
 		dataActions = append(dataActions, to.Ptr(dataPermission))
 	}
 
-	// Determine if a role already exists with the same name
-	listRoles := client.RoleDefinitionsClient.NewListPager(
-		scope,
-		&armauthorization.RoleDefinitionsClientListOptions{
-			Filter: to.Ptr(fmt.Sprintf("roleName eq '%v'", roleName)),
-		},
-	)
-	roleDefinitions := make([]*armauthorization.RoleDefinition, 0)
-	for listRoles.More() {
-		pageResponse, err := listRoles.NextPage(context.Background())
+	// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
+	for i := 0; ; i++ {
+		// Determine if a role already exists with the same name
+		listRoles := client.RoleDefinitionsClient.NewListPager(
+			scope,
+			&armauthorization.RoleDefinitionsClientListOptions{
+				Filter: to.Ptr(fmt.Sprintf("roleName eq '%v'", roleName)),
+			},
+		)
+		roleDefinitions := make([]*armauthorization.RoleDefinition, 0)
+		for listRoles.More() {
+			pageResponse, err := listRoles.NextPage(context.Background())
+			if err != nil {
+				return err
+			}
+			roleDefinitions = append(roleDefinitions, pageResponse.RoleDefinitionListResult.Value...)
+		}
+
+		var roleID string
+		var isNewRole bool
+		switch len(roleDefinitions) {
+		case 0:
+			// Generate a new role ID
+			roleID = uuid.New().String()
+			isNewRole = true
+		case 1:
+			log.Printf("Found existing customRole %s %s", roleName, *roleDefinitions[0].ID)
+			roleID = *roleDefinitions[0].Name
+		default:
+			return fmt.Errorf("found %d role definitions for %s, expected one", len(roleDefinitions), roleName)
+		}
+
+		customRole, err := client.RoleDefinitionsClient.CreateOrUpdate(
+			context.Background(),
+			scope,
+			roleID,
+			armauthorization.RoleDefinition{
+				Properties: &armauthorization.RoleDefinitionProperties{
+					RoleName:         &roleName,
+					Description:      to.Ptr("Custom role for OpenShift. Owned by: " + name),
+					RoleType:         to.Ptr("CustomRole"),
+					Permissions:      []*armauthorization.Permission{{Actions: actions, DataActions: dataActions}},
+					AssignableScopes: []*string{&scope},
+				},
+			},
+			&armauthorization.RoleDefinitionsClientCreateOrUpdateOptions{},
+		)
 		if err != nil {
+			var respErr *azcore.ResponseError
+			if errors.As(err, &respErr) && respErr.ErrorCode == "RoleDefinitionWithSameNameExists" {
+				if i >= 23 {
+					return errors.Wrap(err, "timed out ensuring custom role, this is most likely due to a replication delay")
+				}
+				log.Printf("Custom role with same name exists but was not found in list, retrying...")
+				time.Sleep(10 * time.Second)
+				continue
+			}
 			return err
 		}
-		roleDefinitions = append(roleDefinitions, pageResponse.RoleDefinitionListResult.Value...)
-	}
 
-	var roleID string
-	var isNewRole bool
-	switch len(roleDefinitions) {
-	case 0:
-		// Generate a new role ID
-		roleID = uuid.New().String()
-		isNewRole = true
-	case 1:
-		log.Printf("Found existing customRole %s %s", roleName, *roleDefinitions[0].ID)
-		roleID = *roleDefinitions[0].Name
-	default:
-		return fmt.Errorf("found %d role definitions for %s, expected one", len(roleDefinitions), roleName)
+		if isNewRole {
+			log.Printf("Created customRole %s %s", roleName, *customRole.ID)
+		} else {
+			log.Printf("Updated customRole %s %s", roleName, *customRole.ID)
+		}
+		return nil
 	}
-
-	customRole, err := client.RoleDefinitionsClient.CreateOrUpdate(
-		context.Background(),
-		scope,
-		roleID,
-		armauthorization.RoleDefinition{
-			Properties: &armauthorization.RoleDefinitionProperties{
-				RoleName:         &roleName,
-				Description:      to.Ptr("Custom role for OpenShift. Owned by: " + name),
-				RoleType:         to.Ptr("CustomRole"),
-				Permissions:      []*armauthorization.Permission{{Actions: actions, DataActions: dataActions}},
-				AssignableScopes: []*string{&scope},
-			},
-		},
-		&armauthorization.RoleDefinitionsClientCreateOrUpdateOptions{},
-	)
-	if err != nil {
-		return err
-	}
-
-	if isNewRole {
-		log.Printf("Created customRole %s %s", roleName, *customRole.ID)
-	} else {
-		log.Printf("Updated customRole %s %s", roleName, *customRole.ID)
-	}
-	return nil
 }
 
 // ensureRolesAssignedToManagedIdentity ensures that the provided roleBindings are assigned to the user-assigned
