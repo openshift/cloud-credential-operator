@@ -208,3 +208,30 @@ update-go-modules-k8s:
 	done
 	go mod tidy
 	go mod vendor
+
+# OTE binary configuration
+TESTS_EXT_DIR := ./cmd/extension
+TESTS_EXT_BINARY := cloud-credential-operator-tests-ext
+
+# Build OTE extension binary (following machine-config-operator PR #4665 pattern)
+.PHONY: tests-ext-build
+tests-ext-build:
+	@echo "Building OTE test extension binary..."
+	@cd test && $(MAKE) bindata
+	go build -mod=vendor -o $(TESTS_EXT_DIR)/$(TESTS_EXT_BINARY) $(TESTS_EXT_DIR)
+	@echo "OTE binary built successfully at $(TESTS_EXT_DIR)/$(TESTS_EXT_BINARY)"
+
+# Alias for backward compatibility
+.PHONY: extension
+extension: tests-ext-build
+
+# List all tests
+.PHONY: list-tests
+list-tests: tests-ext-build
+	$(TESTS_EXT_DIR)/$(TESTS_EXT_BINARY) list
+
+# Clean extension binary
+.PHONY: clean-extension
+clean-extension:
+	rm -f $(TESTS_EXT_DIR)/$(TESTS_EXT_BINARY)
+	@cd test && $(MAKE) clean-bindata
