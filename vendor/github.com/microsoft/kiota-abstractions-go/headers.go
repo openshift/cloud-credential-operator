@@ -14,7 +14,7 @@ func normalizeHeaderKey(key string) string {
 	return strings.ToLower(strings.Trim(key, " "))
 }
 
-//Add adds a new header or append a new value to an existing header
+// Add adds a new header or append a new value to an existing header
 func (r *header) Add(key string, value string, additionalValues ...string) {
 	normalizedKey := normalizeHeaderKey(key)
 	if normalizedKey == "" || value == "" {
@@ -32,7 +32,7 @@ func (r *header) Add(key string, value string, additionalValues ...string) {
 	}
 }
 
-//Get returns the values for the specific header
+// Get returns the values for the specific header
 func (r *header) Get(key string) []string {
 	if r.headers == nil {
 		return nil
@@ -48,7 +48,7 @@ func (r *header) Get(key string) []string {
 	return values
 }
 
-//Remove removes the specific header and all its values
+// Remove removes the specific header and all its values
 func (r *header) Remove(key string) {
 	if r.headers == nil {
 		return
@@ -57,7 +57,7 @@ func (r *header) Remove(key string) {
 	delete(r.headers, normalizedKey)
 }
 
-//RemoveValue remove the value for the specific header
+// RemoveValue remove the value for the specific header
 func (r *header) RemoveValue(key string, value string) {
 	if r.headers == nil {
 		return
@@ -72,7 +72,7 @@ func (r *header) RemoveValue(key string, value string) {
 	}
 }
 
-//ContainsKey check if the key exists in the headers
+// ContainsKey check if the key exists in the headers
 func (r *header) ContainsKey(key string) bool {
 	if r.headers == nil {
 		return false
@@ -81,12 +81,12 @@ func (r *header) ContainsKey(key string) bool {
 	return r.headers[normalizedKey] != nil
 }
 
-//Clear clear all headers
+// Clear clear all headers
 func (r *header) Clear() {
 	r.headers = nil
 }
 
-//AddAll adds all headers from the other headers
+// AddAll adds all headers from the other headers
 func (r *header) AddAll(other *header) {
 	if other == nil || other.headers == nil {
 		return
@@ -98,7 +98,7 @@ func (r *header) AddAll(other *header) {
 	}
 }
 
-//ListKeys returns all the keys in the headers
+// ListKeys returns all the keys in the headers
 func (r *header) ListKeys() []string {
 	if r.headers == nil {
 		return make([]string, 0)
