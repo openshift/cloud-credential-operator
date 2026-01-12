@@ -61,7 +61,6 @@ require (
 	k8s.io/code-generator v0.34.1
 	k8s.io/component-base v0.34.1
 	k8s.io/klog/v2 v2.130.1
-	k8s.io/kubernetes v1.34.1
 	k8s.io/utils v0.0.0-20251002143259-bc988d571ff4
 	sigs.k8s.io/controller-runtime v0.22.2
 	sigs.k8s.io/controller-tools v0.18.0
@@ -224,11 +223,9 @@ require (
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.34.1 // indirect
-	k8s.io/apiserver v0.34.1 // indirect
 	k8s.io/gengo/v2 v2.0.0-20250604051438-85fd79dbfd9f // indirect
 	k8s.io/kube-aggregator v0.34.1 // indirect
 	k8s.io/kube-openapi v0.0.0-20250710124328-f3f2b991d03b // indirect
-	k8s.io/pod-security-admission v0.0.0 // indirect
 	sigs.k8s.io/json v0.0.0-20250730193827-2d320260d730 // indirect
 	sigs.k8s.io/kube-storage-version-migrator v0.0.6-0.20230721195810-5c8923c5ff96 // indirect
 	sigs.k8s.io/randfill v1.0.0 // indirect
@@ -240,9 +237,6 @@ replace golang.org/x/net => golang.org/x/net v0.46.0
 
 // Safe to remove this once go.sum shows only v1.2.5 or higher
 replace github.com/golang/glog => github.com/golang/glog v1.2.5
-
-// Required for k8s.io/kubernetes/test/e2e/framework compatibility
-replace k8s.io/pod-security-admission => k8s.io/pod-security-admission v0.34.1
 
 // Required for openshift-tests-extension compatibility (uses OpenShift's ginkgo fork)
 replace github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241205171354-8006f302fd12
