@@ -1,7 +1,6 @@
 package cloudcredential
 
 import (
-	"github.com/openshift/cloud-credential-operator/test/testdata"
 	"context"
 	"encoding/base64"
 	"fmt"
@@ -10,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -23,12 +23,13 @@ import (
 	"github.com/tidwall/gjson"
 
 	compat_otp "github.com/openshift/origin/test/extended/util/compat_otp"
+	testdata "github.com/openshift/cloud-credential-operator/test/testdata"
 
 	"k8s.io/apimachinery/pkg/util/wait"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 )
 
-var _ = g.Describe("[sig-cco] Cluster_Operator CCO is enabled", func() {
+var _ = g.Describe("[sig-cco][OTP]", func() {
 	defer g.GinkgoRecover()
 
 	var (
@@ -40,7 +41,7 @@ var _ = g.Describe("[sig-cco] Cluster_Operator CCO is enabled", func() {
 		compat_otp.SkipNoCapabilities(oc, ccoCap)
 	})
 
-	g.It("NonHyperShiftHOST-PstChkUpgrade-NonPreRelease-Author:mihuang-High-23352-Cloud credential operator resets progressing transition timestamp when it upgrades", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-PstChkUpgrade-NonPreRelease-Author:mihuang-High-23352-Cloud credential operator resets progressing transition timestamp when it upgrades", func() {
 		compat_otp.By("Check if ns-23352 namespace exists")
 		ns := "ns-23352"
 		err := oc.AsAdmin().WithoutNamespace().Run("get").Args("ns", ns).Execute()
@@ -63,7 +64,7 @@ var _ = g.Describe("[sig-cco] Cluster_Operator CCO is enabled", func() {
 	// author: lwan@redhat.com
 	// It is destructive case, will remove root credentials, so adding [Disruptive]. The case duration is greater than 5 minutes
 	// so adding [Slow]
-	g.It("NonHyperShiftHOST-Author:lwan-High-31768-Report the mode of cloud-credential operation as a metric [Slow][Disruptive]", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-Author:lwan-High-31768-Report the mode of cloud-credential operation as a metric [Slow][Disruptive]", func() {
 		compat_otp.By("Get cco mode from Cluster Resource")
 		modeInCR, err := getCloudCredentialMode(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -136,7 +137,7 @@ spec:
 		}
 	})
 
-	g.It("NonHyperShiftHOST-Author:mihuang-LEVEL0-Critical-33204-[cco-passthrough]IPI on azure with cco passthrough mode", func() {
+	g.It("[Level0] Cluster_Operator CCO is enabled NonHyperShiftHOST-Author:mihuang-LEVEL0-Critical-33204-[cco-passthrough]IPI on azure with cco passthrough mode", func() {
 		compat_otp.By("Check if it's an azure cluster")
 		compat_otp.SkipIfPlatformTypeNot(oc, "azure")
 
@@ -151,7 +152,7 @@ spec:
 
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1940142
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1952891
-	g.It("NonHyperShiftHOST-Author:lwan-High-45415-[Bug 1940142] Reset CACert to correct path [Disruptive]", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-Author:lwan-High-45415-[Bug 1940142] Reset CACert to correct path [Disruptive]", func() {
 		compat_otp.By("Check if it's an osp cluster")
 		compat_otp.SkipIfPlatformTypeNot(oc, "openstack")
 		compat_otp.By("Get openstack root credential clouds.yaml field")
@@ -240,7 +241,7 @@ data:
 		o.Expect(credsTXT).To(o.ContainSubstring("cacert: /etc/kubernetes/static-pod-resources/configmaps/cloud-config/ca-bundle.pem"))
 	})
 
-	g.It("NonHyperShiftHOST-ROSA-OSD_CCS-Author:jshu-LEVEL0-Critical-36498-CCO credentials secret change to STS-style", func() {
+	g.It("[Level0] Cluster_Operator CCO is enabled NonHyperShiftHOST-ROSA-OSD_CCS-Author:jshu-LEVEL0-Critical-36498-CCO credentials secret change to STS-style", func() {
 		//Check IAAS platform type
 		iaasPlatform := compat_otp.CheckPlatform(oc)
 		if iaasPlatform != "aws" {
@@ -259,7 +260,7 @@ data:
 	})
 
 	// Author: jshu@redhat.com mihuang@redhat.com
-	g.It("Author:jshu-NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Medium-50869-High-53283-High-77285- CCO Pod Security Admission change", func() {
+	g.It("Cluster_Operator CCO is enabled Author:jshu-NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Medium-50869-High-53283-High-77285- CCO Pod Security Admission change", func() {
 		compat_otp.By("1.Check cloud-credential-operator pod")
 		ccoPodName, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("pod", "-l", "app=cloud-credential-operator", "-n", "openshift-cloud-credential-operator", "-o=jsonpath={.items[*].metadata.name}").Output()
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -290,7 +291,7 @@ data:
 
 	// Author: mihuang@redhat.com
 	// The feature is supported starting from version 4.19.
-	g.It("Author:mihuang-NonHyperShiftHOST-ROSA-OSD_CCS-ARO-High-80542- Enable readOnlyRootFilesystem on all containers", func() {
+	g.It("Cluster_Operator CCO is enabled Author:mihuang-NonHyperShiftHOST-ROSA-OSD_CCS-ARO-High-80542- Enable readOnlyRootFilesystem on all containers", func() {
 		compat_otp.By("Check if SCC Security readOnlyRootFilesystem is correctly configured for the cloud-credential-operator")
 		ccoOperatorPods, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("pod", "-l", "app=cloud-credential-operator", "-n", "openshift-cloud-credential-operator", "-o=jsonpath={.items[*].metadata.name}").Output()
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -327,7 +328,7 @@ data:
 		}
 	})
 
-	g.It("NonHyperShiftHOST-Author:jshu-Medium-48360-Reconciliation of aws pod identity mutating webhook did not happen [Disruptive]", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-Author:jshu-Medium-48360-Reconciliation of aws pod identity mutating webhook did not happen [Disruptive]", func() {
 		//Check IAAS platform type
 		iaasPlatform := compat_otp.CheckPlatform(oc)
 		if iaasPlatform != "aws" {
@@ -366,7 +367,7 @@ data:
 		compat_otp.AssertWaitPollNoErr(errWait, "The port is not reset to 443")
 	})
 
-	g.It("NonHyperShiftHOST-Author:jshu-Medium-45975-Test cco condition changes [Disruptive]", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-Author:jshu-Medium-45975-Test cco condition changes [Disruptive]", func() {
 		//Check CCO mode
 		mode, err := getCloudCredentialMode(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -399,7 +400,8 @@ data:
 		o.Expect(degradedStatus).To(o.Equal("False"))
 
 		compat_otp.By("Create 1st CredentialsRequest whose namespace does not exist")
-		crTemp := testdata.FixturePath("credentials_request.yaml")
+		testDataDir := testdata.FixturePath("cluster_operator/cloudcredential")
+		crTemp := filepath.Join(testDataDir, "credentials_request.yaml")
 		crName1 := "cloud-credential-operator-iam-ro-1"
 		crNamespace := "namespace-does-not-exist"
 		credentialsRequest1 := credentialsRequest{
@@ -461,12 +463,12 @@ data:
 	})
 
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1977319
-	g.It("NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Author:jshu-High-45219-A fresh cluster should not have stale CR", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Author:jshu-High-45219-A fresh cluster should not have stale CR", func() {
 		output, _ := oc.AsAdmin().WithoutNamespace().Run("get").Args("service", "controller-manager-service", "-n", "openshift-cloud-credential-operator").Output()
 		o.Expect(output).To(o.ContainSubstring("Error from server (NotFound)"))
 	})
 
-	g.It("NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Author:jshu-Critical-34470-Cloud credential operator health check", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Author:jshu-Critical-34470-Cloud credential operator health check", func() {
 		compat_otp.By("Check CCO status conditions")
 		//Check CCO mode
 		mode, err := getCloudCredentialMode(oc)
@@ -479,7 +481,7 @@ data:
 		o.Expect(imagePullPolicy).To(o.Equal("IfNotPresent"))
 	})
 
-	g.It("NonHyperShiftHOST-OSD_CCS-ARO-Author:mihuang-LEVEL0-Critical-66538-Azure workload identity cluster healthy check.", func() {
+	g.It("[Level0] Cluster_Operator CCO is enabled NonHyperShiftHOST-OSD_CCS-ARO-Author:mihuang-LEVEL0-Critical-66538-Azure workload identity cluster healthy check.", func() {
 		mode, _ := getCloudCredentialMode(oc)
 		if !(compat_otp.CheckPlatform(oc) == "azure" && mode == "manualpodidentity") {
 			g.Skip("The cluster is not Azure Workload Identity Cluster - skipping test ...")
@@ -497,13 +499,14 @@ data:
 		o.Expect(strings.Contains(doOcpReq(oc, "get", true, "secrets", "-n", "openshift-image-registry", "installer-cloud-credentials", "-o=jsonpath={.data}"), "azure_federated_token_file")).Should(o.BeTrue())
 	})
 
-	g.It("Author:fxie-Critical-64885-CCO-based flow for olm managed operators and AWS STS", func() {
+	g.It("Cluster_Operator CCO is enabled Author:fxie-Critical-64885-CCO-based flow for olm managed operators and AWS STS", func() {
 		compat_otp.SkipIfPlatformTypeNot(oc, "aws")
 		if !compat_otp.IsSTSCluster(oc) {
 			g.Skip("This test case is AWS STS only, skipping")
 		}
 
 		var (
+			testDataDir      = testdata.FixturePath("cluster_operator/cloudcredential")
 			testCaseID       = "64885"
 			crName           = "cr-" + testCaseID
 			targetSecretName = crName
@@ -525,7 +528,7 @@ data:
 			name:      crName,
 			namespace: targetNs,
 			provider:  "AWSProviderSpec",
-			template:  testdata.FixturePath("credentials_request.yaml"),
+			template:  filepath.Join(testDataDir, "credentials_request.yaml"),
 		}
 		defer func() {
 			_ = oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName, "-n", ccoNs).Execute()
@@ -591,7 +594,7 @@ spec:
 		}).WithTimeout(DefaultTimeout * time.Second).WithPolling(30 * time.Second).Should(o.BeTrue())
 	})
 
-	g.It("NonHyperShiftHOST-OSD_CCS-ARO-Author:jshu-Critical-69971-Azure workload identity management for olm managed operators", func() {
+	g.It("Cluster_Operator CCO is enabled NonHyperShiftHOST-OSD_CCS-ARO-Author:jshu-Critical-69971-Azure workload identity management for olm managed operators", func() {
 		compat_otp.SkipIfPlatformTypeNot(oc, "azure")
 		if !compat_otp.IsWorkloadIdentityCluster(oc) {
 			g.Skip("This test case is for Azure Workload Identity only, skipping")
@@ -621,6 +624,7 @@ spec:
 		}
 
 		var (
+			testDataDir      = testdata.FixturePath("cluster_operator/cloudcredential")
 			testCaseID       = "69971"
 			crName           = "cr-" + testCaseID
 			targetSecretName = crName
@@ -640,7 +644,7 @@ spec:
 			name:      crName,
 			namespace: targetNs,
 			provider:  "AzureProviderSpec",
-			template:  testdata.FixturePath("credentials_request.yaml"),
+			template:  filepath.Join(testDataDir, "credentials_request.yaml"),
 		}
 		defer func() {
 			_ = oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName, "-n", ccoNs).Execute()
@@ -676,7 +680,7 @@ spec:
 		}
 	})
 
-	g.It("Author:jshu-NonHyperShiftHOST-OSD_CCS-Critical-75429-GCP workload identity management for olm managed operators", func() {
+	g.It("Cluster_Operator CCO is enabled Author:jshu-NonHyperShiftHOST-OSD_CCS-Critical-75429-GCP workload identity management for olm managed operators", func() {
 		compat_otp.SkipIfPlatformTypeNot(oc, "gcp")
 		if !compat_otp.IsWorkloadIdentityCluster(oc) {
 			g.Skip("This test case is for GCP Workload Identity only, skipping")
@@ -698,6 +702,7 @@ spec:
 		}
 
 		var (
+			testDataDir      = testdata.FixturePath("cluster_operator/cloudcredential")
 			testCaseID       = "75429"
 			crName           = "cr-" + testCaseID
 			targetSecretName = crName
@@ -717,7 +722,7 @@ spec:
 			name:      crName,
 			namespace: targetNs,
 			provider:  "GCPProviderSpec",
-			template:  testdata.FixturePath("credentials_request.yaml"),
+			template:  filepath.Join(testDataDir, "credentials_request.yaml"),
 		}
 		defer func() {
 			_ = oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName, "-n", ccoNs).Execute()
@@ -760,7 +765,7 @@ spec:
 	})
 })
 
-var _ = g.Describe("[sig-cco] Cluster_Operator CCO is disabled", func() {
+var _ = g.Describe("[sig-cco][OTP]", func() {
 	defer g.GinkgoRecover()
 
 	var (
@@ -779,7 +784,7 @@ var _ = g.Describe("[sig-cco] Cluster_Operator CCO is disabled", func() {
 		- It leaves us a maintenance burden
 		- The test case will not be able to detect such scenario when a resource is added (but not annotated) in the future
 	*/
-	g.It("NonHyperShiftHOST-Author:fxie-Critical-68220-Leverage Composable OpenShift feature to make cloud-credential optional", func() {
+	g.It("Cluster_Operator CCO is disabled NonHyperShiftHOST-Author:fxie-Critical-68220-Leverage Composable OpenShift feature to make cloud-credential optional", func() {
 		var (
 			getManifestContent = func(manifest *github.RepositoryContent) []byte {
 				// Prefer manifest.Content
