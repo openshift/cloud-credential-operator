@@ -101,7 +101,7 @@ func NewOperator() *cobra.Command {
 				log.WithError(err).Fatal("failed to parse kubeconfig")
 			}
 
-			run := func(ctx context.Context) {
+			run := func(ctx context.Context) error {
 				// This is required because controller-runtime expects its consumers to
 				// set a logger through log.SetLogger within 30 seconds of the program's
 				// initalization. We have our own logger and can configure controller-runtime's
@@ -111,12 +111,13 @@ func NewOperator() *cobra.Command {
 				log.Info("checking prerequisites")
 				coreClient, err := corev1client.NewForConfig(cfg)
 				if err != nil {
-					log.WithError(err).Fatal("failed to set up client")
+					log.WithError(err).Error("failed to set up client")
+					return err
 				}
 
 				infraStatus, err := platform.GetInfraStatusUsingKubeconfig(opts.Kubeconfig)
 				if err != nil {
-					log.Fatal(err)
+					return err
 				}
 				platformType := platform.GetType(infraStatus)
 
@@ -139,7 +140,8 @@ func NewOperator() *cobra.Command {
 						Continue: continueToken,
 					})
 					if err != nil {
-						log.WithError(err).Fatal("failed to list secrets")
+						log.WithError(err).Error("failed to list secrets")
+						return err
 					}
 					for _, secret := range secrets.Items {
 						if credentialsrequest.IsMissingSecretLabel(&secret) {
@@ -192,7 +194,8 @@ func NewOperator() *cobra.Command {
 					PprofBindAddress: ":6060",
 				})
 				if err != nil {
-					log.WithError(err).Fatal("unable to set up overall controller manager")
+					log.WithError(err).Error("unable to set up overall controller manager")
+					return err
 				}
 
 				rootMgr, err := manager.New(cfg, manager.Options{
@@ -205,7 +208,8 @@ func NewOperator() *cobra.Command {
 					},
 				})
 				if err != nil {
-					log.WithError(err).Fatal("unable to set up root credential controller manager")
+					log.WithError(err).Error("unable to set up root credential controller manager")
+					return err
 				}
 
 				log.Info("registering components")
@@ -217,7 +221,8 @@ func NewOperator() *cobra.Command {
 				// Setup all Controllers
 				log.Info("setting up controllers")
 				if err := controller.AddToManager(mgr, rootMgr, opts.Kubeconfig, coreClient); err != nil {
-					log.WithError(err).Fatal("unable to register controllers to the manager")
+					log.WithError(err).Error("unable to register controllers to the manager")
+					return err
 				}
 
 				// Start the managers
@@ -239,9 +244,11 @@ func NewOperator() *cobra.Command {
 				}()
 				for err := range errs {
 					if err != nil {
-						log.WithError(err).Fatal("unable to run the manager")
+						log.WithError(err).Error("unable to run the manager")
+						return err
 					}
 				}
+				return nil
 			}
 
 			// Leader election code based on:
@@ -289,7 +296,9 @@ func NewOperator() *cobra.Command {
 			}
 
 			if os.Getenv("CCO_SKIP_LEADER_ELECTION") != "" {
-				run(ctx)
+				if err := run(ctx); err != nil {
+					leLog.WithError(err).Error("failed to run operator")
+				}
 			} else {
 				// start the leader election code loop
 				leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
@@ -300,7 +309,10 @@ func NewOperator() *cobra.Command {
 					RetryPeriod:     90 * time.Second,
 					Callbacks: leaderelection.LeaderCallbacks{
 						OnStartedLeading: func(ctx context.Context) {
-							run(ctx)
+							if err := run(ctx); err != nil {
+								leLog.WithError(err).Error("failed to run operator")
+								cancel()
+							}
 						},
 						OnStoppedLeading: func() {
 							// we can do cleanup here if necessary
