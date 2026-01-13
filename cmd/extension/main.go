@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"regexp"
@@ -13,16 +14,25 @@ import (
 	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	g "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
 
-	// Import testdata package from local test module
-	testdata "github.com/openshift/cloud-credential-operator/test/testdata"
+	// Import test framework packages for initialization
+	"github.com/openshift/origin/test/extended/util"
+	"k8s.io/kubernetes/test/e2e/framework"
 
-	// Import test packages from local test module
+	// Import test packages from test module
 	_ "github.com/openshift/cloud-credential-operator/test/e2e"
 )
 
 func main() {
+	// Initialize test framework
+	// This sets TestContext.KubeConfig from KUBECONFIG env var and initializes the cloud provider
+	util.InitStandardFlags()
+	if err := util.InitTest(false); err != nil {
+		panic(fmt.Sprintf("couldn't initialize test framework: %+v", err.Error()))
+	}
+	framework.AfterReadingAllFlags(&framework.TestContext)
+
 	registry := e.NewRegistry()
-	ext := e.NewExtension("openshift", "payload", "cloud-credential-operator")
+	ext := e.NewExtension("openshift", "payload", "cco")
 
 	// Add main test suite
 	ext.AddSuite(e.Suite{
@@ -31,10 +41,19 @@ func main() {
 	})
 
 	// Build test specs from Ginkgo
-	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
+	allSpecs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite()
 	if err != nil {
 		panic(fmt.Sprintf("couldn't build extension test specs from ginkgo: %+v", err.Error()))
 	}
+
+	// Filter to only include CCO-specific tests (tests with [sig-cco] in name)
+	var filteredSpecs []*et.ExtensionTestSpec
+	allSpecs.Walk(func(spec *et.ExtensionTestSpec) {
+		if strings.Contains(spec.Name, "[sig-cco]") {
+			filteredSpecs = append(filteredSpecs, spec)
+		}
+	})
+	specs := et.ExtensionTestSpecs(filteredSpecs)
 
 	// Apply platform filters based on Platform: labels
 	specs.Walk(func(spec *et.ExtensionTestSpec) {
@@ -55,24 +74,16 @@ func main() {
 		}
 	})
 
-	// Add testdata validation and cleanup hooks
-	specs.AddBeforeAll(func() {
-		// List available fixtures
-		fixtures := testdata.ListFixtures()
-		fmt.Printf("Loaded %d test fixtures\n", len(fixtures))
-
-		// Optional: Validate required fixtures
-		// requiredFixtures := []string{
-		//     "credentials_request.yaml",
-		// }
-		// if err := testdata.ValidateFixtures(requiredFixtures); err != nil {
-		//     panic(fmt.Sprintf("Missing required fixtures: %v", err))
-		// }
-	})
-
-	specs.AddAfterAll(func() {
-		if err := testdata.CleanupFixtures(); err != nil {
-			fmt.Printf("Warning: failed to cleanup fixtures: %v\n", err)
+	// Wrap test execution with cleanup handler
+	// This marks tests as started and ensures proper cleanup
+	specs.Walk(func(spec *et.ExtensionTestSpec) {
+		originalRun := spec.Run
+		spec.Run = func(ctx context.Context) *et.ExtensionTestResult {
+			var result *et.ExtensionTestResult
+			util.WithCleanup(func() {
+				result = originalRun(ctx)
+			})
+			return result
 		}
 	})
 

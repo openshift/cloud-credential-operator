@@ -211,15 +211,16 @@ update-go-modules-k8s:
 
 # OTE binary configuration
 TESTS_EXT_DIR := ./cmd/extension
-TESTS_EXT_BINARY := cloud-credential-operator-tests-ext
+TESTS_EXT_BINARY := bin/cco-tests-ext
 
-# Build OTE extension binary (following machine-config-operator PR #4665 pattern)
+# Build OTE extension binary
 .PHONY: tests-ext-build
 tests-ext-build:
 	@echo "Building OTE test extension binary..."
-	@cd test && $(MAKE) bindata
-	go build -mod=vendor -o $(TESTS_EXT_DIR)/$(TESTS_EXT_BINARY) $(TESTS_EXT_DIR)
-	@echo "OTE binary built successfully at $(TESTS_EXT_DIR)/$(TESTS_EXT_BINARY)"
+	@cd test && $(MAKE) -f bindata.mk bindata
+	@mkdir -p bin
+	GOTOOLCHAIN=auto GOSUMDB=sum.golang.org go build -mod=mod -o $(TESTS_EXT_BINARY) $(TESTS_EXT_DIR)
+	@echo "OTE binary built successfully at $(TESTS_EXT_BINARY)"
 
 # Alias for backward compatibility
 .PHONY: extension
