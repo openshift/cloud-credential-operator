@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"regexp"
@@ -10,9 +11,14 @@ import (
 	e "github.com/openshift-eng/openshift-tests-extension/pkg/extension"
 	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	utilflag "k8s.io/component-base/cli/flag"
 	"k8s.io/component-base/logs"
 
 	g "github.com/openshift-eng/openshift-tests-extension/pkg/ginkgo"
+	exutil "github.com/openshift/origin/test/extended/util"
+	compat_otp "github.com/openshift/origin/test/extended/util/compat_otp"
+	e2e "k8s.io/kubernetes/test/e2e/framework"
 	// If using ginkgo, import your tests here.
 	_ "github.com/openshift/cloud-credential-operator/test/extend"
 )
@@ -20,20 +26,30 @@ import (
 func main() {
 	logs.InitLogs()
 	defer logs.FlushLogs()
+	pflag.CommandLine.SetNormalizeFunc(utilflag.WordSepNormalizeFunc)
+	// Ensure Kubernetes e2e framework flags are registered on the Go flagset
+	// and bridged into pflag/cobra so they actually get parsed.
+	e2e.RegisterCommonFlags(flag.CommandLine)
+	e2e.RegisterClusterFlags(flag.CommandLine)
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 
 	// Create our registry of openshift-tests extensions
 	extensionRegistry := e.NewRegistry()
 	ext := e.NewExtension("openshift", "payload", "cloud-credential-operator")
 	extensionRegistry.Register(ext)
 
-	// Carve up the kube tests into our openshift suites...
+	// Carve up the CCO tests into OpenShift suites.
+	//
+	// Note: Specs are already filtered down to this repository's CCO tests
+	// (see BuildExtensionTestSpecsFromOpenShiftGinkgoSuite filter below), so these
+	// qualifiers only need to distinguish Serial/Disruptive.
 	ext.AddSuite(e.Suite{
 		Name: "cco/conformance/parallel",
 		Parents: []string{
 			"openshift/conformance/parallel",
 		},
 		Qualifiers: []string{
-			`!(name.contains("[Serial]") || name.contains("[Slow]"))`,
+			`name.contains("[LEVEL0]") && !(name.contains("[Serial]") || name.contains("[Disruptive]"))`,
 		},
 	})
 
@@ -47,12 +63,11 @@ func main() {
 		},
 	})
 
-	// Suite: optional/slow (long-running tests)
 	ext.AddSuite(e.Suite{
-		Name:    "cco/optional/slow",
-		Parents: []string{"openshift/optional/slow"},
+		Name:    "cco/disruptive",
+		Parents: []string{"openshift/disruptive"},
 		Qualifiers: []string{
-			`name.contains("[Slow]")`,
+			`name.contains("[Disruptive]")`,
 		},
 	})
 
@@ -80,6 +95,24 @@ func main() {
 		panic(fmt.Sprintf("couldn't build extension test specs from ginkgo: %+v", err.Error()))
 	}
 
+	// Add InitTest function for test cases to read cluster context from kubeconfig
+	// Use WithCleanup to set testsStarted = true, which is required by SetupProject
+	specs.AddBeforeAll(func() {
+		exutil.WithCleanup(func() {
+			if err := compat_otp.InitTest(false); err != nil {
+				panic(err)
+			}
+			e2e.AfterReadingAllFlags(compat_otp.TestContext)
+		})
+	})
+
+	// Automatically convert [Disruptive] to [Serial][Disruptive]
+	specs = specs.Walk(func(spec *extensiontests.ExtensionTestSpec) {
+		if strings.Contains(spec.Name, "[Disruptive]") && !strings.Contains(spec.Name, "[Serial]") {
+			spec.Name = strings.ReplaceAll(spec.Name, "[Disruptive]", "[Serial][Disruptive]")
+		}
+	})
+
 	// Handle platform-specific tests by setting proper environmentSelector
 	foundPlatforms := make(map[string]string)
 	for _, test := range specs.Select(extensiontests.NameContains("[platform:")).Names() {
@@ -101,6 +134,8 @@ func main() {
 	root := &cobra.Command{
 		Long: "Cloud Credential Operator tests extension for OpenShift",
 	}
+	// Ensure Go flags (like --kubeconfig) are available on the root command.
+	root.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 
 	root.AddCommand(cmd.DefaultExtensionCommands(extensionRegistry)...)
 
