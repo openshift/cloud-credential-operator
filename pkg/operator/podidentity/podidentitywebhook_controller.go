@@ -9,6 +9,7 @@ import (
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -34,6 +35,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/status"
 	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -259,6 +261,18 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		}
 	}
 
+	apiServerInformer, err := controllerCache.GetInformer(ctx, &configv1.APIServer{})
+	if err != nil {
+		return err
+	}
+	err = c.Watch(&source.Informer{
+		Informer: apiServerInformer,
+		Handler:  &handler.EnqueueRequestForObject{},
+	})
+	if err != nil {
+		return err
+	}
+
 	status.AddHandler(controllerName, r)
 	if err := mgr.Add(&podIdentityController{reconciler: r, cache: controllerCache, logger: logger}); err != nil {
 		return err
@@ -337,6 +351,28 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 	if topology == configv1.SingleReplicaTopologyMode {
 		// Set replicas=1 for deployment on single replica topology clusters
 		requestedDeployment.Spec.Replicas = pointer.Int32(1)
+	}
+
+	apiServer := &configv1.APIServer{}
+	if err := r.client.Get(ctx, client.ObjectKey{Name: "cluster"}, apiServer); err != nil {
+		if !errors.IsNotFound(err) {
+			return err
+		}
+		apiServer = nil
+	}
+	var tlsProfile *configv1.TLSSecurityProfile
+	if apiServer != nil {
+		tlsProfile = apiServer.Spec.TLSSecurityProfile
+	}
+
+	minTLSVersion, _, ciphers := util.GetTLSConfig(tlsProfile)
+	if minTLSVersion != "" {
+		requestedDeployment.Spec.Template.Spec.Containers[0].Command = append(requestedDeployment.Spec.Template.Spec.Containers[0].Command,
+			fmt.Sprintf("--tls-min-version=%s", minTLSVersion))
+	}
+	if ciphers != "" {
+		requestedDeployment.Spec.Template.Spec.Containers[0].Command = append(requestedDeployment.Spec.Template.Spec.Containers[0].Command,
+			fmt.Sprintf("--tls-cipher-suites=%s", ciphers))
 	}
 
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
