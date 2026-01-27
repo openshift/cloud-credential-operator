@@ -18,6 +18,7 @@ package cmd
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	golog "log"
@@ -39,6 +40,7 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
@@ -59,7 +61,9 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 	configclient "github.com/openshift/client-go/config/clientset/versioned"
 	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	utiltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/library-go/pkg/controller/fileobserver"
+	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
 	"github.com/openshift/library-go/pkg/operator/events"
 
@@ -108,6 +112,10 @@ func NewOperator() *cobra.Command {
 				log.WithError(err).Fatal("failed to parse kubeconfig")
 			}
 			kubeClient := kubernetes.NewForConfigOrDie(cfg)
+
+			// use a Go context so we can tell the leaderelection code when we want to step down
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
 
 			run := func(ctx context.Context) error {
 				// This is required because controller-runtime expects its consumers to
@@ -240,6 +248,43 @@ func NewOperator() *cobra.Command {
 					}
 				}
 
+				scheme := runtime.NewScheme()
+				if err := configv1.AddToScheme(scheme); err != nil {
+					log.WithError(err).Error("unable to add configv1 to scheme")
+					return err
+				}
+
+				k8sClient, err := client.New(cfg, client.Options{Scheme: scheme})
+				if err != nil {
+					log.WithError(err).Error("unable to create Kubernetes client")
+					return err
+				}
+
+				// Retrieve the initial TLS Adherence policy for the TLS profile watcher
+				initialTLSAdherence, err := utiltls.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient)
+				if err != nil {
+					log.WithError(err).Error("failed to fetch initial TLS adherence")
+					return err
+				}
+
+				// Retrieve the initial TLS profile to use for the TLS profile watcher
+				initialTLSProfile, err := utiltls.FetchAPIServerTLSProfile(ctx, k8sClient)
+				if err != nil {
+					log.WithError(err).Error("failed to fetch initial TLS profile")
+					return err
+				}
+
+				tlsConfig := func(*tls.Config) {}
+
+				if libgocrypto.ShouldHonorClusterTLSProfile(initialTLSAdherence) {
+					var unsupportedCiphers []string
+					// Create the TLS configuration function for the server endpoints.
+					tlsConfig, unsupportedCiphers = utiltls.NewTLSConfigFromProfile(initialTLSProfile)
+					if len(unsupportedCiphers) > 0 {
+						log.Infof("TLS configuration contains unsupported ciphers that will be ignored: %v", unsupportedCiphers)
+					}
+				}
+
 				// Create a new Cmd to provide shared dependencies and start components
 				log.Info("setting up managers")
 				mgr, err := manager.New(cfg, manager.Options{
@@ -248,9 +293,10 @@ func NewOperator() *cobra.Command {
 					},
 					Metrics: metricsserver.Options{
 						BindAddress:    ":8443",
-						SecureServing:  true,
-						FilterProvider: filters.WithAuthenticationAndAuthorization,
 						CertDir:        "/etc/tls/private",
+						FilterProvider: filters.WithAuthenticationAndAuthorization,
+						SecureServing:  true,
+						TLSOpts:        []func(*tls.Config){tlsConfig},
 					},
 					PprofBindAddress: ":6060",
 				})
@@ -286,6 +332,25 @@ func NewOperator() *cobra.Command {
 					return err
 				}
 
+				// Set up the TLS security profile watcher controller.
+				// This will trigger a graceful shutdown when the TLS profile changes.
+				if err := (&utiltls.SecurityProfileWatcher{
+					Client:                    mgr.GetClient(),
+					InitialTLSProfileSpec:     initialTLSProfile,
+					InitialTLSAdherencePolicy: initialTLSAdherence,
+					OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+						log.Infof("TLS profile changed from %v to %v, restarting operator", oldTLSProfileSpec, newTLSProfileSpec)
+						cancel()
+					},
+					OnAdherencePolicyChange: func(ctx context.Context, oldTLSAdherencePolicy configv1.TLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
+						log.Infof("TLS adherence policy changed from %v to %v, restarting operator", oldTLSAdherencePolicy, newTLSAdherencePolicy)
+						cancel()
+					},
+				}).SetupWithManager(mgr); err != nil {
+					log.WithError(err).Error("failed to set up TLS profile watcher")
+					return err
+				}
+
 				// Start the managers
 				log.Info("starting the managers")
 				runCtx := signals.SetupSignalHandler()
@@ -315,10 +380,6 @@ func NewOperator() *cobra.Command {
 			// Leader election code based on:
 			// https://github.com/kubernetes/kubernetes/blob/f7e3bcdec2e090b7361a61e21c20b3dbbb41b7f0/staging/src/k8s.io/client-go/examples/leader-election/main.go#L92-L154
 			// This gives us ReleaseOnCancel which is not presently exposed in controller-runtime.
-
-			// use a Go context so we can tell the leaderelection code when we want to step down
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
 
 			// If optional cco-trusted-ca configmap exists, run a file observer to watch for changes
 			caConfigMapPath := filepath.Join(caConfigMapMountPath, caConfigMapName)
