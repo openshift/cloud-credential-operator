@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
+
+	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/library-go/pkg/crypto"
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
@@ -50,6 +54,16 @@ func (a AzurePodIdentity) Name() string {
 	return "azure"
 }
 
-func (a AzurePodIdentity) ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger) error {
+func (a AzurePodIdentity) ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger, tlsProfile *configv1.TLSProfileSpec) error {
+
+	if tlsProfile.MinTLSVersion != "" {
+		deployment.Spec.Template.Spec.Containers[0].Command = append(deployment.Spec.Template.Spec.Containers[0].Command,
+			fmt.Sprintf("--tls-min-version=%s", tlsProfile.MinTLSVersion))
+	}
+	if len(tlsProfile.Ciphers) > 0 {
+		deployment.Spec.Template.Spec.Containers[0].Command = append(deployment.Spec.Template.Spec.Containers[0].Command,
+			fmt.Sprintf("--tls-cipher-suites=%s", strings.Join(crypto.OpenSSLToIANACipherSuites(tlsProfile.Ciphers), ",")))
+	}
+
 	return nil
 }

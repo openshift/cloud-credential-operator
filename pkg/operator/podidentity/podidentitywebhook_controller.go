@@ -26,6 +26,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	configv1 "github.com/openshift/api/config/v1"
+	utiltls "github.com/openshift/controller-runtime-common/pkg/tls"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -104,7 +105,7 @@ var (
 )
 
 type PodIdentityManifestSource interface {
-	ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger) error
+	ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger, tlsProfile *configv1.TLSProfileSpec) error
 	Deployment() string
 	GetImagePullSpec() string
 	Webhook() string
@@ -339,9 +340,14 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 		requestedDeployment.Spec.Replicas = pointer.Int32(1)
 	}
 
+	tlsProfile, err := utiltls.FetchAPIServerTLSProfile(ctx, r.client)
+	if err != nil {
+		return err
+	}
+
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
 
-	err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger)
+	err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger, &tlsProfile)
 	if err != nil {
 		r.logger.WithError(err).Error("error substituting Deployment")
 		return err
