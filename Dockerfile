@@ -1,4 +1,4 @@
-FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.24-openshift-4.22 AS builder_rhel9
+FROM registry.ci.openshift.org/ocp/builder:rhel-9-golang-1.25-openshift-4.22 AS builder_rhel9
 WORKDIR /go/src/github.com/openshift/cloud-credential-operator
 COPY . .
 ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
@@ -8,7 +8,7 @@ RUN make cloud-credential-tests-ext && \
     mkdir -p /tmp/build && \
     gzip -c ./cloud-credential-tests-ext > /tmp/build/cloud-credential-tests-ext.gz
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.24-openshift-4.22 AS builder_rhel8
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.25-openshift-4.22 AS builder_rhel8
 WORKDIR /go/src/github.com/openshift/cloud-credential-operator
 COPY . .
 ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
