@@ -19,6 +19,7 @@ package cmd
 import (
 	"context"
 	"flag"
+	"fmt"
 	golog "log"
 	"os"
 	"os/signal"
@@ -30,38 +31,43 @@ import (
 	"github.com/go-logr/logr"
 	"github.com/golang/glog"
 	"github.com/google/uuid"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
 	log "github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/types"
-	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
-	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/controller-runtime/pkg/cache"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
-
-	configv1 "github.com/openshift/api/config/v1"
-	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
-	"github.com/openshift/cloud-credential-operator/pkg/util"
-
-	"github.com/openshift/library-go/pkg/controller/fileobserver"
-
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/kubernetes"
+	corev1client "k8s.io/client-go/kubernetes/typed/core/v1"
 	_ "k8s.io/client-go/plugin/pkg/client/auth/gcp"
+	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	"k8s.io/utils/clock"
+	"sigs.k8s.io/controller-runtime/pkg/cache"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+
+	configv1 "github.com/openshift/api/config/v1"
+	configclient "github.com/openshift/client-go/config/clientset/versioned"
+	configinformers "github.com/openshift/client-go/config/informers/externalversions"
+	"github.com/openshift/library-go/pkg/controller/fileobserver"
+	"github.com/openshift/library-go/pkg/operator/configobserver/featuregates"
+	"github.com/openshift/library-go/pkg/operator/events"
+
+	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	controller "github.com/openshift/cloud-credential-operator/pkg/operator"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/credentialsrequest"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/platform"
+	"github.com/openshift/cloud-credential-operator/pkg/util"
 )
 
 const (
@@ -100,23 +106,75 @@ func NewOperator() *cobra.Command {
 			if err != nil {
 				log.WithError(err).Fatal("failed to parse kubeconfig")
 			}
+			kubeClient := kubernetes.NewForConfigOrDie(cfg)
 
-			run := func(ctx context.Context) {
+			run := func(ctx context.Context) error {
 				// This is required because controller-runtime expects its consumers to
 				// set a logger through log.SetLogger within 30 seconds of the program's
 				// initalization. We have our own logger and can configure controller-runtime's
 				// logger to do nothing.
 				ctrlruntimelog.SetLogger(logr.New(ctrlruntimelog.NullLogSink{}))
 
+				var featureGates featuregates.FeatureGate
+
+				desiredVersion := os.Getenv("RELEASE_VERSION")
+				missingVersion := "0.0.1-snapshot"
+
+				if desiredVersion == "" {
+					desiredVersion = missingVersion
+				}
+
+				configClient, err := configclient.NewForConfig(cfg)
+				if err != nil {
+					log.WithError(err).Error("failed to create config client")
+					return err
+				}
+				configInformers := configinformers.NewSharedInformerFactory(configClient, 10*time.Minute)
+
+				eventRecorder := events.NewKubeRecorder(kubeClient.CoreV1().Events(minterv1.CloudCredOperatorNamespace), "cloud-credential-operator", &corev1.ObjectReference{
+					APIVersion: "apps/v1",
+					Kind:       "Deployment",
+					Name:       "cloud-credential-operator",
+					Namespace:  minterv1.CloudCredOperatorNamespace,
+				}, clock.RealClock{})
+
+				// Setup the feature gate accessor
+				featureGateAccessor := featuregates.NewFeatureGateAccess(
+					desiredVersion,
+					missingVersion,
+					configInformers.Config().V1().ClusterVersions(),
+					configInformers.Config().V1().FeatureGates(),
+					eventRecorder,
+				)
+				go featureGateAccessor.Run(ctx)
+				go configInformers.Start(ctx.Done())
+
+				select {
+				case <-featureGateAccessor.InitialFeatureGatesObserved():
+					featureGates, err = featureGateAccessor.CurrentFeatureGates()
+					if err != nil {
+						log.WithError(err).Error("failed to get current featureGates")
+						return err
+					}
+					log.Info("FeatureGates initialized", "knownFeatures", featureGates.KnownFeatures())
+				case <-time.After(1 * time.Minute):
+					log.Errorf("timed out waiting for FeatureGate detection")
+					return fmt.Errorf("timed out waiting for FeatureGate detection")
+				}
+
+				// Example featureGate usage
+				// azureWorkloadIdentityEnabled := featureGates.Enabled(features.FeatureGateAzureWorkloadIdentity)
+
 				log.Info("checking prerequisites")
 				coreClient, err := corev1client.NewForConfig(cfg)
 				if err != nil {
-					log.WithError(err).Fatal("failed to set up client")
+					log.WithError(err).Error("failed to set up client")
+					return err
 				}
 
 				infraStatus, err := platform.GetInfraStatusUsingKubeconfig(opts.Kubeconfig)
 				if err != nil {
-					log.Fatal(err)
+					return err
 				}
 				platformType := platform.GetType(infraStatus)
 
@@ -139,7 +197,8 @@ func NewOperator() *cobra.Command {
 						Continue: continueToken,
 					})
 					if err != nil {
-						log.WithError(err).Fatal("failed to list secrets")
+						log.WithError(err).Error("failed to list secrets")
+						return err
 					}
 					for _, secret := range secrets.Items {
 						if credentialsrequest.IsMissingSecretLabel(&secret) {
@@ -192,7 +251,8 @@ func NewOperator() *cobra.Command {
 					PprofBindAddress: ":6060",
 				})
 				if err != nil {
-					log.WithError(err).Fatal("unable to set up overall controller manager")
+					log.WithError(err).Error("unable to set up overall controller manager")
+					return err
 				}
 
 				rootMgr, err := manager.New(cfg, manager.Options{
@@ -205,7 +265,8 @@ func NewOperator() *cobra.Command {
 					},
 				})
 				if err != nil {
-					log.WithError(err).Fatal("unable to set up root credential controller manager")
+					log.WithError(err).Error("unable to set up root credential controller manager")
+					return err
 				}
 
 				log.Info("registering components")
@@ -217,7 +278,8 @@ func NewOperator() *cobra.Command {
 				// Setup all Controllers
 				log.Info("setting up controllers")
 				if err := controller.AddToManager(mgr, rootMgr, opts.Kubeconfig, coreClient); err != nil {
-					log.WithError(err).Fatal("unable to register controllers to the manager")
+					log.WithError(err).Error("unable to register controllers to the manager")
+					return err
 				}
 
 				// Start the managers
@@ -239,9 +301,11 @@ func NewOperator() *cobra.Command {
 				}()
 				for err := range errs {
 					if err != nil {
-						log.WithError(err).Fatal("unable to run the manager")
+						log.WithError(err).Error("unable to run the manager")
+						return err
 					}
 				}
+				return nil
 			}
 
 			// Leader election code based on:
@@ -273,7 +337,6 @@ func NewOperator() *cobra.Command {
 			leLog := log.WithField("id", id)
 			leLog.Info("generated leader election ID")
 
-			kubeClient := kubernetes.NewForConfigOrDie(cfg)
 			lock, err := resourcelock.New(
 				resourcelock.LeasesResourceLock,
 				minterv1.CloudCredOperatorNamespace,
@@ -289,7 +352,9 @@ func NewOperator() *cobra.Command {
 			}
 
 			if os.Getenv("CCO_SKIP_LEADER_ELECTION") != "" {
-				run(ctx)
+				if err := run(ctx); err != nil {
+					leLog.WithError(err).Error("failed to run operator")
+				}
 			} else {
 				// start the leader election code loop
 				leaderelection.RunOrDie(ctx, leaderelection.LeaderElectionConfig{
@@ -300,7 +365,10 @@ func NewOperator() *cobra.Command {
 					RetryPeriod:     90 * time.Second,
 					Callbacks: leaderelection.LeaderCallbacks{
 						OnStartedLeading: func(ctx context.Context) {
-							run(ctx)
+							if err := run(ctx); err != nil {
+								leLog.WithError(err).Error("failed to run operator")
+								cancel()
+							}
 						},
 						OnStoppedLeading: func() {
 							// we can do cleanup here if necessary
