@@ -3,9 +3,9 @@ package cmdrun
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
-	"errors"
 	"os/signal"
 	"syscall"
 	"time"
