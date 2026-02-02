@@ -411,7 +411,7 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 func hasResourceTags(event client.Object) bool {
 	switch infra := event.(type) {
 	case *configv1.Infrastructure:
-		if infra != nil && infra.Status.PlatformStatus.AWS != nil && len(infra.Status.PlatformStatus.AWS.ResourceTags) != 0 {
+		if infra != nil && infra.Status.PlatformStatus != nil && infra.Status.PlatformStatus.AWS != nil && len(infra.Status.PlatformStatus.AWS.ResourceTags) != 0 {
 			return true
 		}
 	default:
