@@ -30,6 +30,7 @@ require (
 	github.com/golang/glog v1.2.5
 	github.com/golang/mock v1.7.0-rc.1
 	github.com/google/go-cmp v0.7.0
+	github.com/google/go-github/v57 v57.0.0
 	github.com/google/uuid v1.6.0
 	github.com/microsoft/kiota-authentication-azure-go v1.3.1
 	github.com/microsoftgraph/msgraph-sdk-go v1.87.0
@@ -47,6 +48,7 @@ require (
 	github.com/spf13/cobra v1.10.1
 	github.com/spf13/pflag v1.0.10
 	github.com/stretchr/testify v1.11.1
+	github.com/tidwall/gjson v1.18.0
 	golang.org/x/mod v0.29.0
 	golang.org/x/oauth2 v0.32.0
 	golang.org/x/time v0.14.0
@@ -145,6 +147,7 @@ require (
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/cel-go v0.26.0 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20251007162407-5df77e3f7d1d // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.6 // indirect
@@ -189,6 +192,8 @@ require (
 	github.com/std-uritemplate/std-uritemplate/go/v2 v2.0.8 // indirect
 	github.com/stoewer/go-strcase v1.3.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
+	github.com/tidwall/match v1.1.1 // indirect
+	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/vladimirvivien/gexe v0.5.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.mongodb.org/mongo-driver v1.17.4 // indirect
