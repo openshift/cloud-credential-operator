@@ -5,4 +5,5 @@
 .idea/
 coverage.out
 /cloud-credential-tests-ext
+/bin/cloud-credential-operator-tests-ext
 
