@@ -208,3 +208,42 @@ update-go-modules-k8s:
 	done
 	go mod tidy
 	go mod vendor
+
+# OTE test extension binary configuration
+TESTS_EXT_DIR := test/e2e/extension/cmd
+TESTS_EXT_BINARY := bin/cloud-credential-operator-tests-ext
+
+# Build OTE extension binary (builds from test module, outputs to bin/)
+.PHONY: tests-ext-build
+tests-ext-build:
+	@echo "Building OTE test extension binary..."
+	@$(MAKE) -f test/bindata.mk update-bindata
+	@mkdir -p bin
+	cd test/e2e/extension && GOTOOLCHAIN=auto GOSUMDB=sum.golang.org go build -o ../../../$(TESTS_EXT_BINARY) ./cmd
+	@echo "✅ Extension binary built: $(TESTS_EXT_BINARY)"
+
+# Compress OTE extension binary (for CI/CD and container builds)
+.PHONY: tests-ext-compress
+tests-ext-compress: tests-ext-build
+	@echo "Compressing OTE extension binary..."
+	@gzip -f $(TESTS_EXT_BINARY)
+	@echo "Compressed binary created at $(TESTS_EXT_BINARY).gz"
+
+# Copy compressed binary to _output directory (for CI/CD)
+.PHONY: tests-ext-copy
+tests-ext-copy: tests-ext-compress
+	@echo "Copying compressed binary to _output..."
+	@mkdir -p _output
+	@cp $(TESTS_EXT_BINARY).gz _output/
+	@echo "Binary copied to _output/cloud-credential-operator-tests-ext.gz"
+
+# Alias for backward compatibility
+.PHONY: extension
+extension: tests-ext-build
+
+# Clean extension binary
+.PHONY: clean-extension
+clean-extension:
+	@echo "Cleaning extension binary..."
+	@rm -f $(TESTS_EXT_BINARY) $(TESTS_EXT_BINARY).gz _output/cloud-credential-operator-tests-ext.gz
+	@cd test && $(MAKE) clean-bindata 2>/dev/null || true

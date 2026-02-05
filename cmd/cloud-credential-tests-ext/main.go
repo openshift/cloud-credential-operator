@@ -8,7 +8,7 @@ import (
 
 	"github.com/openshift-eng/openshift-tests-extension/pkg/cmd"
 	e "github.com/openshift-eng/openshift-tests-extension/pkg/extension"
-	"github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
+	et "github.com/openshift-eng/openshift-tests-extension/pkg/extension/extensiontests"
 	"github.com/spf13/cobra"
 	"k8s.io/component-base/logs"
 
@@ -58,7 +58,7 @@ func main() {
 
 	// If using Ginkgo, build test specs automatically
 	// Use custom filter to handle both file system paths and module paths for vendor exclusion
-	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(func(spec *extensiontests.ExtensionTestSpec) bool {
+	specs, err := g.BuildExtensionTestSpecsFromOpenShiftGinkgoSuite(func(spec *et.ExtensionTestSpec) bool {
 		// Only include tests from cloud-credential-operator module (exclude vendor tests)
 		for _, cl := range spec.CodeLocations {
 			// Handle file system paths (e.g., /path/to/vendor/k8s.io/...)
@@ -82,7 +82,7 @@ func main() {
 
 	// Handle platform-specific tests by setting proper environmentSelector
 	foundPlatforms := make(map[string]string)
-	for _, test := range specs.Select(extensiontests.NameContains("[platform:")).Names() {
+	for _, test := range specs.Select(et.NameContains("[platform:")).Names() {
 		re := regexp.MustCompile(`\[platform:[a-z]*]`)
 		matches := re.FindAllString(test, -1)
 		for _, platformDef := range matches {
@@ -90,10 +90,16 @@ func main() {
 				platform := platformDef[strings.Index(platformDef, ":")+1 : len(platformDef)-1]
 				foundPlatforms[platformDef] = platform
 			}
-			specs.Select(extensiontests.NameContains(platformDef)).
-				Include(extensiontests.PlatformEquals(platformDef[strings.Index(platformDef, ":")+1 : len(platformDef)-1]))
+			specs.Select(et.NameContains(platformDef)).
+				Include(et.PlatformEquals(platformDef[strings.Index(platformDef, ":")+1 : len(platformDef)-1]))
 		}
 	}
+
+	// Set lifecycle for all migrated tests to Informing
+	// Tests will run but won't block CI on failure
+	specs.Walk(func(spec *et.ExtensionTestSpec) {
+		spec.Lifecycle = et.LifecycleInforming
+	})
 
 	ext.AddSpecs(specs)
 

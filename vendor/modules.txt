@@ -2181,3 +2181,4 @@ sigs.k8s.io/yaml/goyaml.v2
 # golang.org/x/net => golang.org/x/net v0.46.0
 # github.com/golang/glog => github.com/golang/glog v1.2.5
 # github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241205171354-8006f302fd12
+# github.com/openshift/cloud-credential-operator/test/e2e/extension => ./test/e2e/extension
