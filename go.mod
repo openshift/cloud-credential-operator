@@ -242,3 +242,5 @@ replace github.com/golang/glog => github.com/golang/glog v1.2.5
 
 // Required for openshift-tests-extension compatibility (uses OpenShift's ginkgo fork)
 replace github.com/onsi/ginkgo/v2 => github.com/openshift/onsi-ginkgo/v2 v2.6.1-0.20241205171354-8006f302fd12
+
+replace github.com/openshift/cloud-credential-operator/test/e2e/extension => ./test/e2e/extension

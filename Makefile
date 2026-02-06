@@ -133,11 +133,8 @@ clean:
 # Build OpenShift test extension following OTE requirements:
 # - Static linking (CGO_ENABLED=0)
 # - ART compliance exemption (GO_COMPLIANCE_POLICY=exempt_all)
-cloud-credential-tests-ext:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO_COMPLIANCE_POLICY=exempt_all \
-		go build -mod=vendor \
-		-ldflags "-X $(GO_PACKAGE)/pkg/version.versionFromGit=$$(git describe --long --tags --abbrev=7 --match 'v[0-9]*' )" \
-		./cmd/cloud-credential-tests-ext
+cloud-credential-tests-ext: tests-ext-build
+	cp bin/cloud-credential-operator-tests-ext ./cloud-credential-tests-ext
 .PHONY: cloud-credential-tests-ext
 
 # Run against the configured cluster in ~/.kube/config
@@ -208,3 +205,42 @@ update-go-modules-k8s:
 	done
 	go mod tidy
 	go mod vendor
+
+# OTE test extension binary configuration (Variant B: Subdirectory mode)
+TESTS_EXT_DIR := test/e2e/extension/cmd
+TESTS_EXT_BINARY := bin/cloud-credential-operator-tests-ext
+
+# Build OTE extension binary (builds from test module, outputs to bin/)
+.PHONY: tests-ext-build
+tests-ext-build:
+	@echo "Building OTE test extension binary..."
+	@cd test/e2e/extension && $(MAKE) -f bindata.mk update-bindata
+	@mkdir -p bin
+	cd test/e2e/extension && GOTOOLCHAIN=auto GOSUMDB=sum.golang.org go build -o ../../../$(TESTS_EXT_BINARY) ./cmd
+	@echo "✅ Extension binary built: $(TESTS_EXT_BINARY)"
+
+# Compress OTE extension binary (for CI/CD and container builds)
+.PHONY: tests-ext-compress
+tests-ext-compress: tests-ext-build
+	@echo "Compressing OTE extension binary..."
+	@cd bin && tar -czvf cloud-credential-operator-tests-ext.tar.gz cloud-credential-operator-tests-ext && rm -f cloud-credential-operator-tests-ext
+	@echo "Compressed binary created at bin/cloud-credential-operator-tests-ext.tar.gz"
+
+# Copy compressed binary to _output directory (for CI/CD)
+.PHONY: tests-ext-copy
+tests-ext-copy: tests-ext-compress
+	@echo "Copying compressed binary to _output..."
+	@mkdir -p _output
+	@cp bin/cloud-credential-operator-tests-ext.tar.gz _output/
+	@echo "Binary copied to _output/cloud-credential-operator-tests-ext.tar.gz"
+
+# Alias for backward compatibility
+.PHONY: extension
+extension: tests-ext-build
+
+# Clean extension binary
+.PHONY: clean-extension
+clean-extension:
+	@echo "Cleaning extension binary..."
+	@rm -f $(TESTS_EXT_BINARY) bin/cloud-credential-operator-tests-ext.tar.gz _output/cloud-credential-operator-tests-ext.tar.gz
+	@cd test/e2e/extension && $(MAKE) -f bindata.mk clean-bindata 2>/dev/null || true
