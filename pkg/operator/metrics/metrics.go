@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -252,11 +253,17 @@ func (a *credRequestAccumulator) processCR(cr *credreqv1.CredentialsRequest, cco
 
 	isPodIdentity, err := credRequestIsPodIdentity(cr, cloudType, a.kubeClient)
 	if err != nil {
-		a.logger.WithError(err).Error("failed to determine whether CredentialsRequest is of type STS")
+		a.logger.WithError(err).WithField("credentialsRequest", cr.Name).Error("failed to determine whether CredentialsRequest is of type pod identity")
 	}
 
 	if isPodIdentity {
 		a.podIdentityCredentials++
+		a.logger.WithFields(log.Fields{
+			"credentialsRequest": cr.Name,
+			"namespace":          cr.Namespace,
+			"cloudType":          cloudType,
+			"secretRef":          fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
+		}).Debug("detected pod identity credentials")
 	}
 
 	// Skip reporting conditions if CCO is disabled, as we shouldn't be alerting in that case, except for stale credentials.
@@ -364,14 +371,32 @@ func (a *credRequestAccumulator) setMetrics() {
 }
 
 func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string, kubeClient client.Client) (bool, error) {
+	// Check if SecretRef is set
+	if cr.Spec.SecretRef.Name == "" || cr.Spec.SecretRef.Namespace == "" {
+		log.WithFields(log.Fields{
+				"credentialsRequest": cr.Name,
+			}).Debug("keys Name or Namespace is null")
+		return false, nil
+	}
+
 	secretKey := types.NamespacedName{Name: cr.Spec.SecretRef.Name, Namespace: cr.Spec.SecretRef.Namespace}
 	secret := &corev1.Secret{}
 
 	err := kubeClient.Get(context.TODO(), secretKey, secret)
 	if errors.IsNotFound(err) {
 		// Secret for CredReq doesn't exist so we can't query it
+		log.WithFields(log.Fields{
+			"credentialsRequest": cr.Name,
+			"secretName":         secret.Name,
+			"secretNamespace":    secret.Namespace,
+		}).Debug("AWS secret not found")
 		return false, nil
 	} else if err != nil {
+		log.WithFields(log.Fields{
+			"credentialsRequest": cr.Name,
+			"secretName":         secret.Name,
+			"secretNamespace":    secret.Namespace,
+		}).Debug("AWS secret not loaded due to other error")
 		return false, err
 	}
 
@@ -379,6 +404,18 @@ func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string
 	case "AWSProviderSpec":
 		secretData, ok := secret.Data[constants.AWSSecretDataCredentialsKey]
 		if !ok {
+			// Log available keys for debugging
+			availableKeys := make([]string, 0, len(secret.Data))
+			for k := range secret.Data {
+				availableKeys = append(availableKeys, k)
+			}
+			log.WithFields(log.Fields{
+				"credentialsRequest": cr.Name,
+				"secretName":         secret.Name,
+				"secretNamespace":    secret.Namespace,
+				"expectedKey":        constants.AWSSecretDataCredentialsKey,
+				"availableKeys":      availableKeys,
+			}).Debug("AWS secret missing expected credentials key")
 			return false, nil
 		}
 
@@ -388,10 +425,35 @@ func credRequestIsPodIdentity(cr *credreqv1.CredentialsRequest, cloudType string
 			return true, nil
 		}
 
+		// Log for debugging when AWS secret doesn't contain STS indicators
+		preview := string(secretData)
+		if len(preview) > 100 {
+			preview = preview[:100] + "..."
+		}
+		log.WithFields(log.Fields{
+			"credentialsRequest": cr.Name,
+			"secretName":         secret.Name,
+			"secretNamespace":    secret.Namespace,
+			"secretDataPreview":  preview,
+		}).Debug("AWS secret does not contain web_identity_token_file, not STS credentials")
+
 		return false, nil
 	case "AzureProviderSpec":
 		_, ok := secret.Data[azure.AzureFederatedTokenFile]
 		return ok, nil
+	case "GCPProviderSpec":
+		secretData, ok := secret.Data["service_account.json"]
+		if !ok {
+			return false, nil
+		}
+
+		// external_account type is a clear indicator that the credentials
+		// are configured for GCP Workload Identity Federation (WIF)
+		if strings.Contains(string(secretData), "external_account") {
+			return true, nil
+		}
+
+		return false, nil
 	default:
 		return false, nil
 	}
