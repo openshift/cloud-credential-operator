@@ -647,22 +647,6 @@ func (m *DeviceManagement) GetFieldDeserializers()(map[string]func(i878a80d2330e
         }
         return nil
     }
-    res["telecomExpenseManagementPartners"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
-        val, err := n.GetCollectionOfObjectValues(CreateTelecomExpenseManagementPartnerFromDiscriminatorValue)
-        if err != nil {
-            return err
-        }
-        if val != nil {
-            res := make([]TelecomExpenseManagementPartnerable, len(val))
-            for i, v := range val {
-                if v != nil {
-                    res[i] = v.(TelecomExpenseManagementPartnerable)
-                }
-            }
-            m.SetTelecomExpenseManagementPartners(res)
-        }
-        return nil
-    }
     res["termsAndConditions"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
         val, err := n.GetCollectionOfObjectValues(CreateTermsAndConditionsFromDiscriminatorValue)
         if err != nil {
@@ -1261,7 +1245,7 @@ func (m *DeviceManagement) GetRemoteAssistancePartners()([]RemoteAssistancePartn
     }
     return nil
 }
-// GetReports gets the reports property value. Reports singleton
+// GetReports gets the reports property value. The reports property
 // returns a DeviceManagementReportsable when successful
 func (m *DeviceManagement) GetReports()(DeviceManagementReportsable) {
     val, err := m.GetBackingStore().Get("reports")
@@ -1342,18 +1326,6 @@ func (m *DeviceManagement) GetSubscriptionState()(*DeviceManagementSubscriptionS
     }
     if val != nil {
         return val.(*DeviceManagementSubscriptionState)
-    }
-    return nil
-}
-// GetTelecomExpenseManagementPartners gets the telecomExpenseManagementPartners property value. The telecom expense management partners.
-// returns a []TelecomExpenseManagementPartnerable when successful
-func (m *DeviceManagement) GetTelecomExpenseManagementPartners()([]TelecomExpenseManagementPartnerable) {
-    val, err := m.GetBackingStore().Get("telecomExpenseManagementPartners")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.([]TelecomExpenseManagementPartnerable)
     }
     return nil
 }
@@ -1669,7 +1641,7 @@ func (m *DeviceManagement) GetUserExperienceAnalyticsWorkFromAnywhereModelPerfor
     }
     return nil
 }
-// GetVirtualEndpoint gets the virtualEndpoint property value. Virtual endpoint
+// GetVirtualEndpoint gets the virtualEndpoint property value. The virtualEndpoint property
 // returns a VirtualEndpointable when successful
 func (m *DeviceManagement) GetVirtualEndpoint()(VirtualEndpointable) {
     val, err := m.GetBackingStore().Get("virtualEndpoint")
@@ -2056,18 +2028,6 @@ func (m *DeviceManagement) Serialize(writer i878a80d2330e89d26896388a3f487eef27b
     if m.GetSubscriptionState() != nil {
         cast := (*m.GetSubscriptionState()).String()
         err = writer.WriteStringValue("subscriptionState", &cast)
-        if err != nil {
-            return err
-        }
-    }
-    if m.GetTelecomExpenseManagementPartners() != nil {
-        cast := make([]i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, len(m.GetTelecomExpenseManagementPartners()))
-        for i, v := range m.GetTelecomExpenseManagementPartners() {
-            if v != nil {
-                cast[i] = v.(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable)
-            }
-        }
-        err = writer.WriteCollectionOfObjectValues("telecomExpenseManagementPartners", cast)
         if err != nil {
             return err
         }
@@ -2597,7 +2557,7 @@ func (m *DeviceManagement) SetRemoteAssistancePartners(value []RemoteAssistanceP
         panic(err)
     }
 }
-// SetReports sets the reports property value. Reports singleton
+// SetReports sets the reports property value. The reports property
 func (m *DeviceManagement) SetReports(value DeviceManagementReportsable)() {
     err := m.GetBackingStore().Set("reports", value)
     if err != nil {
@@ -2642,13 +2602,6 @@ func (m *DeviceManagement) SetSoftwareUpdateStatusSummary(value SoftwareUpdateSt
 // SetSubscriptionState sets the subscriptionState property value. Tenant mobile device management subscription state.
 func (m *DeviceManagement) SetSubscriptionState(value *DeviceManagementSubscriptionState)() {
     err := m.GetBackingStore().Set("subscriptionState", value)
-    if err != nil {
-        panic(err)
-    }
-}
-// SetTelecomExpenseManagementPartners sets the telecomExpenseManagementPartners property value. The telecom expense management partners.
-func (m *DeviceManagement) SetTelecomExpenseManagementPartners(value []TelecomExpenseManagementPartnerable)() {
-    err := m.GetBackingStore().Set("telecomExpenseManagementPartners", value)
     if err != nil {
         panic(err)
     }
@@ -2835,7 +2788,7 @@ func (m *DeviceManagement) SetUserExperienceAnalyticsWorkFromAnywhereModelPerfor
         panic(err)
     }
 }
-// SetVirtualEndpoint sets the virtualEndpoint property value. Virtual endpoint
+// SetVirtualEndpoint sets the virtualEndpoint property value. The virtualEndpoint property
 func (m *DeviceManagement) SetVirtualEndpoint(value VirtualEndpointable)() {
     err := m.GetBackingStore().Set("virtualEndpoint", value)
     if err != nil {
@@ -2912,7 +2865,6 @@ type DeviceManagementable interface {
     GetSettings()(DeviceManagementSettingsable)
     GetSoftwareUpdateStatusSummary()(SoftwareUpdateStatusSummaryable)
     GetSubscriptionState()(*DeviceManagementSubscriptionState)
-    GetTelecomExpenseManagementPartners()([]TelecomExpenseManagementPartnerable)
     GetTermsAndConditions()([]TermsAndConditionsable)
     GetTroubleshootingEvents()([]DeviceManagementTroubleshootingEventable)
     GetUserExperienceAnalyticsAppHealthApplicationPerformance()([]UserExperienceAnalyticsAppHealthApplicationPerformanceable)
@@ -2977,7 +2929,6 @@ type DeviceManagementable interface {
     SetSettings(value DeviceManagementSettingsable)()
     SetSoftwareUpdateStatusSummary(value SoftwareUpdateStatusSummaryable)()
     SetSubscriptionState(value *DeviceManagementSubscriptionState)()
-    SetTelecomExpenseManagementPartners(value []TelecomExpenseManagementPartnerable)()
     SetTermsAndConditions(value []TermsAndConditionsable)()
     SetTroubleshootingEvents(value []DeviceManagementTroubleshootingEventable)()
     SetUserExperienceAnalyticsAppHealthApplicationPerformance(value []UserExperienceAnalyticsAppHealthApplicationPerformanceable)()

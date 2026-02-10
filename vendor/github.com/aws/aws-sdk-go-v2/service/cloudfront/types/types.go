@@ -200,6 +200,13 @@ type AnycastIpList struct {
 	// This member is required.
 	Status *string
 
+	// The IP address type for the Anycast static IP list.
+	IpAddressType IpAddressType
+
+	// The IPAM configuration for the Anycast static IP list, that contains the
+	// quantity and list of IPAM CIDR configurations.
+	IpamConfig *IpamConfig
+
 	noSmithyDocumentSerde
 }
 
@@ -277,7 +284,60 @@ type AnycastIpListSummary struct {
 	// This member is required.
 	Status *string
 
+	// The current version (ETag value) of the Anycast static IP list.
+	ETag *string
+
+	// The IP address type for the Anycast static IP list.
+	IpAddressType IpAddressType
+
+	// The IPAM configuration for the Anycast static IP list, that contains the
+	// quantity and list of IPAM CIDR configurations.
+	IpamConfig *IpamConfig
+
 	noSmithyDocumentSerde
+}
+
+// The CA certificates bundle location in Amazon S3.
+type CaCertificatesBundleS3Location struct {
+
+	// The S3 bucket.
+	//
+	// This member is required.
+	Bucket *string
+
+	// The location's key.
+	//
+	// This member is required.
+	Key *string
+
+	// The location's Region.
+	//
+	// This member is required.
+	Region *string
+
+	// The location's version.
+	Version *string
+
+	noSmithyDocumentSerde
+}
+
+// A CA certificates bundle source.
+//
+// The following types satisfy this interface:
+//
+//	CaCertificatesBundleSourceMemberCaCertificatesBundleS3Location
+type CaCertificatesBundleSource interface {
+	isCaCertificatesBundleSource()
+}
+
+// The CA certificates bundle location in Amazon S3.
+type CaCertificatesBundleSourceMemberCaCertificatesBundleS3Location struct {
+	Value CaCertificatesBundleS3Location
+
+	noSmithyDocumentSerde
+}
+
+func (*CaCertificatesBundleSourceMemberCaCertificatesBundleS3Location) isCaCertificatesBundleSource() {
 }
 
 // A complex type that describes how CloudFront processes requests.
@@ -1067,6 +1127,84 @@ type ConflictingAliasesList struct {
 	noSmithyDocumentSerde
 }
 
+// A connection function association.
+type ConnectionFunctionAssociation struct {
+
+	// The association's ID.
+	//
+	// This member is required.
+	Id *string
+
+	noSmithyDocumentSerde
+}
+
+// A connection function summary.
+type ConnectionFunctionSummary struct {
+
+	// The connection function Amazon Resource Name (ARN).
+	//
+	// This member is required.
+	ConnectionFunctionArn *string
+
+	// Contains configuration information about a CloudFront function.
+	//
+	// This member is required.
+	ConnectionFunctionConfig *FunctionConfig
+
+	// The connection function created time.
+	//
+	// This member is required.
+	CreatedTime *time.Time
+
+	// The connection function ID.
+	//
+	// This member is required.
+	Id *string
+
+	// The connection function last modified time.
+	//
+	// This member is required.
+	LastModifiedTime *time.Time
+
+	// The connection function name.
+	//
+	// This member is required.
+	Name *string
+
+	// The connection function stage.
+	//
+	// This member is required.
+	Stage FunctionStage
+
+	// The connection function status.
+	//
+	// This member is required.
+	Status *string
+
+	noSmithyDocumentSerde
+}
+
+// A connection function test result.
+type ConnectionFunctionTestResult struct {
+
+	// The connection function compute utilization.
+	ComputeUtilization *string
+
+	// The connection function error message.
+	ConnectionFunctionErrorMessage *string
+
+	// The connection function execution logs.
+	ConnectionFunctionExecutionLogs []string
+
+	// The connection function output.
+	ConnectionFunctionOutput *string
+
+	// The connection function summary.
+	ConnectionFunctionSummary *ConnectionFunctionSummary
+
+	noSmithyDocumentSerde
+}
+
 // The connection group for your distribution tenants. When you first create a
 // distribution tenant and you don't specify a connection group, CloudFront will
 // automatically create a default connection group for you. When you create a new
@@ -1617,6 +1755,9 @@ type CustomOriginConfig struct {
 	// [Keep-alive timeout (custom origins only)]: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesOrigin.html#DownloadDistValuesOriginKeepaliveTimeout
 	OriginKeepaliveTimeout *int32
 
+	// Configures mutual TLS authentication between CloudFront and your origin server.
+	OriginMtlsConfig *OriginMtlsConfig
+
 	// Specifies how long, in seconds, CloudFront waits for a response from the
 	// origin. This is also known as the origin response timeout. The minimum timeout
 	// is 1 second, the maximum is 120 seconds, and the default (if you don't specify
@@ -2029,6 +2170,9 @@ type DistributionConfig struct {
 	// A complex type that contains zero or more CacheBehavior elements.
 	CacheBehaviors *CacheBehaviors
 
+	// The distribution's connection function association.
+	ConnectionFunctionAssociation *ConnectionFunctionAssociation
+
 	// This field specifies whether the connection mode is through a standard
 	// distribution (direct) or a multi-tenant distribution with distribution tenants
 	// (tenant-only).
@@ -2205,6 +2349,9 @@ type DistributionConfig struct {
 	// communicating with viewers.
 	ViewerCertificate *ViewerCertificate
 
+	// The distribution's viewer mTLS configuration.
+	ViewerMtlsConfig *ViewerMtlsConfig
+
 	// Multi-tenant distributions only support WAF V2 web ACLs.
 	//
 	// A unique identifier that specifies the WAF web ACL, if any, to associate with
@@ -2275,6 +2422,64 @@ type DistributionIdList struct {
 
 	// Contains the value that you should use in the Marker field of a subsequent
 	// request to continue listing distribution IDs where you left off.
+	NextMarker *string
+
+	noSmithyDocumentSerde
+}
+
+// A structure that pairs a CloudFront distribution ID with its owning Amazon Web
+// Services account ID.
+type DistributionIdOwner struct {
+
+	// The ID of the distribution.
+	//
+	// This member is required.
+	DistributionId *string
+
+	// The ID of the Amazon Web Services account that owns the distribution.
+	//
+	// This member is required.
+	OwnerAccountId *string
+
+	noSmithyDocumentSerde
+}
+
+// The list of distribution IDs and the Amazon Web Services accounts that they
+// belong to.
+type DistributionIdOwnerList struct {
+
+	// A flag that indicates whether more DistributionIdOwner objects remain to be
+	// listed. If your results were truncated, you can make a follow-up pagination
+	// request using the Marker request parameter to retrieve more results in the list.
+	//
+	// This member is required.
+	IsTruncated *bool
+
+	// Use this field when paginating results to indicate where to begin in your list
+	// of DistributionIdOwner objects. The response includes distributions in the list
+	// that occur after the marker. To get the next page of the list, set this field's
+	// value to the value of NextMarker from the current page's response.
+	//
+	// This member is required.
+	Marker *string
+
+	// The maximum number of DistributionIdOwner objects to return.
+	//
+	// This member is required.
+	MaxItems *int32
+
+	// Specifies the actual number of DistributionIdOwner objects included in the list
+	// for the current page.
+	//
+	// This member is required.
+	Quantity *int32
+
+	// The number of DistributionIdOwner objects.
+	Items []DistributionIdOwner
+
+	// A token used for pagination of results returned in the response. You can use
+	// the token from the previous request to define where the current request should
+	// begin.
 	NextMarker *string
 
 	noSmithyDocumentSerde
@@ -2464,6 +2669,9 @@ type DistributionSummary struct {
 	// ID of the Anycast static IP list that is associated with the distribution.
 	AnycastIpListId *string
 
+	// The distribution's connection function association.
+	ConnectionFunctionAssociation *ConnectionFunctionAssociation
+
 	// This field specifies whether the connection mode is through a standard
 	// distribution (direct) or a multi-tenant distribution with distribution tenants
 	// (tenant-only).
@@ -2475,6 +2683,9 @@ type DistributionSummary struct {
 	// A complex type that contains information about origin groups for this
 	// distribution.
 	OriginGroups *OriginGroups
+
+	// The distribution's viewer mTLS configuration.
+	ViewerMtlsConfig *ViewerMtlsConfig
 
 	noSmithyDocumentSerde
 }
@@ -3483,6 +3694,49 @@ type InvalidationSummary struct {
 	noSmithyDocumentSerde
 }
 
+// Configuration for an IPAM CIDR that defines a specific IP address range, IPAM
+// pool, and associated Anycast IP address.
+type IpamCidrConfig struct {
+
+	// The CIDR that specifies the IP address range for this IPAM configuration.
+	//
+	// This member is required.
+	Cidr *string
+
+	// The Amazon Resource Name (ARN) of the IPAM pool that the CIDR block is assigned
+	// to.
+	//
+	// This member is required.
+	IpamPoolArn *string
+
+	// The specified Anycast IP address allocated from the IPAM pool for this CIDR
+	// configuration.
+	AnycastIp *string
+
+	// The current status of the IPAM CIDR configuration.
+	Status IpamCidrStatus
+
+	noSmithyDocumentSerde
+}
+
+// The configuration IPAM settings that includes the quantity of CIDR
+// configurations and the list of IPAM CIDR configurations.
+type IpamConfig struct {
+
+	// A list of IPAM CIDR configurations that define the IP address ranges, IPAM
+	// pools, and associated Anycast IP addresses.
+	//
+	// This member is required.
+	IpamCidrConfigs []IpamCidrConfig
+
+	// The number of IPAM CIDR configurations in the IpamCidrConfigs list.
+	//
+	// This member is required.
+	Quantity *int32
+
+	noSmithyDocumentSerde
+}
+
 // A key group.
 //
 // A key group contains a list of public keys that you can use with [CloudFront signed URLs and signed cookies].
@@ -4283,6 +4537,19 @@ type OriginGroups struct {
 
 	// The items (origin groups) in a distribution.
 	Items []OriginGroup
+
+	noSmithyDocumentSerde
+}
+
+// Configures mutual TLS authentication between CloudFront and your origin server.
+type OriginMtlsConfig struct {
+
+	// The Amazon Resource Name (ARN) of the client certificate stored in Amazon Web
+	// Services Certificate Manager (ACM) that CloudFront uses to authenticate with
+	// your origin using Mutual TLS.
+	//
+	// This member is required.
+	ClientCertificateArn *string
 
 	noSmithyDocumentSerde
 }
@@ -6329,6 +6596,94 @@ type TrustedSigners struct {
 	noSmithyDocumentSerde
 }
 
+// A trust store.
+type TrustStore struct {
+
+	// The trust store's Amazon Resource Name (ARN).
+	Arn *string
+
+	// The trust store's ID.
+	Id *string
+
+	// The trust store's last modified time.
+	LastModifiedTime *time.Time
+
+	// The trust store's name.
+	Name *string
+
+	// The trust store's number of CA certificates.
+	NumberOfCaCertificates *int32
+
+	// The trust store's reason.
+	Reason *string
+
+	// The trust store's status.
+	Status TrustStoreStatus
+
+	noSmithyDocumentSerde
+}
+
+// A trust store configuration.
+type TrustStoreConfig struct {
+
+	// The trust store ID.
+	//
+	// This member is required.
+	TrustStoreId *string
+
+	// The configuration to use to advertise trust store CA names.
+	AdvertiseTrustStoreCaNames *bool
+
+	// The configuration to use to ignore certificate expiration.
+	IgnoreCertificateExpiry *bool
+
+	noSmithyDocumentSerde
+}
+
+// A trust store summary.
+type TrustStoreSummary struct {
+
+	// The trust store's Amazon Resource Name (ARN).
+	//
+	// This member is required.
+	Arn *string
+
+	// The version identifier for the current version of the trust store.
+	//
+	// This member is required.
+	ETag *string
+
+	// The trust store's ID.
+	//
+	// This member is required.
+	Id *string
+
+	// The trust store's last modified time.
+	//
+	// This member is required.
+	LastModifiedTime *time.Time
+
+	// The trust store's name.
+	//
+	// This member is required.
+	Name *string
+
+	// The trust store's number of CA certificates.
+	//
+	// This member is required.
+	NumberOfCaCertificates *int32
+
+	// The trust store's status.
+	//
+	// This member is required.
+	Status TrustStoreStatus
+
+	// The trust store's reason.
+	Reason *string
+
+	noSmithyDocumentSerde
+}
+
 // Contains details about the validation token.
 type ValidationTokenDetail struct {
 
@@ -6507,6 +6862,18 @@ type ViewerCertificate struct {
 	noSmithyDocumentSerde
 }
 
+// A viewer mTLS configuration.
+type ViewerMtlsConfig struct {
+
+	// The viewer mTLS mode.
+	Mode ViewerMtlsMode
+
+	// The trust store configuration associated with the viewer mTLS configuration.
+	TrustStoreConfig *TrustStoreConfig
+
+	noSmithyDocumentSerde
+}
+
 // An Amazon CloudFront VPC origin.
 type VpcOrigin struct {
 
@@ -6540,6 +6907,9 @@ type VpcOrigin struct {
 	// This member is required.
 	VpcOriginEndpointConfig *VpcOriginEndpointConfig
 
+	// The account ID of the Amazon Web Services account that owns the VPC origin.
+	AccountId *string
+
 	noSmithyDocumentSerde
 }
 
@@ -6569,6 +6939,9 @@ type VpcOriginConfig struct {
 	//
 	// [Response timeout]: https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/DownloadDistValuesOrigin.html#DownloadDistValuesOriginResponseTimeout
 	OriginReadTimeout *int32
+
+	// The account ID of the Amazon Web Services account that owns the VPC origin.
+	OwnerAccountId *string
 
 	noSmithyDocumentSerde
 }
@@ -6682,6 +7055,9 @@ type VpcOriginSummary struct {
 	// This member is required.
 	Status *string
 
+	// The account ID of the Amazon Web Services account that owns the VPC origin.
+	AccountId *string
+
 	noSmithyDocumentSerde
 }
 
@@ -6703,3 +7079,14 @@ type WebAclCustomization struct {
 }
 
 type noSmithyDocumentSerde = smithydocument.NoSerde
+
+// UnknownUnionMember is returned when a union member is returned over the wire,
+// but has an unknown tag.
+type UnknownUnionMember struct {
+	Tag   string
+	Value []byte
+
+	noSmithyDocumentSerde
+}
+
+func (*UnknownUnionMember) isCaCertificatesBundleSource() {}

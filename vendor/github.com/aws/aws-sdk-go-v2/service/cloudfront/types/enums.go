@@ -445,6 +445,45 @@ func (IpAddressType) Values() []IpAddressType {
 	}
 }
 
+type IpamCidrStatus string
+
+// Enum values for IpamCidrStatus
+const (
+	IpamCidrStatusProvisioned       IpamCidrStatus = "provisioned"
+	IpamCidrStatusFailedProvision   IpamCidrStatus = "failed-provision"
+	IpamCidrStatusProvisioning      IpamCidrStatus = "provisioning"
+	IpamCidrStatusDeprovisioned     IpamCidrStatus = "deprovisioned"
+	IpamCidrStatusFailedDeprovision IpamCidrStatus = "failed-deprovision"
+	IpamCidrStatusDeprovisioning    IpamCidrStatus = "deprovisioning"
+	IpamCidrStatusAdvertised        IpamCidrStatus = "advertised"
+	IpamCidrStatusFailedAdvertise   IpamCidrStatus = "failed-advertise"
+	IpamCidrStatusAdvertising       IpamCidrStatus = "advertising"
+	IpamCidrStatusWithdrawn         IpamCidrStatus = "withdrawn"
+	IpamCidrStatusFailedWithdraw    IpamCidrStatus = "failed-withdraw"
+	IpamCidrStatusWithdrawing       IpamCidrStatus = "withdrawing"
+)
+
+// Values returns all known values for IpamCidrStatus. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (IpamCidrStatus) Values() []IpamCidrStatus {
+	return []IpamCidrStatus{
+		"provisioned",
+		"failed-provision",
+		"provisioning",
+		"deprovisioned",
+		"failed-deprovision",
+		"deprovisioning",
+		"advertised",
+		"failed-advertise",
+		"advertising",
+		"withdrawn",
+		"failed-withdraw",
+		"withdrawing",
+	}
+}
+
 type ItemSelection string
 
 // Enum values for ItemSelection
@@ -924,6 +963,27 @@ func (SSLSupportMethod) Values() []SSLSupportMethod {
 	}
 }
 
+type TrustStoreStatus string
+
+// Enum values for TrustStoreStatus
+const (
+	TrustStoreStatusPending TrustStoreStatus = "pending"
+	TrustStoreStatusActive  TrustStoreStatus = "active"
+	TrustStoreStatusFailed  TrustStoreStatus = "failed"
+)
+
+// Values returns all known values for TrustStoreStatus. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (TrustStoreStatus) Values() []TrustStoreStatus {
+	return []TrustStoreStatus{
+		"pending",
+		"active",
+		"failed",
+	}
+}
+
 type ValidationTokenHost string
 
 // Enum values for ValidationTokenHost
@@ -940,6 +1000,25 @@ func (ValidationTokenHost) Values() []ValidationTokenHost {
 	return []ValidationTokenHost{
 		"cloudfront",
 		"self-hosted",
+	}
+}
+
+type ViewerMtlsMode string
+
+// Enum values for ViewerMtlsMode
+const (
+	ViewerMtlsModeRequired ViewerMtlsMode = "required"
+	ViewerMtlsModeOptional ViewerMtlsMode = "optional"
+)
+
+// Values returns all known values for ViewerMtlsMode. Note that this can be
+// expanded in the future, and so it is only as up to date as the client.
+//
+// The ordering of this slice is not guaranteed to be stable across updates.
+func (ViewerMtlsMode) Values() []ViewerMtlsMode {
+	return []ViewerMtlsMode{
+		"required",
+		"optional",
 	}
 }
 

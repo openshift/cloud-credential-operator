@@ -4,7 +4,6 @@
 package models
 
 import (
-    i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e "time"
     i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
@@ -49,7 +48,7 @@ func (m *Fido2AuthenticationMethod) GetAttestationCertificates()([]string) {
     }
     return nil
 }
-// GetAttestationLevel gets the attestationLevel property value. The attestation level of this FIDO2 security key. Possible values are: attested, or notAttested.
+// GetAttestationLevel gets the attestationLevel property value. The attestation level of this FIDO2 security key. The possible values are: attested, or notAttested.
 // returns a *AttestationLevel when successful
 func (m *Fido2AuthenticationMethod) GetAttestationLevel()(*AttestationLevel) {
     val, err := m.GetBackingStore().Get("attestationLevel")
@@ -58,18 +57,6 @@ func (m *Fido2AuthenticationMethod) GetAttestationLevel()(*AttestationLevel) {
     }
     if val != nil {
         return val.(*AttestationLevel)
-    }
-    return nil
-}
-// GetCreatedDateTime gets the createdDateTime property value. The timestamp when this key was registered to the user.
-// returns a *Time when successful
-func (m *Fido2AuthenticationMethod) GetCreatedDateTime()(*i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time) {
-    val, err := m.GetBackingStore().Get("createdDateTime")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(*i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)
     }
     return nil
 }
@@ -122,16 +109,6 @@ func (m *Fido2AuthenticationMethod) GetFieldDeserializers()(map[string]func(i878
         }
         if val != nil {
             m.SetAttestationLevel(val.(*AttestationLevel))
-        }
-        return nil
-    }
-    res["createdDateTime"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
-        val, err := n.GetTimeValue()
-        if err != nil {
-            return err
-        }
-        if val != nil {
-            m.SetCreatedDateTime(val)
         }
         return nil
     }
@@ -195,12 +172,6 @@ func (m *Fido2AuthenticationMethod) Serialize(writer i878a80d2330e89d26896388a3f
         }
     }
     {
-        err = writer.WriteTimeValue("createdDateTime", m.GetCreatedDateTime())
-        if err != nil {
-            return err
-        }
-    }
-    {
         err = writer.WriteStringValue("displayName", m.GetDisplayName())
         if err != nil {
             return err
@@ -228,16 +199,9 @@ func (m *Fido2AuthenticationMethod) SetAttestationCertificates(value []string)()
         panic(err)
     }
 }
-// SetAttestationLevel sets the attestationLevel property value. The attestation level of this FIDO2 security key. Possible values are: attested, or notAttested.
+// SetAttestationLevel sets the attestationLevel property value. The attestation level of this FIDO2 security key. The possible values are: attested, or notAttested.
 func (m *Fido2AuthenticationMethod) SetAttestationLevel(value *AttestationLevel)() {
     err := m.GetBackingStore().Set("attestationLevel", value)
-    if err != nil {
-        panic(err)
-    }
-}
-// SetCreatedDateTime sets the createdDateTime property value. The timestamp when this key was registered to the user.
-func (m *Fido2AuthenticationMethod) SetCreatedDateTime(value *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)() {
-    err := m.GetBackingStore().Set("createdDateTime", value)
     if err != nil {
         panic(err)
     }
@@ -262,13 +226,11 @@ type Fido2AuthenticationMethodable interface {
     GetAaGuid()(*string)
     GetAttestationCertificates()([]string)
     GetAttestationLevel()(*AttestationLevel)
-    GetCreatedDateTime()(*i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)
     GetDisplayName()(*string)
     GetModel()(*string)
     SetAaGuid(value *string)()
     SetAttestationCertificates(value []string)()
     SetAttestationLevel(value *AttestationLevel)()
-    SetCreatedDateTime(value *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)()
     SetDisplayName(value *string)()
     SetModel(value *string)()
 }

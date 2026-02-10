@@ -40,6 +40,20 @@ type CreateAnycastIpListInput struct {
 	// This member is required.
 	Name *string
 
+	// The IP address type for the Anycast static IP list. You can specify one of the
+	// following options:
+	//
+	//   - ipv4 only
+	//
+	//   - ipv6 only
+	//
+	//   - dualstack - Allocate a list of both IPv4 and IPv6 addresses
+	IpAddressType types.IpAddressType
+
+	//  A list of IPAM CIDR configurations that specify the IP address ranges and IPAM
+	// pool settings for creating the Anycast static IP list.
+	IpamCidrConfigs []types.IpamCidrConfig
+
 	// A complex type that contains zero or more Tag elements.
 	Tags *types.Tags
 
@@ -155,40 +169,7 @@ func (c *Client) addOperationCreateAnycastIpListMiddlewares(stack *middleware.St
 	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptExecution(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeSerialization(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAfterSerialization(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeSigning(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAfterSigning(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptTransmit(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAfterDeserialization(stack, options); err != nil {
-		return err
-	}
-	if err = addSpanInitializeStart(stack); err != nil {
-		return err
-	}
-	if err = addSpanInitializeEnd(stack); err != nil {
-		return err
-	}
-	if err = addSpanBuildRequestStart(stack); err != nil {
-		return err
-	}
-	if err = addSpanBuildRequestEnd(stack); err != nil {
+	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

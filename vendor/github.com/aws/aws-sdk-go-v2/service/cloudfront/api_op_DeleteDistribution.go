@@ -11,6 +11,10 @@ import (
 )
 
 // Delete a distribution.
+//
+// Before you can delete a distribution, you must disable it, which requires
+// permission to update the distribution. Once deleted, a distribution cannot be
+// recovered.
 func (c *Client) DeleteDistribution(ctx context.Context, params *DeleteDistributionInput, optFns ...func(*Options)) (*DeleteDistributionOutput, error) {
 	if params == nil {
 		params = &DeleteDistributionInput{}
@@ -177,40 +181,7 @@ func (c *Client) addOperationDeleteDistributionMiddlewares(stack *middleware.Sta
 	if err = addInterceptAttempt(stack, options); err != nil {
 		return err
 	}
-	if err = addInterceptExecution(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeSerialization(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAfterSerialization(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeSigning(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAfterSigning(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptTransmit(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptBeforeDeserialization(stack, options); err != nil {
-		return err
-	}
-	if err = addInterceptAfterDeserialization(stack, options); err != nil {
-		return err
-	}
-	if err = addSpanInitializeStart(stack); err != nil {
-		return err
-	}
-	if err = addSpanInitializeEnd(stack); err != nil {
-		return err
-	}
-	if err = addSpanBuildRequestStart(stack); err != nil {
-		return err
-	}
-	if err = addSpanBuildRequestEnd(stack); err != nil {
+	if err = addInterceptors(stack, options); err != nil {
 		return err
 	}
 	return nil

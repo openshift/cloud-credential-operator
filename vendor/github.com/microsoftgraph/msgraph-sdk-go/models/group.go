@@ -788,6 +788,16 @@ func (m *Group) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388
         }
         return nil
     }
+    res["onPremisesSyncBehavior"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+        val, err := n.GetObjectValue(CreateOnPremisesSyncBehaviorFromDiscriminatorValue)
+        if err != nil {
+            return err
+        }
+        if val != nil {
+            m.SetOnPremisesSyncBehavior(val.(OnPremisesSyncBehaviorable))
+        }
+        return nil
+    }
     res["onPremisesSyncEnabled"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
         val, err := n.GetBoolValue()
         if err != nil {
@@ -1396,6 +1406,18 @@ func (m *Group) GetOnPremisesSecurityIdentifier()(*string) {
     }
     return nil
 }
+// GetOnPremisesSyncBehavior gets the onPremisesSyncBehavior property value. The onPremisesSyncBehavior property
+// returns a OnPremisesSyncBehaviorable when successful
+func (m *Group) GetOnPremisesSyncBehavior()(OnPremisesSyncBehaviorable) {
+    val, err := m.GetBackingStore().Get("onPremisesSyncBehavior")
+    if err != nil {
+        panic(err)
+    }
+    if val != nil {
+        return val.(OnPremisesSyncBehaviorable)
+    }
+    return nil
+}
 // GetOnPremisesSyncEnabled gets the onPremisesSyncEnabled property value. true if this group is synced from an on-premises directory; false if this group was originally synced from an on-premises directory but is no longer synced; null if this object has never synced from an on-premises directory (default). Returned by default. Read-only. Supports $filter (eq, ne, not, in, and eq on null values).
 // returns a *bool when successful
 func (m *Group) GetOnPremisesSyncEnabled()(*bool) {
@@ -1672,7 +1694,7 @@ func (m *Group) GetUnseenCount()(*int32) {
     }
     return nil
 }
-// GetVisibility gets the visibility property value. Specifies the group join policy and group content visibility for groups. Possible values are: Private, Public, or HiddenMembership. HiddenMembership can be set only for Microsoft 365 groups when the groups are created. It can't be updated later. Other values of visibility can be updated after group creation. If visibility value isn't specified during group creation on Microsoft Graph, a security group is created as Private by default, and the Microsoft 365 group is Public. Groups assignable to roles are always Private. To learn more, see group visibility options. Returned by default. Nullable.
+// GetVisibility gets the visibility property value. Specifies the group join policy and group content visibility for groups. The possible values are: Private, Public, or HiddenMembership. HiddenMembership can be set only for Microsoft 365 groups when the groups are created. It can't be updated later. Other values of visibility can be updated after group creation. If visibility value isn't specified during group creation on Microsoft Graph, a security group is created as Private by default, and the Microsoft 365 group is Public. Groups assignable to roles are always Private. To learn more, see group visibility options. Returned by default. Nullable.
 // returns a *string when successful
 func (m *Group) GetVisibility()(*string) {
     val, err := m.GetBackingStore().Get("visibility")
@@ -2034,6 +2056,12 @@ func (m *Group) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c4
     }
     {
         err = writer.WriteStringValue("onPremisesSecurityIdentifier", m.GetOnPremisesSecurityIdentifier())
+        if err != nil {
+            return err
+        }
+    }
+    {
+        err = writer.WriteObjectValue("onPremisesSyncBehavior", m.GetOnPremisesSyncBehavior())
         if err != nil {
             return err
         }
@@ -2552,6 +2580,13 @@ func (m *Group) SetOnPremisesSecurityIdentifier(value *string)() {
         panic(err)
     }
 }
+// SetOnPremisesSyncBehavior sets the onPremisesSyncBehavior property value. The onPremisesSyncBehavior property
+func (m *Group) SetOnPremisesSyncBehavior(value OnPremisesSyncBehaviorable)() {
+    err := m.GetBackingStore().Set("onPremisesSyncBehavior", value)
+    if err != nil {
+        panic(err)
+    }
+}
 // SetOnPremisesSyncEnabled sets the onPremisesSyncEnabled property value. true if this group is synced from an on-premises directory; false if this group was originally synced from an on-premises directory but is no longer synced; null if this object has never synced from an on-premises directory (default). Returned by default. Read-only. Supports $filter (eq, ne, not, in, and eq on null values).
 func (m *Group) SetOnPremisesSyncEnabled(value *bool)() {
     err := m.GetBackingStore().Set("onPremisesSyncEnabled", value)
@@ -2713,7 +2748,7 @@ func (m *Group) SetUnseenCount(value *int32)() {
         panic(err)
     }
 }
-// SetVisibility sets the visibility property value. Specifies the group join policy and group content visibility for groups. Possible values are: Private, Public, or HiddenMembership. HiddenMembership can be set only for Microsoft 365 groups when the groups are created. It can't be updated later. Other values of visibility can be updated after group creation. If visibility value isn't specified during group creation on Microsoft Graph, a security group is created as Private by default, and the Microsoft 365 group is Public. Groups assignable to roles are always Private. To learn more, see group visibility options. Returned by default. Nullable.
+// SetVisibility sets the visibility property value. Specifies the group join policy and group content visibility for groups. The possible values are: Private, Public, or HiddenMembership. HiddenMembership can be set only for Microsoft 365 groups when the groups are created. It can't be updated later. Other values of visibility can be updated after group creation. If visibility value isn't specified during group creation on Microsoft Graph, a security group is created as Private by default, and the Microsoft 365 group is Public. Groups assignable to roles are always Private. To learn more, see group visibility options. Returned by default. Nullable.
 func (m *Group) SetVisibility(value *string)() {
     err := m.GetBackingStore().Set("visibility", value)
     if err != nil {
@@ -2767,6 +2802,7 @@ type Groupable interface {
     GetOnPremisesProvisioningErrors()([]OnPremisesProvisioningErrorable)
     GetOnPremisesSamAccountName()(*string)
     GetOnPremisesSecurityIdentifier()(*string)
+    GetOnPremisesSyncBehavior()(OnPremisesSyncBehaviorable)
     GetOnPremisesSyncEnabled()(*bool)
     GetOwners()([]DirectoryObjectable)
     GetPermissionGrants()([]ResourceSpecificPermissionGrantable)
@@ -2835,6 +2871,7 @@ type Groupable interface {
     SetOnPremisesProvisioningErrors(value []OnPremisesProvisioningErrorable)()
     SetOnPremisesSamAccountName(value *string)()
     SetOnPremisesSecurityIdentifier(value *string)()
+    SetOnPremisesSyncBehavior(value OnPremisesSyncBehaviorable)()
     SetOnPremisesSyncEnabled(value *bool)()
     SetOwners(value []DirectoryObjectable)()
     SetPermissionGrants(value []ResourceSpecificPermissionGrantable)()
