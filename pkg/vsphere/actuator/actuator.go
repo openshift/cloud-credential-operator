@@ -317,8 +317,135 @@ func (a *VSphereActuator) GetCredentialsRootSecretLocation() types.NamespacedNam
 	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.VSphereCloudCredSecretName}
 }
 
+// getComponentSecretName determines the dedicated secret name for a component
+// based on the CredentialsRequest name. Returns empty string if no dedicated
+// secret mapping exists for this component.
+func getComponentSecretName(cr *minterv1.CredentialsRequest) string {
+	crName := cr.Name
+
+	// Map known component CredentialsRequest names to their dedicated secret names
+	componentMap := map[string]string{
+		"openshift-machine-api-vsphere":                constants.VSphereCredsMachineAPISecretName,
+		"openshift-vmware-vsphere-csi-driver-operator": constants.VSphereCredsCSIDriverSecretName,
+		"openshift-vsphere-cloud-controller-manager":   constants.VSphereCredsCloudControllerSecretName,
+		"openshift-vsphere-problem-detector":           constants.VSphereCredsDiagnosticsSecretName,
+	}
+
+	if dedicatedSecretName, exists := componentMap[crName]; exists {
+		return dedicatedSecretName
+	}
+
+	return ""
+}
+
+// findDedicatedSecretByAnnotation searches kube-system for a secret whose
+// cloudcredential.openshift.io/credentials-request annotation matches the
+// given CredentialsRequest's namespace/name. This is the primary lookup
+// mechanism when the installer annotates dedicated secrets.
+func (a *VSphereActuator) findDedicatedSecretByAnnotation(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
+	crKey := fmt.Sprintf("%s/%s", cr.Namespace, cr.Name)
+
+	secretList := &corev1.SecretList{}
+	if err := a.RootCredClient.List(ctx, secretList,
+		client.InNamespace(constants.CloudCredSecretNamespace),
+		client.MatchingLabels{minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue},
+	); err != nil {
+		return nil, fmt.Errorf("failed to list secrets in %s: %v", constants.CloudCredSecretNamespace, err)
+	}
+
+	for i := range secretList.Items {
+		secret := &secretList.Items[i]
+		if secret.Annotations[minterv1.AnnotationCredentialsRequest] == crKey {
+			logger.Infof("found dedicated credentials via annotation: %s/%s", secret.Namespace, secret.Name)
+			return secret, nil
+		}
+	}
+
+	logger.Debugf("no dedicated secret with annotation %q found in %s", crKey, constants.CloudCredSecretNamespace)
+	return nil, errors.NewNotFound(corev1.Resource("secret"), crKey)
+}
+
+// findDedicatedSecretByName attempts to fetch a component-specific credentials
+// secret from kube-system using the hardcoded name mapping. This serves as a
+// fallback when secrets are not annotated with the CredentialsRequest reference.
+func (a *VSphereActuator) findDedicatedSecretByName(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
+
+	dedicatedSecretName := getComponentSecretName(cr)
+	if dedicatedSecretName == "" {
+		return nil, errors.NewNotFound(corev1.Resource("secret"), "")
+	}
+
+	dedicatedSecret := &corev1.Secret{}
+	secretLocation := types.NamespacedName{
+		Namespace: constants.CloudCredSecretNamespace,
+		Name:      dedicatedSecretName,
+	}
+
+	logger.Debugf("attempting to fetch dedicated credentials by name: %s/%s", secretLocation.Namespace, secretLocation.Name)
+
+	if err := a.RootCredClient.Get(ctx, secretLocation, dedicatedSecret); err != nil {
+		if errors.IsNotFound(err) {
+			logger.Debugf("dedicated secret %s/%s not found", secretLocation.Namespace, secretLocation.Name)
+		}
+		return nil, err
+	}
+
+	logger.Infof("found dedicated credentials by name: %s/%s", secretLocation.Namespace, secretLocation.Name)
+	return dedicatedSecret, nil
+}
+
+// GetDedicatedCredentialsSecret attempts to fetch component-specific credentials
+// from kube-system namespace. It first searches for a secret annotated with the
+// CredentialsRequest reference (cloudcredential.openshift.io/credentials-request),
+// then falls back to a hardcoded name mapping. Returns (secret, nil) if found,
+// (nil, NotFound error) if no dedicated secret exists, or (nil, other error)
+// on unexpected failures.
+func (a *VSphereActuator) GetDedicatedCredentialsSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
+	logger := a.getLogger(cr)
+
+	// Primary: find by annotation
+	secret, err := a.findDedicatedSecretByAnnotation(ctx, cr)
+	if err == nil {
+		return secret, nil
+	}
+	if !errors.IsNotFound(err) {
+		logger.WithError(err).Warn("error during annotation-based secret lookup, trying name-based fallback")
+	}
+
+	// Fallback: find by hardcoded name mapping
+	secret, err = a.findDedicatedSecretByName(ctx, cr)
+	if err == nil {
+		return secret, nil
+	}
+
+	return nil, err
+}
+
 func (a *VSphereActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
+
+	// Try dedicated component-specific credentials first
+	dedicatedSecret, err := a.GetDedicatedCredentialsSecret(ctx, cr)
+	if err == nil {
+		// Successfully found and validated dedicated secret
+		return dedicatedSecret, nil
+	}
+
+	// If error is NOT NotFound, propagate it (could be permissions issue, etc.)
+	if !errors.IsNotFound(err) {
+		msg := "error fetching dedicated cloud cred secret"
+		logger.WithError(err).Error(msg)
+		return nil, &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("%v: %v", msg, err),
+		}
+	}
+
+	// Dedicated secret not found or not configured, fall back to root credentials
+	logger.Debug("falling back to root vsphere credentials")
+
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
