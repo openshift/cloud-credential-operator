@@ -195,12 +195,13 @@ func (a *VSphereActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequ
 		}
 	}
 
-	if credentialsRootSecret.Annotations[constants.AnnotationKey] == constants.PassthroughAnnotation {
-		logger.Debugf("provisioning with passthrough")
-		err := a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
-		if err != nil {
-			return err
-		}
+	// Sync credentials to target namespace. This handles both:
+	// 1. Passthrough mode (when root credentials have passthrough annotation)
+	// 2. Component-scoped credentials (dedicated secrets may not have annotations)
+	logger.Debugf("syncing credentials to target secret")
+	err = a.syncPassthrough(ctx, cr, credentialsRootSecret, logger)
+	if err != nil {
+		return err
 	}
 
 	return nil
