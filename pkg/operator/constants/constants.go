@@ -123,6 +123,12 @@ const (
 	// for vSphere are stored.
 	VSphereCloudCredSecretName = "vsphere-creds"
 
+	// VSphere component-specific credential secret names
+	VSphereCredsMachineAPISecretName      = "vsphere-creds-machine-api"
+	VSphereCredsCSIDriverSecretName       = "vsphere-creds-csi-driver"
+	VSphereCredsCloudControllerSecretName = "vsphere-creds-cloud-controller"
+	VSphereCredsDiagnosticsSecretName     = "vsphere-creds-diagnostics"
+
 	// KubevirtCloudCredSecretName is the name of the secret where credentials
 	// for Kubevirt are stored.
 	KubevirtCloudCredSecretName = "kubevirt-credentials"
