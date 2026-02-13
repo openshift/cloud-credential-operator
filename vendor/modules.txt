@@ -572,6 +572,12 @@ github.com/google/go-cmp/cmp/internal/diff
 github.com/google/go-cmp/cmp/internal/flags
 github.com/google/go-cmp/cmp/internal/function
 github.com/google/go-cmp/cmp/internal/value
+# github.com/google/go-github/v57 v57.0.0
+## explicit; go 1.17
+github.com/google/go-github/v57/github
+# github.com/google/go-querystring v1.1.0
+## explicit; go 1.10
+github.com/google/go-querystring/query
 # github.com/google/pprof v0.0.0-20251007162407-5df77e3f7d1d
 ## explicit; go 1.24.0
 github.com/google/pprof/profile
@@ -1050,6 +1056,15 @@ github.com/stoewer/go-strcase
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
+# github.com/tidwall/gjson v1.18.0
+## explicit; go 1.12
+github.com/tidwall/gjson
+# github.com/tidwall/match v1.1.1
+## explicit; go 1.15
+github.com/tidwall/match
+# github.com/tidwall/pretty v1.2.0
+## explicit; go 1.16
+github.com/tidwall/pretty
 # github.com/vladimirvivien/gexe v0.5.0
 ## explicit; go 1.23
 github.com/vladimirvivien/gexe

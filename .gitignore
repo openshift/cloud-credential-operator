@@ -5,4 +5,4 @@
 .idea/
 coverage.out
 /cloud-credential-tests-ext
-
+.openshift-tests-extension/
