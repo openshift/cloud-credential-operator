@@ -4680,14 +4680,14 @@ func (iamPolicyManagement *IamPolicyManagementV1) CreateRoleTemplateVersionWithC
 	builder.AddHeader("Content-Type", "application/json")
 
 	body := make(map[string]interface{})
-	if createRoleTemplateVersionOptions.Role != nil {
-		body["role"] = createRoleTemplateVersionOptions.Role
-	}
 	if createRoleTemplateVersionOptions.Name != nil {
 		body["name"] = createRoleTemplateVersionOptions.Name
 	}
 	if createRoleTemplateVersionOptions.Description != nil {
 		body["description"] = createRoleTemplateVersionOptions.Description
+	}
+	if createRoleTemplateVersionOptions.Role != nil {
+		body["role"] = createRoleTemplateVersionOptions.Role
 	}
 	if createRoleTemplateVersionOptions.Committed != nil {
 		body["committed"] = createRoleTemplateVersionOptions.Committed
@@ -4852,14 +4852,14 @@ func (iamPolicyManagement *IamPolicyManagementV1) ReplaceRoleTemplateWithContext
 	}
 
 	body := make(map[string]interface{})
-	if replaceRoleTemplateOptions.Role != nil {
-		body["role"] = replaceRoleTemplateOptions.Role
-	}
 	if replaceRoleTemplateOptions.Name != nil {
 		body["name"] = replaceRoleTemplateOptions.Name
 	}
 	if replaceRoleTemplateOptions.Description != nil {
 		body["description"] = replaceRoleTemplateOptions.Description
+	}
+	if replaceRoleTemplateOptions.Role != nil {
+		body["role"] = replaceRoleTemplateOptions.Role
 	}
 	if replaceRoleTemplateOptions.Committed != nil {
 		body["committed"] = replaceRoleTemplateOptions.Committed
@@ -7059,7 +7059,7 @@ type CreateRoleTemplateOptions struct {
 	Committed *bool `json:"committed,omitempty"`
 
 	// The role properties that are created in an action resource when the template is assigned.
-	Role *TemplateRole `json:"role,omitempty"`
+	Role *RoleTemplatePrototypeRole `json:"role,omitempty"`
 
 	// Language code for translations
 	// * `default` - English
@@ -7112,7 +7112,7 @@ func (_options *CreateRoleTemplateOptions) SetCommitted(committed bool) *CreateR
 }
 
 // SetRole : Allow user to set Role
-func (_options *CreateRoleTemplateOptions) SetRole(role *TemplateRole) *CreateRoleTemplateOptions {
+func (_options *CreateRoleTemplateOptions) SetRole(role *RoleTemplatePrototypeRole) *CreateRoleTemplateOptions {
 	_options.Role = role
 	return _options
 }
@@ -7134,9 +7134,6 @@ type CreateRoleTemplateVersionOptions struct {
 	// The role template ID.
 	RoleTemplateID *string `json:"role_template_id" validate:"required,ne="`
 
-	// The role properties that are created in an action resource when the template is assigned.
-	Role *TemplateRole `json:"role" validate:"required"`
-
 	// Required field when creating a new template. Otherwise, this field is optional. If the field is included, it will
 	// change the name value for all existing versions of the template.
 	Name *string `json:"name,omitempty"`
@@ -7144,6 +7141,9 @@ type CreateRoleTemplateVersionOptions struct {
 	// Description of the role template. This is shown to users in the enterprise account. Use this to describe the purpose
 	// or context of the role for enterprise users managing IAM templates.
 	Description *string `json:"description,omitempty"`
+
+	// The role properties that are created in an action resource when the template is assigned.
+	Role *TemplateRole `json:"role,omitempty"`
 
 	// Committed status of the template version. If committed is set to true, then the template version can no longer be
 	// updated.
@@ -7154,22 +7154,15 @@ type CreateRoleTemplateVersionOptions struct {
 }
 
 // NewCreateRoleTemplateVersionOptions : Instantiate CreateRoleTemplateVersionOptions
-func (*IamPolicyManagementV1) NewCreateRoleTemplateVersionOptions(roleTemplateID string, role *TemplateRole) *CreateRoleTemplateVersionOptions {
+func (*IamPolicyManagementV1) NewCreateRoleTemplateVersionOptions(roleTemplateID string) *CreateRoleTemplateVersionOptions {
 	return &CreateRoleTemplateVersionOptions{
 		RoleTemplateID: core.StringPtr(roleTemplateID),
-		Role: role,
 	}
 }
 
 // SetRoleTemplateID : Allow user to set RoleTemplateID
 func (_options *CreateRoleTemplateVersionOptions) SetRoleTemplateID(roleTemplateID string) *CreateRoleTemplateVersionOptions {
 	_options.RoleTemplateID = core.StringPtr(roleTemplateID)
-	return _options
-}
-
-// SetRole : Allow user to set Role
-func (_options *CreateRoleTemplateVersionOptions) SetRole(role *TemplateRole) *CreateRoleTemplateVersionOptions {
-	_options.Role = role
 	return _options
 }
 
@@ -7182,6 +7175,12 @@ func (_options *CreateRoleTemplateVersionOptions) SetName(name string) *CreateRo
 // SetDescription : Allow user to set Description
 func (_options *CreateRoleTemplateVersionOptions) SetDescription(description string) *CreateRoleTemplateVersionOptions {
 	_options.Description = core.StringPtr(description)
+	return _options
+}
+
+// SetRole : Allow user to set Role
+func (_options *CreateRoleTemplateVersionOptions) SetRole(role *TemplateRole) *CreateRoleTemplateVersionOptions {
+	_options.Role = role
 	return _options
 }
 
@@ -11506,9 +11505,9 @@ type ReplacePolicyTemplateOptions struct {
 	// The policy template version.
 	Version *string `json:"version" validate:"required,ne="`
 
-	// The revision number for updating a policy template version and must match the ETag value of the existing policy
+	// The revision number for updating a policy template version and must match the Etag value of the existing policy
 	// template version. The Etag can be retrieved using the GET
-	// /v1/policy_templates/{policy_template_id}/versions/{version} API and looking at the ETag response header.
+	// /v1/policy_templates/{policy_template_id}/versions/{version} API and looking at the Etag response header.
 	IfMatch *string `json:"If-Match" validate:"required"`
 
 	// The core set of properties associated with the template's policy object.
@@ -11669,9 +11668,6 @@ type ReplaceRoleTemplateOptions struct {
 	// at the Etag response header.
 	IfMatch *string `json:"If-Match" validate:"required"`
 
-	// The role properties that are created in an action resource when the template is assigned.
-	Role *TemplateRole `json:"role" validate:"required"`
-
 	// Required field when creating a new template. Otherwise, this field is optional. If the field is included, it will
 	// change the name value for all existing versions of the template.
 	Name *string `json:"name,omitempty"`
@@ -11679,6 +11675,9 @@ type ReplaceRoleTemplateOptions struct {
 	// Description of the role template. This is shown to users in the enterprise account. Use this to describe the purpose
 	// or context of the role for enterprise users managing IAM templates.
 	Description *string `json:"description,omitempty"`
+
+	// The role properties that are created in an action resource when the template is assigned.
+	Role *TemplateRole `json:"role,omitempty"`
 
 	// Committed status of the template version. If committed is set to true, then the template version can no longer be
 	// updated.
@@ -11689,12 +11688,11 @@ type ReplaceRoleTemplateOptions struct {
 }
 
 // NewReplaceRoleTemplateOptions : Instantiate ReplaceRoleTemplateOptions
-func (*IamPolicyManagementV1) NewReplaceRoleTemplateOptions(roleTemplateID string, version string, ifMatch string, role *TemplateRole) *ReplaceRoleTemplateOptions {
+func (*IamPolicyManagementV1) NewReplaceRoleTemplateOptions(roleTemplateID string, version string, ifMatch string) *ReplaceRoleTemplateOptions {
 	return &ReplaceRoleTemplateOptions{
 		RoleTemplateID: core.StringPtr(roleTemplateID),
 		Version: core.StringPtr(version),
 		IfMatch: core.StringPtr(ifMatch),
-		Role: role,
 	}
 }
 
@@ -11716,12 +11714,6 @@ func (_options *ReplaceRoleTemplateOptions) SetIfMatch(ifMatch string) *ReplaceR
 	return _options
 }
 
-// SetRole : Allow user to set Role
-func (_options *ReplaceRoleTemplateOptions) SetRole(role *TemplateRole) *ReplaceRoleTemplateOptions {
-	_options.Role = role
-	return _options
-}
-
 // SetName : Allow user to set Name
 func (_options *ReplaceRoleTemplateOptions) SetName(name string) *ReplaceRoleTemplateOptions {
 	_options.Name = core.StringPtr(name)
@@ -11731,6 +11723,12 @@ func (_options *ReplaceRoleTemplateOptions) SetName(name string) *ReplaceRoleTem
 // SetDescription : Allow user to set Description
 func (_options *ReplaceRoleTemplateOptions) SetDescription(description string) *ReplaceRoleTemplateOptions {
 	_options.Description = core.StringPtr(description)
+	return _options
+}
+
+// SetRole : Allow user to set Role
+func (_options *ReplaceRoleTemplateOptions) SetRole(role *TemplateRole) *ReplaceRoleTemplateOptions {
+	_options.Role = role
 	return _options
 }
 
@@ -12251,7 +12249,7 @@ func UnmarshalRoleAssignmentResource(m map[string]json.RawMessage, result interf
 	return
 }
 
-// RoleAssignmentResourceCreated : On success, it includes the action control assigned.
+// RoleAssignmentResourceCreated : On success, it includes the role assigned.
 type RoleAssignmentResourceCreated struct {
 	// role id.
 	ID *string `json:"id,omitempty"`
@@ -12271,7 +12269,7 @@ func UnmarshalRoleAssignmentResourceCreated(m map[string]json.RawMessage, result
 
 // RoleAssignmentResourceRole : Set of properties of the assigned resource or error message if assignment failed.
 type RoleAssignmentResourceRole struct {
-	// On success, it includes the action control assigned.
+	// On success, it includes the role assigned.
 	ResourceCreated *RoleAssignmentResourceCreated `json:"resource_created,omitempty"`
 
 	// Body parameters for assignment error.
@@ -12385,7 +12383,7 @@ type RoleTemplate struct {
 	Committed *bool `json:"committed,omitempty"`
 
 	// The role properties that are created in an action resource when the template is assigned.
-	Role *TemplateRole `json:"role,omitempty"`
+	Role *RoleTemplatePrototypeRole `json:"role,omitempty"`
 
 	// The role template ID.
 	ID *string `json:"id,omitempty"`
@@ -12442,7 +12440,7 @@ func UnmarshalRoleTemplate(m map[string]json.RawMessage, result interface{}) (er
 		err = core.SDKErrorf(err, "", "committed-error", common.GetComponentInfo())
 		return
 	}
-	err = core.UnmarshalModel(m, "role", &obj.Role, UnmarshalTemplateRole)
+	err = core.UnmarshalModel(m, "role", &obj.Role, UnmarshalRoleTemplatePrototypeRole)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "role-error", common.GetComponentInfo())
 		return
@@ -12547,6 +12545,109 @@ func (resp *RoleTemplateCollection) GetNextStart() (*string, error) {
 		return nil, nil
 	}
 	return resp.Next.Start, nil
+}
+
+// RoleTemplatePrototypeRole : The role properties that are created in an action resource when the template is assigned.
+type RoleTemplatePrototypeRole struct {
+	// The name of the role that is used in the CRN. This must be alphanumeric and capitalized.
+	Name *string `json:"name" validate:"required"`
+
+	// The display the name of the role that is shown in the console.
+	DisplayName *string `json:"display_name" validate:"required"`
+
+	// The service name that the role refers.
+	ServiceName *string `json:"service_name,omitempty"`
+
+	// Description of the role.
+	Description *string `json:"description,omitempty"`
+
+	// The actions of the role.
+	Actions []string `json:"actions" validate:"required"`
+}
+
+// NewRoleTemplatePrototypeRole : Instantiate RoleTemplatePrototypeRole (Generic Model Constructor)
+func (*IamPolicyManagementV1) NewRoleTemplatePrototypeRole(name string, displayName string, actions []string) (_model *RoleTemplatePrototypeRole, err error) {
+	_model = &RoleTemplatePrototypeRole{
+		Name: core.StringPtr(name),
+		DisplayName: core.StringPtr(displayName),
+		Actions: actions,
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+// UnmarshalRoleTemplatePrototypeRole unmarshals an instance of RoleTemplatePrototypeRole from the specified map of raw messages.
+func UnmarshalRoleTemplatePrototypeRole(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(RoleTemplatePrototypeRole)
+	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "display_name", &obj.DisplayName)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "display_name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "service_name", &obj.ServiceName)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "service_name-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "description", &obj.Description)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "description-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "actions", &obj.Actions)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "actions-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// RoleTemplateReferencesItem : A role template reference associated with a policy template.
+type RoleTemplateReferencesItem struct {
+	// The role template ID.
+	ID *string `json:"id" validate:"required"`
+
+	// Role template version.
+	Version *string `json:"version" validate:"required"`
+}
+
+// NewRoleTemplateReferencesItem : Instantiate RoleTemplateReferencesItem (Generic Model Constructor)
+func (*IamPolicyManagementV1) NewRoleTemplateReferencesItem(id string, version string) (_model *RoleTemplateReferencesItem, err error) {
+	_model = &RoleTemplateReferencesItem{
+		ID: core.StringPtr(id),
+		Version: core.StringPtr(version),
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+// UnmarshalRoleTemplateReferencesItem unmarshals an instance of RoleTemplateReferencesItem from the specified map of raw messages.
+func UnmarshalRoleTemplateReferencesItem(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(RoleTemplateReferencesItem)
+	err = core.UnmarshalPrimitive(m, "id", &obj.ID)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "id-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalPrimitive(m, "version", &obj.Version)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "version-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
 }
 
 // RoleTemplateVersionsCollection : A collection of versions for a specific role template.
@@ -12796,6 +12897,36 @@ func UnmarshalTemplateActionControl(m map[string]json.RawMessage, result interfa
 	return
 }
 
+// TemplateControl : Specifies the type of access that is granted by the policy.
+type TemplateControl struct {
+	// Permission is granted by the policy.
+	Grant TemplateGrantIntf `json:"grant" validate:"required"`
+}
+
+// NewTemplateControl : Instantiate TemplateControl (Generic Model Constructor)
+func (*IamPolicyManagementV1) NewTemplateControl(grant TemplateGrantIntf) (_model *TemplateControl, err error) {
+	_model = &TemplateControl{
+		Grant: grant,
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+// UnmarshalTemplateControl unmarshals an instance of TemplateControl from the specified map of raw messages.
+func UnmarshalTemplateControl(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(TemplateControl)
+	err = core.UnmarshalModel(m, "grant", &obj.Grant, UnmarshalTemplateGrant)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "grant-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
 // TemplateCountData : policy template count details.
 type TemplateCountData struct {
 	// policy template current and limit details with in an account.
@@ -12816,6 +12947,42 @@ func UnmarshalTemplateCountData(m map[string]json.RawMessage, result interface{}
 	err = core.UnmarshalModel(m, "version", &obj.Version, UnmarshalLimitData)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "version-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// TemplateGrant : Permission is granted by the policy.
+// Models which "extend" this model:
+// - TemplateGrantRoles
+// - TemplateGrantRoleReferences
+type TemplateGrant struct {
+	// A set of role Cloud Resource Names (CRNs) granted by the policy.
+	Roles []Roles `json:"roles,omitempty"`
+
+	// A set of role template reference IDs granted by the policy.
+	RoleTemplateReferences []RoleTemplateReferencesItem `json:"role_template_references,omitempty"`
+}
+func (*TemplateGrant) isaTemplateGrant() bool {
+	return true
+}
+
+type TemplateGrantIntf interface {
+	isaTemplateGrant() bool
+}
+
+// UnmarshalTemplateGrant unmarshals an instance of TemplateGrant from the specified map of raw messages.
+func UnmarshalTemplateGrant(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(TemplateGrant)
+	err = core.UnmarshalModel(m, "roles", &obj.Roles, UnmarshalRoles)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "roles-error", common.GetComponentInfo())
+		return
+	}
+	err = core.UnmarshalModel(m, "role_template_references", &obj.RoleTemplateReferences, UnmarshalRoleTemplateReferencesItem)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "role_template_references-error", common.GetComponentInfo())
 		return
 	}
 	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
@@ -12896,7 +13063,7 @@ type TemplatePolicy struct {
 	Rule V2PolicyRuleIntf `json:"rule,omitempty"`
 
 	// Specifies the type of access that is granted by the policy.
-	Control *Control `json:"control,omitempty"`
+	Control *TemplateControl `json:"control,omitempty"`
 }
 
 // Constants associated with the TemplatePolicy.Type property.
@@ -12951,7 +13118,7 @@ func UnmarshalTemplatePolicy(m map[string]json.RawMessage, result interface{}) (
 		err = core.SDKErrorf(err, "", "rule-error", common.GetComponentInfo())
 		return
 	}
-	err = core.UnmarshalModel(m, "control", &obj.Control, UnmarshalControl)
+	err = core.UnmarshalModel(m, "control", &obj.Control, UnmarshalTemplateControl)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "control-error", common.GetComponentInfo())
 		return
@@ -12962,14 +13129,11 @@ func UnmarshalTemplatePolicy(m map[string]json.RawMessage, result interface{}) (
 
 // TemplateRole : The role properties that are created in an action resource when the template is assigned.
 type TemplateRole struct {
-	// The name of the role that is used in the CRN. This must be alphanumeric and capitalized.
-	Name *string `json:"name" validate:"required"`
-
 	// The display the name of the role that is shown in the console.
 	DisplayName *string `json:"display_name" validate:"required"`
 
 	// The service name that the role refers.
-	ServiceName *string `json:"service_name" validate:"required"`
+	ServiceName *string `json:"service_name,omitempty"`
 
 	// Description of the role.
 	Description *string `json:"description,omitempty"`
@@ -12979,11 +13143,9 @@ type TemplateRole struct {
 }
 
 // NewTemplateRole : Instantiate TemplateRole (Generic Model Constructor)
-func (*IamPolicyManagementV1) NewTemplateRole(name string, displayName string, serviceName string, actions []string) (_model *TemplateRole, err error) {
+func (*IamPolicyManagementV1) NewTemplateRole(displayName string, actions []string) (_model *TemplateRole, err error) {
 	_model = &TemplateRole{
-		Name: core.StringPtr(name),
 		DisplayName: core.StringPtr(displayName),
-		ServiceName: core.StringPtr(serviceName),
 		Actions: actions,
 	}
 	err = core.ValidateStruct(_model, "required parameters")
@@ -12996,11 +13158,6 @@ func (*IamPolicyManagementV1) NewTemplateRole(name string, displayName string, s
 // UnmarshalTemplateRole unmarshals an instance of TemplateRole from the specified map of raw messages.
 func UnmarshalTemplateRole(m map[string]json.RawMessage, result interface{}) (err error) {
 	obj := new(TemplateRole)
-	err = core.UnmarshalPrimitive(m, "name", &obj.Name)
-	if err != nil {
-		err = core.SDKErrorf(err, "", "name-error", common.GetComponentInfo())
-		return
-	}
 	err = core.UnmarshalPrimitive(m, "display_name", &obj.DisplayName)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "display_name-error", common.GetComponentInfo())
@@ -14433,6 +14590,76 @@ func UnmarshalPolicyTemplateAssignmentItemsPolicyAssignmentV1(m map[string]json.
 	err = core.UnmarshalPrimitive(m, "status", &obj.Status)
 	if err != nil {
 		err = core.SDKErrorf(err, "", "status-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// TemplateGrantRoleReferences : TemplateGrantRoleReferences struct
+// This model "extends" TemplateGrant
+type TemplateGrantRoleReferences struct {
+	// A set of role template reference IDs granted by the policy.
+	RoleTemplateReferences []RoleTemplateReferencesItem `json:"role_template_references" validate:"required"`
+}
+
+// NewTemplateGrantRoleReferences : Instantiate TemplateGrantRoleReferences (Generic Model Constructor)
+func (*IamPolicyManagementV1) NewTemplateGrantRoleReferences(roleTemplateReferences []RoleTemplateReferencesItem) (_model *TemplateGrantRoleReferences, err error) {
+	_model = &TemplateGrantRoleReferences{
+		RoleTemplateReferences: roleTemplateReferences,
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*TemplateGrantRoleReferences) isaTemplateGrant() bool {
+	return true
+}
+
+// UnmarshalTemplateGrantRoleReferences unmarshals an instance of TemplateGrantRoleReferences from the specified map of raw messages.
+func UnmarshalTemplateGrantRoleReferences(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(TemplateGrantRoleReferences)
+	err = core.UnmarshalModel(m, "role_template_references", &obj.RoleTemplateReferences, UnmarshalRoleTemplateReferencesItem)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "role_template_references-error", common.GetComponentInfo())
+		return
+	}
+	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))
+	return
+}
+
+// TemplateGrantRoles : TemplateGrantRoles struct
+// This model "extends" TemplateGrant
+type TemplateGrantRoles struct {
+	// A set of role Cloud Resource Names (CRNs) granted by the policy.
+	Roles []Roles `json:"roles" validate:"required"`
+}
+
+// NewTemplateGrantRoles : Instantiate TemplateGrantRoles (Generic Model Constructor)
+func (*IamPolicyManagementV1) NewTemplateGrantRoles(roles []Roles) (_model *TemplateGrantRoles, err error) {
+	_model = &TemplateGrantRoles{
+		Roles: roles,
+	}
+	err = core.ValidateStruct(_model, "required parameters")
+	if err != nil {
+		err = core.SDKErrorf(err, "", "model-missing-required", common.GetComponentInfo())
+	}
+	return
+}
+
+func (*TemplateGrantRoles) isaTemplateGrant() bool {
+	return true
+}
+
+// UnmarshalTemplateGrantRoles unmarshals an instance of TemplateGrantRoles from the specified map of raw messages.
+func UnmarshalTemplateGrantRoles(m map[string]json.RawMessage, result interface{}) (err error) {
+	obj := new(TemplateGrantRoles)
+	err = core.UnmarshalModel(m, "roles", &obj.Roles, UnmarshalRoles)
+	if err != nil {
+		err = core.SDKErrorf(err, "", "roles-error", common.GetComponentInfo())
 		return
 	}
 	reflect.ValueOf(result).Elem().Set(reflect.ValueOf(obj))

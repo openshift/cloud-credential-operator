@@ -48,7 +48,7 @@ func (m *Incident) GetAssignedTo()(*string) {
     }
     return nil
 }
-// GetClassification gets the classification property value. The specification for the incident. Possible values are: unknown, falsePositive, truePositive, informationalExpectedActivity, unknownFutureValue.
+// GetClassification gets the classification property value. The specification for the incident. The possible values are: unknown, falsePositive, truePositive, informationalExpectedActivity, unknownFutureValue.
 // returns a *AlertClassification when successful
 func (m *Incident) GetClassification()(*AlertClassification) {
     val, err := m.GetBackingStore().Get("classification")
@@ -108,7 +108,7 @@ func (m *Incident) GetDescription()(*string) {
     }
     return nil
 }
-// GetDetermination gets the determination property value. Specifies the determination of the incident. Possible values are: unknown, apt, malware, securityPersonnel, securityTesting, unwantedSoftware, other, multiStagedAttack, compromisedUser, phishing, maliciousUserActivity, clean, insufficientData, confirmedUserActivity, lineOfBusinessApplication, unknownFutureValue.
+// GetDetermination gets the determination property value. Specifies the determination of the incident. The possible values are: unknown, apt, malware, securityPersonnel, securityTesting, unwantedSoftware, other, multiStagedAttack, compromisedUser, phishing, maliciousUserActivity, clean, insufficientData, confirmedUserActivity, lineOfBusinessApplication, unknownFutureValue.
 // returns a *AlertDetermination when successful
 func (m *Incident) GetDetermination()(*AlertDetermination) {
     val, err := m.GetBackingStore().Get("determination")
@@ -274,6 +274,16 @@ func (m *Incident) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896
         }
         return nil
     }
+    res["priorityScore"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+        val, err := n.GetInt32Value()
+        if err != nil {
+            return err
+        }
+        if val != nil {
+            m.SetPriorityScore(val)
+        }
+        return nil
+    }
     res["redirectIncidentId"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
         val, err := n.GetStringValue()
         if err != nil {
@@ -385,6 +395,18 @@ func (m *Incident) GetLastUpdateDateTime()(*i336074805fc853987abe6f7fe3ad97a6a6f
     }
     if val != nil {
         return val.(*i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)
+    }
+    return nil
+}
+// GetPriorityScore gets the priorityScore property value. A priority score for the incident from 0 to 100, with > 85 being the top priority, 15 - 85 medium priority, and < 15 low priority. This score is generated using machine learning and is based on multiple factors, including severity, disruption impact, threat intelligence, alert types, asset criticality, threat analytics, incident rarity, and additional priority signals. The value can also be null which indicates the feature is not open for the tenant or the value of the score is pending calculation.
+// returns a *int32 when successful
+func (m *Incident) GetPriorityScore()(*int32) {
+    val, err := m.GetBackingStore().Get("priorityScore")
+    if err != nil {
+        panic(err)
+    }
+    if val != nil {
+        return val.(*int32)
     }
     return nil
 }
@@ -565,6 +587,12 @@ func (m *Incident) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c01
         }
     }
     {
+        err = writer.WriteInt32Value("priorityScore", m.GetPriorityScore())
+        if err != nil {
+            return err
+        }
+    }
+    {
         err = writer.WriteStringValue("redirectIncidentId", m.GetRedirectIncidentId())
         if err != nil {
             return err
@@ -624,7 +652,7 @@ func (m *Incident) SetAssignedTo(value *string)() {
         panic(err)
     }
 }
-// SetClassification sets the classification property value. The specification for the incident. Possible values are: unknown, falsePositive, truePositive, informationalExpectedActivity, unknownFutureValue.
+// SetClassification sets the classification property value. The specification for the incident. The possible values are: unknown, falsePositive, truePositive, informationalExpectedActivity, unknownFutureValue.
 func (m *Incident) SetClassification(value *AlertClassification)() {
     err := m.GetBackingStore().Set("classification", value)
     if err != nil {
@@ -659,7 +687,7 @@ func (m *Incident) SetDescription(value *string)() {
         panic(err)
     }
 }
-// SetDetermination sets the determination property value. Specifies the determination of the incident. Possible values are: unknown, apt, malware, securityPersonnel, securityTesting, unwantedSoftware, other, multiStagedAttack, compromisedUser, phishing, maliciousUserActivity, clean, insufficientData, confirmedUserActivity, lineOfBusinessApplication, unknownFutureValue.
+// SetDetermination sets the determination property value. Specifies the determination of the incident. The possible values are: unknown, apt, malware, securityPersonnel, securityTesting, unwantedSoftware, other, multiStagedAttack, compromisedUser, phishing, maliciousUserActivity, clean, insufficientData, confirmedUserActivity, lineOfBusinessApplication, unknownFutureValue.
 func (m *Incident) SetDetermination(value *AlertDetermination)() {
     err := m.GetBackingStore().Set("determination", value)
     if err != nil {
@@ -690,6 +718,13 @@ func (m *Incident) SetLastModifiedBy(value *string)() {
 // SetLastUpdateDateTime sets the lastUpdateDateTime property value. Time when the incident was last updated.
 func (m *Incident) SetLastUpdateDateTime(value *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)() {
     err := m.GetBackingStore().Set("lastUpdateDateTime", value)
+    if err != nil {
+        panic(err)
+    }
+}
+// SetPriorityScore sets the priorityScore property value. A priority score for the incident from 0 to 100, with > 85 being the top priority, 15 - 85 medium priority, and < 15 low priority. This score is generated using machine learning and is based on multiple factors, including severity, disruption impact, threat intelligence, alert types, asset criticality, threat analytics, incident rarity, and additional priority signals. The value can also be null which indicates the feature is not open for the tenant or the value of the score is pending calculation.
+func (m *Incident) SetPriorityScore(value *int32)() {
+    err := m.GetBackingStore().Set("priorityScore", value)
     if err != nil {
         panic(err)
     }
@@ -758,6 +793,7 @@ type Incidentable interface {
     GetIncidentWebUrl()(*string)
     GetLastModifiedBy()(*string)
     GetLastUpdateDateTime()(*i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)
+    GetPriorityScore()(*int32)
     GetRedirectIncidentId()(*string)
     GetResolvingComment()(*string)
     GetSeverity()(*AlertSeverity)
@@ -777,6 +813,7 @@ type Incidentable interface {
     SetIncidentWebUrl(value *string)()
     SetLastModifiedBy(value *string)()
     SetLastUpdateDateTime(value *i336074805fc853987abe6f7fe3ad97a6a6f3077a16391fec744f671a015fbd7e.Time)()
+    SetPriorityScore(value *int32)()
     SetRedirectIncidentId(value *string)()
     SetResolvingComment(value *string)()
     SetSeverity(value *AlertSeverity)()

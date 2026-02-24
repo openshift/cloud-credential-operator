@@ -17,10 +17,8 @@ test-unit:
 #
 # BEGIN: Update codegen-crds. Defaults to generating updates for all API packages.
 #        To run a subset of packages:
-#        - Filter by group with make update-codegen-crds-<group>
-#          E.g. make update-codegen-crds-machine
-#        - Set API_GROUP_VERSIONS to a space separated list of <group>/<version>.
-#          E.g. API_GROUP_VERSIONS="apps/v1 build/v1" make update-codegen-crds.
+#        - Set API_GROUP_VERSIONS to a space separated list of fully qualified <group>/<version>.
+#          E.g. API_GROUP_VERSIONS="apps.openshift.io/v1 build.openshift.io/v1" make update-codegen-crds.
 #        FeatureSet generation is controlled at the group level by the
 #        .codegen.yaml file.
 #
@@ -104,8 +102,8 @@ verify-%:
 ################################################################################################
 #
 # BEGIN: Update scripts. Defaults to generating updates for all API packages.
-#        Set API_GROUP_VERSIONS to a space separated list of <group>/<version> to limit
-#        the scope of the updates. Eg API_GROUP_VERSIONS="apps/v1 build/v1" make update-scripts.
+#        Set API_GROUP_VERSIONS to a space separated list of fully qualified <group>/<version> to limit
+#        the scope of the updates. Eg API_GROUP_VERSIONS="apps.openshift.io/v1 build.openshift.io/v1" make update-scripts.
 #        Note: Protobuf generation is handled separately, see hack/lib/init.sh.
 #
 ################################################################################################
@@ -116,15 +114,17 @@ update-scripts: update-compatibility update-openapi update-deepcopy update-proto
 # Update codegen runs all generators in the order they are defined in the root.go file.
 # The per group generators are:[compatibility, deepcopy, swagger-docs, empty-partial-schema, schema-patch, crd-manifest-merge]
 # The multi group generators are:[openapi]
+# The payload generation must come after these generators have run so they are included here as well, rather than in update-non-codegen.
 .PHONY: update-codegen
 update-codegen:
 	hack/update-codegen.sh
+	make update-payload-crds update-payload-featuregates
 
 # Update non-codegen runs all generators that are not part of the codegen utility, or
 # are part of it, but are not run by default when invoking codegen without a specific generator.
 # E.g. the payload feature gates which is not part of the generator style, but is still a subcommand.
 .PHONY: update-non-codegen
-update-non-codegen: update-protobuf tests-vendor update-prerelease-lifecycle-gen update-payload-crds update-payload-featuregates
+update-non-codegen: update-protobuf tests-vendor update-prerelease-lifecycle-gen 
 
 .PHONY: update-compatibility
 update-compatibility:

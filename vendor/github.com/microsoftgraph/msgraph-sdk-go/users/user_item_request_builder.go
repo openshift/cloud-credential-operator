@@ -21,7 +21,7 @@ type UserItemRequestBuilderDeleteRequestConfiguration struct {
     // Request options
     Options []i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestOption
 }
-// UserItemRequestBuilderGetQueryParameters read properties and relationships of the user object.
+// UserItemRequestBuilderGetQueryParameters retrieve the properties and relationships of user object. This operation returns by default only a subset of the more commonly used properties for each user. These default properties are noted in the Properties section. To get properties that are not returned by default, do a GET operation for the user and specify the properties in a $select OData query option. Because the user resource supports extensions, you can also use the GET operation to get custom properties and extension data in a user instance. Customers through Microsoft Entra ID for customers can also use this API operation to retrieve their details.
 type UserItemRequestBuilderGetQueryParameters struct {
     // Expand related entities
     Expand []string `uriparametername:"%24expand"`
@@ -48,6 +48,11 @@ type UserItemRequestBuilderPatchRequestConfiguration struct {
 // returns a *ItemActivitiesRequestBuilder when successful
 func (m *UserItemRequestBuilder) Activities()(*ItemActivitiesRequestBuilder) {
     return NewItemActivitiesRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+}
+// AdhocCalls provides operations to manage the adhocCalls property of the microsoft.graph.user entity.
+// returns a *ItemAdhocCallsRequestBuilder when successful
+func (m *UserItemRequestBuilder) AdhocCalls()(*ItemAdhocCallsRequestBuilder) {
+    return NewItemAdhocCallsRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
 // AgreementAcceptances provides operations to manage the agreementAcceptances property of the microsoft.graph.user entity.
 // returns a *ItemAgreementAcceptancesRequestBuilder when successful
@@ -113,6 +118,11 @@ func (m *UserItemRequestBuilder) CheckMemberObjects()(*ItemCheckMemberObjectsReq
 // returns a *ItemCloudClipboardRequestBuilder when successful
 func (m *UserItemRequestBuilder) CloudClipboard()(*ItemCloudClipboardRequestBuilder) {
     return NewItemCloudClipboardRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+}
+// CloudPCs provides operations to manage the cloudPCs property of the microsoft.graph.user entity.
+// returns a *ItemCloudPCsRequestBuilder when successful
+func (m *UserItemRequestBuilder) CloudPCs()(*ItemCloudPCsRequestBuilder) {
+    return NewItemCloudPCsRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
 // NewUserItemRequestBuilderInternal instantiates a new UserItemRequestBuilder and sets the default values.
 func NewUserItemRequestBuilderInternal(pathParameters map[string]string, requestAdapter i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestAdapter)(*UserItemRequestBuilder) {
@@ -226,12 +236,12 @@ func (m *UserItemRequestBuilder) FindMeetingTimes()(*ItemFindMeetingTimesRequest
 func (m *UserItemRequestBuilder) FollowedSites()(*ItemFollowedSitesRequestBuilder) {
     return NewItemFollowedSitesRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
-// Get read properties and relationships of the user object.
+// Get retrieve the properties and relationships of user object. This operation returns by default only a subset of the more commonly used properties for each user. These default properties are noted in the Properties section. To get properties that are not returned by default, do a GET operation for the user and specify the properties in a $select OData query option. Because the user resource supports extensions, you can also use the GET operation to get custom properties and extension data in a user instance. Customers through Microsoft Entra ID for customers can also use this API operation to retrieve their details.
 // returns a Userable when successful
 // returns a ODataError error when the service returns a 4XX or 5XX status code
 // [Find more info here]
 // 
-// [Find more info here]: https://learn.microsoft.com/graph/api/intune-onboarding-user-get?view=graph-rest-1.0
+// [Find more info here]: https://learn.microsoft.com/graph/api/user-get?view=graph-rest-1.0
 func (m *UserItemRequestBuilder) Get(ctx context.Context, requestConfiguration *UserItemRequestBuilderGetRequestConfiguration)(iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.Userable, error) {
     requestInfo, err := m.ToGetRequestInformation(ctx, requestConfiguration);
     if err != nil {
@@ -349,6 +359,11 @@ func (m *UserItemRequestBuilder) Onenote()(*ItemOnenoteRequestBuilder) {
 func (m *UserItemRequestBuilder) OnlineMeetings()(*ItemOnlineMeetingsRequestBuilder) {
     return NewItemOnlineMeetingsRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
+// OnPremisesSyncBehavior provides operations to manage the onPremisesSyncBehavior property of the microsoft.graph.user entity.
+// returns a *ItemOnPremisesSyncBehaviorRequestBuilder when successful
+func (m *UserItemRequestBuilder) OnPremisesSyncBehavior()(*ItemOnPremisesSyncBehaviorRequestBuilder) {
+    return NewItemOnPremisesSyncBehaviorRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
+}
 // Outlook provides operations to manage the outlook property of the microsoft.graph.user entity.
 // returns a *ItemOutlookRequestBuilder when successful
 func (m *UserItemRequestBuilder) Outlook()(*ItemOutlookRequestBuilder) {
@@ -369,7 +384,7 @@ func (m *UserItemRequestBuilder) OwnedObjects()(*ItemOwnedObjectsRequestBuilder)
 // returns a ODataError error when the service returns a 4XX or 5XX status code
 // [Find more info here]
 // 
-// [Find more info here]: https://learn.microsoft.com/graph/api/intune-onboarding-user-update?view=graph-rest-1.0
+// [Find more info here]: https://learn.microsoft.com/graph/api/user-update?view=graph-rest-1.0
 func (m *UserItemRequestBuilder) Patch(ctx context.Context, body iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.Userable, requestConfiguration *UserItemRequestBuilderPatchRequestConfiguration)(iadcd81124412c61e647227ecfc4449d8bba17de0380ddda76f641a29edf2b242.Userable, error) {
     requestInfo, err := m.ToPatchRequestInformation(ctx, body, requestConfiguration);
     if err != nil {
@@ -503,7 +518,7 @@ func (m *UserItemRequestBuilder) ToDeleteRequestInformation(ctx context.Context,
 func (m *UserItemRequestBuilder) Todo()(*ItemTodoRequestBuilder) {
     return NewItemTodoRequestBuilderInternal(m.BaseRequestBuilder.PathParameters, m.BaseRequestBuilder.RequestAdapter)
 }
-// ToGetRequestInformation read properties and relationships of the user object.
+// ToGetRequestInformation retrieve the properties and relationships of user object. This operation returns by default only a subset of the more commonly used properties for each user. These default properties are noted in the Properties section. To get properties that are not returned by default, do a GET operation for the user and specify the properties in a $select OData query option. Because the user resource supports extensions, you can also use the GET operation to get custom properties and extension data in a user instance. Customers through Microsoft Entra ID for customers can also use this API operation to retrieve their details.
 // returns a *RequestInformation when successful
 func (m *UserItemRequestBuilder) ToGetRequestInformation(ctx context.Context, requestConfiguration *UserItemRequestBuilderGetRequestConfiguration)(*i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.RequestInformation, error) {
     requestInfo := i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.NewRequestInformationWithMethodAndUrlTemplateAndPathParameters(i2ae4187f7daee263371cb1c977df639813ab50ffa529013b7437480d1ec0158f.GET, m.BaseRequestBuilder.UrlTemplate, m.BaseRequestBuilder.PathParameters)

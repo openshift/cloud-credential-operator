@@ -42,6 +42,8 @@ func CreateCaseOperationFromDiscriminatorValue(parseNode i878a80d2330e89d2689638
                         return NewEdiscoveryExportOperation(), nil
                     case "#microsoft.graph.security.ediscoveryHoldOperation":
                         return NewEdiscoveryHoldOperation(), nil
+                    case "#microsoft.graph.security.ediscoveryHoldPolicySyncOperation":
+                        return NewEdiscoveryHoldPolicySyncOperation(), nil
                     case "#microsoft.graph.security.ediscoveryIndexOperation":
                         return NewEdiscoveryIndexOperation(), nil
                     case "#microsoft.graph.security.ediscoveryPurgeDataOperation":
@@ -56,7 +58,7 @@ func CreateCaseOperationFromDiscriminatorValue(parseNode i878a80d2330e89d2689638
     }
     return NewCaseOperation(), nil
 }
-// GetAction gets the action property value. The type of action the operation represents. Possible values are: contentExport,  applyTags, convertToPdf, index, estimateStatistics, addToReviewSet, holdUpdate, unknownFutureValue, purgeData, exportReport, exportResult. Use the Prefer: include-unknown-enum-members request header to get the following values from this evolvable enum: purgeData, exportReport, exportResult.
+// GetAction gets the action property value. The type of action the operation represents. The possible values are: contentExport,  applyTags, convertToPdf, index, estimateStatistics, addToReviewSet, holdUpdate, unknownFutureValue, purgeData, exportReport, exportResult, holdPolicySync. Use the Prefer: include-unknown-enum-members request header to get the following values from this evolvable enum: purgeData, exportReport, exportResult, holdPolicySync.
 // returns a *CaseAction when successful
 func (m *CaseOperation) GetAction()(*CaseAction) {
     val, err := m.GetBackingStore().Get("action")
@@ -204,7 +206,7 @@ func (m *CaseOperation) GetResultInfo()(iadcd81124412c61e647227ecfc4449d8bba17de
     }
     return nil
 }
-// GetStatus gets the status property value. The status of the case operation. Possible values are: notStarted, submissionFailed, running, succeeded, partiallySucceeded, failed.
+// GetStatus gets the status property value. The status of the case operation. The possible values are: notStarted, submissionFailed, running, succeeded, partiallySucceeded, failed, unknownFutureValue.
 // returns a *CaseOperationStatus when successful
 func (m *CaseOperation) GetStatus()(*CaseOperationStatus) {
     val, err := m.GetBackingStore().Get("status")
@@ -268,7 +270,7 @@ func (m *CaseOperation) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0
     }
     return nil
 }
-// SetAction sets the action property value. The type of action the operation represents. Possible values are: contentExport,  applyTags, convertToPdf, index, estimateStatistics, addToReviewSet, holdUpdate, unknownFutureValue, purgeData, exportReport, exportResult. Use the Prefer: include-unknown-enum-members request header to get the following values from this evolvable enum: purgeData, exportReport, exportResult.
+// SetAction sets the action property value. The type of action the operation represents. The possible values are: contentExport,  applyTags, convertToPdf, index, estimateStatistics, addToReviewSet, holdUpdate, unknownFutureValue, purgeData, exportReport, exportResult, holdPolicySync. Use the Prefer: include-unknown-enum-members request header to get the following values from this evolvable enum: purgeData, exportReport, exportResult, holdPolicySync.
 func (m *CaseOperation) SetAction(value *CaseAction)() {
     err := m.GetBackingStore().Set("action", value)
     if err != nil {
@@ -310,7 +312,7 @@ func (m *CaseOperation) SetResultInfo(value iadcd81124412c61e647227ecfc4449d8bba
         panic(err)
     }
 }
-// SetStatus sets the status property value. The status of the case operation. Possible values are: notStarted, submissionFailed, running, succeeded, partiallySucceeded, failed.
+// SetStatus sets the status property value. The status of the case operation. The possible values are: notStarted, submissionFailed, running, succeeded, partiallySucceeded, failed, unknownFutureValue.
 func (m *CaseOperation) SetStatus(value *CaseOperationStatus)() {
     err := m.GetBackingStore().Set("status", value)
     if err != nil {
