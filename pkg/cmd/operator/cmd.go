@@ -261,6 +261,9 @@ func NewOperator() *cobra.Command {
 							&corev1.Secret{}: {
 								Field: selectorForRootCredential(platformType),
 							},
+							&corev1.ConfigMap{}: {
+								Field: selectorForCloudConfig(platformType),
+							},
 						},
 					},
 				})
@@ -423,6 +426,26 @@ func selectorForRootCredential(platformType configv1.PlatformType) fields.Select
 		"metadata.name":      name,
 	})
 	log.WithField("selector", selector.String()).Info("setting up field selector for root credential Secret")
+	return selector
+}
+
+func selectorForCloudConfig(platformType configv1.PlatformType) fields.Selector {
+	var name, namespace string
+	switch platformType {
+	case configv1.AWSPlatformType:
+		namespace = "openshift-config-managed"
+		name = "kube-cloud-config"
+	case configv1.OpenStackPlatformType:
+		namespace = "openshift-config"
+		name = "cloud-provider-config"
+	default:
+		return fields.Nothing()
+	}
+	selector := fields.SelectorFromSet(fields.Set{
+		"metadata.namespace": namespace,
+		"metadata.name":      name,
+	})
+	log.WithField("selector", selector.String()).Info("setting up field selector for cloud config ConfigMap")
 	return selector
 }
 

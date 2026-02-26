@@ -71,16 +71,14 @@ var _ actuatoriface.Actuator = (*AWSActuator)(nil)
 type AWSActuator struct {
 	Client           client.Client
 	RootCredClient   client.Client
-	LiveClient       client.Client
 	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 	Scheme           *runtime.Scheme
 }
 
 // NewAWSActuator creates a new AWSActuator.
-func NewAWSActuator(client, rootCredClient, liveClient client.Client, scheme *runtime.Scheme) (*AWSActuator, error) {
+func NewAWSActuator(client, rootCredClient client.Client, scheme *runtime.Scheme) (*AWSActuator, error) {
 	return &AWSActuator{
 		Client:           client,
-		LiveClient:       liveClient,
 		RootCredClient:   rootCredClient,
 		AWSClientBuilder: awsutils.ClientBuilder,
 		Scheme:           scheme,
@@ -158,7 +156,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 
 	// Various checks for the kinds of reasons that would trigger a needed update
 	_, existingAccessKey, existingSecretKey, existingCredentialsKey := a.loadExistingSecret(cr)
-	awsClient, err := a.AWSClientBuilder([]byte(existingAccessKey), []byte(existingSecretKey), a.LiveClient)
+	awsClient, err := a.AWSClientBuilder([]byte(existingAccessKey), []byte(existingSecretKey), a.RootCredClient)
 	if err != nil {
 		return true, err
 	}
@@ -467,7 +465,7 @@ func (a *AWSActuator) syncPassthrough(ctx context.Context, cr *minterv1.Credenti
 		}
 
 		// build client with root secret and verify that the creds are good enough to pass through
-		awsClient, err := a.AWSClientBuilder([]byte(accessKeyID), []byte(secretAccessKey), a.LiveClient)
+		awsClient, err := a.AWSClientBuilder([]byte(accessKeyID), []byte(secretAccessKey), a.RootCredClient)
 		if err != nil {
 			msg := "error building AWS client"
 			logger.WithError(err).Error(msg)
@@ -933,7 +931,7 @@ func (a *AWSActuator) buildRootAWSClient(cr *minterv1.CredentialsRequest) (ccaws
 	}
 
 	logger.Debug("creating root AWS client")
-	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.LiveClient)
+	return a.AWSClientBuilder(accessKeyID, secretAccessKey, a.RootCredClient)
 }
 
 // buildReadAWSClient will return an AWS client using the the scaled down read only AWS creds
@@ -963,7 +961,7 @@ func (a *AWSActuator) buildReadAWSClient(cr *minterv1.CredentialsRequest) (ccaws
 	}
 
 	logger.Debug("creating read AWS client")
-	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey, a.LiveClient)
+	client, err := a.AWSClientBuilder(accessKeyID, secretAccessKey, a.RootCredClient)
 	if err != nil {
 		return nil, err
 	}
