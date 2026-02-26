@@ -974,7 +974,7 @@ func TestCredentialsRequestGCPReconcile(t *testing.T) {
 
 			if test.expectedCOConditions != nil {
 				logger := log.WithFields(log.Fields{"controller": controllerName})
-				currentConditions, err := rcr.GetConditions(logger)
+				currentConditions, err := rcr.GetConditions(context.TODO(), logger)
 				require.NoError(t, err, "failed getting conditions")
 
 				for _, expectedCondition := range test.expectedCOConditions {
