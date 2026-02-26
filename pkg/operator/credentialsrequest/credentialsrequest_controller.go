@@ -493,9 +493,9 @@ type ReconcileSecretMissingLabel struct {
 	mutatingClient corev1client.SecretsGetter
 }
 
-func (r *ReconcileSecretMissingLabel) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+func (r *ReconcileSecretMissingLabel) GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	var secrets corev1.SecretList
-	if err := r.cachedClient.List(context.TODO(), &secrets); err != nil {
+	if err := r.cachedClient.List(ctx, &secrets); err != nil {
 		return nil, err
 	}
 	var missing int

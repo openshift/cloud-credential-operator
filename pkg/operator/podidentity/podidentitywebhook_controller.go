@@ -37,12 +37,14 @@ import (
 )
 
 const (
-	controllerName                      = "pod-identity"
-	deploymentName                      = "cloud-credential-operator"
-	operatorNamespace                   = "openshift-cloud-credential-operator"
-	retryInterval                       = 10 * time.Second
-	reasonStaticResourceReconcileFailed = "StaticResourceReconcileFailed"
-	pdb                                 = "v4.1.0/common/poddisruptionbudget.yaml"
+	controllerName                            = "pod-identity"
+	deploymentName                            = "cloud-credential-operator"
+	operatorNamespace                         = "openshift-cloud-credential-operator"
+	retryInterval                             = 10 * time.Second
+	reasonStaticResourceReconcileFailed       = "StaticResourceReconcileFailed"
+	reasonPodIdentityWebhookPodsStillUpdating = "PodIdentityWebhookPodsStillUpdating"
+	reasonPodIdentityWebhookPodsNotAvailable  = "PodIdentityWebhookPodsNotAvailable"
+	pdb                                       = "v4.1.0/common/poddisruptionbudget.yaml"
 )
 
 var (
@@ -384,10 +386,75 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 	return nil
 }
 
+type webhookPodStatus struct {
+	desiredReplicas   int32
+	availableReplicas int32
+	updatedReplicas   int32
+}
+
+func (wps *webhookPodStatus) Available() bool {
+	return wps.availableReplicas > 0
+}
+
+func (wps *webhookPodStatus) Progressing() bool {
+	return wps.updatedReplicas != wps.desiredReplicas
+}
+
+func (r *staticResourceReconciler) CheckPodStatus(ctx context.Context) (*webhookPodStatus, error) {
+	deployment := &appsv1.Deployment{}
+	err := r.client.Get(ctx, client.ObjectKey{
+		Name:      "pod-identity-webhook",
+		Namespace: "openshift-cloud-credential-operator",
+	}, deployment)
+	if err != nil {
+		return nil, err
+	}
+
+	if deployment.Spec.Replicas == nil {
+		return &webhookPodStatus{}, nil
+	}
+
+	deploymentStatus := &webhookPodStatus{
+		desiredReplicas:   *deployment.Spec.Replicas,
+		availableReplicas: deployment.Status.AvailableReplicas,
+		updatedReplicas:   deployment.Status.UpdatedReplicas,
+	}
+
+	return deploymentStatus, nil
+}
+
 var _ status.Handler = &staticResourceReconciler{}
 
-func (r *staticResourceReconciler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
-	return r.conditions, nil
+func (r *staticResourceReconciler) GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+	podStatus, err := r.CheckPodStatus(ctx)
+	if err != nil {
+		logger.WithError(err).Errorf("checking pod identity webhook status failed")
+		return nil, err
+	}
+
+	conditions := r.conditions
+	if !podStatus.Available() {
+		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorAvailable,
+			Status:  configv1.ConditionFalse,
+			Reason:  reasonPodIdentityWebhookPodsNotAvailable,
+			Message: "No pod identity webhook pods are available\n",
+		})
+	}
+	if podStatus.Progressing() {
+		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+			Reason: reasonPodIdentityWebhookPodsStillUpdating,
+			Message: fmt.Sprintf(
+				"Waiting for pod identity webhook deployment rollout to finish: %d out of %d new replica(s) have been updated...\n",
+				podStatus.updatedReplicas,
+				podStatus.desiredReplicas,
+			),
+		})
+	}
+
+	return conditions, nil
 }
 
 func (r *staticResourceReconciler) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {

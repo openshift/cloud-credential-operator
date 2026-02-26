@@ -29,8 +29,8 @@ const (
 
 var _ status.Handler = &ReconcileCredentialsRequest{}
 
-func (r *ReconcileCredentialsRequest) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
-	_, credRequests, mode, err := r.getOperatorState(logger)
+func (r *ReconcileCredentialsRequest) GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+	_, credRequests, mode, err := r.getOperatorState(ctx, logger)
 	if err != nil {
 		return []configv1.ClusterOperatorStatusCondition{}, fmt.Errorf("failed to get operator state: %v", err)
 	}
@@ -43,7 +43,7 @@ func (r *ReconcileCredentialsRequest) GetConditions(logger log.FieldLogger) ([]c
 }
 
 func (r *ReconcileCredentialsRequest) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {
-	_, credRequests, _, err := r.getOperatorState(logger)
+	_, credRequests, _, err := r.getOperatorState(context.TODO(), logger)
 	if err != nil {
 		return []configv1.ObjectReference{}, fmt.Errorf("failed to get operator state: %v", err)
 	}
@@ -56,10 +56,10 @@ func (r *ReconcileCredentialsRequest) Name() string {
 
 // getOperatorState gets and returns the resources necessary to compute the
 // operator's current state.
-func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest, operatorv1.CloudCredentialsMode, error) {
+func (r *ReconcileCredentialsRequest) getOperatorState(ctx context.Context, logger log.FieldLogger) (*corev1.Namespace, []minterv1.CredentialsRequest, operatorv1.CloudCredentialsMode, error) {
 
 	ns := &corev1.Namespace{}
-	if err := r.Client.Get(context.TODO(), types.NamespacedName{Name: minterv1.CloudCredOperatorNamespace}, ns); err != nil {
+	if err := r.Client.Get(ctx, types.NamespacedName{Name: minterv1.CloudCredOperatorNamespace}, ns); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil, operatorv1.CloudCredentialsModeDefault, nil
 		}
@@ -72,7 +72,7 @@ func (r *ReconcileCredentialsRequest) getOperatorState(logger log.FieldLogger) (
 	// central list to live. Other credentials requests in other namespaces will not affect status,
 	// but they will still work fine.
 	credRequestList := &minterv1.CredentialsRequestList{}
-	err := r.Client.List(context.TODO(), credRequestList, client.InNamespace(minterv1.CloudCredOperatorNamespace))
+	err := r.Client.List(ctx, credRequestList, client.InNamespace(minterv1.CloudCredOperatorNamespace))
 	if err != nil {
 		return nil, nil, operatorv1.CloudCredentialsModeDefault, fmt.Errorf(
 			"failed to list CredentialsRequests: %v", err)

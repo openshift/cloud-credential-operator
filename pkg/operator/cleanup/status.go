@@ -1,6 +1,8 @@
 package cleanup
 
 import (
+	"context"
+
 	log "github.com/sirupsen/logrus"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -9,7 +11,7 @@ import (
 
 var _ status.Handler = &ReconcileStaleCredentialsRequest{}
 
-func (r *ReconcileStaleCredentialsRequest) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+func (r *ReconcileStaleCredentialsRequest) GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	return []configv1.ClusterOperatorStatusCondition{}, nil
 }
 
