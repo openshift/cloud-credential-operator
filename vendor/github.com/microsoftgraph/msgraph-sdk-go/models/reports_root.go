@@ -4,26 +4,30 @@
 package models
 
 import (
-    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
 type ReportsRoot struct {
-    Entity
+	Entity
 }
+
 // NewReportsRoot instantiates a new ReportsRoot and sets the default values.
-func NewReportsRoot()(*ReportsRoot) {
-    m := &ReportsRoot{
-        Entity: *NewEntity(),
-    }
-    return m
+func NewReportsRoot() *ReportsRoot {
+	m := &ReportsRoot{
+		Entity: *NewEntity(),
+	}
+	return m
 }
+
 // CreateReportsRootFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
 // returns a Parsable when successful
-func CreateReportsRootFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
-    return NewReportsRoot(), nil
+func CreateReportsRootFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) (i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
+	return NewReportsRoot(), nil
 }
+
 // GetFieldDeserializers the deserialization information for the current model
 // returns a map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error) when successful
+<<<<<<< HEAD
 func (m *ReportsRoot) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error)) {
     res := m.Entity.GetFieldDeserializers()
     res["readingAssignmentSubmissions"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
@@ -91,19 +95,58 @@ func (m *ReportsRoot) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26
         return nil
     }
     return res
+=======
+func (m *ReportsRoot) GetFieldDeserializers() map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+	res := m.Entity.GetFieldDeserializers()
+	res["readingAssignmentSubmissions"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetCollectionOfObjectValues(CreateReadingAssignmentSubmissionFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			res := make([]ReadingAssignmentSubmissionable, len(val))
+			for i, v := range val {
+				if v != nil {
+					res[i] = v.(ReadingAssignmentSubmissionable)
+				}
+			}
+			m.SetReadingAssignmentSubmissions(res)
+		}
+		return nil
+	}
+	res["reflectCheckInResponses"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetCollectionOfObjectValues(CreateReflectCheckInResponseFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			res := make([]ReflectCheckInResponseable, len(val))
+			for i, v := range val {
+				if v != nil {
+					res[i] = v.(ReflectCheckInResponseable)
+				}
+			}
+			m.SetReflectCheckInResponses(res)
+		}
+		return nil
+	}
+	return res
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
+
 // GetReadingAssignmentSubmissions gets the readingAssignmentSubmissions property value. Details of submitted reading assignments.
 // returns a []ReadingAssignmentSubmissionable when successful
-func (m *ReportsRoot) GetReadingAssignmentSubmissions()([]ReadingAssignmentSubmissionable) {
-    val, err := m.GetBackingStore().Get("readingAssignmentSubmissions")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.([]ReadingAssignmentSubmissionable)
-    }
-    return nil
+func (m *ReportsRoot) GetReadingAssignmentSubmissions() []ReadingAssignmentSubmissionable {
+	val, err := m.GetBackingStore().Get("readingAssignmentSubmissions")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.([]ReadingAssignmentSubmissionable)
+	}
+	return nil
 }
+<<<<<<< HEAD
 // GetReadingCoachPassages gets the readingCoachPassages property value. Details of practiced Reading Coach passages.
 // returns a []ReadingCoachPassageable when successful
 func (m *ReportsRoot) GetReadingCoachPassages()([]ReadingCoachPassageable) {
@@ -116,18 +159,22 @@ func (m *ReportsRoot) GetReadingCoachPassages()([]ReadingCoachPassageable) {
     }
     return nil
 }
+=======
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // GetReflectCheckInResponses gets the reflectCheckInResponses property value. Details of check-in responses.
 // returns a []ReflectCheckInResponseable when successful
-func (m *ReportsRoot) GetReflectCheckInResponses()([]ReflectCheckInResponseable) {
-    val, err := m.GetBackingStore().Get("reflectCheckInResponses")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.([]ReflectCheckInResponseable)
-    }
-    return nil
+func (m *ReportsRoot) GetReflectCheckInResponses() []ReflectCheckInResponseable {
+	val, err := m.GetBackingStore().Get("reflectCheckInResponses")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.([]ReflectCheckInResponseable)
+	}
+	return nil
 }
+<<<<<<< HEAD
 // GetSpeakerAssignmentSubmissions gets the speakerAssignmentSubmissions property value. Details of submitted speaker assignments.
 // returns a []SpeakerAssignmentSubmissionable when successful
 func (m *ReportsRoot) GetSpeakerAssignmentSubmissions()([]SpeakerAssignmentSubmissionable) {
@@ -195,14 +242,50 @@ func (m *ReportsRoot) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6
         }
     }
     return nil
+=======
+
+// Serialize serializes information the current object
+func (m *ReportsRoot) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter) error {
+	err := m.Entity.Serialize(writer)
+	if err != nil {
+		return err
+	}
+	if m.GetReadingAssignmentSubmissions() != nil {
+		cast := make([]i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, len(m.GetReadingAssignmentSubmissions()))
+		for i, v := range m.GetReadingAssignmentSubmissions() {
+			if v != nil {
+				cast[i] = v.(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable)
+			}
+		}
+		err = writer.WriteCollectionOfObjectValues("readingAssignmentSubmissions", cast)
+		if err != nil {
+			return err
+		}
+	}
+	if m.GetReflectCheckInResponses() != nil {
+		cast := make([]i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, len(m.GetReflectCheckInResponses()))
+		for i, v := range m.GetReflectCheckInResponses() {
+			if v != nil {
+				cast[i] = v.(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable)
+			}
+		}
+		err = writer.WriteCollectionOfObjectValues("reflectCheckInResponses", cast)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
+
 // SetReadingAssignmentSubmissions sets the readingAssignmentSubmissions property value. Details of submitted reading assignments.
-func (m *ReportsRoot) SetReadingAssignmentSubmissions(value []ReadingAssignmentSubmissionable)() {
-    err := m.GetBackingStore().Set("readingAssignmentSubmissions", value)
-    if err != nil {
-        panic(err)
-    }
+func (m *ReportsRoot) SetReadingAssignmentSubmissions(value []ReadingAssignmentSubmissionable) {
+	err := m.GetBackingStore().Set("readingAssignmentSubmissions", value)
+	if err != nil {
+		panic(err)
+	}
 }
+<<<<<<< HEAD
 // SetReadingCoachPassages sets the readingCoachPassages property value. Details of practiced Reading Coach passages.
 func (m *ReportsRoot) SetReadingCoachPassages(value []ReadingCoachPassageable)() {
     err := m.GetBackingStore().Set("readingCoachPassages", value)
@@ -210,13 +293,17 @@ func (m *ReportsRoot) SetReadingCoachPassages(value []ReadingCoachPassageable)()
         panic(err)
     }
 }
+=======
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // SetReflectCheckInResponses sets the reflectCheckInResponses property value. Details of check-in responses.
-func (m *ReportsRoot) SetReflectCheckInResponses(value []ReflectCheckInResponseable)() {
-    err := m.GetBackingStore().Set("reflectCheckInResponses", value)
-    if err != nil {
-        panic(err)
-    }
+func (m *ReportsRoot) SetReflectCheckInResponses(value []ReflectCheckInResponseable) {
+	err := m.GetBackingStore().Set("reflectCheckInResponses", value)
+	if err != nil {
+		panic(err)
+	}
 }
+<<<<<<< HEAD
 // SetSpeakerAssignmentSubmissions sets the speakerAssignmentSubmissions property value. Details of submitted speaker assignments.
 func (m *ReportsRoot) SetSpeakerAssignmentSubmissions(value []SpeakerAssignmentSubmissionable)() {
     err := m.GetBackingStore().Set("speakerAssignmentSubmissions", value)
@@ -235,4 +322,14 @@ type ReportsRootable interface {
     SetReadingCoachPassages(value []ReadingCoachPassageable)()
     SetReflectCheckInResponses(value []ReflectCheckInResponseable)()
     SetSpeakerAssignmentSubmissions(value []SpeakerAssignmentSubmissionable)()
+=======
+
+type ReportsRootable interface {
+	Entityable
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
+	GetReadingAssignmentSubmissions() []ReadingAssignmentSubmissionable
+	GetReflectCheckInResponses() []ReflectCheckInResponseable
+	SetReadingAssignmentSubmissions(value []ReadingAssignmentSubmissionable)
+	SetReflectCheckInResponses(value []ReflectCheckInResponseable)
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }

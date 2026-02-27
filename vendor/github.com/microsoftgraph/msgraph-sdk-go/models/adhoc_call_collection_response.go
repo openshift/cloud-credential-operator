@@ -4,9 +4,10 @@
 package models
 
 import (
-    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
+<<<<<<< HEAD:vendor/github.com/microsoftgraph/msgraph-sdk-go/models/adhoc_call_collection_response.go
 type AdhocCallCollectionResponse struct {
     BaseCollectionPaginationCountResponse
 }
@@ -21,9 +22,29 @@ func NewAdhocCallCollectionResponse()(*AdhocCallCollectionResponse) {
 // returns a Parsable when successful
 func CreateAdhocCallCollectionResponseFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
     return NewAdhocCallCollectionResponse(), nil
+=======
+type TelecomExpenseManagementPartnerCollectionResponse struct {
+	BaseCollectionPaginationCountResponse
 }
+
+// NewTelecomExpenseManagementPartnerCollectionResponse instantiates a new TelecomExpenseManagementPartnerCollectionResponse and sets the default values.
+func NewTelecomExpenseManagementPartnerCollectionResponse() *TelecomExpenseManagementPartnerCollectionResponse {
+	m := &TelecomExpenseManagementPartnerCollectionResponse{
+		BaseCollectionPaginationCountResponse: *NewBaseCollectionPaginationCountResponse(),
+	}
+	return m
+}
+
+// CreateTelecomExpenseManagementPartnerCollectionResponseFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
+// returns a Parsable when successful
+func CreateTelecomExpenseManagementPartnerCollectionResponseFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) (i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
+	return NewTelecomExpenseManagementPartnerCollectionResponse(), nil
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead):vendor/github.com/microsoftgraph/msgraph-sdk-go/models/telecom_expense_management_partner_collection_response.go
+}
+
 // GetFieldDeserializers the deserialization information for the current model
 // returns a map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error) when successful
+<<<<<<< HEAD:vendor/github.com/microsoftgraph/msgraph-sdk-go/models/adhoc_call_collection_response.go
 func (m *AdhocCallCollectionResponse) GetFieldDeserializers()(map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error)) {
     res := m.BaseCollectionPaginationCountResponse.GetFieldDeserializers()
     res["value"] = func (n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
@@ -43,8 +64,31 @@ func (m *AdhocCallCollectionResponse) GetFieldDeserializers()(map[string]func(i8
         return nil
     }
     return res
+=======
+func (m *TelecomExpenseManagementPartnerCollectionResponse) GetFieldDeserializers() map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+	res := m.BaseCollectionPaginationCountResponse.GetFieldDeserializers()
+	res["value"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetCollectionOfObjectValues(CreateTelecomExpenseManagementPartnerFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			res := make([]TelecomExpenseManagementPartnerable, len(val))
+			for i, v := range val {
+				if v != nil {
+					res[i] = v.(TelecomExpenseManagementPartnerable)
+				}
+			}
+			m.SetValue(res)
+		}
+		return nil
+	}
+	return res
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead):vendor/github.com/microsoftgraph/msgraph-sdk-go/models/telecom_expense_management_partner_collection_response.go
 }
+
 // GetValue gets the value property value. The value property
+<<<<<<< HEAD:vendor/github.com/microsoftgraph/msgraph-sdk-go/models/adhoc_call_collection_response.go
 // returns a []AdhocCallable when successful
 func (m *AdhocCallCollectionResponse) GetValue()([]AdhocCallable) {
     val, err := m.GetBackingStore().Get("value")
@@ -55,8 +99,22 @@ func (m *AdhocCallCollectionResponse) GetValue()([]AdhocCallable) {
         return val.([]AdhocCallable)
     }
     return nil
+=======
+// returns a []TelecomExpenseManagementPartnerable when successful
+func (m *TelecomExpenseManagementPartnerCollectionResponse) GetValue() []TelecomExpenseManagementPartnerable {
+	val, err := m.GetBackingStore().Get("value")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.([]TelecomExpenseManagementPartnerable)
+	}
+	return nil
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead):vendor/github.com/microsoftgraph/msgraph-sdk-go/models/telecom_expense_management_partner_collection_response.go
 }
+
 // Serialize serializes information the current object
+<<<<<<< HEAD:vendor/github.com/microsoftgraph/msgraph-sdk-go/models/adhoc_call_collection_response.go
 func (m *AdhocCallCollectionResponse) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter)(error) {
     err := m.BaseCollectionPaginationCountResponse.Serialize(writer)
     if err != nil {
@@ -75,8 +133,30 @@ func (m *AdhocCallCollectionResponse) Serialize(writer i878a80d2330e89d26896388a
         }
     }
     return nil
+=======
+func (m *TelecomExpenseManagementPartnerCollectionResponse) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter) error {
+	err := m.BaseCollectionPaginationCountResponse.Serialize(writer)
+	if err != nil {
+		return err
+	}
+	if m.GetValue() != nil {
+		cast := make([]i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, len(m.GetValue()))
+		for i, v := range m.GetValue() {
+			if v != nil {
+				cast[i] = v.(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable)
+			}
+		}
+		err = writer.WriteCollectionOfObjectValues("value", cast)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead):vendor/github.com/microsoftgraph/msgraph-sdk-go/models/telecom_expense_management_partner_collection_response.go
 }
+
 // SetValue sets the value property value. The value property
+<<<<<<< HEAD:vendor/github.com/microsoftgraph/msgraph-sdk-go/models/adhoc_call_collection_response.go
 func (m *AdhocCallCollectionResponse) SetValue(value []AdhocCallable)() {
     err := m.GetBackingStore().Set("value", value)
     if err != nil {
@@ -88,4 +168,18 @@ type AdhocCallCollectionResponseable interface {
     i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
     GetValue()([]AdhocCallable)
     SetValue(value []AdhocCallable)()
+=======
+func (m *TelecomExpenseManagementPartnerCollectionResponse) SetValue(value []TelecomExpenseManagementPartnerable) {
+	err := m.GetBackingStore().Set("value", value)
+	if err != nil {
+		panic(err)
+	}
+}
+
+type TelecomExpenseManagementPartnerCollectionResponseable interface {
+	BaseCollectionPaginationCountResponseable
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
+	GetValue() []TelecomExpenseManagementPartnerable
+	SetValue(value []TelecomExpenseManagementPartnerable)
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead):vendor/github.com/microsoftgraph/msgraph-sdk-go/models/telecom_expense_management_partner_collection_response.go
 }

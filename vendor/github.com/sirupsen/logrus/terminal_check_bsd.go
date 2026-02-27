@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 // +build darwin dragonfly freebsd netbsd openbsd hurd
+=======
+//go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && !js
+// +build darwin dragonfly freebsd netbsd openbsd
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // +build !js
 
 package logrus

@@ -4,24 +4,27 @@
 package models
 
 import (
-    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
 type EmployeeExperienceUser struct {
-    Entity
+	Entity
 }
+
 // NewEmployeeExperienceUser instantiates a new EmployeeExperienceUser and sets the default values.
-func NewEmployeeExperienceUser()(*EmployeeExperienceUser) {
-    m := &EmployeeExperienceUser{
-        Entity: *NewEntity(),
-    }
-    return m
+func NewEmployeeExperienceUser() *EmployeeExperienceUser {
+	m := &EmployeeExperienceUser{
+		Entity: *NewEntity(),
+	}
+	return m
 }
+
 // CreateEmployeeExperienceUserFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
 // returns a Parsable when successful
-func CreateEmployeeExperienceUserFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
-    return NewEmployeeExperienceUser(), nil
+func CreateEmployeeExperienceUserFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) (i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
+	return NewEmployeeExperienceUser(), nil
 }
+<<<<<<< HEAD
 // GetAssignedRoles gets the assignedRoles property value. Represents the collection of Viva Engage roles assigned to a user.
 // returns a []EngagementRoleable when successful
 func (m *EmployeeExperienceUser) GetAssignedRoles()([]EngagementRoleable) {
@@ -71,20 +74,47 @@ func (m *EmployeeExperienceUser) GetFieldDeserializers()(map[string]func(i878a80
         return nil
     }
     return res
+=======
+
+// GetFieldDeserializers the deserialization information for the current model
+// returns a map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error) when successful
+func (m *EmployeeExperienceUser) GetFieldDeserializers() map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+	res := m.Entity.GetFieldDeserializers()
+	res["learningCourseActivities"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetCollectionOfObjectValues(CreateLearningCourseActivityFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			res := make([]LearningCourseActivityable, len(val))
+			for i, v := range val {
+				if v != nil {
+					res[i] = v.(LearningCourseActivityable)
+				}
+			}
+			m.SetLearningCourseActivities(res)
+		}
+		return nil
+	}
+	return res
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
+
 // GetLearningCourseActivities gets the learningCourseActivities property value. The learningCourseActivities property
 // returns a []LearningCourseActivityable when successful
-func (m *EmployeeExperienceUser) GetLearningCourseActivities()([]LearningCourseActivityable) {
-    val, err := m.GetBackingStore().Get("learningCourseActivities")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.([]LearningCourseActivityable)
-    }
-    return nil
+func (m *EmployeeExperienceUser) GetLearningCourseActivities() []LearningCourseActivityable {
+	val, err := m.GetBackingStore().Get("learningCourseActivities")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.([]LearningCourseActivityable)
+	}
+	return nil
 }
+
 // Serialize serializes information the current object
+<<<<<<< HEAD
 func (m *EmployeeExperienceUser) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter)(error) {
     err := m.Entity.Serialize(writer)
     if err != nil {
@@ -123,18 +153,48 @@ func (m *EmployeeExperienceUser) SetAssignedRoles(value []EngagementRoleable)() 
         panic(err)
     }
 }
-// SetLearningCourseActivities sets the learningCourseActivities property value. The learningCourseActivities property
-func (m *EmployeeExperienceUser) SetLearningCourseActivities(value []LearningCourseActivityable)() {
-    err := m.GetBackingStore().Set("learningCourseActivities", value)
-    if err != nil {
-        panic(err)
-    }
+=======
+func (m *EmployeeExperienceUser) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter) error {
+	err := m.Entity.Serialize(writer)
+	if err != nil {
+		return err
+	}
+	if m.GetLearningCourseActivities() != nil {
+		cast := make([]i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, len(m.GetLearningCourseActivities()))
+		for i, v := range m.GetLearningCourseActivities() {
+			if v != nil {
+				cast[i] = v.(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable)
+			}
+		}
+		err = writer.WriteCollectionOfObjectValues("learningCourseActivities", cast)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
+// SetLearningCourseActivities sets the learningCourseActivities property value. The learningCourseActivities property
+func (m *EmployeeExperienceUser) SetLearningCourseActivities(value []LearningCourseActivityable) {
+	err := m.GetBackingStore().Set("learningCourseActivities", value)
+	if err != nil {
+		panic(err)
+	}
+}
+
 type EmployeeExperienceUserable interface {
+<<<<<<< HEAD
     Entityable
     i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
     GetAssignedRoles()([]EngagementRoleable)
     GetLearningCourseActivities()([]LearningCourseActivityable)
     SetAssignedRoles(value []EngagementRoleable)()
     SetLearningCourseActivities(value []LearningCourseActivityable)()
+=======
+	Entityable
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
+	GetLearningCourseActivities() []LearningCourseActivityable
+	SetLearningCourseActivities(value []LearningCourseActivityable)
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }

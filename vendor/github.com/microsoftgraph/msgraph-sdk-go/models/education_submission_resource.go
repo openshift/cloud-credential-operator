@@ -4,36 +4,44 @@
 package models
 
 import (
-    i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91 "github.com/microsoft/kiota-abstractions-go/serialization"
 )
 
 type EducationSubmissionResource struct {
-    Entity
+	Entity
 }
+
 // NewEducationSubmissionResource instantiates a new EducationSubmissionResource and sets the default values.
-func NewEducationSubmissionResource()(*EducationSubmissionResource) {
-    m := &EducationSubmissionResource{
-        Entity: *NewEntity(),
-    }
-    return m
+func NewEducationSubmissionResource() *EducationSubmissionResource {
+	m := &EducationSubmissionResource{
+		Entity: *NewEntity(),
+	}
+	return m
 }
+
 // CreateEducationSubmissionResourceFromDiscriminatorValue creates a new instance of the appropriate class based on discriminator value
 // returns a Parsable when successful
-func CreateEducationSubmissionResourceFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
-    return NewEducationSubmissionResource(), nil
+func CreateEducationSubmissionResourceFromDiscriminatorValue(parseNode i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) (i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable, error) {
+	return NewEducationSubmissionResource(), nil
 }
+<<<<<<< HEAD
 // GetAssignmentResourceUrl gets the assignmentResourceUrl property value. Pointer to the assignment from which the resource was copied. If the value is null, the student uploaded the resource.
+=======
+
+// GetAssignmentResourceUrl gets the assignmentResourceUrl property value. Pointer to the assignment from which the resource was copied, and if null, the student uploaded the resource.
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 // returns a *string when successful
-func (m *EducationSubmissionResource) GetAssignmentResourceUrl()(*string) {
-    val, err := m.GetBackingStore().Get("assignmentResourceUrl")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(*string)
-    }
-    return nil
+func (m *EducationSubmissionResource) GetAssignmentResourceUrl() *string {
+	val, err := m.GetBackingStore().Get("assignmentResourceUrl")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.(*string)
+	}
+	return nil
 }
+<<<<<<< HEAD
 // GetDependentResources gets the dependentResources property value. A collection of submission resources that depend on the parent educationSubmissionResource.
 // returns a []EducationSubmissionResourceable when successful
 func (m *EducationSubmissionResource) GetDependentResources()([]EducationSubmissionResourceable) {
@@ -87,20 +95,51 @@ func (m *EducationSubmissionResource) GetFieldDeserializers()(map[string]func(i8
         return nil
     }
     return res
+=======
+
+// GetFieldDeserializers the deserialization information for the current model
+// returns a map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode)(error) when successful
+func (m *EducationSubmissionResource) GetFieldDeserializers() map[string]func(i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+	res := m.Entity.GetFieldDeserializers()
+	res["assignmentResourceUrl"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetStringValue()
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			m.SetAssignmentResourceUrl(val)
+		}
+		return nil
+	}
+	res["resource"] = func(n i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.ParseNode) error {
+		val, err := n.GetObjectValue(CreateEducationResourceFromDiscriminatorValue)
+		if err != nil {
+			return err
+		}
+		if val != nil {
+			m.SetResource(val.(EducationResourceable))
+		}
+		return nil
+	}
+	return res
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
+
 // GetResource gets the resource property value. Resource object.
 // returns a EducationResourceable when successful
-func (m *EducationSubmissionResource) GetResource()(EducationResourceable) {
-    val, err := m.GetBackingStore().Get("resource")
-    if err != nil {
-        panic(err)
-    }
-    if val != nil {
-        return val.(EducationResourceable)
-    }
-    return nil
+func (m *EducationSubmissionResource) GetResource() EducationResourceable {
+	val, err := m.GetBackingStore().Get("resource")
+	if err != nil {
+		panic(err)
+	}
+	if val != nil {
+		return val.(EducationResourceable)
+	}
+	return nil
 }
+
 // Serialize serializes information the current object
+<<<<<<< HEAD
 func (m *EducationSubmissionResource) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter)(error) {
     err := m.Entity.Serialize(writer)
     if err != nil {
@@ -146,14 +185,46 @@ func (m *EducationSubmissionResource) SetDependentResources(value []EducationSub
         panic(err)
     }
 }
-// SetResource sets the resource property value. Resource object.
-func (m *EducationSubmissionResource) SetResource(value EducationResourceable)() {
-    err := m.GetBackingStore().Set("resource", value)
-    if err != nil {
-        panic(err)
-    }
+=======
+func (m *EducationSubmissionResource) Serialize(writer i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.SerializationWriter) error {
+	err := m.Entity.Serialize(writer)
+	if err != nil {
+		return err
+	}
+	{
+		err = writer.WriteStringValue("assignmentResourceUrl", m.GetAssignmentResourceUrl())
+		if err != nil {
+			return err
+		}
+	}
+	{
+		err = writer.WriteObjectValue("resource", m.GetResource())
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
+
+// SetAssignmentResourceUrl sets the assignmentResourceUrl property value. Pointer to the assignment from which the resource was copied, and if null, the student uploaded the resource.
+func (m *EducationSubmissionResource) SetAssignmentResourceUrl(value *string) {
+	err := m.GetBackingStore().Set("assignmentResourceUrl", value)
+	if err != nil {
+		panic(err)
+	}
+}
+
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
+// SetResource sets the resource property value. Resource object.
+func (m *EducationSubmissionResource) SetResource(value EducationResourceable) {
+	err := m.GetBackingStore().Set("resource", value)
+	if err != nil {
+		panic(err)
+	}
+}
+
 type EducationSubmissionResourceable interface {
+<<<<<<< HEAD
     Entityable
     i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
     GetAssignmentResourceUrl()(*string)
@@ -162,4 +233,12 @@ type EducationSubmissionResourceable interface {
     SetAssignmentResourceUrl(value *string)()
     SetDependentResources(value []EducationSubmissionResourceable)()
     SetResource(value EducationResourceable)()
+=======
+	Entityable
+	i878a80d2330e89d26896388a3f487eef27b0a0e6c010c493bf80be1452208f91.Parsable
+	GetAssignmentResourceUrl() *string
+	GetResource() EducationResourceable
+	SetAssignmentResourceUrl(value *string)
+	SetResource(value EducationResourceable)
+>>>>>>> baeadee06 (mockgen deprecated: use uber-go/mock instead)
 }
