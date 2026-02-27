@@ -46,6 +46,7 @@ rules:
 - apiGroups:
   - config.openshift.io
   resources:
+  - apiservers
   - clusterversions
   - dnses
   - featuregates
