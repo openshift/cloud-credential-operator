@@ -8,7 +8,7 @@ import (
 	reflect "reflect"
 
 	adal "github.com/Azure/go-autorest/autorest/adal"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockAdalService is a mock of AdalService interface.
