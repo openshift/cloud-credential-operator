@@ -4,7 +4,8 @@ COPY . .
 ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
 RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/cloud-credential-operator
 RUN go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/ccoctl
-RUN make cloud-credential-tests-ext && \
+
+RUN CGO_ENABLED=0 GO_COMPLIANCE_POLICY=exempt_all go build -ldflags "-X $GO_PACKAGE/pkg/version.versionFromGit=$(git describe --long --tags --abbrev=7 --match 'v[0-9]*')" ./cmd/cloud-credential-tests-ext && \
     mkdir -p /tmp/build && \
     gzip -c ./cloud-credential-tests-ext > /tmp/build/cloud-credential-tests-ext.gz
 

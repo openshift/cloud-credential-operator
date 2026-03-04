@@ -134,7 +134,7 @@ clean:
 # - Static linking (CGO_ENABLED=0)
 # - ART compliance exemption (GO_COMPLIANCE_POLICY=exempt_all)
 cloud-credential-tests-ext:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 GO_COMPLIANCE_POLICY=exempt_all \
+	CGO_ENABLED=0 GO_COMPLIANCE_POLICY=exempt_all \
 		go build -mod=vendor \
 		-ldflags "-X $(GO_PACKAGE)/pkg/version.versionFromGit=$$(git describe --long --tags --abbrev=7 --match 'v[0-9]*' )" \
 		./cmd/cloud-credential-tests-ext
