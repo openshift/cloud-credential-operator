@@ -414,7 +414,14 @@ func selectorForRootCredential(platformType configv1.PlatformType) fields.Select
 	case configv1.KubevirtPlatformType:
 		name = constants.KubevirtCloudCredSecretName
 	case configv1.VSpherePlatformType:
-		name = constants.VSphereCloudCredSecretName
+		// vSphere needs access to both the root credential secret and any
+		// per-component dedicated credential secrets in kube-system, so
+		// scope the cache by namespace rather than a single secret name.
+		selector := fields.SelectorFromSet(fields.Set{
+			"metadata.namespace": constants.CloudCredSecretNamespace,
+		})
+		log.WithField("selector", selector.String()).Info("setting up field selector for root credential Secret")
+		return selector
 	default:
 		return fields.Nothing()
 	}
