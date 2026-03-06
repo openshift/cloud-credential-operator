@@ -285,6 +285,7 @@ type staticResourceReconciler struct {
 	conditions           []configv1.ClusterOperatorStatusCondition
 	cache                resourceapply.ResourceCache
 	podIdentityType      PodIdentityManifestSource
+	degradedSince        time.Time
 }
 
 var _ reconcile.Reconciler = &staticResourceReconciler{}
@@ -294,16 +295,22 @@ func (r *staticResourceReconciler) Reconcile(ctx context.Context, request reconc
 	err := r.ReconcileResources(ctx)
 	if err != nil {
 		r.logger.Errorf("reconciliation failed, retrying in %s", retryInterval.String())
-		r.conditions = []configv1.ClusterOperatorStatusCondition{
-			{
-				Type:    configv1.OperatorDegraded,
-				Status:  configv1.ConditionTrue,
-				Reason:  reasonStaticResourceReconcileFailed,
-				Message: fmt.Sprintf("static resource reconciliation failed: %v", err),
-			},
+		if r.degradedSince.IsZero() {
+			r.degradedSince = time.Now()
+		} else if time.Since(r.degradedSince) > 5*time.Minute {
+			r.conditions = []configv1.ClusterOperatorStatusCondition{
+				{
+					Type:    configv1.OperatorDegraded,
+					Status:  configv1.ConditionTrue,
+					Reason:  reasonStaticResourceReconcileFailed,
+					Message: fmt.Sprintf("static resource reconciliation failed: %v", err),
+				},
+			}
 		}
 		return reconcile.Result{RequeueAfter: retryInterval}, err
 	}
+
+	r.degradedSince = time.Time{}
 	r.conditions = []configv1.ClusterOperatorStatusCondition{}
 	return reconcile.Result{}, nil
 }

@@ -311,7 +311,7 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 		},
 		{
 			// This indicates an error state.
-			name: "new credential no root creds available",
+			name: "new credential no root creds available (initially)",
 			existing: []runtime.Object{
 				testOperatorConfig(""),
 				createTestNamespace(testNamespace),
@@ -337,6 +337,60 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 				assert.False(t, cr.Status.Provisioned)
 			},
 			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        "CredentialsProvisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
+			// This indicates an error state.
+			name: "new credential no root creds available (after waiting period)",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequestWithCondition(t, minterv1.CredentialsRequestCondition{
+					Type:               minterv1.CredentialsProvisionFailure,
+					Reason:             "CredentialsProvisionFailure",
+					Status:             corev1.ConditionTrue,
+					LastTransitionTime: metav1.NewTime(time.Now().Add(-10 * time.Minute)),
+				}),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+				testInfrastructure(testInfraName),
+			},
+			existingAdmin: []runtime.Object{},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getSecret(c)
+				assert.Nil(t, targetSecret)
+				cr := getCR(c)
+				assert.False(t, cr.Status.Provisioned)
+			},
+			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        "CredentialsProvisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
 			expectedCOConditions: []ExpectedCOCondition{
 				{
 					conditionType: configv1.OperatorProgressing,
@@ -1680,6 +1734,12 @@ func testCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 func testProvisionedCredentialsRequest(t *testing.T) *minterv1.CredentialsRequest {
 	cr := testCredentialsRequest(t)
 	cr.Status.Provisioned = true
+	return cr
+}
+
+func testCredentialsRequestWithCondition(t *testing.T, condition minterv1.CredentialsRequestCondition) *minterv1.CredentialsRequest {
+	cr := testCredentialsRequest(t)
+	cr.Status.Conditions = append(cr.Status.Conditions, condition)
 	return cr
 }
 

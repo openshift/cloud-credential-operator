@@ -3,6 +3,7 @@ package credentialsrequest
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -131,7 +132,9 @@ func computeStatusConditions(
 		for _, t := range minterv1.FailureConditionTypes {
 			failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
 			if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
-				foundFailure = true
+				if time.Since(failureCond.LastTransitionTime.Time) > 5*time.Minute {
+					foundFailure = true
+				}
 				break
 			}
 		}
