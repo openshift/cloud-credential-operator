@@ -44,7 +44,7 @@ const (
 // Handler produces conditions and related objects to be reflected
 // in the cloud-credential-operator ClusterOperatorStatus
 type Handler interface {
-	GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error)
+	GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error)
 	GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error)
 	Name() string
 }
@@ -179,7 +179,7 @@ func (r *ReconcileStatus) Reconcile(ctx context.Context, request reconcile.Reque
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
 
-	err := syncStatus(r.Client, r.Logger)
+	err := syncStatus(ctx, r.Client, r.Logger)
 	return reconcile.Result{
 		RequeueAfter: defaultRequeuePeriod,
 	}, err
@@ -188,7 +188,7 @@ func (r *ReconcileStatus) Reconcile(ctx context.Context, request reconcile.Reque
 // syncStatus is written in a way so that if we expose this function it would allow
 // external controllers to trigger a static sync. But for now we will make this an internal
 // function until the need arises to expose it.
-func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
+func syncStatus(ctx context.Context, kubeClient client.Client, logger log.FieldLogger) error {
 	log.Info("reconciling clusteroperator status")
 
 	co := &configv1.ClusterOperator{}
@@ -209,7 +209,7 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 	conditions := []configv1.ClusterOperatorStatusCondition{}
 	relatedObjects := []configv1.ObjectReference{}
 	for handlerName, handler := range statusHandlers {
-		handlerConditions, err := handler.GetConditions(logger)
+		handlerConditions, err := handler.GetConditions(ctx, logger)
 		logger.WithFields(log.Fields{
 			"handlerconditions": handlerConditions,
 			"statushandler":     handlerName,
@@ -261,6 +261,7 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 		progressing, _ := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
 		// We know this should be there.
 		progressing.LastTransitionTime = metav1.Now()
+		progressing.Status = configv1.ConditionTrue
 	}
 
 	// ClusterOperator should already exist (from the manifest payload), but recreate it if needed

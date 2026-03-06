@@ -1,6 +1,7 @@
 package status
 
 import (
+	"context"
 	"fmt"
 
 	log "github.com/sirupsen/logrus"
@@ -28,7 +29,7 @@ func NewSecretStatusHandler(kubeClient client.Client) *SecretStatusHandler {
 
 var _ status.Handler = &SecretStatusHandler{}
 
-func (s *SecretStatusHandler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+func (s *SecretStatusHandler) GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
 	conditions := []configv1.ClusterOperatorStatusCondition{}
 
 	mode, conflict, err := utils.GetOperatorConfiguration(s.kubeClient, logger)
