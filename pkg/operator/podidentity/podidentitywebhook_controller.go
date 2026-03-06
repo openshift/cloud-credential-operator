@@ -26,6 +26,8 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	configv1 "github.com/openshift/api/config/v1"
+	utiltls "github.com/openshift/controller-runtime-common/pkg/tls"
+	libgocrypto "github.com/openshift/library-go/pkg/crypto"
 	"github.com/openshift/library-go/pkg/operator/events"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceapply"
 	"github.com/openshift/library-go/pkg/operator/resource/resourceread"
@@ -104,7 +106,7 @@ var (
 )
 
 type PodIdentityManifestSource interface {
-	ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger) error
+	ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger, tlsProfileSpec configv1.TLSProfileSpec) error
 	Deployment() string
 	GetImagePullSpec() string
 	Webhook() string
@@ -201,6 +203,21 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		conditions:      []configv1.ClusterOperatorStatusCondition{},
 		cache:           resourceapply.NewResourceCache(),
 		podIdentityType: podIdentityType,
+		tlsProfileSpec:  configv1.TLSProfileSpec{},
+	}
+
+	tlsAdherence, err := utiltls.FetchAPIServerTLSAdherencePolicy(ctx, mgr.GetClient())
+	if err != nil {
+		return err
+	}
+
+	initialTLSProfile, err := utiltls.FetchAPIServerTLSProfile(ctx, mgr.GetClient())
+	if err != nil {
+		return err
+	}
+
+	if libgocrypto.ShouldHonorClusterTLSProfile(tlsAdherence) {
+		r.tlsProfileSpec = initialTLSProfile
 	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
@@ -285,6 +302,7 @@ type staticResourceReconciler struct {
 	conditions           []configv1.ClusterOperatorStatusCondition
 	cache                resourceapply.ResourceCache
 	podIdentityType      PodIdentityManifestSource
+	tlsProfileSpec       configv1.TLSProfileSpec
 }
 
 var _ reconcile.Reconciler = &staticResourceReconciler{}
@@ -341,7 +359,7 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
 
-	err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger)
+	err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger, r.tlsProfileSpec)
 	if err != nil {
 		r.logger.WithError(err).Error("error substituting Deployment")
 		return err
