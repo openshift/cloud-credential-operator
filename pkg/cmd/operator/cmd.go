@@ -53,7 +53,6 @@ import (
 	ctrlruntimelog "sigs.k8s.io/controller-runtime/pkg/log"
 	"sigs.k8s.io/controller-runtime/pkg/manager"
 	"sigs.k8s.io/controller-runtime/pkg/manager/signals"
-	"sigs.k8s.io/controller-runtime/pkg/metrics/filters"
 	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
 
 	configv1 "github.com/openshift/api/config/v1"
@@ -247,10 +246,7 @@ func NewOperator() *cobra.Command {
 						ByObject: objectSelectors,
 					},
 					Metrics: metricsserver.Options{
-						BindAddress:    ":8443",
-						SecureServing:  true,
-						FilterProvider: filters.WithAuthenticationAndAuthorization,
-						CertDir:        "/etc/tls/private",
+						BindAddress: ":2112",
 					},
 					PprofBindAddress: ":6060",
 				})
