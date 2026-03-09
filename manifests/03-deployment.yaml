@@ -34,33 +34,6 @@ spec:
         seccompProfile:
           type: RuntimeDefault
       containers:
-      - args:
-        - --secure-listen-address=0.0.0.0:8443
-        - --upstream=http://127.0.0.1:2112/
-        - --tls-cert-file=/etc/tls/private/tls.crt
-        - --tls-private-key-file=/etc/tls/private/tls.key
-        - --logtostderr=true
-        image: quay.io/openshift/origin-kube-rbac-proxy:latest
-        imagePullPolicy: IfNotPresent
-        name: kube-rbac-proxy
-        securityContext:
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-          readOnlyRootFilesystem: true
-        ports:
-        - containerPort: 8443
-          name: metrics
-          protocol: TCP
-        resources:
-          requests:
-            memory: 20Mi
-            cpu: 10m
-        terminationMessagePath: /dev/termination-log
-        terminationMessagePolicy: FallbackToLogsOnError
-        volumeMounts:
-        - mountPath: /etc/tls/private
-          name: cloud-credential-operator-serving-cert
       - command:
         - /usr/bin/cloud-credential-operator
         - operator
@@ -81,6 +54,10 @@ spec:
           capabilities:
             drop: ["ALL"]
           readOnlyRootFilesystem: true
+        ports:
+        - containerPort: 8443
+          name: metrics
+          protocol: TCP
         resources:
           requests:
             cpu: 10m
@@ -89,6 +66,8 @@ spec:
         volumeMounts:
         - mountPath: /etc/pki/ca-trust/extracted/pem
           name: cco-trusted-ca
+        - mountPath: /etc/tls/private
+          name: cloud-credential-operator-serving-cert
       nodeSelector:
         node-role.kubernetes.io/master: ""
       priorityClassName: system-cluster-critical
