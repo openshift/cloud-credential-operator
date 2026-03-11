@@ -60,7 +60,7 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 
 	// It is destructive case, will remove root credentials, so adding [Disruptive]. The case duration is greater than 5 minutes
 	// so adding [Slow]
-	g.It("[Suite:cco/disruptive][OTP][PolarionID:31768][Disruptive][Serial][Slow]NonHyperShiftHOST-High-Report the mode of cloud-credential operation as a metric", ote.Informing(), func() {
+	g.It("[Suite:cco/disruptive][OTP][PolarionID:31768][Disruptive][Slow]NonHyperShiftHOST-High-Report the mode of cloud-credential operation as a metric", ote.Informing(), func() {
 		iaasPlatform, err := getIaasPlatform(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
@@ -160,7 +160,7 @@ spec:
 
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1940142
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1952891
-	g.It("[Suite:cco/disruptive][OTP][PolarionID:45415][Level0][Disruptive][Serial][platform:openstack] NonHyperShiftHOST-High-[Bug 1940142] Reset CACert to correct path", ote.Informing(), func() {
+	g.It("[Suite:cco/disruptive][OTP][PolarionID:45415][Disruptive][platform:openstack] NonHyperShiftHOST-High-[Bug 1940142] Reset CACert to correct path", ote.Informing(), func() {
 		g.By("Check if it's an osp cluster")
 		skipIfPlatformTypeNot(oc, "openstack")
 		g.By("Get openstack root credential clouds.yaml field")
@@ -337,7 +337,7 @@ data:
 		}
 	})
 
-	g.It("[Suite:cco/disruptive][OTP][PolarionID:48360][Disruptive][Serial][platform:aws] NonHyperShiftHOST-Medium-Reconciliation of aws pod identity mutating webhook did not happen", ote.Informing(), func() {
+	g.It("[Suite:cco/disruptive][OTP][PolarionID:48360][Disruptive][platform:aws] NonHyperShiftHOST-Medium-Reconciliation of aws pod identity mutating webhook did not happen", ote.Informing(), func() {
 		//Check IAAS platform type
 		iaasPlatform := checkPlatform(oc)
 		if iaasPlatform != "aws" {
@@ -376,7 +376,7 @@ data:
 		assertWaitPollNoErr(errWait, "The port is not reset to 443")
 	})
 
-	g.It("[Suite:cco/disruptive][OTP][PolarionID:45975][Disruptive][Serial] NonHyperShiftHOST-Medium-Test cco condition changes", ote.Informing(), func() {
+	g.It("[Suite:cco/disruptive][OTP][PolarionID:45975][Disruptive] NonHyperShiftHOST-Medium-Test cco condition changes", ote.Informing(), func() {
 		//Check CCO mode
 		mode, err := getCloudCredentialMode(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -516,7 +516,7 @@ data:
 		o.Expect(strings.Contains(doOcpReq(oc, "get", true, "secrets", "-n", OpenShiftImageRegistryNamespace, InstallerCloudCredentialsSecretName, "-o=jsonpath={.data}"), "azure_federated_token_file")).Should(o.BeTrue())
 	})
 
-	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:64885][platform:aws] NonHyperShiftHOST-OSD_CCS-ARO-Critical-CCO-based flow for olm managed operators and AWS STS", ote.Informing(), func() {
+	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:64885][platform:aws] Critical-CCO-based flow for olm managed operators and AWS STS", ote.Informing(), func() {
 		skipIfPlatformTypeNot(oc, "aws")
 		if !isSTSCluster(oc) {
 			g.Skip("This test case is AWS STS only, skipping")

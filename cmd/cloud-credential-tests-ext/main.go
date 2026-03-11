@@ -52,7 +52,7 @@ func registerSuites(ext *e.Extension) {
 				"openshift/conformance/parallel",
 			},
 			Qualifiers: []string{
-				`name.contains("[Level0]") && !(name.contains("[Serial]") || name.contains("[Disruptive]"))`,
+				`(name.contains("[Level0]") || name.contains("[Suite:cco/conformance/parallel]")) && !(name.contains("[Serial]") || name.contains("[Disruptive]"))`,
 			},
 		},
 		{
@@ -61,14 +61,21 @@ func registerSuites(ext *e.Extension) {
 				"openshift/conformance/serial",
 			},
 			Qualifiers: []string{
-				`name.contains("[Serial]") && !name.contains("[Disruptive]")`,
+				`name.contains("[Serial]") && !name.contains("[Disruptive]") && !name.contains("[Slow]")`,
 			},
 		},
 		{
 			Name:    "cco/disruptive",
 			Parents: []string{"openshift/disruptive"},
 			Qualifiers: []string{
-				`name.contains("[Disruptive]")`,
+				`name.contains("[Disruptive]") && !name.contains("[Slow]")`,
+			},
+		},
+		{
+			Name:    "cco/slow",
+			Parents: []string{"openshift/optional/slow"},
+			Qualifiers: []string{
+				`name.contains("[Slow]")`,
 			},
 		},
 		{
