@@ -2074,3 +2074,212 @@ func testOperatorConfig(mode operatorv1.CloudCredentialsMode) *operatorv1.CloudC
 
 	return conf
 }
+
+func TestHasResourceTags(t *testing.T) {
+	tests := []struct {
+		name     string
+		infra    *configv1.Infrastructure
+		expected bool
+	}{
+		{
+			name: "infrastructure with resource tags",
+			infra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS: &configv1.AWSPlatformStatus{
+							ResourceTags: []configv1.AWSResourceTag{
+								{Key: "key1", Value: "value1"},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "infrastructure without resource tags",
+			infra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS:  &configv1.AWSPlatformStatus{},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "infrastructure with nil status",
+			infra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+			},
+			expected: false,
+		},
+		{
+			name:     "nil infrastructure",
+			infra:    nil,
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := hasResourceTags(tt.infra)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestAreTagsUpdated(t *testing.T) {
+	tests := []struct {
+		name     string
+		oldInfra *configv1.Infrastructure
+		newInfra *configv1.Infrastructure
+		expected bool
+	}{
+		{
+			name: "tags updated",
+			oldInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS: &configv1.AWSPlatformStatus{
+							ResourceTags: []configv1.AWSResourceTag{
+								{Key: "key1", Value: "value1"},
+							},
+						},
+					},
+				},
+			},
+			newInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS: &configv1.AWSPlatformStatus{
+							ResourceTags: []configv1.AWSResourceTag{
+								{Key: "key1", Value: "value2"},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "tags not updated",
+			oldInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS: &configv1.AWSPlatformStatus{
+							ResourceTags: []configv1.AWSResourceTag{
+								{Key: "key1", Value: "value1"},
+							},
+						},
+					},
+				},
+			},
+			newInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS: &configv1.AWSPlatformStatus{
+							ResourceTags: []configv1.AWSResourceTag{
+								{Key: "key1", Value: "value1"},
+							},
+						},
+					},
+				},
+			},
+			expected: false,
+		},
+		{
+			name: "new tags added",
+			oldInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS:  &configv1.AWSPlatformStatus{},
+					},
+				},
+			},
+			newInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS: &configv1.AWSPlatformStatus{
+							ResourceTags: []configv1.AWSResourceTag{
+								{Key: "key1", Value: "value1"},
+							},
+						},
+					},
+				},
+			},
+			expected: true,
+		},
+		{
+			name: "new infra without tags",
+			oldInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS: &configv1.AWSPlatformStatus{
+							ResourceTags: []configv1.AWSResourceTag{
+								{Key: "key1", Value: "value1"},
+							},
+						},
+					},
+				},
+			},
+			newInfra: &configv1.Infrastructure{
+				ObjectMeta: metav1.ObjectMeta{
+					Name: "cluster",
+				},
+				Status: configv1.InfrastructureStatus{
+					PlatformStatus: &configv1.PlatformStatus{
+						Type: configv1.AWSPlatformType,
+						AWS:  &configv1.AWSPlatformStatus{},
+					},
+				},
+			},
+			expected: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := areTagsUpdated(tt.oldInfra, tt.newInfra)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}

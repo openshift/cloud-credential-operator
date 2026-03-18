@@ -254,16 +254,18 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 		return requests
 	})
 
-	// predicate functions to filter the events based on the AWS resourceTags presence.
+	// predicate functions to filter events for the "cluster" infrastructure resource based on AWS resourceTags presence.
+	// Only the infrastructure resource named "cluster" should be processed; other infrastructure resources like
+	// "cloud-provider-config" must be ignored to prevent incorrect behavior.
 	infraResourcePredicate := predicate.TypedFuncs[*configv1.Infrastructure]{
 		CreateFunc: func(e event.TypedCreateEvent[*configv1.Infrastructure]) bool {
-			return hasResourceTags(e.Object)
+			return e.Object.GetName() == "cluster" && hasResourceTags(e.Object)
 		},
 		DeleteFunc: func(e event.TypedDeleteEvent[*configv1.Infrastructure]) bool {
 			return false
 		},
 		UpdateFunc: func(e event.TypedUpdateEvent[*configv1.Infrastructure]) bool {
-			return areTagsUpdated(e.ObjectOld, e.ObjectNew)
+			return e.ObjectNew.GetName() == "cluster" && areTagsUpdated(e.ObjectOld, e.ObjectNew)
 		},
 	}
 	// Watch for the changes happening to Infrastructure Resource
