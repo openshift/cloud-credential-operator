@@ -780,7 +780,7 @@ spec:
 
 	g.It("[Suite:cco/conformance/parallel][PolarionID:88196] NonHyperShiftHOST-High-CCO metrics endpoint validation", ote.Informing(), func() {
 		g.By("Validate CCO container exposes metrics on port 8443")
-		ports, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.template.spec.containers[0].ports}").Output()
+		ports, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.template.spec.containers[?(@.name==\"cloud-credential-operator\")].ports}").Output()
 		o.Expect(err).NotTo(o.HaveOccurred())
 		o.Expect(ports).To(o.ContainSubstring(`"containerPort":8443`))
 		o.Expect(ports).To(o.ContainSubstring(`"name":"metrics"`))
@@ -788,7 +788,7 @@ spec:
 		g.GinkgoT().Logf("CCO container ports configuration: %s", ports)
 
 		g.By("Validate CCO container mounts serving certs")
-		volumeMounts, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.template.spec.containers[0].volumeMounts}").Output()
+		volumeMounts, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.template.spec.containers[?(@.name==\"cloud-credential-operator\")].volumeMounts}").Output()
 		o.Expect(err).NotTo(o.HaveOccurred())
 		o.Expect(volumeMounts).To(o.ContainSubstring(`"mountPath":"/etc/pki/ca-trust/extracted/pem"`))
 		o.Expect(volumeMounts).To(o.ContainSubstring(`"name":"cco-trusted-ca"`))
@@ -825,12 +825,8 @@ spec:
 		g.GinkgoT().Logf("Metrics endpoint response (first 10 lines): %s", metricsOutput)
 
 		g.By("Verify response includes CCO business metrics")
-		o.Expect(metricsOutput).To(o.ContainSubstring("cco_"))
-		// Check for common CCO metrics
-		hasMetric := strings.Contains(metricsOutput, "cco_credentials_mode") ||
-			strings.Contains(metricsOutput, "cco_credentials_requests") ||
-			strings.Contains(metricsOutput, "cco_")
-		o.Expect(hasMetric).To(o.BeTrue(), "Expected to find CCO metrics in response")
+		// Check for common CCO metrics prefixed with cco_
+		o.Expect(metricsOutput).To(o.ContainSubstring("cco_"), "Expected to find CCO metrics in response")
 		g.GinkgoT().Logf("Successfully verified CCO business metrics are present")
 
 		g.By("Verify prometheus target is up and has no TLS errors")
