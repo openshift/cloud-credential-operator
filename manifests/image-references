@@ -18,7 +18,3 @@ spec:
     from:
       kind: DockerImage
       Name: quay.io/openshift/gcp-workload-identity-federation-webhook
-  - name: kube-rbac-proxy
-    from:
-      kind: DockerImage
-      name: quay.io/openshift/origin-kube-rbac-proxy:latest
