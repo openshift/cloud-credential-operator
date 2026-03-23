@@ -457,6 +457,9 @@ func getPartition(region string) (string, error) {
 	if strings.HasPrefix(region, "cn-") {
 		return "aws-cn", nil
 	}
+	if strings.HasPrefix(region, "eusc-") {
+		return "aws-eusc", nil
+	}
 	return "aws", nil
 }
 
