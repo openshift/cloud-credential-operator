@@ -4,48 +4,52 @@
 package metric // import "go.opentelemetry.io/otel/sdk/metric"
 
 import (
-	"os"
 	"runtime"
-	"slices"
 
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/sdk/metric/exemplar"
 	"go.opentelemetry.io/otel/sdk/metric/internal/aggregate"
 )
 
+// ExemplarReservoirProviderSelector selects the
+// [exemplar.ReservoirProvider] to use
+// based on the [Aggregation] of the metric.
+type ExemplarReservoirProviderSelector func(Aggregation) exemplar.ReservoirProvider
+
 // reservoirFunc returns the appropriately configured exemplar reservoir
-// creation func based on the passed InstrumentKind and user defined
-// environment variables.
-//
-// Note: This will only return non-nil values when the experimental exemplar
-// feature is enabled and the OTEL_METRICS_EXEMPLAR_FILTER environment variable
-// is not set to always_off.
-func reservoirFunc[N int64 | float64](agg Aggregation) func() aggregate.FilteredExemplarReservoir[N] {
-	// https://github.com/open-telemetry/opentelemetry-specification/blob/d4b241f451674e8f611bb589477680341006ad2b/specification/configuration/sdk-environment-variables.md#exemplar
-	const filterEnvKey = "OTEL_METRICS_EXEMPLAR_FILTER"
-
-	var filter exemplar.Filter
-
-	switch os.Getenv(filterEnvKey) {
-	case "always_on":
-		filter = exemplar.AlwaysOnFilter
-	case "always_off":
-		return aggregate.DropReservoir
-	case "trace_based":
-		fallthrough
-	default:
-		filter = exemplar.TraceBasedFilter
+// creation func based on the passed InstrumentKind and filter configuration.
+func reservoirFunc[N int64 | float64](
+	provider exemplar.ReservoirProvider,
+	filter exemplar.Filter,
+) func(attribute.Set) aggregate.FilteredExemplarReservoir[N] {
+	return func(attrs attribute.Set) aggregate.FilteredExemplarReservoir[N] {
+		return aggregate.NewFilteredExemplarReservoir[N](filter, provider(attrs))
 	}
+}
 
+// DefaultExemplarReservoirProviderSelector returns the default
+// [exemplar.ReservoirProvider] for the
+// provided [Aggregation].
+//
+// For explicit bucket histograms with more than 1 bucket, it uses the
+// [exemplar.HistogramReservoirProvider].
+// For exponential histograms, it uses the
+// [exemplar.FixedSizeReservoirProvider]
+// with a size of min(20, max_buckets).
+// For all other aggregations, it uses the
+// [exemplar.FixedSizeReservoirProvider]
+// with a size equal to the number of CPUs.
+//
+// Exemplar default reservoirs MAY change in a minor version bump. No
+// guarantees are made on the shape or statistical properties of returned
+// exemplars.
+func DefaultExemplarReservoirProviderSelector(agg Aggregation) exemplar.ReservoirProvider {
 	// https://github.com/open-telemetry/opentelemetry-specification/blob/d4b241f451674e8f611bb589477680341006ad2b/specification/metrics/sdk.md#exemplar-defaults
 	// Explicit bucket histogram aggregation with more than 1 bucket will
 	// use AlignedHistogramBucketExemplarReservoir.
 	a, ok := agg.(AggregationExplicitBucketHistogram)
 	if ok && len(a.Boundaries) > 0 {
-		cp := slices.Clone(a.Boundaries)
-		return func() aggregate.FilteredExemplarReservoir[N] {
-			bounds := cp
-			return aggregate.NewFilteredExemplarReservoir[N](filter, exemplar.NewHistogramReservoir(bounds))
-		}
+		return exemplar.HistogramReservoirProvider(a.Boundaries)
 	}
 
 	var n int
@@ -54,10 +58,7 @@ func reservoirFunc[N int64 | float64](agg Aggregation) func() aggregate.Filtered
 		// SimpleFixedSizeExemplarReservoir with a reservoir equal to the
 		// smaller of the maximum number of buckets configured on the
 		// aggregation or twenty (e.g. min(20, max_buckets)).
-		n = int(a.MaxSize)
-		if n > 20 {
-			n = 20
-		}
+		n = min(int(a.MaxSize), 20)
 	} else {
 		// https://github.com/open-telemetry/opentelemetry-specification/blob/e94af89e3d0c01de30127a0f423e912f6cda7bed/specification/metrics/sdk.md#simplefixedsizeexemplarreservoir
 		//   This Exemplar reservoir MAY take a configuration parameter for
@@ -65,14 +66,12 @@ func reservoirFunc[N int64 | float64](agg Aggregation) func() aggregate.Filtered
 		//   provided, the default size MAY be the number of possible
 		//   concurrent threads (e.g. number of CPUs) to help reduce
 		//   contention. Otherwise, a default size of 1 SHOULD be used.
-		n = runtime.NumCPU()
-		if n < 1 {
-			// Should never be the case, but be defensive.
-			n = 1
-		}
+		//
+		// Use runtime.GOMAXPROCS instead of runtime.NumCPU to support
+		// containerized environments that may have less than the total number
+		// of logical CPUs available on the local machine allocated to it.
+		n = max(runtime.GOMAXPROCS(0), 1)
 	}
 
-	return func() aggregate.FilteredExemplarReservoir[N] {
-		return aggregate.NewFilteredExemplarReservoir[N](filter, exemplar.NewFixedSizeReservoir(n))
-	}
+	return exemplar.FixedSizeReservoirProvider(n)
 }
