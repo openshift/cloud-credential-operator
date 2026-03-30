@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	log "github.com/sirupsen/logrus"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/serializer"
 	"k8s.io/client-go/kubernetes"
@@ -37,12 +39,14 @@ import (
 )
 
 const (
-	controllerName                      = "pod-identity"
-	deploymentName                      = "cloud-credential-operator"
-	operatorNamespace                   = "openshift-cloud-credential-operator"
-	retryInterval                       = 10 * time.Second
-	reasonStaticResourceReconcileFailed = "StaticResourceReconcileFailed"
-	pdb                                 = "v4.1.0/common/poddisruptionbudget.yaml"
+	controllerName                            = "pod-identity"
+	deploymentName                            = "cloud-credential-operator"
+	operatorNamespace                         = "openshift-cloud-credential-operator"
+	retryInterval                             = 10 * time.Second
+	reasonStaticResourceReconcileFailed       = "StaticResourceReconcileFailed"
+	reasonPodIdentityWebhookPodsStillUpdating = "PodIdentityWebhookPodsStillUpdating"
+	reasonPodIdentityWebhookPodsNotAvailable  = "PodIdentityWebhookPodsNotAvailable"
+	pdb                                       = "v4.1.0/common/poddisruptionbudget.yaml"
 )
 
 var (
@@ -198,6 +202,7 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeconfig string) error {
 		logger:          logger,
 		eventRecorder:   eventRecorder,
 		imagePullSpec:   imagePullSpec,
+		conditionsMutex: &sync.RWMutex{},
 		conditions:      []configv1.ClusterOperatorStatusCondition{},
 		cache:           resourceapply.NewResourceCache(),
 		podIdentityType: podIdentityType,
@@ -282,6 +287,7 @@ type staticResourceReconciler struct {
 	eventRecorder        events.Recorder
 	deploymentGeneration int64
 	imagePullSpec        string
+	conditionsMutex      *sync.RWMutex
 	conditions           []configv1.ClusterOperatorStatusCondition
 	cache                resourceapply.ResourceCache
 	podIdentityType      PodIdentityManifestSource
@@ -291,6 +297,8 @@ var _ reconcile.Reconciler = &staticResourceReconciler{}
 
 func (r *staticResourceReconciler) Reconcile(ctx context.Context, request reconcile.Request) (reconcile.Result, error) {
 	r.logger.Debugf("reconciling after watch event %#v", request)
+	r.conditionsMutex.Lock()
+
 	err := r.ReconcileResources(ctx)
 	if err != nil {
 		r.logger.Errorf("reconciliation failed, retrying in %s", retryInterval.String())
@@ -302,9 +310,13 @@ func (r *staticResourceReconciler) Reconcile(ctx context.Context, request reconc
 				Message: fmt.Sprintf("static resource reconciliation failed: %v", err),
 			},
 		}
+
+		r.conditionsMutex.Unlock()
 		return reconcile.Result{RequeueAfter: retryInterval}, err
 	}
+
 	r.conditions = []configv1.ClusterOperatorStatusCondition{}
+	r.conditionsMutex.Unlock()
 	return reconcile.Result{}, nil
 }
 
@@ -384,10 +396,95 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) error
 	return nil
 }
 
+type webhookPodStatus struct {
+	desiredReplicas   int32
+	availableReplicas int32
+	updatedReplicas   int32
+	totalReplicas     int32
+}
+
+func (wps *webhookPodStatus) Available() bool {
+	return wps.availableReplicas > 0
+}
+
+func (wps *webhookPodStatus) Progressing() bool {
+	return wps.updatedReplicas != wps.desiredReplicas || wps.totalReplicas != wps.desiredReplicas
+}
+
+func (r *staticResourceReconciler) CheckPodStatus(ctx context.Context) (*webhookPodStatus, error) {
+	deployment := &appsv1.Deployment{}
+	err := r.client.Get(ctx, client.ObjectKey{
+		Name:      "pod-identity-webhook",
+		Namespace: operatorNamespace,
+	}, deployment)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// If the pod identity webhook controller is running, we know that
+			// we will eventually want at least one pod identity webhook pod. If
+			// the Deployment is missing, we can still assume we want at least one.
+			// This is important to set the proper status of this controller later on.
+			return &webhookPodStatus{
+				desiredReplicas: 1,
+			}, nil
+		}
+		return nil, err
+	}
+
+	desiredReplicas := int32(1) // kubernetes defaults to 1 if not specified
+	if deployment.Spec.Replicas != nil {
+		desiredReplicas = *deployment.Spec.Replicas
+	}
+
+	deploymentStatus := &webhookPodStatus{
+		desiredReplicas:   desiredReplicas,
+		availableReplicas: deployment.Status.AvailableReplicas,
+		updatedReplicas:   deployment.Status.UpdatedReplicas,
+		totalReplicas:     deployment.Status.Replicas,
+	}
+
+	return deploymentStatus, nil
+}
+
 var _ status.Handler = &staticResourceReconciler{}
 
-func (r *staticResourceReconciler) GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
-	return r.conditions, nil
+func (r *staticResourceReconciler) GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error) {
+	r.conditionsMutex.RLock()
+	conditions := make([]configv1.ClusterOperatorStatusCondition, len(r.conditions))
+	copy(conditions, r.conditions)
+	r.conditionsMutex.RUnlock()
+
+	podStatus, err := r.CheckPodStatus(ctx)
+	if err != nil {
+		logger.WithError(err).Errorf("checking pod identity webhook status failed")
+		if len(conditions) > 0 {
+			// Ignore the pod status error for now, we have bigger conditions to report
+			return conditions, nil
+		}
+		return nil, err
+	}
+
+	if !podStatus.Available() {
+		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
+			Type:    configv1.OperatorAvailable,
+			Status:  configv1.ConditionFalse,
+			Reason:  reasonPodIdentityWebhookPodsNotAvailable,
+			Message: "No pod identity webhook pods are available",
+		})
+	}
+	if podStatus.Progressing() {
+		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+			Reason: reasonPodIdentityWebhookPodsStillUpdating,
+			Message: fmt.Sprintf(
+				"Waiting for pod identity webhook deployment rollout to finish: %d out of %d new replica(s) have been updated...",
+				podStatus.updatedReplicas,
+				podStatus.desiredReplicas,
+			),
+		})
+	}
+
+	return conditions, nil
 }
 
 func (r *staticResourceReconciler) GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error) {

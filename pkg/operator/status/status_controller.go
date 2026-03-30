@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	k8errors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +45,7 @@ const (
 // Handler produces conditions and related objects to be reflected
 // in the cloud-credential-operator ClusterOperatorStatus
 type Handler interface {
-	GetConditions(logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error)
+	GetConditions(ctx context.Context, logger log.FieldLogger) ([]configv1.ClusterOperatorStatusCondition, error)
 	GetRelatedObjects(logger log.FieldLogger) ([]configv1.ObjectReference, error)
 	Name() string
 }
@@ -156,6 +157,15 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 		return err
 	}
 
+	// Watch the pod-identity-webhook Deployment to re-reconcile status when pod identity controller reconciles
+	// The manager cache is already filtered to only this deployment in cmd.go
+	err = c.Watch(source.Kind(operatorCache, &appsv1.Deployment{},
+		handler.TypedEnqueueRequestsFromMapFunc[*appsv1.Deployment](alwaysReconcileCCOConfigObject),
+	))
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -179,7 +189,7 @@ func (r *ReconcileStatus) Reconcile(ctx context.Context, request reconcile.Reque
 		metrics.MetricControllerReconcileTime.WithLabelValues(controllerName).Observe(dur.Seconds())
 	}()
 
-	err := syncStatus(r.Client, r.Logger)
+	err := syncStatus(ctx, r.Client, r.Logger)
 	return reconcile.Result{
 		RequeueAfter: defaultRequeuePeriod,
 	}, err
@@ -188,11 +198,11 @@ func (r *ReconcileStatus) Reconcile(ctx context.Context, request reconcile.Reque
 // syncStatus is written in a way so that if we expose this function it would allow
 // external controllers to trigger a static sync. But for now we will make this an internal
 // function until the need arises to expose it.
-func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
+func syncStatus(ctx context.Context, kubeClient client.Client, logger log.FieldLogger) error {
 	log.Info("reconciling clusteroperator status")
 
 	co := &configv1.ClusterOperator{}
-	err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: constants.CloudCredClusterOperatorName}, co)
+	err := kubeClient.Get(ctx, types.NamespacedName{Name: constants.CloudCredClusterOperatorName}, co)
 	isNotFound := k8errors.IsNotFound(err)
 	if err != nil && !isNotFound {
 		logger.WithError(err).WithField("clusterOperator", constants.CloudCredClusterOperatorName).Error("failed to retrive ClusterOperator")
@@ -209,7 +219,7 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 	conditions := []configv1.ClusterOperatorStatusCondition{}
 	relatedObjects := []configv1.ObjectReference{}
 	for handlerName, handler := range statusHandlers {
-		handlerConditions, err := handler.GetConditions(logger)
+		handlerConditions, err := handler.GetConditions(ctx, logger)
 		logger.WithFields(log.Fields{
 			"handlerconditions": handlerConditions,
 			"statushandler":     handlerName,
@@ -261,11 +271,14 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 		progressing, _ := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
 		// We know this should be there.
 		progressing.LastTransitionTime = metav1.Now()
+		progressing.Status = configv1.ConditionTrue
+		progressing.Reason = "VersionChanged"
+		progressing.Message = "Operator version is updating"
 	}
 
 	// ClusterOperator should already exist (from the manifest payload), but recreate it if needed
 	if isNotFound {
-		if err := kubeClient.Create(context.TODO(), co); err != nil {
+		if err := kubeClient.Create(ctx, co); err != nil {
 			return errors.Wrap(err, "failed to create clusteroperator")
 		}
 		logger.Info("created clusteroperator")
@@ -281,7 +294,7 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 		!reflect.DeepEqual(oldVersions, co.Status.Versions) ||
 		!reflect.DeepEqual(oldRelatedObjects, co.Status.RelatedObjects) {
 
-		if err := kubeClient.Status().Update(context.TODO(), co); err != nil {
+		if err := kubeClient.Status().Update(ctx, co); err != nil {
 			return errors.Wrap(err, "failed to update clusteroperator status")
 		}
 		logger.Info("clusteroperator status updated")

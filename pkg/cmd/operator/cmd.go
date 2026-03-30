@@ -35,6 +35,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/fields"
@@ -228,6 +229,11 @@ func NewOperator() *cobra.Command {
 						Field: fields.SelectorFromSet(fields.Set{
 							"metadata.namespace": minterv1.CloudCredOperatorNamespace,
 							"metadata.name":      constants.CloudCredOperatorConfigMap,
+						}),
+					},
+					&appsv1.Deployment{}: {
+						Field: fields.SelectorFromSet(fields.Set{
+							"metadata.namespace": minterv1.CloudCredOperatorNamespace,
 						}),
 					},
 				}
