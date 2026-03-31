@@ -278,7 +278,7 @@ func skipIfHypershiftHostedCluster(oc *CLI) {
 // skipIfMicroShift skips the test if the cluster is MicroShift
 func skipIfMicroShift(oc *CLI) {
 	if isMicroshiftCluster(oc) {
-		g.Skip("Test is skipped on MicroShift clusters")
+		g.Skip("Test is skipped on MicroShift")
 	}
 }
 
@@ -390,41 +390,33 @@ func applyNsResourceFromTemplate(oc *CLI, ns string, args ...string) {
 // Returns:
 //   - bool: true if cluster is MicroShift, false otherwise
 func isMicroshiftCluster(oc *CLI) bool {
-	return !isCRDSpecificFieldExist(oc, "template.apiVersion")
-}
-
-// isCRDSpecificFieldExist checks whether the specified CRD field exists in the cluster
-// Parameters:
-//   - oc: CLI client for interacting with the OpenShift cluster
-//   - crdFieldPath: path to the CRD field to check (e.g., "template.apiVersion")
-//
-// Returns:
-//   - bool: true if the CRD field exists, false otherwise
-func isCRDSpecificFieldExist(oc *CLI, crdFieldPath string) bool {
-	var (
-		crdFieldInfo string
-		getInfoErr   error
-	)
-	err := wait.PollUntilContextTimeout(context.TODO(), 5*time.Second, 30*time.Second, false, func(ctx context.Context) (bool, error) {
-		crdFieldInfo, getInfoErr = oc.AsAdmin().WithoutNamespace().Run("explain").Args(crdFieldPath).Output()
-		if getInfoErr != nil && strings.Contains(crdFieldInfo, "the server doesn't have a resource type") {
-			if strings.Contains(crdFieldInfo, "the server doesn't have a resource type") {
-				logf("The test cluster specified crd field: %s is not exist.", crdFieldPath)
-				return true, nil
-			}
-			// TODO: The "couldn't find resource" error info sometimes(very low frequency) happens in few cases but I couldn't reproduce it, this retry solution should be an enhancement
-			if strings.Contains(getInfoErr.Error(), "couldn't find resource") {
-				logf("Failed to check whether the specified crd field: %s exist, try again. Err:\n%v", crdFieldPath, getInfoErr)
-				return false, nil
-			}
-			return false, getInfoErr
+	var version string
+	err := wait.PollUntilContextTimeout(context.TODO(), 10*time.Second, 5*time.Minute, true, func(ctx context.Context) (bool, error) {
+		out, getErr := oc.AsAdmin().WithoutNamespace().Run("get").Args("configmap", "microshift-version", "-n", "kube-public", "-o=jsonpath={.data.version}").Output()
+		if getErr == nil {
+			version = strings.TrimSpace(out)
+			return true, nil
 		}
-		return true, nil
+
+		output := strings.TrimSpace(out)
+		if strings.Contains(output, "not found") || strings.Contains(output, "(NotFound)") {
+			version = ""
+			return true, nil
+		}
+
+		logf("IsMicroShiftCluster: retrying after transient error reading kube-public/microshift-version: %v, output: %s", getErr, output)
+		return false, nil
 	})
 	if err != nil {
-		g.Skip(fmt.Sprintf("Check whether the specified: %s crd field exist with err %v for case, so skip it.", crdFieldPath, err))
+		logf("IsMicroShiftCluster: timed out after 5m: %v (assuming not MicroShift)", err)
+		return false
 	}
-	return !strings.Contains(crdFieldInfo, "the server doesn't have a resource type")
+	if version == "" {
+		logf("IsMicroShiftCluster: kube-public/microshift-version not found, not MicroShift")
+		return false
+	}
+	logf("IsMicroShiftCluster: MicroShift cluster with version: %s", version)
+	return true
 }
 
 // IsRosaCluster determines whether the cluster is a Red Hat OpenShift Service on AWS (ROSA) cluster
