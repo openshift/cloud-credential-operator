@@ -251,7 +251,7 @@ func TestReconcileSecretMissingLabel_GetConditions(t *testing.T) {
 				mutatingClient: nil,
 			}
 
-			conditions, err := rcr.GetConditions(context.TODO(), logrus.StandardLogger())
+			conditions, err := rcr.GetConditions(logrus.StandardLogger())
 
 			if err != nil && !test.expectErr {
 				require.NoError(t, err, "Unexpected error: %v", err)
