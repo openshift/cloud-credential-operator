@@ -32,9 +32,8 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 	)
 
 	g.JustBeforeEach(func() {
-		skipNoCapabilities(oc, ccoCap)
-		skipIfHypershiftHostedCluster(oc)
 		skipIfMicroShift(oc)
+		skipNoCapabilities(oc, ccoCap)
 	})
 
 	// Upgrade test: skipped until QE CI migration.
@@ -61,6 +60,7 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 	// It is destructive case, will remove root credentials, so adding [Disruptive]. The case duration is greater than 5 minutes
 	// so adding [Slow]
 	g.It("[Suite:cco/disruptive][OTP][PolarionID:31768][Disruptive][Slow]NonHyperShiftHOST-High-Report the mode of cloud-credential operation as a metric", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		iaasPlatform, err := getIaasPlatform(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
 
@@ -146,6 +146,7 @@ spec:
 	})
 
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:33204][Level0][platform:azure] NonHyperShiftHOST-Critical-[cco-passthrough]IPI on azure with cco passthrough mode", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		g.By("Check if it's an azure cluster")
 		skipIfPlatformTypeNot(oc, "azure")
 
@@ -161,6 +162,7 @@ spec:
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1940142
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1952891
 	g.It("[Suite:cco/disruptive][OTP][PolarionID:45415][Disruptive][platform:openstack] NonHyperShiftHOST-High-[Bug 1940142] Reset CACert to correct path", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		g.By("Check if it's an osp cluster")
 		skipIfPlatformTypeNot(oc, "openstack")
 		g.By("Get openstack root credential clouds.yaml field")
@@ -250,6 +252,7 @@ data:
 	})
 
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:36498][Level0][platform:aws] NonHyperShiftHOST-ROSA-OSD_CCS-Critical-CCO credentials secret change to STS-style", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		//Check IAAS platform type
 		iaasPlatform := checkPlatform(oc)
 		if iaasPlatform != "aws" {
@@ -268,6 +271,7 @@ data:
 	})
 
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:50869] NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Medium-High-53283-High-77285-CCO Pod Security Admission change", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		g.By("1.Check cloud-credential-operator pod")
 		ccoPodName, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("pod", "-l", "app=cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.items[*].metadata.name}").Output()
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -301,6 +305,7 @@ data:
 
 	// The feature is supported starting from version 4.19.
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:80542] NonHyperShiftHOST-ROSA-OSD_CCS-ARO-High-Enable readOnlyRootFilesystem on all containers", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		g.By("Check if SCC Security readOnlyRootFilesystem is correctly configured for the cloud-credential-operator")
 		ccoOperatorPods, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("pod", "-l", "app=cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.items[*].metadata.name}").Output()
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -338,6 +343,7 @@ data:
 	})
 
 	g.It("[Suite:cco/disruptive][OTP][PolarionID:48360][Disruptive][platform:aws] NonHyperShiftHOST-Medium-Reconciliation of aws pod identity mutating webhook did not happen", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		//Check IAAS platform type
 		iaasPlatform := checkPlatform(oc)
 		if iaasPlatform != "aws" {
@@ -377,6 +383,7 @@ data:
 	})
 
 	g.It("[Suite:cco/disruptive][OTP][PolarionID:45975][Disruptive] NonHyperShiftHOST-Medium-Test cco condition changes", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		//Check CCO mode
 		mode, err := getCloudCredentialMode(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
@@ -473,11 +480,13 @@ data:
 
 	//For bug https://bugzilla.redhat.com/show_bug.cgi?id=1977319
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:45219] NonHyperShiftHOST-ROSA-OSD_CCS-ARO-High-A fresh cluster should not have stale CR", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		output, _ := oc.AsAdmin().WithoutNamespace().Run("get").Args("service", "controller-manager-service", "-n", DefaultNamespace).Output()
 		o.Expect(output).To(o.ContainSubstring("Error from server (NotFound)"))
 	})
 
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:34470] NonHyperShiftHOST-ROSA-OSD_CCS-ARO-Critical-Cloud credential operator health check", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		iaasPlatform, err := getIaasPlatform(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
 		// Skip tests for IBMCloud/Nutanix due to known issues with these platforms.
@@ -499,6 +508,7 @@ data:
 	})
 
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:66538][Level0][platform:azure] NonHyperShiftHOST-OSD_CCS-ARO-Critical-Azure workload identity cluster healthy check", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		mode, _ := getCloudCredentialMode(oc)
 		if !(checkPlatform(oc) == "azure" && mode == "manualpodidentity") {
 			g.Skip("The cluster is not Azure Workload Identity Cluster - skipping test ...")
@@ -611,6 +621,7 @@ spec:
 	})
 
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:69971][platform:azure] NonHyperShiftHOST-OSD_CCS-ARO-Critical-Azure workload identity management for olm managed operators", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		skipIfPlatformTypeNot(oc, "azure")
 		if !isWorkloadIdentityCluster(oc) {
 			g.Skip("This test case is for Azure Workload Identity only, skipping")
@@ -696,6 +707,7 @@ spec:
 	})
 
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:75429][platform:gcp] NonHyperShiftHOST-OSD_CCS-Critical-GCP workload identity management for olm managed operators", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		skipIfPlatformTypeNot(oc, "gcp")
 		if !isWorkloadIdentityCluster(oc) {
 			g.Skip("This test case is for GCP Workload Identity only, skipping")
@@ -787,9 +799,8 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 	)
 
 	g.BeforeEach(func() {
-		skipIfCapEnabled(oc, ccoCap)
-		skipIfHypershiftHostedCluster(oc)
 		skipIfMicroShift(oc)
+		skipIfCapEnabled(oc, ccoCap)
 	})
 
 	/*
@@ -801,6 +812,7 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 		- The test case will not be able to detect such scenario when a resource is added (but not annotated) in the future
 	*/
 	g.It("[Suite:cco/conformance/parallel][OTP][PolarionID:68220] NonHyperShiftHOST-Critical-Leverage Composable OpenShift feature to make cloud-credential optional", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
 		var (
 			getManifestContent = func(manifest *github.RepositoryContent) []byte {
 				// Prefer manifest.Content
