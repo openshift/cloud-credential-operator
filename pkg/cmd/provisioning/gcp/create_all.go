@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"path"
@@ -46,7 +47,7 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create workload identity pool: %s", err)
 	}
 
-	if err = createWorkloadIdentityProvider(ctx, gcpClient, CreateAllOpts.Name, CreateAllOpts.Region, CreateAllOpts.Project, CreateAllOpts.Name, publicKeyPath, CreateAllOpts.TargetDir, false); err != nil {
+	if err = createWorkloadIdentityProvider(ctx, gcpClient, CreateAllOpts.Name, CreateAllOpts.Region, CreateAllOpts.Project, CreateAllOpts.Name, publicKeyPath, CreateAllOpts.TargetDir, CreateAllOpts.KeyStorageMethod, false); err != nil {
 		log.Fatalf("Failed to create workload identity provider: %s", err)
 	}
 
@@ -61,6 +62,10 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 func validationForCreateAllCmd(cmd *cobra.Command, args []string) {
 	if len(CreateAllOpts.Name) > 32 {
 		log.Fatalf("Name can be at most 32 characters long")
+	}
+
+	if err := validateKeyStorageMethod(CreateAllOpts.KeyStorageMethod); err != nil {
+		log.Fatalf("%s", err)
 	}
 
 	if CreateAllOpts.TargetDir == "" {
@@ -117,6 +122,7 @@ func NewCreateAllCmd() *cobra.Command {
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	createAllCmd.PersistentFlags().BoolVar(&CreateAllOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
+	createAllCmd.PersistentFlags().StringVar(&CreateAllOpts.KeyStorageMethod, "key-storage-method", KeyStorageMethodPublicBucket, fmt.Sprintf("Method for storing OIDC JWK files. %q (default) creates a public GCS bucket; %q attaches the JWK directly to the workload identity pool provider without creating a bucket", KeyStorageMethodPublicBucket, KeyStorageMethodPoolJWKFile))
 
 	return createAllCmd
 }

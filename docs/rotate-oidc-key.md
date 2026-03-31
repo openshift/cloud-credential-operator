@@ -37,6 +37,8 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     CURRENT_ISSUER=$(oc get authentication cluster -o jsonpath='{.spec.serviceAccountIssuer}')
 
     GCP_BUCKET=$(echo ${CURRENT_ISSUER} | cut -d "/" -f4)
+
+    CLUSTER_NAME=${GCP_BUCKET%-*}
     ```
 
 1. Confirm that your cluster is in a stable state.
@@ -100,9 +102,14 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     az storage blob download --container-name ${AZURE_STORAGE_CONTAINER} --account-name ${AZURE_STORAGE_ACCOUNT} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.current.json
     ```
 
-    GCP
+    GCP public-bucket
     ```bash
     gcloud storage cp gs://${GCP_BUCKET}/keys.json ${TEMPDIR}/jwks.current.json
+    ```
+
+    GCP pool-jwk-file
+    ```bash
+    gcloud iam workload-identity-pools providers describe --format json --location global --workload-identity-pool ${CLUSTER_NAME} ${CLUSTER_NAME} | jq -r ".oidc.jwksJson" > ${TEMPDIR}/jwks.current.json
     ```
 
 1. Combine the current and new keys
@@ -127,9 +134,14 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     az storage blob upload --overwrite --account-name ${AZURE_STORAGE_ACCOUNT}  --container-name ${AZURE_STORAGE_CONTAINER} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.combined.json
     ```
 
-    GCP
+    GCP public-bucket
     ```bash
     gcloud storage cp ${TEMPDIR}/jwks.combined.json gs://${GCP_BUCKET}/keys.json
+    ```
+
+    GCP pool-jwk-file
+    ```bash
+    gcloud iam workload-identity-pools providers update-oidc ${CLUSTER_NAME} --location=global --workload-identity-pool=${CLUSTER_NAME} --jwk-json-path=${TEMPDIR}/jwks.combined.json
     ```
 
 1. Wait for kube-apiserver to update to the new key
@@ -168,7 +180,12 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     az storage blob upload --overwrite --account-name ${AZURE_STORAGE_ACCOUNT} --container-name ${AZURE_STORAGE_CONTAINER} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.new.json
     ```
 
-    GCP
+    GCP public-bucket
     ```bash
     gcloud storage cp ${TEMPDIR}/jwks.new.json gs://${GCP_BUCKET}/keys.json
+    ```
+
+    GCP pool-jwk-file
+    ```bash
+    gcloud iam workload-identity-pools providers update-oidc ${CLUSTER_NAME} --location=global --workload-identity-pool=${CLUSTER_NAME} --jwk-json-path=${TEMPDIR}/jwks.new.json
     ```

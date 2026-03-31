@@ -15,6 +15,7 @@ type options struct {
 	WorkloadIdentityPool     string
 	WorkloadIdentityProvider string
 	CredRequestDir           string
+	KeyStorageMethod         string
 	DryRun                   bool
 	EnableTechPreview        bool
 }
