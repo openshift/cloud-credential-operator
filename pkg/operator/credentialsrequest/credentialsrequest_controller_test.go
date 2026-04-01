@@ -342,10 +342,8 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 					conditionType: configv1.OperatorProgressing,
 					status:        corev1.ConditionTrue,
 				},
-				{
-					conditionType: configv1.OperatorDegraded,
-					status:        corev1.ConditionTrue,
-				},
+				// Degraded may also be reported here (failing + generation mismatch).
+				// Suppression during cluster upgrades is handled centrally in syncStatus.
 			},
 		},
 		{

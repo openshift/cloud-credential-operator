@@ -2,6 +2,7 @@ package status
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"reflect"
 	"sort"
@@ -39,6 +40,8 @@ const (
 	msgOperatorDisabled    = "Credential minting is disabled by cluster admin"
 	reasonOperatorDisabled = "OperatorDisabledByAdmin"
 	defaultRequeuePeriod   = time.Minute * 5
+
+	reasonVersionChanged = "VersionChanged"
 )
 
 // Handler produces conditions and related objects to be reflected
@@ -106,6 +109,11 @@ func Add(mgr, rootCredentialManager manager.Manager, kubeConfig string) error {
 	operatorCache := mgr.GetCache()
 
 	if err := c.Watch(source.Kind(operatorCache, &operatorv1.CloudCredential{}, &handler.TypedEnqueueRequestForObject[*operatorv1.CloudCredential]{})); err != nil {
+		return err
+	}
+
+	// Watch ClusterVersion so we can detect cluster-wide upgrades and suppress Degraded accordingly.
+	if err := c.Watch(source.Kind(operatorCache, &configv1.ClusterVersion{}, handler.TypedEnqueueRequestsFromMapFunc[*configv1.ClusterVersion](alwaysReconcileCCOConfigObject))); err != nil {
 		return err
 	}
 
@@ -208,15 +216,25 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 	// If the controller is functioning normally, it should return an empty slice of conditions.
 	conditions := []configv1.ClusterOperatorStatusCondition{}
 	relatedObjects := []configv1.ObjectReference{}
-	for handlerName, handler := range statusHandlers {
+	handlerNames := make([]string, 0, len(statusHandlers))
+	for name := range statusHandlers {
+		handlerNames = append(handlerNames, name)
+	}
+	sort.Strings(handlerNames)
+	for _, handlerName := range handlerNames {
+		handler := statusHandlers[handlerName]
 		handlerConditions, err := handler.GetConditions(logger)
 		logger.WithFields(log.Fields{
 			"handlerconditions": handlerConditions,
 			"statushandler":     handlerName,
 		}).Debug("received conditions from handler")
 		if err != nil {
+			// Do not continue — a handler failure would leave its condition
+			// types unset, causing defaultUnsetConditions to mark them
+			// "AsExpected" and masking real problems. Abort the reconcile
+			// so the last published status is preserved.
 			logger.WithError(err).WithField("statushandler", handlerName).Errorf("failed to get conditions from status handler")
-			continue
+			return fmt.Errorf("status handler %s failed: %w", handlerName, err)
 		}
 		conditions = mergeConditions(conditions, handlerConditions, handlerName, logger)
 		handlerRelatedObjects, err := handler.GetRelatedObjects(logger)
@@ -252,24 +270,80 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 	// Update transition time for any condition that has changed
 	setLastTransitionTime(oldConditions, co.Status.Conditions)
 
-	// Check if version changed, if so force a progressing last transition update:
+	// Spec: report Progressing=True when actively rolling out a version change.
+	// On the reconcile where the version changes, set Progressing=True. On
+	// subsequent reconciles, handlers dictate the Progressing state — if no
+	// handler reports Progressing=True, we are done progressing.
+	progressing, _ := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
 	if !reflect.DeepEqual(oldVersions, co.Status.Versions) {
+		// Version just changed — set Progressing=True with VersionChanged reason.
 		logger.WithFields(log.Fields{
 			"old": oldVersions,
 			"new": co.Status.Versions,
-		}).Info("version has changed, updating progressing condition lastTransitionTime")
-		progressing, _ := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorProgressing)
-		// We know this should be there.
-		progressing.LastTransitionTime = metav1.Now()
+		}).Info("version has changed, setting Progressing=True")
+		if progressing != nil {
+			oldProgressing, _ := findClusterOperatorCondition(oldConditions, configv1.OperatorProgressing)
+			if oldProgressing == nil || oldProgressing.Status != configv1.ConditionTrue {
+				progressing.LastTransitionTime = metav1.Now()
+			} else {
+				progressing.LastTransitionTime = oldProgressing.LastTransitionTime
+			}
+			progressing.Status = configv1.ConditionTrue
+			progressing.Reason = reasonVersionChanged
+			progressing.Message = "Operator version is updating"
+		}
+	}
+
+	// Spec: "A component must not report Degraded during the course of a normal upgrade."
+	// Suppression is scoped to when this operator is actively progressing as part
+	// of the upgrade. Once CCO finishes its upgrade work (Progressing=False), Degraded
+	// is no longer suppressed — even if the cluster-wide upgrade is still running —
+	// because any failure at that point is a real problem, not an upgrade artifact.
+	// Available is NOT suppressed during upgrades — multi-replica deployments spread
+	// across nodes handle upgrade availability naturally.
+	operatorIsProgressing := progressing != nil && progressing.Status == configv1.ConditionTrue
+	clusterUpgrading, upgradeErr := isClusterUpgrading(kubeClient, logger)
+	if upgradeErr != nil {
+		// Cannot determine cluster upgrade state — default to not suppressing
+		// Degraded so the rest of the status sync can proceed. This avoids
+		// leaving stale conditions when the ClusterVersion is temporarily
+		// unreadable (e.g., during API server restarts).
+		logger.WithError(upgradeErr).Warn("unable to determine cluster upgrade state, defaulting to not suppressing Degraded")
+		clusterUpgrading = false
+	}
+	if clusterUpgrading && operatorIsProgressing {
+		degraded, _ := findClusterOperatorCondition(co.Status.Conditions, configv1.OperatorDegraded)
+		if degraded != nil && degraded.Status == configv1.ConditionTrue {
+			logger.Info("suppressing Degraded condition during cluster upgrade")
+			originalMessage := fmt.Sprintf("Degraded=True suppressed during cluster upgrade (reason: %s, message: %s)",
+				degraded.Reason, degraded.Message)
+			degraded.Status = configv1.ConditionFalse
+			degraded.Reason = "UpgradeInProgress"
+			degraded.Message = originalMessage
+			// Preserve transition time: if the old condition was already False
+			// (suppressed on a previous reconcile), carry its transition time forward
+			// rather than using the one setLastTransitionTime computed from the
+			// intermediate True state.
+			oldDegraded, _ := findClusterOperatorCondition(oldConditions, configv1.OperatorDegraded)
+			if oldDegraded != nil && oldDegraded.Status == configv1.ConditionFalse {
+				degraded.LastTransitionTime = oldDegraded.LastTransitionTime
+			} else {
+				degraded.LastTransitionTime = metav1.Now()
+			}
+		}
 	}
 
 	// ClusterOperator should already exist (from the manifest payload), but recreate it if needed
 	if isNotFound {
+		co.Name = constants.CloudCredClusterOperatorName
 		if err := kubeClient.Create(context.TODO(), co); err != nil {
 			return errors.Wrap(err, "failed to create clusteroperator")
 		}
 		logger.Info("created clusteroperator")
-		// return error so we can immediately recalculate status???
+		if err := kubeClient.Status().Update(context.TODO(), co); err != nil {
+			return errors.Wrap(err, "failed to update clusteroperator status after creation")
+		}
+		logger.Info("updated clusteroperator status after creation")
 		return nil
 	}
 
@@ -291,18 +365,53 @@ func syncStatus(kubeClient client.Client, logger log.FieldLogger) error {
 }
 
 // mergeConditions will take the existing list of conditions and merge in the list of new conditions.
-// Any pre-existing condition will be overwritten with the values found in the new list (and logged).
+// When multiple handlers set the same condition type, the "worst" status wins:
+// for Degraded/Progressing True is worse; for Available/Upgradeable False is worse.
+// When both are equally bad, messages are concatenated so no information is lost.
 func mergeConditions(existing, new []configv1.ClusterOperatorStatusCondition, handlerName string, logger log.FieldLogger) []configv1.ClusterOperatorStatusCondition {
 	for _, newCondition := range new {
 		existingCondition, index := findClusterOperatorCondition(existing, newCondition.Type)
 		if existingCondition == nil {
 			existing = append(existing, newCondition)
 		} else {
-			logger.WithField("statushandler", handlerName).Warningf("condition already set for type %s by a previous handler, the new condition from the current handler will be accepted: %v", newCondition.Type, newCondition)
-			existing[index] = newCondition
+			logger.WithField("statushandler", handlerName).Infof("condition already set for type %s by a previous handler, merging with worst-wins", newCondition.Type)
+			existing[index] = worstCondition(*existingCondition, newCondition)
 		}
 	}
 	return existing
+}
+
+// isWorse returns true if candidate is a worse status than current for the
+// given condition type. For Degraded/Progressing, True is worse. For
+// Available/Upgradeable, False is worse.
+func isWorse(conditionType configv1.ClusterStatusConditionType, candidate, current configv1.ConditionStatus) bool {
+	if candidate == current {
+		return false
+	}
+	switch conditionType {
+	case configv1.OperatorAvailable, configv1.OperatorUpgradeable:
+		return candidate == configv1.ConditionFalse
+	default: // Degraded, Progressing
+		return candidate == configv1.ConditionTrue
+	}
+}
+
+// worstCondition returns the condition with the worse status, preserving the
+// winner's reason. When both have equally bad status, messages are concatenated.
+func worstCondition(a, b configv1.ClusterOperatorStatusCondition) configv1.ClusterOperatorStatusCondition {
+	if isWorse(a.Type, b.Status, a.Status) {
+		// b is worse — take b but append a's message for context
+		b.Message = b.Message + "; " + a.Message
+		return b
+	}
+	if isWorse(a.Type, a.Status, b.Status) {
+		// a is already worse — keep a but append b's message
+		a.Message = a.Message + "; " + b.Message
+		return a
+	}
+	// Same status — keep a's reason, concatenate messages
+	a.Message = a.Message + "; " + b.Message
+	return a
 }
 
 // findClusterOperatorCondition iterates all conditions on a ClusterOperator looking for the
@@ -328,7 +437,11 @@ func defaultUnsetConditions(existing []configv1.ClusterOperatorStatusCondition) 
 		if existingCondition != nil {
 			conditions = append(conditions, *existingCondition)
 		} else {
-			// No handler set this condition type, set to defaults
+			// No handler set this condition type, set to defaults.
+			// Spec: Available defaults to True (component is functional),
+			// Degraded defaults to False (no persistent issues),
+			// Progressing defaults to False (no active rollout),
+			// Upgradeable defaults to True (safe to upgrade).
 			defaultCondition := configv1.ClusterOperatorStatusCondition{
 				Type: conditionType,
 			}
@@ -416,6 +529,23 @@ func getWatchedSecrets(platformType configv1.PlatformType) []types.NamespacedNam
 
 	secrets = append(secrets, rootSecret)
 	return secrets
+}
+
+// isClusterUpgrading checks whether the cluster is currently performing an upgrade
+// by reading the ClusterVersion object's Progressing condition. Returns an error
+// if the ClusterVersion cannot be read, so callers can treat upgrade state as
+// unknown rather than assuming "not upgrading" on transient failures.
+func isClusterUpgrading(kubeClient client.Client, logger log.FieldLogger) (bool, error) {
+	cv := &configv1.ClusterVersion{}
+	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "version"}, cv); err != nil {
+		return false, errors.Wrap(err, "unable to get ClusterVersion")
+	}
+	for _, cond := range cv.Status.Conditions {
+		if cond.Type == configv1.OperatorProgressing {
+			return cond.Status == configv1.ConditionTrue, nil
+		}
+	}
+	return false, nil
 }
 
 func sortStatusArrays(status *configv1.ClusterOperatorStatus) {

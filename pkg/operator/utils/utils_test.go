@@ -209,6 +209,128 @@ func TestUpgradeableCheck(t *testing.T) {
 	}
 }
 
+func TestUpgradeableCheckAnnotationEdgeCases(t *testing.T) {
+	schemeutil.SetupScheme(scheme.Scheme)
+
+	tests := []struct {
+		name              string
+		annotation        string
+		expectUpgradeable bool // true = nil returned (upgradeable), false = condition returned
+	}{
+		{
+			name:              "empty annotation - not upgradeable in manual mode",
+			annotation:        "",
+			expectUpgradeable: false,
+		},
+		{
+			name:              "just v prefix - not upgradeable",
+			annotation:        "v",
+			expectUpgradeable: false,
+		},
+		{
+			name:              "garbage annotation - not upgradeable",
+			annotation:        "notaversion",
+			expectUpgradeable: false,
+		},
+		{
+			name:              "valid annotation higher than cluster version - upgradeable",
+			annotation:        "4.7",
+			expectUpgradeable: true,
+		},
+		{
+			name:              "valid annotation equal to cluster version - not upgradeable",
+			annotation:        "4.6",
+			expectUpgradeable: false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			clusterVersion := &configv1.ClusterVersion{
+				ObjectMeta: metav1.ObjectMeta{Name: "version"},
+				Status: configv1.ClusterVersionStatus{
+					History: []configv1.UpdateHistory{
+						{State: configv1.CompletedUpdate, Version: "4.6.0"},
+					},
+				},
+			}
+			operatorConfig := &operatorv1.CloudCredential{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:        "cluster",
+					Annotations: map[string]string{constants.UpgradeableAnnotation: test.annotation},
+				},
+				Spec: operatorv1.CloudCredentialSpec{
+					CredentialsMode: operatorv1.CloudCredentialsModeManual,
+				},
+			}
+
+			fakeClient := fake.NewClientBuilder().
+				WithRuntimeObjects(clusterVersion, operatorConfig).Build()
+
+			result := UpgradeableCheck(fakeClient, operatorv1.CloudCredentialsModeManual,
+				types.NamespacedName{Name: "dummy", Namespace: "dummy"})
+
+			if test.expectUpgradeable {
+				assert.Nil(t, result, "expected nil (upgradeable)")
+			} else {
+				require.NotNil(t, result, "expected non-nil condition (not upgradeable)")
+				assert.Equal(t, configv1.ConditionFalse, result.Status)
+			}
+		})
+	}
+}
+
+func TestGetClusterVersionCompletedEdgeCases(t *testing.T) {
+	t.Run("no completed updates", func(t *testing.T) {
+		cv := &configv1.ClusterVersion{
+			Status: configv1.ClusterVersionStatus{
+				History: []configv1.UpdateHistory{
+					{State: configv1.PartialUpdate, Version: "4.7.0"},
+					{State: configv1.PartialUpdate, Version: "4.6.0"},
+				},
+			},
+		}
+		result := getClusterVersionCompleted(cv)
+		assert.Equal(t, "", result, "should return empty when no completed updates exist")
+	})
+
+	t.Run("empty history", func(t *testing.T) {
+		cv := &configv1.ClusterVersion{
+			Status: configv1.ClusterVersionStatus{
+				History: []configv1.UpdateHistory{},
+			},
+		}
+		result := getClusterVersionCompleted(cv)
+		assert.Equal(t, "", result)
+	})
+
+	t.Run("duplicate completed versions", func(t *testing.T) {
+		cv := &configv1.ClusterVersion{
+			Status: configv1.ClusterVersionStatus{
+				History: []configv1.UpdateHistory{
+					{State: configv1.CompletedUpdate, Version: "4.6.0"},
+					{State: configv1.CompletedUpdate, Version: "4.6.0"},
+				},
+			},
+		}
+		result := getClusterVersionCompleted(cv)
+		assert.Equal(t, "v4.6.0", result)
+	})
+
+	t.Run("current completed version wins over older higher version", func(t *testing.T) {
+		cv := &configv1.ClusterVersion{
+			Status: configv1.ClusterVersionStatus{
+				History: []configv1.UpdateHistory{
+					{State: configv1.CompletedUpdate, Version: "4.5.0"},
+					{State: configv1.CompletedUpdate, Version: "4.6.0"},
+				},
+			},
+		}
+		result := getClusterVersionCompleted(cv)
+		assert.Equal(t, "v4.5.0", result)
+	})
+}
+
 func testRootSecret(name string) *corev1.Secret {
 	sec := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{

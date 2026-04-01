@@ -38,6 +38,9 @@ func (s *SecretStatusHandler) GetConditions(logger log.FieldLogger) ([]configv1.
 
 	// shouldn't happen with the server-side enforcement of the CRDs enum specification
 	if !utils.IsValidMode(mode) {
+		// Spec: Degraded means the component does not match its desired state over a
+		// period of time. An invalid mode is a persistent misconfiguration requiring
+		// administrator intervention.
 		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
 			Type:    configv1.OperatorDegraded,
 			Status:  configv1.ConditionTrue,
@@ -45,6 +48,9 @@ func (s *SecretStatusHandler) GetConditions(logger log.FieldLogger) ([]configv1.
 			Message: fmt.Sprintf("operator mode of %s is invalid", mode),
 		})
 	} else if conflict {
+		// Spec: Degraded for persistent misconfiguration requiring admin intervention.
+		// A conflict between legacy configmap and operator config is an unresolvable
+		// state without administrator action.
 		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
 			Type:   configv1.OperatorDegraded,
 			Status: configv1.ConditionTrue,

@@ -82,6 +82,8 @@ func (a *DummyActuator) IsTimedTokenCluster(c client.Client, ctx context.Context
 }
 
 func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
+	// Spec: Upgradeable=True means it is safe to upgrade. The DummyActuator
+	// always reports upgradeable since it performs no real cloud operations.
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
 		Status: configv1.ConditionTrue,
 		Type:   configv1.OperatorUpgradeable,

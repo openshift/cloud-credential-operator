@@ -346,6 +346,11 @@ func IsValidMode(operatorMode operatorv1.CloudCredentialsMode) bool {
 //
 // Note: the upgradeable flag can only stop upgrades from 4.x to 4.y, not 4.x.y to 4.x.z.
 func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentialsMode, rootSecret types.NamespacedName) *configv1.ClusterOperatorStatusCondition {
+	// Spec: Upgradeable indicates whether the component is safe to upgrade.
+	// When False, the CVO blocks minor OpenShift updates unless forced.
+	// Returns nil (no condition) when upgradeable — the status controller
+	// defaults unset Upgradeable to True, which the CVO treats as allowing
+	// updates (same as missing or Unknown per the spec).
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
 		Type: configv1.OperatorUpgradeable,
 	}
@@ -353,6 +358,10 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 	clusterVersion := &configv1.ClusterVersion{}
 	if err := kubeClient.Get(context.TODO(), types.NamespacedName{Name: "version"}, clusterVersion); err != nil {
 		log.Errorf("Failed to get ClusterVersion object while calculating Upgradeable: %s", err)
+		// Spec: Upgradeable=False blocks minor OpenShift updates. We cannot
+		// determine upgrade safety without the ClusterVersion, so we block
+		// upgrades defensively. The message includes the error to guide
+		// administrator investigation.
 		upgradeableCondition.Status = configv1.ConditionFalse
 		upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
 		upgradeableCondition.Message = fmt.Sprintf("Error getting ClusterVersion while determining upgradability: %s", err)
@@ -369,6 +378,9 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 	}
 
 	if !semver.IsValid(clusterSemVer) {
+		// Spec: Upgradeable=False blocks minor OpenShift updates. A malformed
+		// version string prevents us from comparing versions safely, so we
+		// block upgrades until the version is correctable.
 		upgradeableCondition.Status = configv1.ConditionFalse
 		upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
 		upgradeableCondition.Message = fmt.Sprintf("Unable to decode cluster version: %s", clusterSemVer)
@@ -385,6 +397,9 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 	}
 	if err := kubeClient.Get(context.Background(), operatorConfigKey, operatorConfig); err != nil {
 		log.WithError(err).Error("unexpected error checking for CloudCredential config annotation")
+		// Spec: Upgradeable=False blocks minor OpenShift updates. We need the
+		// operator config to check for the upgradeable annotation; without it
+		// we block upgrades defensively.
 		upgradeableCondition.Status = configv1.ConditionFalse
 		upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
 		upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgraded: %s", err)
@@ -407,8 +422,11 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 	// Check for upgradeability based on mode
 
 	if mode == operatorv1.CloudCredentialsModeManual {
-
-		// No matter what, if the annotation is missing/too low, we are Upgradeable=False when in Manual mode
+		// Spec: Upgradeable=False blocks minor OpenShift updates. In Manual mode
+		// the administrator must prepare credentials for the new version before
+		// upgrading and signal readiness via the upgradeable annotation. The
+		// message tells the administrator exactly what to do per the spec's
+		// requirement for a "human readable description."
 		upgradeableCondition.Status = configv1.ConditionFalse
 		upgradeableCondition.Reason = constants.MissingUpgradeableAnnotationReason
 		upgradeableCondition.Message = fmt.Sprintf("Upgradeable annotation %s on cloudcredential.operator.openshift.io/cluster object needs updating before upgrade."+
@@ -423,6 +441,10 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 	if err != nil {
 		if errors.IsNotFound(err) {
 			log.WithField("secret", rootSecret).Info("parent cred secret must be restored prior to upgrade, marking upgradeable=false")
+			// Spec: Upgradeable=False blocks minor OpenShift updates. In
+			// mint/passthrough mode the root credential secret is required for
+			// the upgrade process to provision updated credentials. The message
+			// tells the administrator which secret to restore.
 			upgradeableCondition.Status = configv1.ConditionFalse
 			upgradeableCondition.Reason = constants.MissingRootCredentialUpgradeableReason
 			upgradeableCondition.Message = fmt.Sprintf("Parent credentials secret must be restored prior to upgrade: %s/%s",
@@ -431,7 +453,8 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 		}
 
 		log.WithError(err).Error("unexpected error looking up parent secret, marking upgradeable=false")
-		// If we can't figure out if you're upgradeable, you're not upgradeable:
+		// Spec: Upgradeable=False blocks minor OpenShift updates. We cannot
+		// verify the root credential exists, so we block upgrades defensively.
 		upgradeableCondition.Status = configv1.ConditionFalse
 		upgradeableCondition.Reason = constants.ErrorDeterminingUpgradeableReason
 		upgradeableCondition.Message = fmt.Sprintf("Error determining if cluster can be upgraded: %s", err)
@@ -443,23 +466,15 @@ func UpgradeableCheck(kubeClient client.Client, mode operatorv1.CloudCredentials
 }
 
 func getClusterVersionCompleted(clusterVersion *configv1.ClusterVersion) string {
-	versionFound := ""
-
-	// get the most recently completed version
+	// Return the most-recent completed version. The History slice is ordered
+	// most-recent-first by the CVO, so the first CompletedUpdate entry is
+	// the current running version (even after a rollback to a lower semver).
 	for _, version := range clusterVersion.Status.History {
 		if version.State == configv1.CompletedUpdate {
-
-			if versionFound == "" {
-				versionFound = "v" + version.Version
-				continue
-			}
-
-			// get the greater of the two version
-			versionFound = semver.Max("v"+version.Version, versionFound)
+			return "v" + version.Version
 		}
 	}
-
-	return versionFound
+	return ""
 }
 
 // FindClusterOperatorCondition iterates all conditions on a ClusterOperator looking for the
