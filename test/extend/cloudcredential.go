@@ -489,10 +489,10 @@ data:
 		skipIfHypershiftHostedCluster(oc)
 		iaasPlatform, err := getIaasPlatform(oc)
 		o.Expect(err).NotTo(o.HaveOccurred())
-		// Skip tests for IBMCloud/Nutanix due to known issues with these platforms.
+		// Skip tests for IBMCloud/PowerVS/Nutanix due to known issues with these platforms.
 		// https://issues.redhat.com/browse/OCPBUGS-29840 - Not a blocker bug
-		if iaasPlatform == "ibmcloud" || iaasPlatform == "nutanix" {
-			g.Skip("The cluster is IBMCloud/Nutanix - skipping test due to known issues...")
+		if iaasPlatform == "ibmcloud" || iaasPlatform == "powervs" || iaasPlatform == "nutanix" {
+			g.Skip("The cluster is IBMCloud/PowerVS/Nutanix - skipping test due to known issues...")
 		}
 
 		g.By("Check CCO status conditions")
