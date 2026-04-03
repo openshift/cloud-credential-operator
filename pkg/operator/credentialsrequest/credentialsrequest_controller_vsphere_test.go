@@ -49,6 +49,23 @@ var (
 		"key1": []byte("key1data"),
 		"key2": []byte("key2data"),
 	}
+
+	testVSphereDedicatedSecretData = map[string][]byte{
+		"dedicated-key1": []byte("dedicated-data1"),
+		"dedicated-key2": []byte("dedicated-data2"),
+	}
+
+	testVSphereMultiVCenterSecretData = map[string][]byte{
+		"vcenter1.example.com.username": []byte("user1"),
+		"vcenter1.example.com.password": []byte("pass1"),
+		"vcenter2.example.com.username": []byte("user2"),
+		"vcenter2.example.com.password": []byte("pass2"),
+	}
+
+	testVSphereAnnotatedDedicatedSecretData = map[string][]byte{
+		"annotated-key1": []byte("annotated-data1"),
+		"annotated-key2": []byte("annotated-data2"),
+	}
 )
 
 func init() {
@@ -174,6 +191,94 @@ func TestCredentialsRequestVSphereReconcile(t *testing.T) {
 				assert.True(t, cr.Status.Provisioned)
 				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
 				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
+		{
+			name: "new credentialsrequest with annotated dedicated secret",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequestMachineAPI(t),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
+				testVSphereAnnotatedDedicatedMachineAPISecret(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret)
+				// Should use annotated dedicated secret data
+				assert.Equal(t, testVSphereAnnotatedDedicatedSecretData, targetSecret.Data)
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "new credentialsrequest with name-based dedicated secret",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequestMachineAPI(t),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
+				testVSphereDedicatedMachineAPISecret(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret)
+				// Should use dedicated secret data via name-based fallback
+				assert.Equal(t, testVSphereDedicatedSecretData, targetSecret.Data)
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "fallback to root when dedicated secret missing",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequestMachineAPI(t),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
+				// No dedicated secret provided
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret)
+				// Should fall back to root secret data
+				assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "multi-vcenter credential format passthrough",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequest(t),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereMultiVCenterCredsSecret(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret)
+				// Verify multi-vCenter keys are preserved
+				assert.Contains(t, targetSecret.Data, "vcenter1.example.com.username")
+				assert.Contains(t, targetSecret.Data, "vcenter1.example.com.password")
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
 			},
 		},
 	}
@@ -311,5 +416,32 @@ func testSecret(namespace, name string, secretData map[string][]byte) *corev1.Se
 		},
 		Data: secretData,
 	}
+	return s
+}
+
+func testVSphereCredentialsRequestMachineAPI(t *testing.T) *minterv1.CredentialsRequest {
+	cr := testVSphereCredentialsRequest(t)
+	cr.Name = "openshift-machine-api-vsphere"
+	return cr
+}
+
+func testVSphereDedicatedMachineAPISecret() *corev1.Secret {
+	s := testSecret("kube-system", constants.VSphereCredsMachineAPISecretName, testVSphereDedicatedSecretData)
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
+	return s
+}
+
+func testVSphereAnnotatedDedicatedMachineAPISecret() *corev1.Secret {
+	s := testSecret("kube-system", "vsphere-creds-custom-name", testVSphereAnnotatedDedicatedSecretData)
+	s.Labels = map[string]string{
+		minterv1.LabelCredentialsRequest: minterv1.LabelCredentialsRequestValue,
+	}
+	s.Annotations[minterv1.AnnotationCredentialsRequest] = testNamespace + "/openshift-machine-api-vsphere"
+	return s
+}
+
+func testVSphereMultiVCenterCredsSecret() *corev1.Secret {
+	s := testSecret("kube-system", constants.VSphereCloudCredSecretName, testVSphereMultiVCenterSecretData)
+	s.Annotations[constants.AnnotationKey] = constants.PassthroughAnnotation
 	return s
 }
