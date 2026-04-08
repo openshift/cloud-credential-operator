@@ -556,6 +556,21 @@ func (mr *MockClientMockRecorder) UndeleteWorkloadIdentityPool(arg0, arg1, arg2 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UndeleteWorkloadIdentityPool", reflect.TypeOf((*MockClient)(nil).UndeleteWorkloadIdentityPool), arg0, arg1, arg2)
 }
 
+// UpdateWorkloadIdentityProvider mocks base method.
+func (m *MockClient) UpdateWorkloadIdentityProvider(arg0 context.Context, arg1 string, arg2 *iam0.WorkloadIdentityPoolProvider, arg3 string) (*iam0.Operation, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateWorkloadIdentityProvider", arg0, arg1, arg2, arg3)
+	ret0, _ := ret[0].(*iam0.Operation)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateWorkloadIdentityProvider indicates an expected call of UpdateWorkloadIdentityProvider.
+func (mr *MockClientMockRecorder) UpdateWorkloadIdentityProvider(arg0, arg1, arg2, arg3 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateWorkloadIdentityProvider", reflect.TypeOf((*MockClient)(nil).UpdateWorkloadIdentityProvider), arg0, arg1, arg2, arg3)
+}
+
 // UpdateRole mocks base method.
 func (m *MockClient) UpdateRole(arg0 context.Context, arg1 *admin.UpdateRoleRequest) (*admin.Role, error) {
 	m.ctrl.T.Helper()

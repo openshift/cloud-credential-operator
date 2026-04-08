@@ -48,10 +48,34 @@ const (
 	createIdentityProviderScriptName = "05-create-workload-identity-provider.sh"
 	// createIdentityProviderCmd is gcloud cli command to create workload identity provider
 	createIdentityProviderCmd = "gcloud iam workload-identity-pools providers create-oidc %s --location=global --workload-identity-pool=%s --display-name=%s --description=\"%s\" --issuer-uri=%s --allowed-audiences=%s --attribute-mapping=\"google.subject=assertion.sub\""
+	// createIdentityProviderWithJWKFileCmd is gcloud cli command to create workload identity provider with attached JWK file
+	createIdentityProviderWithJWKFileCmd = "gcloud iam workload-identity-pools providers create-oidc %s --location=global --workload-identity-pool=%s --display-name=%s --description=\"%s\" --issuer-uri=%s --allowed-audiences=%s --attribute-mapping=\"google.subject=assertion.sub\" --jwk-json-path=%s"
 	// openShiftAudience is the only acceptable value for the `aud` field (audience) in the OIDC token shared by
 	// OpenShift components
 	openShiftAudience = "openshift"
+
+	// KeyStorageMethodPublicBucket is the default storage method that creates a public GCS bucket to host OIDC config
+	KeyStorageMethodPublicBucket = "public-bucket"
+	// KeyStorageMethodPoolJWKFile is the storage method that attaches the JWK directly to the workload identity pool provider
+	KeyStorageMethodPoolJWKFile = "pool-jwk-file"
+
+	// oidcJWKSUpdateMask is the field mask used when patching the JWKS on a workload identity pool provider
+	oidcJWKSUpdateMask = "oidc.jwks_json"
+
+	// workloadIdentityPoolResourceFmt is the GCP resource path format for a workload identity pool
+	workloadIdentityPoolResourceFmt = "projects/%s/locations/global/workloadIdentityPools/%s"
+	// workloadIdentityProviderResourceFmt is the GCP resource path format for a workload identity provider
+	workloadIdentityProviderResourceFmt = "projects/%s/locations/global/workloadIdentityPools/%s/providers/%s"
 )
+
+func validateKeyStorageMethod(method string) error {
+	switch method {
+	case KeyStorageMethodPublicBucket, KeyStorageMethodPoolJWKFile:
+		return nil
+	default:
+		return fmt.Errorf("invalid --key-storage-method %q, must be one of: %s, %s", method, KeyStorageMethodPublicBucket, KeyStorageMethodPoolJWKFile)
+	}
+}
 
 func createWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
 	ctx := context.Background()
@@ -71,39 +95,116 @@ func createWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
 		publicKeyPath = filepath.Join(CreateWorkloadIdentityProviderOpts.TargetDir, provisioning.PublicKeyFile)
 	}
 
-	err = createWorkloadIdentityProvider(ctx, gcpClient, CreateWorkloadIdentityProviderOpts.Name, CreateWorkloadIdentityProviderOpts.Region, CreateWorkloadIdentityProviderOpts.Project, CreateWorkloadIdentityProviderOpts.WorkloadIdentityPool, publicKeyPath, CreateWorkloadIdentityProviderOpts.TargetDir, CreateWorkloadIdentityProviderOpts.DryRun)
+	err = createWorkloadIdentityProvider(ctx, gcpClient, CreateWorkloadIdentityProviderOpts.Name, CreateWorkloadIdentityProviderOpts.Region, CreateWorkloadIdentityProviderOpts.Project, CreateWorkloadIdentityProviderOpts.WorkloadIdentityPool, publicKeyPath, CreateWorkloadIdentityProviderOpts.TargetDir, CreateWorkloadIdentityProviderOpts.KeyStorageMethod, CreateWorkloadIdentityProviderOpts.DryRun)
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func createWorkloadIdentityProvider(ctx context.Context, client gcp.Client, name, region, project, workloadIdentityPool string, publicKeyPath, targetDir string, generateOnly bool) error {
-	// Create a storage bucket
+func createWorkloadIdentityProvider(ctx context.Context, client gcp.Client, name, region, project, workloadIdentityPool string, publicKeyPath, targetDir, keyStorageMethod string, generateOnly bool) error {
 	bucketName := fmt.Sprintf("%s-oidc", name)
-	if err := createOIDCBucket(ctx, client, bucketName, region, project, targetDir, generateOnly); err != nil {
-		return err
-	}
 	issuerURL := fmt.Sprintf("https://storage.googleapis.com/%s", bucketName)
 
-	// Create the OIDC config file
-	if err := createOIDCConfiguration(ctx, client, bucketName, issuerURL, targetDir, generateOnly); err != nil {
-		return err
-	}
+	switch keyStorageMethod {
+	case KeyStorageMethodPoolJWKFile:
+		// Build the JWKS and attach it directly to the identity pool provider
+		if err := createIdentityProviderWithJWKFile(ctx, client, name, project, issuerURL, workloadIdentityPool, publicKeyPath, targetDir, generateOnly); err != nil {
+			return err
+		}
+	case KeyStorageMethodPublicBucket:
+		if err := createOIDCBucket(ctx, client, bucketName, region, project, targetDir, generateOnly); err != nil {
+			return err
+		}
 
-	// Create the OIDC key list
-	if err := createJSONWebKeySet(ctx, client, publicKeyPath, bucketName, targetDir, generateOnly); err != nil {
-		return err
-	}
+		// Create the OIDC config file
+		if err := createOIDCConfiguration(ctx, client, bucketName, issuerURL, targetDir, generateOnly); err != nil {
+			return err
+		}
 
-	// Create the workload identity provider
-	err := createIdentityProvider(ctx, client, name, project, issuerURL, workloadIdentityPool, targetDir, generateOnly)
-	if err != nil {
-		return err
+		// Create the OIDC key list
+		if err := createJSONWebKeySet(ctx, client, publicKeyPath, bucketName, targetDir, generateOnly); err != nil {
+			return err
+		}
+
+		// Create the workload identity provider
+		if err := createIdentityProvider(ctx, client, name, project, issuerURL, workloadIdentityPool, targetDir, generateOnly); err != nil {
+			return err
+		}
+	default:
+		return fmt.Errorf("unsupported key-storage-method %q", keyStorageMethod)
 	}
 
 	// Create the installer manifest file
 	if err := provisioning.CreateClusterAuthentication(issuerURL, targetDir); err != nil {
 		return err
+	}
+
+	return nil
+}
+
+func createIdentityProviderWithJWKFile(ctx context.Context, client gcp.Client, name, project, issuerURL, workloadIdentityPool, publicKeyPath, targetDir string, generateOnly bool) error {
+	jwks, err := provisioning.BuildJsonWebKeySet(publicKeyPath)
+	if err != nil {
+		return fmt.Errorf("failed to build JSON web key set from the public key: %w", err)
+	}
+
+	if generateOnly {
+		jwksFilePath := filepath.Join(targetDir, gcpOidcKeysFilename)
+		log.Printf("Saving JSON web key set (JWKS) locally at %s", jwksFilePath)
+		if err := os.WriteFile(jwksFilePath, jwks, fileModeCcoctlDryRun); err != nil {
+			return fmt.Errorf("failed to save JSON web key set (JWKS) locally at %s: %w", jwksFilePath, err)
+		}
+
+		createIdentityProviderScript := provisioning.CreateShellScript([]string{createIdentityProviderWithJWKFileCmd})
+		createIdentityProviderScriptFilepath := filepath.Join(targetDir, createIdentityProviderScriptName)
+		script := fmt.Sprintf(createIdentityProviderScript, name, workloadIdentityPool, name, createdByCcoctl, issuerURL, openShiftAudience, gcpOidcKeysFilename)
+		log.Printf("Saving shell script to create workload identity provider locally at %s", createIdentityProviderScriptFilepath)
+		if err := os.WriteFile(createIdentityProviderScriptFilepath, []byte(script), fileModeCcoctlDryRun); err != nil {
+			return fmt.Errorf("failed to save shell script to create workload identity provider locally at %s: %w", createIdentityProviderScriptFilepath, err)
+		}
+		return nil
+	}
+
+	providerResource := fmt.Sprintf(workloadIdentityProviderResourceFmt, project, workloadIdentityPool, name)
+	existingProvider, err := client.GetWorkloadIdentityProvider(ctx, providerResource)
+	if err != nil {
+		if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 {
+			provider := &iam.WorkloadIdentityPoolProvider{
+				Name:        name,
+				DisplayName: name,
+				Description: createdByCcoctl,
+				Disabled:    false,
+				State:       "ACTIVE",
+				Oidc: &iam.Oidc{
+					AllowedAudiences: []string{openShiftAudience},
+					IssuerUri:        issuerURL,
+					JwksJson:         string(jwks),
+				},
+				AttributeMapping: map[string]string{
+					"google.subject": "assertion.sub",
+				},
+			}
+
+			_, err := client.CreateWorkloadIdentityProvider(ctx, fmt.Sprintf(workloadIdentityPoolResourceFmt, project, workloadIdentityPool), name, provider)
+			if err != nil {
+				return fmt.Errorf("failed to create workload identity provider %s: %w", name, err)
+			}
+			log.Printf("workload identity provider created with name %s", name)
+		} else {
+			return fmt.Errorf("failed to check if there is existing workload identity provider %s in pool %s: %w", name, workloadIdentityPool, err)
+		}
+	} else {
+		log.Printf("Workload identity provider %s already exists in pool %s, updating JWK set", existingProvider.Name, workloadIdentityPool)
+		updatedProvider := &iam.WorkloadIdentityPoolProvider{
+			Oidc: &iam.Oidc{
+				JwksJson: string(jwks),
+			},
+		}
+		_, err := client.UpdateWorkloadIdentityProvider(ctx, providerResource, updatedProvider, oidcJWKSUpdateMask)
+		if err != nil {
+			return fmt.Errorf("failed to update workload identity provider %s: %w", name, err)
+		}
+		log.Printf("workload identity provider %s updated with new JWK set", name)
 	}
 
 	return nil
@@ -226,7 +327,7 @@ func createIdentityProvider(ctx context.Context, client gcp.Client, name, projec
 			return errors.Wrap(err, fmt.Sprintf("Failed to save shell script to create workload identity provider locally at %s", createIdentityProviderScriptFilepath))
 		}
 	} else {
-		providerResource := fmt.Sprintf("projects/%s/locations/global/workloadIdentityPools/%s/providers/%s", project, workloadIdentityPool, name)
+		providerResource := fmt.Sprintf(workloadIdentityProviderResourceFmt, project, workloadIdentityPool, name)
 		_, err := client.GetWorkloadIdentityProvider(ctx, providerResource)
 		if err != nil {
 			if gerr, ok := err.(*googleapi.Error); ok && gerr.Code == 404 && strings.Contains(gerr.Message, "Requested entity was not found") {
@@ -248,7 +349,7 @@ func createIdentityProvider(ctx context.Context, client gcp.Client, name, projec
 					},
 				}
 
-				_, err := client.CreateWorkloadIdentityProvider(ctx, fmt.Sprintf("projects/%s/locations/global/workloadIdentityPools/%s", project, workloadIdentityPool), name, provider)
+				_, err := client.CreateWorkloadIdentityProvider(ctx, fmt.Sprintf(workloadIdentityPoolResourceFmt, project, workloadIdentityPool), name, provider)
 				if err != nil {
 					return errors.Wrapf(err, "failed to create workload identity provider %s", name)
 				}
@@ -269,6 +370,10 @@ func createIdentityProvider(ctx context.Context, client gcp.Client, name, projec
 func validationForCreateWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
 	if len(CreateWorkloadIdentityProviderOpts.Name) > 32 {
 		log.Fatalf("Name can be at most 32 characters long")
+	}
+
+	if err := validateKeyStorageMethod(CreateWorkloadIdentityProviderOpts.KeyStorageMethod); err != nil {
+		log.Fatalf("%s", err)
 	}
 
 	if CreateWorkloadIdentityProviderOpts.TargetDir == "" {
@@ -318,6 +423,7 @@ func NewCreateWorkloadIdentityProviderCmd() *cobra.Command {
 	createWorkloadIdentityProviderCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityProviderOpts.PublicKeyPath, "public-key-file", "", "Path to public ServiceAccount signing key")
 	createWorkloadIdentityProviderCmd.PersistentFlags().BoolVar(&CreateWorkloadIdentityProviderOpts.DryRun, "dry-run", false, "Skip creating objects, and just save what would have been created into files")
 	createWorkloadIdentityProviderCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityProviderOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
+	createWorkloadIdentityProviderCmd.PersistentFlags().StringVar(&CreateWorkloadIdentityProviderOpts.KeyStorageMethod, "key-storage-method", KeyStorageMethodPublicBucket, fmt.Sprintf("Method for storing OIDC JWK files. %q (default) creates a public GCS bucket; %q attaches the JWK directly to the workload identity pool provider without creating a bucket", KeyStorageMethodPublicBucket, KeyStorageMethodPoolJWKFile))
 
 	return createWorkloadIdentityProviderCmd
 }

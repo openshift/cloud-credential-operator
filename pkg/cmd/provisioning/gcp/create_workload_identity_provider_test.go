@@ -47,13 +47,13 @@ const (
 func TestCreateWorkloadIdentityProvider(t *testing.T) {
 
 	tests := []struct {
-		name          string
-		mockGCPClient func(mockCtrl *gomock.Controller) *mockgcp.MockClient
-		setup         func(*testing.T) string
-		verify        func(t *testing.T, tempDirName string)
-		cleanup       func(*testing.T)
-		generateOnly  bool
-		expectError   bool
+		name             string
+		mockGCPClient    func(mockCtrl *gomock.Controller) *mockgcp.MockClient
+		setup            func(*testing.T) string
+		verify           func(t *testing.T, tempDirName string)
+		keyStorageMethod string
+		generateOnly     bool
+		expectError      bool
 	}{
 		{
 			name: "Public key not found",
@@ -118,6 +118,20 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 			},
 			verify:      func(t *testing.T, tempDirName string) {},
 			expectError: false,
+		},
+		{
+			name: "unsupported key-storage-method returns error",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				return mockgcp.NewMockClient(mockCtrl)
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+				return tempDirName
+			},
+			verify:           func(t *testing.T, tempDirName string) {},
+			keyStorageMethod: "invalid-method",
+			expectError:      true,
 		},
 		{
 			name: "generate files only",
@@ -187,13 +201,56 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 			tempDirName := test.setup(t)
 			defer os.RemoveAll(tempDirName)
 
+			keyStorageMethod := test.keyStorageMethod
+			if keyStorageMethod == "" {
+				keyStorageMethod = KeyStorageMethodPublicBucket
+			}
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
-			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, test.generateOnly)
+			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, keyStorageMethod, test.generateOnly)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
 			} else {
 				test.verify(t, tempDirName)
+			}
+		})
+	}
+}
+
+func TestValidateKeyStorageMethod(t *testing.T) {
+	tests := []struct {
+		name        string
+		method      string
+		expectError bool
+	}{
+		{
+			name:        "public-bucket is valid",
+			method:      KeyStorageMethodPublicBucket,
+			expectError: false,
+		},
+		{
+			name:        "pool-jwk-file is valid",
+			method:      KeyStorageMethodPoolJWKFile,
+			expectError: false,
+		},
+		{
+			name:        "unknown method returns error",
+			method:      "invalid-method",
+			expectError: true,
+		},
+		{
+			name:        "empty string returns error",
+			method:      "",
+			expectError: true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			err := validateKeyStorageMethod(test.method)
+			if test.expectError {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
 			}
 		})
 	}
@@ -251,4 +308,122 @@ func mockCreateWorkloadIdentityProviderSuccess(mockGCPClient *mockgcp.MockClient
 	mockGCPClient.EXPECT().CreateWorkloadIdentityProvider(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.Operation{
 		Done: true,
 	}, nil).Times(1)
+}
+
+func mockUpdateWorkloadIdentityProviderSuccess(mockGCPClient *mockgcp.MockClient) {
+	mockGCPClient.EXPECT().UpdateWorkloadIdentityProvider(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&iam.Operation{
+		Done: true,
+	}, nil).Times(1)
+}
+
+func setupTempDirWithKeyAndManifests(t *testing.T) string {
+	t.Helper()
+	tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
+	require.NoError(t, err, "Failed to create temp directory")
+	err = os.MkdirAll(filepath.Join(tempDirName, provisioning.ManifestsDirName), 0755)
+	require.NoError(t, err, "Failed to create manifests directory")
+	err = os.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+	require.NoError(t, err, "errored while setting up environment for test")
+	return tempDirName
+}
+
+func TestCreateWorkloadIdentityProviderWithPoolJwkFile(t *testing.T) {
+	tests := []struct {
+		name          string
+		mockGCPClient func(mockCtrl *gomock.Controller) *mockgcp.MockClient
+		setup         func(*testing.T) string
+		verify        func(t *testing.T, tempDirName string)
+		generateOnly  bool
+		expectError   bool
+	}{
+		{
+			name: "pool-jwk-file: public key not found",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				return mockGCPClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+				return tempDirName
+			},
+			expectError: true,
+		},
+		{
+			name: "pool-jwk-file: identity provider created with embedded JWK",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetWorkloadIdentityProviderFailure(mockGCPClient)
+				mockCreateWorkloadIdentityProviderSuccess(mockGCPClient)
+				return mockGCPClient
+			},
+			setup:       setupTempDirWithKeyAndManifests,
+			verify:      func(t *testing.T, tempDirName string) {},
+			expectError: false,
+		},
+		{
+			name: "pool-jwk-file: existing identity provider updated with new JWK",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				mockGetWorkloadIdentityProviderSuccess(mockGCPClient)
+				mockUpdateWorkloadIdentityProviderSuccess(mockGCPClient)
+				return mockGCPClient
+			},
+			setup:       setupTempDirWithKeyAndManifests,
+			verify:      func(t *testing.T, tempDirName string) {},
+			expectError: false,
+		},
+		{
+			name: "pool-jwk-file: generate files only",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				return mockGCPClient
+			},
+			setup: setupTempDirWithKeyAndManifests,
+			verify: func(t *testing.T, tempDirName string) {
+				// Verify JWKS file was saved locally
+				jwks, err := os.ReadFile(filepath.Join(tempDirName, gcpOidcKeysFilename))
+				require.NoError(t, err, "error reading JWKS file")
+
+				var jwksJSON map[string]interface{}
+				err = json.Unmarshal(jwks, &jwksJSON)
+				require.NoError(t, err, "JWKS is not valid JSON")
+
+				keys, ok := jwksJSON["keys"].([]interface{})
+				require.True(t, ok, "no keys in JSON web key set")
+				assert.Len(t, keys, 1, "expected exactly one key in JWKS")
+
+				// Verify identity provider script was saved (not bucket script)
+				_, err = os.Stat(filepath.Join(tempDirName, createIdentityProviderScriptName))
+				assert.NoError(t, err, "identity provider script should exist")
+
+				_, err = os.Stat(filepath.Join(tempDirName, createOidcBucketScriptName))
+				assert.True(t, os.IsNotExist(err), "bucket creation script should NOT exist for pool-jwk-file")
+			},
+			generateOnly: true,
+			expectError:  false,
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			mockGCPClient := test.mockGCPClient(mockCtrl)
+
+			tempDirName := test.setup(t)
+			defer os.RemoveAll(tempDirName)
+
+			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
+			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, KeyStorageMethodPoolJWKFile, test.generateOnly)
+
+			if test.expectError {
+				require.Error(t, err, "expected error returned")
+			} else {
+				require.NoError(t, err)
+				test.verify(t, tempDirName)
+			}
+		})
+	}
 }

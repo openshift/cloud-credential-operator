@@ -60,6 +60,7 @@ type Client interface {
 	UndeleteWorkloadIdentityPool(context.Context, string, *iam.UndeleteWorkloadIdentityPoolRequest) (*iam.Operation, error)
 	CreateWorkloadIdentityProvider(context.Context, string, string, *iam.WorkloadIdentityPoolProvider) (*iam.Operation, error)
 	GetWorkloadIdentityProvider(context.Context, string) (*iam.WorkloadIdentityPoolProvider, error)
+	UpdateWorkloadIdentityProvider(context.Context, string, *iam.WorkloadIdentityPoolProvider, string) (*iam.Operation, error)
 
 	//CloudResourceManager
 	GetProjectName() string
@@ -277,6 +278,12 @@ func (c *gcpClient) GetWorkloadIdentityProvider(ctx context.Context, resource st
 	ctx, cancel := contextWithTimeout(ctx)
 	defer cancel()
 	return c.iamService.Projects.Locations.WorkloadIdentityPools.Providers.Get(resource).Context(ctx).Do()
+}
+
+func (c *gcpClient) UpdateWorkloadIdentityProvider(ctx context.Context, resource string, provider *iam.WorkloadIdentityPoolProvider, updateMask string) (*iam.Operation, error) {
+	ctx, cancel := contextWithTimeout(ctx)
+	defer cancel()
+	return c.iamService.Projects.Locations.WorkloadIdentityPools.Providers.Patch(resource, provider).UpdateMask(updateMask).Context(ctx).Do()
 }
 
 func (c *gcpClient) ListServicesEnabled() (map[string]bool, error) {
