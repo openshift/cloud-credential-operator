@@ -12,6 +12,9 @@ import (
 	"k8s.io/client-go/kubernetes"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/library-go/pkg/crypto"
+
 	awsutils "github.com/openshift/cloud-credential-operator/pkg/operator/utils/aws"
 )
 
@@ -40,7 +43,7 @@ func (a AwsPodIdentity) Name() string {
 	return "aws"
 }
 
-func (a AwsPodIdentity) ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger) error {
+func (a AwsPodIdentity) ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.Deployment, client client.Client, logger log.FieldLogger, tlsProfileSpec configv1.TLSProfileSpec) error {
 	region, err := awsutils.LoadInfrastructureRegion(client, logger)
 	if err != nil {
 		return err
@@ -54,6 +57,15 @@ func (a AwsPodIdentity) ApplyDeploymentSubstitutionsInPlace(deployment *appsv1.D
 				deployment.Spec.Template.Spec.Containers[0].Command[i] = fmt.Sprintf("--aws-default-region=%s", region)
 			}
 		}
+	}
+
+	if tlsProfileSpec.MinTLSVersion != "" {
+		deployment.Spec.Template.Spec.Containers[0].Command = append(deployment.Spec.Template.Spec.Containers[0].Command,
+			fmt.Sprintf("--tls-min-version=%s", tlsProfileSpec.MinTLSVersion))
+	}
+	if len(tlsProfileSpec.Ciphers) > 0 {
+		deployment.Spec.Template.Spec.Containers[0].Command = append(deployment.Spec.Template.Spec.Containers[0].Command,
+			fmt.Sprintf("--tls-cipher-suites=%s", strings.Join(crypto.OpenSSLToIANACipherSuites(tlsProfileSpec.Ciphers), ",")))
 	}
 
 	return nil
