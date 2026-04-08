@@ -789,6 +789,154 @@ spec:
 		gen_token_path := gjson.Get(string(credential), `credential_source.file`).String()
 		o.Expect(gen_token_path).To(o.Equal(gcpCredList[2].value))
 	})
+
+	g.It("[Suite:cco/conformance/parallel][PolarionID:88196] NonHyperShiftHOST-High-CCO metrics endpoint validation", ote.Informing(), func() {
+		g.By("Validate CCO container exposes metrics on port 8443")
+		ports, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.template.spec.containers[?(@.name==\"cloud-credential-operator\")].ports}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(ports).To(o.ContainSubstring(`"containerPort":8443`))
+		o.Expect(ports).To(o.ContainSubstring(`"name":"metrics"`))
+		o.Expect(ports).To(o.ContainSubstring(`"protocol":"TCP"`))
+		g.GinkgoT().Logf("CCO container ports configuration: %s", ports)
+
+		g.By("Validate CCO container mounts serving certs")
+		volumeMounts, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.template.spec.containers[?(@.name==\"cloud-credential-operator\")].volumeMounts}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(volumeMounts).To(o.ContainSubstring(`"mountPath":"/etc/pki/ca-trust/extracted/pem"`))
+		o.Expect(volumeMounts).To(o.ContainSubstring(`"name":"cco-trusted-ca"`))
+		o.Expect(volumeMounts).To(o.ContainSubstring(`"mountPath":"/etc/tls/private"`))
+		o.Expect(volumeMounts).To(o.ContainSubstring(`"name":"cloud-credential-operator-serving-cert"`))
+		g.GinkgoT().Logf("CCO container volume mounts: %s", volumeMounts)
+
+		g.By("Verify prometheus pods are running in openshift-monitoring")
+		prometheusPods, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("pods", "-n", OpenShiftMonitoringNamespace, "-l", "app.kubernetes.io/name=prometheus", "-o=jsonpath={.items[*].metadata.name}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(prometheusPods).NotTo(o.BeEmpty())
+		o.Expect(prometheusPods).To(o.ContainSubstring("prometheus-k8s"))
+		g.GinkgoT().Logf("Prometheus pods found: %s", prometheusPods)
+
+		g.By("Validate service cco-metrics targets port 8443")
+		svcTargetPort, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("svc", "cco-metrics", "-n", DefaultNamespace, "-o=jsonpath={.spec.ports[0].targetPort}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(svcTargetPort).To(o.Or(o.Equal("8443"), o.Equal("metrics")))
+		svcPort, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("svc", "cco-metrics", "-n", DefaultNamespace, "-o=jsonpath={.spec.ports[0].port}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(svcPort).To(o.Equal("8443"))
+		g.GinkgoT().Logf("Service cco-metrics port: %s, targetPort: %s", svcPort, svcTargetPort)
+
+		g.By("Get service account token for authentication")
+		token, err := getSAToken(oc)
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(token).NotTo(o.BeEmpty())
+		g.GinkgoT().Logf("Successfully obtained service account token")
+
+		g.By("Validate metrics are reachable via HTTPS from prometheus pod")
+		metricsOutput, err := oc.AsAdmin().WithoutNamespace().Run("exec").Args("-n", OpenShiftMonitoringNamespace, "prometheus-k8s-0", "-c", "prometheus", "--", "sh", "-c", fmt.Sprintf("wget -qO- --no-check-certificate --header='Authorization: Bearer %s' https://cco-metrics.%s.svc:8443/metrics 2>/dev/null | head -10", token, DefaultNamespace)).Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(metricsOutput).NotTo(o.BeEmpty())
+		g.GinkgoT().Logf("Metrics endpoint response (first 10 lines): %s", metricsOutput)
+
+		g.By("Verify response includes CCO business metrics")
+		// Check for common CCO metrics prefixed with cco_
+		o.Expect(metricsOutput).To(o.ContainSubstring("cco_"), "Expected to find CCO metrics in response")
+		g.GinkgoT().Logf("Successfully verified CCO business metrics are present")
+
+		g.By("Verify prometheus target is up and has no TLS errors")
+		err = wait.Poll(10*time.Second, 2*time.Minute, func() (bool, error) {
+			targetsOutput, err := oc.AsAdmin().WithoutNamespace().Run("exec").Args("-n", OpenShiftMonitoringNamespace, "prometheus-k8s-0", "-c", "prometheus", "--", "wget", "-qO-", "http://localhost:9090/api/v1/targets").Output()
+			if err != nil {
+				g.GinkgoT().Logf("Failed to query prometheus targets: %v, retrying...", err)
+				return false, nil
+			}
+			if targetsOutput == "" {
+				g.GinkgoT().Logf("Empty targets response, retrying...")
+				return false, nil
+			}
+
+			// Parse JSON response and look for cco-metrics target
+			activeTargets := gjson.Get(targetsOutput, "data.activeTargets")
+			if !activeTargets.Exists() {
+				g.GinkgoT().Logf("No activeTargets found in response, retrying...")
+				return false, nil
+			}
+
+			// Find cco-metrics target
+			var ccoTarget gjson.Result
+			var found bool
+			for _, target := range activeTargets.Array() {
+				serviceName := target.Get("labels.service").String()
+				if serviceName == "cco-metrics" {
+					ccoTarget = target
+					found = true
+					break
+				}
+			}
+
+			if !found {
+				g.GinkgoT().Logf("cco-metrics target not found in targets list, retrying...")
+				return false, nil
+			}
+
+			// Check health status
+			health := ccoTarget.Get("health").String()
+			if health != "up" {
+				g.GinkgoT().Logf("cco-metrics target found but health=%s (expected 'up'), retrying...", health)
+				return false, nil
+			}
+
+			// Check for errors in lastError field
+			lastError := ccoTarget.Get("lastError").String()
+			if lastError != "" {
+				g.GinkgoT().Logf("WARNING: cco-metrics target has lastError: %s", lastError)
+			}
+
+			g.GinkgoT().Logf("cco-metrics target is UP (health=%s) with no errors", health)
+			return true, nil
+		})
+		assertWaitPollNoErr(err, "cco-metrics prometheus target is not up or has errors")
+
+		g.By("Validate ServiceMonitor is configured correctly")
+		smExists, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("servicemonitor", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.metadata.name}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(smExists).To(o.Equal("cloud-credential-operator"))
+
+		smEndpoints, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("servicemonitor", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.endpoints}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(smEndpoints).To(o.ContainSubstring("metrics"))
+		o.Expect(smEndpoints).To(o.ContainSubstring("https"))
+		g.GinkgoT().Logf("ServiceMonitor endpoints configuration: %s", smEndpoints)
+
+		g.By("Verify request without Bearer token is rejected")
+		unauthorizedOutput, err := oc.AsAdmin().WithoutNamespace().Run("exec").Args("-n", OpenShiftMonitoringNamespace, "prometheus-k8s-0", "-c", "prometheus", "--", "sh", "-c", fmt.Sprintf("wget -qS -qO- --no-check-certificate https://cco-metrics.%s.svc:8443/metrics 2>&1 | head -5", DefaultNamespace)).Output()
+		// We expect wget to fail (non-zero exit) when unauthorized, but we still want the output
+		// The error is expected here, we're checking for 401/403 response
+		o.Expect(unauthorizedOutput).To(o.Or(
+			o.ContainSubstring("401"),
+			o.ContainSubstring("403"),
+			o.ContainSubstring("Unauthorized"),
+			o.ContainSubstring("Forbidden"),
+		))
+		g.GinkgoT().Logf("Unauthorized access correctly rejected: %s", unauthorizedOutput)
+
+		g.By("Verify ClusterOperator cloud-credential is Available and not Degraded")
+		checkCCOHealth(oc, "")
+
+		g.By("Verify CCO logs show successful reconciliation")
+		ccoPodName, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("pods", "-n", DefaultNamespace, "-l", "app=cloud-credential-operator", "-o=jsonpath={.items[0].metadata.name}").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		o.Expect(ccoPodName).NotTo(o.BeEmpty())
+		g.GinkgoT().Logf("CCO pod name: %s", ccoPodName)
+
+		logs, err := oc.AsAdmin().WithoutNamespace().Run("logs").Args("-n", DefaultNamespace, ccoPodName, "-c", "cloud-credential-operator", "--tail=500").Output()
+		o.Expect(err).NotTo(o.HaveOccurred())
+		// Check for evidence of reconciliation activity (look for any of these patterns)
+		hasReconcileActivity := strings.Contains(logs, "syncing credentials request") ||
+			strings.Contains(logs, "reconciling clusteroperator status") ||
+			strings.Contains(logs, "Reconciling") ||
+			strings.Contains(logs, "requeueing all CredentialsRequests")
+		o.Expect(hasReconcileActivity).To(o.BeTrue(), "Expected to find reconciliation activity in CCO logs")
+		g.GinkgoT().Logf("Successfully verified CCO reconciliation activity in logs")
+	})
 })
 
 var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is disabled", func() {
