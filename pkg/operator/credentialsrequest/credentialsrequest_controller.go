@@ -508,6 +508,12 @@ func (r *ReconcileSecretMissingLabel) GetConditions(logger log.FieldLogger) ([]c
 	}
 
 	if missing > 0 {
+		// Progressing is the correct condition here per the spec: after an upgrade
+		// introduces the labeling requirement, secrets created by prior versions won't
+		// have the label. The operator is moving from one steady state (unlabeled) to
+		// another (labeled) as a direct consequence of the version change, which fits
+		// the spec's "propagating config changes" language. The labeling should complete
+		// quickly; if it exceeds 20 minutes, ProgressingTooLong will fire.
 		return []configv1.ClusterOperatorStatusCondition{{
 			Type:    configv1.OperatorProgressing,
 			Status:  configv1.ConditionTrue,

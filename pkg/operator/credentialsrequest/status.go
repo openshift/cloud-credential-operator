@@ -3,6 +3,7 @@ package credentialsrequest
 import (
 	"context"
 	"fmt"
+	"time"
 
 	log "github.com/sirupsen/logrus"
 
@@ -24,7 +25,12 @@ import (
 const (
 	reasonCredentialsFailing = "CredentialsFailing"
 	reasonReconciling        = "Reconciling"
-	reasonStaleCredentials   = "StaleCredentials"
+
+	// degradedGracePeriod is the minimum time a CredentialsRequest failure
+	// condition must persist before counting toward Degraded. Per the spec,
+	// Degraded represents a condition that persists "over a period of time" —
+	// transient failures during reconciliation should not immediately surface.
+	degradedGracePeriod = 5 * time.Minute
 )
 
 var _ status.Handler = &ReconcileCredentialsRequest{}
@@ -34,6 +40,7 @@ func (r *ReconcileCredentialsRequest) GetConditions(logger log.FieldLogger) ([]c
 	if err != nil {
 		return []configv1.ClusterOperatorStatusCondition{}, fmt.Errorf("failed to get operator state: %v", err)
 	}
+
 	return computeStatusConditions(
 		r.Actuator,
 		mode,
@@ -125,54 +132,74 @@ func computeStatusConditions(
 		validCredRequests = append(validCredRequests, credRequests[i])
 	}
 
-	for _, cr := range validCredRequests {
-		// Check for provision failure conditions:
-		foundFailure := false
-		for _, t := range minterv1.FailureConditionTypes {
-			failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
-			if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
-				foundFailure = true
-				break
-			}
-		}
-
-		if foundFailure {
-			failingCredRequests = failingCredRequests + 1
-		}
-	}
-
-	if failingCredRequests > 0 {
-		var degradedCondition configv1.ClusterOperatorStatusCondition
-		degradedCondition.Type = configv1.OperatorDegraded
-		degradedCondition.Status = configv1.ConditionTrue
-		degradedCondition.Reason = reasonCredentialsFailing
-		degradedCondition.Message = fmt.Sprintf(
-			"%d of %d credentials requests are failing to sync.",
-			failingCredRequests, len(validCredRequests))
-		conditions = append(conditions, degradedCondition)
-	}
-
-	// Progressing should be true if the operator is making changes to the operand. In this case
-	// we will set true if any CredentialsRequests are not provisioned, or have failure conditions,
-	// as this indicates the controllers have work they are trying to do.
-	credRequestsNotProvisioned := 0
+	// Spec: Progressing means actively moving from one steady state to another,
+	// not reconciling a previously known state. A generation mismatch indicates
+	// the CR spec has changed and the reconciler has not yet synced it.
+	//
+	// Resource version checks (root credential secret, Infrastructure) are
+	// intentionally NOT used here for Progressing detection:
+	// - Root credential rotation: the credreq controller watches the root
+	//   secret and re-syncs all CRs immediately via CreateOrUpdateOnCredsExist.
+	//   The sync completes in milliseconds (passthrough) to seconds (mint),
+	//   so the transient RV mismatch is almost never visible to the status
+	//   controller's 5-minute reconcile loop.
+	// - Infrastructure RV: changes for many reasons unrelated to CCO (proxy,
+	//   platform status, topology) and would cause noisy false Progressing.
+	credRequestsProgressing := 0
+	credRequestsProvisioned := 0
 	logger.Debugf("%d cred requests", len(validCredRequests))
 
 	for _, cr := range validCredRequests {
-		if !cr.Status.Provisioned {
-			credRequestsNotProvisioned = credRequestsNotProvisioned + 1
+		if cr.Generation != cr.Status.LastSyncGeneration {
+			credRequestsProgressing++
+		}
+		if cr.Status.Provisioned {
+			credRequestsProvisioned++
+		}
+		for _, t := range minterv1.FailureConditionTypes {
+			failureCond := utils.FindCredentialsRequestCondition(cr.Status.Conditions, t)
+			if failureCond != nil && failureCond.Status == corev1.ConditionTrue {
+				// Spec: Degraded represents a persistent condition, not a transient
+				// error. Only count as failing after the grace period has elapsed.
+				if time.Since(failureCond.LastTransitionTime.Time) > degradedGracePeriod {
+					failingCredRequests++
+					break
+				}
+				// Continue checking other failure types if this one is still
+				// within the grace period.
+			}
 		}
 	}
 
-	if credRequestsNotProvisioned > 0 || failingCredRequests > 0 {
-		var progressingCondition configv1.ClusterOperatorStatusCondition
-		progressingCondition.Type = configv1.OperatorProgressing
-		progressingCondition.Status = configv1.ConditionTrue
-		progressingCondition.Reason = reasonReconciling
-		progressingCondition.Message = fmt.Sprintf(
-			"%d of %d credentials requests provisioned, %d reporting errors.",
-			len(validCredRequests)-credRequestsNotProvisioned, len(validCredRequests), failingCredRequests)
-		conditions = append(conditions, progressingCondition)
+	// Spec: Degraded means the component does not match its desired state over a
+	// period of time. Failing credentials requests indicate a persistent lower
+	// quality of service. Suppression during cluster upgrades is handled centrally
+	// in syncStatus via the ClusterVersion Progressing condition.
+	if failingCredRequests > 0 {
+		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorDegraded,
+			Status: configv1.ConditionTrue,
+			Reason: reasonCredentialsFailing,
+			Message: fmt.Sprintf(
+				"%d of %d credentials requests are failing to sync.",
+				failingCredRequests, len(validCredRequests)),
+		})
+	}
+
+	// Progressing should be true if the operator is making changes to the
+	// operand. Report true when any CredentialsRequests are not yet provisioned
+	// (credRequestsNotProvisioned > 0) or when controllers are actively
+	// reconciling a generation mismatch (credRequestsProgressing > 0).
+	credRequestsNotProvisioned := len(validCredRequests) - credRequestsProvisioned
+	if credRequestsNotProvisioned > 0 || credRequestsProgressing > 0 {
+		conditions = append(conditions, configv1.ClusterOperatorStatusCondition{
+			Type:   configv1.OperatorProgressing,
+			Status: configv1.ConditionTrue,
+			Reason: reasonReconciling,
+			Message: fmt.Sprintf(
+				"%d of %d credentials requests provisioned, %d reporting errors.",
+				credRequestsProvisioned, len(validCredRequests), failingCredRequests),
+		})
 	}
 
 	// Log all conditions we set:
