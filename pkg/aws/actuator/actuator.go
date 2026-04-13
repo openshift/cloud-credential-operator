@@ -624,6 +624,9 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 
 	policyEqual, err := a.awsPolicyEqualsDesiredPolicy(ctx, desiredUserPolicy, awsStatus, readAWSClient, logger)
+	if err != nil {
+		return err
+	}
 	if !policyEqual {
 		if rootAWSClient == nil {
 			return fmt.Errorf("no root AWS client available, cred secret may not exist: %s/%s", constants.CloudCredSecretNamespace, constants.AWSCloudCredSecretName)
@@ -1225,7 +1228,9 @@ func userHasTag(user *iamtypes.User, key, val string) bool {
 func (a *AWSActuator) createUser(ctx context.Context, logger log.FieldLogger, awsClient ccaws.Client, username string) (*iam.CreateUserOutput, error) {
 	userInput := &iam.GetUserInput{}
 	currentUser, err := awsClient.GetUser(ctx, userInput)
-
+	if err != nil {
+		return nil, err
+	}
 	var input *iam.CreateUserInput
 	if currentUser != nil && currentUser.User.PermissionsBoundary != nil {
 		input = &iam.CreateUserInput{
