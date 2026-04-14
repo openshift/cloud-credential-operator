@@ -256,6 +256,26 @@ func TestCredentialsRequests(t *testing.T) {
 				assert.Equal(t, 1, accumulator.podIdentityCredentials)
 			},
 		},
+		{
+			name:        "cco manual mode with GCP Workload Identity Federation",
+			ccoDisabled: true,
+			existingObjects: []runtime.Object{
+				testSecret("wif-namespace", "wif-name", map[string][]byte{
+					"service_account.json": []byte(`{"type": "external_account", "audience": "//iam.googleapis.com/projects/123/locations/global/workloadIdentityPools/pool/providers/provider"}`),
+				}),
+				testSecret("non-wif-namespace", "non-wif-name", map[string][]byte{
+					"service_account.json": []byte(`{"type": "service_account", "project_id": "my-project"}`),
+				}),
+			},
+			credReqs: []credreqv1.CredentialsRequest{
+				testCredRequestWithSecretRef(testGCPCredRequest("wif-style"), "wif-namespace", "wif-name"),
+				testCredRequestWithSecretRef(testGCPCredRequest("non-wif-style"), "non-wif-namespace", "non-wif-name"),
+			},
+			validate: func(t *testing.T, accumulator *credRequestAccumulator) {
+				assert.Equal(t, 2, accumulator.crTotals["gcp"])
+				assert.Equal(t, 1, accumulator.podIdentityCredentials)
+			},
+		},
 	}
 
 	for _, test := range tests {
