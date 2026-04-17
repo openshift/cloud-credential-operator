@@ -237,10 +237,7 @@ Cons:
   * Requires an additional cloud infrastructure setup from the user. The [ccoctl](./docs/ccoctl.md) tool can assist in the setup process.
   * Push-button upgrades will not work as the cluster no longer has the admin credentials to mint credentials
   
-Read more about supported clouds by clicking on the links below: 
-  * [AWS](./docs/sts.md)
-  * [Azure](./docs/azure_workload_identity.md)
-  * [GCP](./docs/gcp_workload_identity.md)
+[Documentation](./docs/short-term-credentials.md)
 
 ## Support Matrix
 Cloud | Mint | Mint + Remove Admin Cred | Passthrough | Manual | Token
