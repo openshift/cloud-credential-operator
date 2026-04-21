@@ -800,6 +800,313 @@ func TestEnsureRolesAssignedToManagedIdentity(t *testing.T) {
 			},
 		},
 		{
+			name: "Existing role assignment with nil Properties is skipped without panic",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						// Incomplete role assignment with nil Properties (simulates Azure eventual consistency)
+						{
+							Name:       to.Ptr("IncompleteRoleAssignmentName"),
+							Properties: nil,
+						},
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
+			name: "Existing role assignment with nil RoleDefinitionID is skipped without panic",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						// Role assignment with Properties present but nil RoleDefinitionID
+						{
+							Name: to.Ptr("IncompleteRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: nil,
+							},
+						},
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
+			name: "Existing role assignment with nil Scope is skipped without panic",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						// Role assignment with Properties and RoleDefinitionID present but nil Scope
+						{
+							Name: to.Ptr("IncompleteRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            nil,
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
+			name: "Extra role assignment with nil Properties in cleanup loop is skipped without panic",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						// Incomplete role assignment that is not in shouldExistRoleAssignments — would reach the cleanup loop
+						{
+							Name:       to.Ptr("IncompleteExtraRoleAssignmentName"),
+							Properties: nil,
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
+			name: "Extra role assignment with nil RoleDefinitionID in cleanup loop is skipped without panic",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						// Role assignment with nil RoleDefinitionID that is not in shouldExistRoleAssignments — would reach the cleanup loop
+						{
+							Name: to.Ptr("NilRoleDefIDExtraRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: nil,
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
+			name: "Extra role assignment with nil Name in cleanup loop is skipped without panic",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						// Role assignment with nil Name that would reach the cleanup loop
+						{
+							Name: nil,
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
+			name: "Extra role assignment with nil Scope in cleanup loop is skipped without panic",
+			roleBindings: []credreqv1.RoleBinding{
+				{
+					Role: "Private DNS Zone Contributor",
+				},
+			},
+			mockAzureClientWrapper: func(mockCtrl *gomock.Controller) *azureclients.AzureClientWrapper {
+				wrapper := mockAzureClientWrapper(mockCtrl)
+				mockRoleAssignmentsListForScopePager(wrapper,
+					[]*armauthorization.RoleAssignment{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            to.Ptr("/subscriptions/" + testSubscriptionID + "/resourceGroups/" + testInstallResourceGroupName),
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+						// Role assignment with nil Scope that is not in shouldExistRoleAssignments — would reach the cleanup loop
+						{
+							Name: to.Ptr("NilScopeExtraRoleAssignmentName"),
+							Properties: &armauthorization.RoleAssignmentProperties{
+								Scope:            nil,
+								PrincipalID:      to.Ptr(testManagedIdentityPrincipalID),
+								RoleDefinitionID: to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							},
+						},
+					},
+					testManagedIdentityPrincipalID,
+					testSubscriptionID,
+				)
+				mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID,
+					[]*armauthorization.RoleDefinition{
+						{
+							Name: to.Ptr("PrivateDNSZoneContibutorRoleDefinitionName"),
+							ID:   to.Ptr(fmt.Sprintf("/subscriptions/%s/providers/Microsoft.Authorization/roleDefinitions/%s", testSubscriptionID, "PrivateDNSZoneContibutorRoleDefinitionID")),
+							Properties: &armauthorization.RoleDefinitionProperties{
+								RoleName: to.Ptr("Private DNS Zone Contributor"),
+							},
+						},
+					})
+				return wrapper
+			},
+		},
+		{
 			name: "Extra role assignments preserved when preserve-existing-roles",
 			roleBindings: []credreqv1.RoleBinding{
 				{
