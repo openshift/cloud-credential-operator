@@ -1,9 +1,19 @@
 package gcp
 
 import (
+	"time"
+
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
+)
+
+const (
+	// iamPolicyMaxRetries is the maximum retry index (0-based) for transient IAM policy errors.
+	// With a 10-second delay this allows up to 24 attempts (~4 minutes total).
+	iamPolicyMaxRetries = 23
+	// iamPolicyRetryDelay is the sleep duration between IAM policy retry attempts.
+	iamPolicyRetryDelay = 10 * time.Second
 )
 
 type options struct {
