@@ -134,7 +134,7 @@ func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClien
 			}
 		default:
 			log.Info("initializing no-op actuator (unsupported platform)")
-			a = &actuator.DummyActuator{}
+			a = &actuator.DummyActuator{Client: m.GetClient()}
 		}
 		if err := f(m, rootM, a, platformType, coreClient); err != nil {
 			return err

@@ -518,7 +518,8 @@ func testCondition(condType configv1.ClusterStatusConditionType, status configv1
 	}
 }
 
-// dummyUpgradeableCondition is always returned by DummyActuator.Upgradeable().
+// dummyUpgradeableCondition is returned by DummyActuator.Upgradeable() when no Client is set
+// (nil-client path) or when the mode is not Manual.
 var dummyUpgradeableCondition = testCondition(configv1.OperatorUpgradeable, configv1.ConditionTrue, "")
 
 func testCRCondition(condType minterv1.CredentialsRequestConditionType, status corev1.ConditionStatus) minterv1.CredentialsRequestCondition {

@@ -28,7 +28,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	minterv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
-	"github.com/openshift/cloud-credential-operator/pkg/operator/constants"
+	"github.com/openshift/cloud-credential-operator/pkg/operator/utils"
 )
 
 // Actuator controls credentials on a specific infrastructure. All
@@ -54,6 +54,7 @@ type Actuator interface {
 }
 
 type DummyActuator struct {
+	Client client.Client
 }
 
 func (a *DummyActuator) Exists(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, error) {
@@ -74,7 +75,7 @@ func (a *DummyActuator) Delete(ctx context.Context, cr *minterv1.CredentialsRequ
 
 // GetCredentialsRootSecretLocation returns the namespace and name where the parent credentials secret is stored.
 func (a *DummyActuator) GetCredentialsRootSecretLocation() types.NamespacedName {
-	return types.NamespacedName{Namespace: constants.CloudCredSecretNamespace, Name: constants.AWSCloudCredSecretName}
+	return types.NamespacedName{}
 }
 
 func (a *DummyActuator) IsTimedTokenCluster(c client.Client, ctx context.Context, logger log.FieldLogger) (bool, error) {
@@ -82,8 +83,14 @@ func (a *DummyActuator) IsTimedTokenCluster(c client.Client, ctx context.Context
 }
 
 func (a *DummyActuator) Upgradeable(mode operatorv1.CloudCredentialsMode) *configv1.ClusterOperatorStatusCondition {
-	// Spec: Upgradeable=True means it is safe to upgrade. The DummyActuator
-	// always reports upgradeable since it performs no real cloud operations.
+	// In Manual mode, the admin must annotate the CCO config to confirm credentials
+	// are prepared for the next release. Delegate to UpgradeableCheck so unsupported
+	// platforms still respect that gate. rootSecret is unused in Manual mode.
+	if mode == operatorv1.CloudCredentialsModeManual && a.Client != nil {
+		return utils.UpgradeableCheck(a.Client, mode, types.NamespacedName{})
+	}
+	// For all other modes, DummyActuator performs no cloud operations and therefore
+	// poses no credential-related upgrade risk.
 	upgradeableCondition := &configv1.ClusterOperatorStatusCondition{
 		Status: configv1.ConditionTrue,
 		Type:   configv1.OperatorUpgradeable,
