@@ -791,6 +791,8 @@ spec:
 	})
 
 	g.It("[Suite:cco/conformance/parallel][PolarionID:88196] NonHyperShiftHOST-High-CCO metrics endpoint validation", ote.Informing(), func() {
+		skipIfHypershiftHostedCluster(oc)
+
 		g.By("Validate CCO container exposes metrics on port 8443")
 		ports, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("deployment", "cloud-credential-operator", "-n", DefaultNamespace, "-o=jsonpath={.spec.template.spec.containers[?(@.name==\"cloud-credential-operator\")].ports}").Output()
 		o.Expect(err).NotTo(o.HaveOccurred())
