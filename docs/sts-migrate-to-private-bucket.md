@@ -121,6 +121,7 @@ TOKEN_PATH=$(oc get secrets aws-cloud-credentials \
 # Get Controler's pod
 CAPI_POD=$(oc get pods -n openshift-machine-api \
     -l api=clusterapi \
+    -l k8s-app=controller \
     -o jsonpath='{.items[*].metadata.name}')
 
 # Extract tokens from the pod
