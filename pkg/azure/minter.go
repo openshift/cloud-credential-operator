@@ -2,14 +2,15 @@ package azure
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
 
 	log "github.com/sirupsen/logrus"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/cloud"
 	azidentity "github.com/Azure/azure-sdk-for-go/sdk/azidentity"
-	"github.com/Azure/go-autorest/autorest/azure"
 	azurekiota "github.com/microsoft/kiota-authentication-azure-go"
 	msgraphsdk "github.com/microsoftgraph/msgraph-sdk-go"
 
@@ -34,14 +35,39 @@ func NewFakeAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecre
 	}, nil
 }
 
+const azureStackEnvFilePathEnvVar = "AZURE_ENVIRONMENT_FILEPATH"
+
+type azureEnvironment struct {
+	ActiveDirectoryEndpoint string `json:"activeDirectoryEndpoint"`
+	ResourceManagerEndpoint string `json:"resourceManagerEndpoint"`
+	TokenAudience           string `json:"tokenAudience"`
+}
+
 func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret string, cloudName configv1.AzureCloudEnvironment, tenantID, subscriptionID string) (*AzureCredentialsMinter, error) {
-	env, err := azure.EnvironmentFromName(string(cloudName))
-	if err != nil {
-		return nil, fmt.Errorf("Unable to determine Azure environment: %w", err)
-	}
 	var cloudConfig cloud.Configuration
 	switch cloudName {
 	case "AzureStackCloud":
+		envFilePath := os.Getenv(azureStackEnvFilePathEnvVar)
+		if envFilePath == "" {
+			return nil, fmt.Errorf("%s must be set for AzureStackCloud", azureStackEnvFilePathEnvVar)
+		}
+		data, err := os.ReadFile(envFilePath)
+		if err != nil {
+			return nil, fmt.Errorf("unable to read Azure Stack environment file %q: %w", envFilePath, err)
+		}
+		var env azureEnvironment
+		if err := json.Unmarshal(data, &env); err != nil {
+			return nil, fmt.Errorf("unable to parse Azure Stack environment file %q: %w", envFilePath, err)
+		}
+		if env.ActiveDirectoryEndpoint == "" {
+			return nil, fmt.Errorf("Azure Stack environment file %q is missing activeDirectoryEndpoint", envFilePath)
+		}
+		if env.ResourceManagerEndpoint == "" {
+			return nil, fmt.Errorf("Azure Stack environment file %q is missing resourceManagerEndpoint", envFilePath)
+		}
+		if env.TokenAudience == "" {
+			env.TokenAudience = env.ResourceManagerEndpoint
+		}
 		cloudConfig = cloud.Configuration{
 			ActiveDirectoryAuthorityHost: env.ActiveDirectoryEndpoint,
 			Services: map[cloud.ServiceName]cloud.ServiceConfiguration{
