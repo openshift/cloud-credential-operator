@@ -435,6 +435,7 @@ metadata:
   namespace: openshift-cloud-credential-operator
 spec:
   minAvailable: 1
+  unhealthyPodEvictionPolicy: AlwaysAllow
   selector:
     matchLabels:
       app: pod-identity-webhook
