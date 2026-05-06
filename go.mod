@@ -27,7 +27,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.88.5
 	github.com/aws/smithy-go v1.23.1
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-jose/go-jose/v4 v4.1.3
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-logr/logr v1.4.3
 	github.com/golang/glog v1.2.5
 	github.com/golang/mock v1.7.0-rc.1
