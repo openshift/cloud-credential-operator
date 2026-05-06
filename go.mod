@@ -1,8 +1,8 @@
 module github.com/openshift/cloud-credential-operator
 
-go 1.23.0
+go 1.24.0
 
-toolchain go1.23.4
+toolchain go1.24.4
 
 require (
 	cloud.google.com/go/iam v1.3.1
@@ -21,7 +21,7 @@ require (
 	github.com/IBM/platform-services-go-sdk v0.73.0
 	github.com/aws/aws-sdk-go v1.55.6
 	github.com/go-bindata/go-bindata v3.1.2+incompatible
-	github.com/go-jose/go-jose/v4 v4.0.5
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-logr/logr v1.4.2
 	github.com/golang/glog v1.2.5
 	github.com/golang/mock v1.6.0
