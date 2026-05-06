@@ -1,8 +1,8 @@
 module github.com/openshift/cloud-credential-operator
 
-go 1.22.0
+go 1.24.0
 
-toolchain go1.22.5
+toolchain go1.24.4
 
 require (
 	cloud.google.com/go v0.112.1 // indirect
@@ -61,7 +61,7 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources v1.0.0
 	github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage v1.1.0
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v0.5.1
-	github.com/go-jose/go-jose/v4 v4.0.5
+	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-logr/logr v1.4.1
 	github.com/google/go-cmp v0.6.0
 	github.com/microsoft/kiota-authentication-azure-go v0.6.0
