@@ -268,6 +268,10 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 			// at the specified scope
 			roleAssignmentExists := false
 			for _, roleAssignment := range existingRoleAssignments {
+				if roleAssignment.Properties == nil || roleAssignment.Properties.RoleDefinitionID == nil || roleAssignment.Properties.Scope == nil {
+					log.Printf("skipping incomplete role assignment (nil Properties, RoleDefinitionID, or Scope)")
+					continue
+				}
 				if *roleDefinition.Properties.RoleName == roleBinding.Role && *roleAssignment.Properties.RoleDefinitionID == *roleDefinition.ID && *roleAssignment.Properties.Scope == scope {
 					roleAssignmentExists = true
 					log.Printf("Found existing role assignment %s for user-assigned managed identity with principal ID %s at scope %s", roleBinding.Role, managedIdentityPrincipalID, scope)
@@ -300,6 +304,10 @@ func ensureRolesAssignedToManagedIdentity(client *azureclients.AzureClientWrappe
 	}
 
 	for _, existingRoleAssignment := range existingRoleAssignments {
+		if existingRoleAssignment.Name == nil || existingRoleAssignment.Properties == nil || existingRoleAssignment.Properties.RoleDefinitionID == nil || existingRoleAssignment.Properties.Scope == nil {
+			log.Printf("skipping incomplete existing role assignment during cleanup (nil Name, Properties, RoleDefinitionID, or Scope)")
+			continue
+		}
 		found := false
 		for _, shouldExistRoleAssignment := range shouldExistRoleAssignments {
 			if shouldExistRoleAssignment != nil && *shouldExistRoleAssignment.Name == *existingRoleAssignment.Name {
