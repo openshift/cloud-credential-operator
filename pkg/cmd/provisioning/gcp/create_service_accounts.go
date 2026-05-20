@@ -292,14 +292,19 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 			if err != nil {
 				if strings.Contains(err.Error(), "Service account "+serviceAccount.Email+" does not exist") {
 					// The service account just created can't be found yet due to a replication delay so we need to retry.
-					if i >= 23 {
+					if i >= iamPolicyMaxRetries {
 						log.Fatal("Timed out adding predefined roles to IAM service account, this is most likely due to a replication delay following creation of the service account, please retry")
-						break
-					} else {
-						log.Printf("Unable to add predefined roles to IAM service account, retrying...")
-						time.Sleep(10 * time.Second)
-						continue
 					}
+					log.Printf("Unable to add predefined roles to IAM service account, retrying...")
+					time.Sleep(iamPolicyRetryDelay)
+					continue
+				} else if strings.Contains(err.Error(), "concurrent policy changes") {
+					if i >= iamPolicyMaxRetries {
+						log.Fatal("Timed out adding predefined roles to IAM service account due to concurrent policy changes, please retry")
+					}
+					log.Printf("Concurrent policy change detected while adding predefined roles to IAM service account, retrying...")
+					time.Sleep(iamPolicyRetryDelay)
+					continue
 				}
 
 				return "", errors.Wrap(err, fmt.Sprintf("Failed to add predefined roles for IAM service account %s", serviceAccount.DisplayName))

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
@@ -88,9 +89,22 @@ func deleteServiceAccounts(ctx context.Context, client gcp.Client, namePrefix, c
 		for _, svcAcct := range svcAcctList {
 			if svcAcct.DisplayName == serviceAccountNameFromCredReq {
 				svcAcctBindingName := actuator.ServiceAccountBindingName(svcAcct)
-				err := actuator.RemovePolicyBindingsForProject(client, svcAcctBindingName)
-				if err != nil {
-					return errors.Wrapf(err, "Failed to remove project policy bindings for service account")
+				// RemovePolicyBindingsForProject can encounter concurrent modification conflicts.
+				// Try up to 24 times with a 10 second delay between each attempt, up to 4 minutes.
+				for i := 0; ; i++ {
+					err := actuator.RemovePolicyBindingsForProject(client, svcAcctBindingName)
+					if err != nil {
+						if strings.Contains(err.Error(), "concurrent policy changes") {
+							if i >= iamPolicyMaxRetries {
+								return errors.New("timed out removing project policy bindings for service account due to concurrent policy changes, please retry")
+							}
+							log.Printf("Concurrent policy change detected while removing project policy bindings for service account, retrying...")
+							time.Sleep(iamPolicyRetryDelay)
+							continue
+						}
+						return errors.Wrapf(err, "Failed to remove project policy bindings for service account")
+					}
+					break
 				}
 
 				if err := actuator.DeleteServiceAccount(client, svcAcct); err != nil {
