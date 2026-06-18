@@ -248,7 +248,7 @@ github.com/ghodss/yaml
 ## explicit
 github.com/go-bindata/go-bindata
 github.com/go-bindata/go-bindata/go-bindata
-# github.com/go-jose/go-jose/v4 v4.0.5
+# github.com/go-jose/go-jose/v4 v4.0.5 => github.com/openshift-sustaining/go-jose/v4 v4.0.5-sec.1
 ## explicit; go 1.21
 github.com/go-jose/go-jose/v4
 github.com/go-jose/go-jose/v4/cipher
@@ -1673,3 +1673,4 @@ sigs.k8s.io/structured-merge-diff/v4/value
 sigs.k8s.io/yaml
 sigs.k8s.io/yaml/goyaml.v2
 # github.com/golang/glog => github.com/golang/glog v1.2.5
+# github.com/go-jose/go-jose/v4 => github.com/openshift-sustaining/go-jose/v4 v4.0.5-sec.1
