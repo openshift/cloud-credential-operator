@@ -800,6 +800,17 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 			return reconcile.Result{}, err
 		}
 
+		// Unlike the non-STS guard, we omit cloudCredsSecretUpdated and
+		// isInfrastructureUpdated: STS secrets reference an IAM role ARN and
+		// token path, not root credentials or infrastructure tags.
+		isStale := cr.Generation != cr.Status.LastSyncGeneration
+		hasRecentlySynced := cr.Status.LastSyncTimestamp != nil && cr.Status.LastSyncTimestamp.Add(syncPeriod).After(time.Now())
+		hasActiveFailureConditions := checkForFailureConditions(cr)
+		if !isStale && hasRecentlySynced && credsExists && !hasActiveFailureConditions && cr.Status.Provisioned {
+			logger.Debug("STS: recently synced and target secret exists, no need to sync")
+			return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
+		}
+
 		var syncErr error
 		syncErr = r.CreateOrUpdateOnCredsExist(ctx, credsExists, syncErr, cr)
 		if syncErr != nil {

@@ -129,9 +129,25 @@ func (a *AWSActuator) Exists(ctx context.Context, cr *minterv1.CredentialsReques
 	}
 
 	existingSecret := &corev1.Secret{}
-	err = a.Client.Get(context.TODO(), types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}, existingSecret)
+	secretKey := types.NamespacedName{Namespace: cr.Spec.SecretRef.Namespace, Name: cr.Spec.SecretRef.Name}
+	err = a.Client.Get(ctx, secretKey, existingSecret)
 	if err != nil {
 		if k8serrors.IsNotFound(err) {
+			if a.LiveClient != nil {
+				// The cached client filters secrets by label; manually-managed
+				// secrets (e.g. in manual mode) won't have the label and will
+				// appear missing from the cache. Fall back to a direct API lookup.
+				err = a.LiveClient.Get(ctx, secretKey, existingSecret)
+				if err != nil {
+					if k8serrors.IsNotFound(err) {
+						logger.Debug("target secret does not exist")
+						return false, nil
+					}
+					return false, err
+				}
+				logger.Debug("target secret exists (found via live lookup)")
+				return true, nil
+			}
 			logger.Debug("target secret does not exist")
 			return false, nil
 		}
@@ -308,6 +324,25 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
+	// On STS clusters, CRs without an IAM Role ARN have their secrets managed
+	// externally. Return early before needsUpdate, which would attempt to load
+	// the secret through the label-filtered cache and fail.
+	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
+	if err != nil {
+		return err
+	}
+	logger.Debugf("stsDetected: %v", stsDetected)
+	if stsDetected {
+		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(minterv1.Codec, cr)
+		if err != nil {
+			return err
+		}
+		if awsSTSIAMRoleARN == "" {
+			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
+			return nil
+		}
+	}
+
 	// Should we update anything
 	needsUpdate, err := a.needsUpdate(ctx, cr)
 	if err != nil {
@@ -323,21 +358,9 @@ func (a *AWSActuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest)
 		return nil
 	}
 
-	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
-	if err != nil {
-		return err
-	}
-	logger.Debugf("stsDetected: %v", stsDetected)
 	if stsDetected {
 		logger.Debug("actuator detected STS enabled cluster, enabling STS secret brokering for CredentialsRequests providing an IAM Role ARN")
-		awsSTSIAMRoleARN, err := awsSTSIAMRoleARN(minterv1.Codec, cr)
-		if err != nil {
-			return err
-		}
-		if awsSTSIAMRoleARN == "" {
-			logger.Debug("CredentialsRequest has no awsSTSIAMRoleARN, no reason to sync")
-			return nil
-		}
+		awsSTSIAMRoleARN, _ := awsSTSIAMRoleARN(minterv1.Codec, cr)
 		cloudTokenPath := cr.Spec.CloudTokenPath
 		if cr.Spec.CloudTokenPath == "" {
 			logger.Debug("CredentialsRequest has no cloudTokenPath, defaulting cloudTokenPath to /var/run/secrets/kubernetes.io/serviceaccount/token")
