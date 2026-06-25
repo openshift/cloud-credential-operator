@@ -18,6 +18,7 @@ package actuator
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"testing"
@@ -719,4 +720,260 @@ func testAuthentication(issuer string) *configv1.Authentication {
 		},
 	}
 	return conf
+}
+
+func TestGetDesiredUserPolicyInfraCondition(t *testing.T) {
+	a := &AWSActuator{}
+	infraName := "test-infra"
+	conditionKey := ccaws.InfraResourceTagKeyPrefix + infraName
+	userARN := "arn:aws:iam::123456789012:user/test-user"
+
+	t.Run("scoped actions get infra condition", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"ec2:TerminateInstances"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		require.Len(t, doc.Statement, 2)
+		strEq := doc.Statement[0].Condition["StringEquals"]
+		assert.Equal(t, ccaws.InfraResourceTagValue, strEq[conditionKey])
+	})
+
+	t.Run("existing StringEquals condition preserved on scoped action", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{
+				Effect:   "Allow",
+				Action:   []string{"ec2:TerminateInstances"},
+				Resource: "*",
+				PolicyCondition: minterv1.IAMPolicyCondition{
+					"StringEquals": minterv1.IAMPolicyConditionKeyValue{
+						"ec2:Region": "us-east-1",
+					},
+				},
+			},
+		}
+		snapshot := entries[0].PolicyCondition.DeepCopy()
+
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		assert.Equal(t, *snapshot, entries[0].PolicyCondition)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		strEq := doc.Statement[0].Condition["StringEquals"]
+		assert.Equal(t, "us-east-1", strEq["ec2:Region"])
+		assert.Equal(t, ccaws.InfraResourceTagValue, strEq[conditionKey])
+	})
+
+	t.Run("unscoped actions do not get infra condition", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"ec2:DescribeInstances"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		require.Len(t, doc.Statement, 2)
+		assert.Nil(t, doc.Statement[0].Condition)
+	})
+
+	t.Run("S3 actions are all unscoped", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"s3:CreateBucket", "s3:GetObject", "s3:PutObject"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		require.Len(t, doc.Statement, 2)
+		assert.ElementsMatch(t, []string{"s3:CreateBucket", "s3:GetObject", "s3:PutObject"}, doc.Statement[0].Action)
+		assert.Nil(t, doc.Statement[0].Condition)
+	})
+
+	t.Run("multiple scoped statements all get condition", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"ec2:TerminateInstances"}, Resource: "*"},
+			{Effect: "Allow", Action: []string{"ec2:DeleteVolume"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		require.Len(t, doc.Statement, 3)
+		for _, stmt := range doc.Statement[:2] {
+			strEq := stmt.Condition["StringEquals"]
+			assert.Equal(t, ccaws.InfraResourceTagValue, strEq[conditionKey])
+		}
+	})
+
+	t.Run("empty infraName skips condition", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"ec2:TerminateInstances"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, "")
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		assert.Nil(t, doc.Statement[0].Condition)
+	})
+
+	t.Run("empty infraName preserves existing condition without mutation", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{
+				Effect:   "Allow",
+				Action:   []string{"ec2:TerminateInstances"},
+				Resource: "*",
+				PolicyCondition: minterv1.IAMPolicyCondition{
+					"StringEquals": minterv1.IAMPolicyConditionKeyValue{
+						"ec2:Region": "us-east-1",
+					},
+				},
+			},
+		}
+		snapshot := entries[0].PolicyCondition.DeepCopy()
+
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, "")
+		require.NoError(t, err)
+
+		assert.Equal(t, *snapshot, entries[0].PolicyCondition)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		assert.Equal(t, "us-east-1", doc.Statement[0].Condition["StringEquals"]["ec2:Region"])
+	})
+
+	t.Run("mixed scoped and unscoped actions are split", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{
+				Effect:   "Allow",
+				Action:   []string{"ec2:RunInstances", "ec2:TerminateInstances", "ec2:DescribeInstances"},
+				Resource: "*",
+			},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		// Scoped (TerminateInstances) + unscoped (RunInstances, DescribeInstances) + iam:GetUser = 3
+		require.Len(t, doc.Statement, 3)
+
+		assert.Equal(t, []string{"ec2:TerminateInstances"}, doc.Statement[0].Action)
+		assert.Equal(t, ccaws.InfraResourceTagValue, doc.Statement[0].Condition["StringEquals"][conditionKey])
+
+		assert.ElementsMatch(t, []string{"ec2:RunInstances", "ec2:DescribeInstances"}, doc.Statement[1].Action)
+		assert.Nil(t, doc.Statement[1].Condition)
+
+		assert.Equal(t, []string{"iam:GetUser"}, doc.Statement[2].Action)
+	})
+
+	t.Run("mixed statement preserves original condition on both halves", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{
+				Effect:   "Allow",
+				Action:   []string{"ec2:RunInstances", "ec2:TerminateInstances"},
+				Resource: "*",
+				PolicyCondition: minterv1.IAMPolicyCondition{
+					"Bool": minterv1.IAMPolicyConditionKeyValue{
+						"kms:GrantIsForAWSResource": true,
+					},
+				},
+			},
+		}
+		snapshot := entries[0].PolicyCondition.DeepCopy()
+
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		assert.Equal(t, *snapshot, entries[0].PolicyCondition)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		require.Len(t, doc.Statement, 3)
+
+		assert.Equal(t, true, doc.Statement[0].Condition["Bool"]["kms:GrantIsForAWSResource"])
+		assert.Equal(t, ccaws.InfraResourceTagValue, doc.Statement[0].Condition["StringEquals"][conditionKey])
+
+		assert.Equal(t, true, doc.Statement[1].Condition["Bool"]["kms:GrantIsForAWSResource"])
+		_, hasStringEquals := doc.Statement[1].Condition["StringEquals"]
+		assert.False(t, hasStringEquals)
+	})
+
+	t.Run("Deny statements are never conditioned", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Deny", Action: []string{"s3:DeleteBucket"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		assert.Nil(t, doc.Statement[0].Condition)
+	})
+
+	t.Run("iam:GetUser self-lookup has no infra condition", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"ec2:TerminateInstances"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		getUserStmt := doc.Statement[len(doc.Statement)-1]
+		assert.Equal(t, []string{"iam:GetUser"}, getUserStmt.Action)
+		assert.Empty(t, getUserStmt.Condition)
+	})
+
+	t.Run("unknown action returns error", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"ec2:TerminateInstances", "foo:BarAction"}, Resource: "*"},
+		}
+		_, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "foo:BarAction")
+		assert.Contains(t, err.Error(), "openshift/cloud-credential-operator")
+	})
+
+	t.Run("unknown action with empty infraName is not checked", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"foo:BarAction"}, Resource: "*"},
+		}
+		_, err := a.getDesiredUserPolicy(entries, userARN, "")
+		require.NoError(t, err)
+	})
+
+	t.Run("KMS actions are scoped via key resource type", func(t *testing.T) {
+		entries := []minterv1.StatementEntry{
+			{Effect: "Allow", Action: []string{"kms:Decrypt", "kms:Encrypt"}, Resource: "*"},
+		}
+		policyJSON, err := a.getDesiredUserPolicy(entries, userARN, infraName)
+		require.NoError(t, err)
+
+		var doc PolicyDocument
+		require.NoError(t, json.Unmarshal([]byte(policyJSON), &doc))
+
+		require.Len(t, doc.Statement, 2)
+		strEq := doc.Statement[0].Condition["StringEquals"]
+		assert.Equal(t, ccaws.InfraResourceTagValue, strEq[conditionKey])
+	})
 }
