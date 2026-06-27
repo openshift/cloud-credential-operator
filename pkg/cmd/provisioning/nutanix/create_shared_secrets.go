@@ -53,7 +53,7 @@ func createSharedSecretsCmd() *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&CreateSharedSecretsOpts.CredRequestDir, "credentials-requests-dir", "", "Directory containing files of CredentialsRequests (can be created by running 'oc adm release extract --credentials-requests --cloud=nutanix' against an OpenShift release image)")
 	cmd.MarkPersistentFlagRequired("credentials-requests-dir")
-	cmd.PersistentFlags().StringVar(&CreateSharedSecretsOpts.CredentialsSourceFilePath, "credentials-source-filepath", "", "The filepath of the nutanix credentials data. If not specified, will use the default path ~/.nutanix/credentials")
+	cmd.PersistentFlags().StringVar(&CreateSharedSecretsOpts.CredentialsSourceFilePath, "credentials-source-filepath", "", "The path to the nutanix credentials data file, or the directory containing a file named 'credentials'. If not specified, will use the default path ~/.nutanix/credentials")
 	cmd.PersistentFlags().StringVar(&CreateSharedSecretsOpts.TargetDir, "output-dir", "", "Directory to place generated files (defaults to current directory)")
 	cmd.PersistentFlags().BoolVar(&CreateSharedSecretsOpts.EnableTechPreview, "enable-tech-preview", false, "Opt into processing CredentialsRequests marked as tech-preview")
 
@@ -87,8 +87,15 @@ func createSecretsCmd(cmd *cobra.Command, args []string) error {
 
 // Retrieve the credentials data
 func getCredentialsFromFile(filePath string) (*kubernetes.NutanixCredentials, error) {
-	if _, err := os.Stat(filePath); err != nil {
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
 		return nil, errors.Wrapf(err, "source credentials file %s does not exist", filePath)
+	}
+	if fileInfo.IsDir() {
+		filePath = filepath.Join(filePath, "credentials")
+		if _, err := os.Stat(filePath); err != nil {
+			return nil, errors.Wrapf(err, "credentials file not found in directory; expected at %s", filePath)
+		}
 	}
 
 	bytes, err := os.ReadFile(filePath)

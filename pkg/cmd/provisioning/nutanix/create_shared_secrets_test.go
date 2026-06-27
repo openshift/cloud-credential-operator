@@ -182,6 +182,58 @@ func TestCreateSharedSecrets(t *testing.T) {
 			expectedErr: "source credentials file does/not/exist does not exist",
 		},
 		{
+			name: "Directory provided for credentials-source-filepath with credentials file inside",
+			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
+				credReqDir, err := os.MkdirTemp(os.TempDir(), testCredReqDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory for credentials requests")
+				testCredentialsRequest(t, "credreq-test", "NutanixProviderSpec", "secret-ns", "secret-name", credReqDir)
+
+				targetDir, err = os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory for credentials requests")
+
+				// Create a directory with a "credentials" file inside it (as the docs describe)
+				credentialsDir, err := os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory for credentials")
+				credentialsFilePath := filepath.Join(credentialsDir, "credentials")
+				err = os.WriteFile(credentialsFilePath, []byte(getBasicAuthCredentials("username", "password")), 0600)
+				require.NoError(t, err, "Failed to write credentials file")
+
+				// Pass the directory, not the file
+				credentialsSourceFilepath = credentialsDir
+				return
+			},
+			verify: func(t *testing.T, manifestsDir string) {
+				files, err := os.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Len(t, files, 1, "Should be exactly one file in manifestsDir when directory with credentials file is provided")
+				contents := getSecretFromFileContents(t, filepath.Join(manifestsDir, files[0].Name()))
+				assert.Equal(t, "username", contents.PrismCentral.Username)
+				assert.Equal(t, "password", contents.PrismCentral.Password)
+			},
+			expectedErr: "",
+		},
+		{
+			name: "Directory provided for credentials-source-filepath without credentials file inside",
+			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
+				credReqDir, err := os.MkdirTemp(os.TempDir(), testCredReqDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory for credentials requests")
+
+				targetDir, err = os.MkdirTemp(os.TempDir(), testTargetDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory for credentials requests")
+
+				// Pass a directory with no credentials file inside
+				credentialsSourceFilepath, err = os.MkdirTemp(os.TempDir(), testCredentialsDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory for credentials")
+				return
+			},
+			verify: func(t *testing.T, manifestsDir string) {
+				files, err := os.ReadDir(manifestsDir)
+				require.NoError(t, err, "unexpected error listing files in manifestsDir")
+				assert.Zero(t, len(files), "Should be no files in manifestsDir when no credentials file in directory")
+			},
+			expectedErr: "credentials file not found in directory",
+		},
+		{
 			name: "Non-existent credentials requests directory",
 			setup: func(t *testing.T) (credReqDir, targetDir, credentialsSourceFilepath string) {
 				credReqDir = "does/not/exist"
