@@ -233,7 +233,7 @@ func (a *AWSActuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsR
 		}
 
 		// Check whether the current policy attached to the creds match what is being requested
-		desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries, *user.User.Arn)
+		desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries, *user.User.Arn, infra.Status.InfrastructureName)
 		if err != nil {
 			return false, err
 		}
@@ -618,7 +618,7 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 	}
 
 	// TODO: check if user policy needs to be set? user generation and last set time.
-	desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries, *userOut.Arn)
+	desiredUserPolicy, err := a.getDesiredUserPolicy(awsSpec.StatementEntries, *userOut.Arn, infra.Status.InfrastructureName)
 	if err != nil {
 		return err
 	}
@@ -731,8 +731,8 @@ func userHasExpectedTags(logger log.FieldLogger, user *iamtypes.User, clusterUUI
 
 	if infraResource != nil && infraResource.Status.InfrastructureName != "" {
 		clusterTag := fmt.Sprintf("kubernetes.io/cluster/%s", infraResource.Status.InfrastructureName)
-		if !userHasTag(user, clusterTag, "owned") {
-			log.Warnf("user missing tag: %s=%s", clusterTag, "owned")
+		if !userHasTag(user, clusterTag, ccaws.InfraResourceTagValue) {
+			log.Warnf("user missing tag: %s=%s", clusterTag, ccaws.InfraResourceTagValue)
 			return false
 		}
 	} else {
@@ -888,7 +888,7 @@ func (a *AWSActuator) tagUser(ctx context.Context, logger log.FieldLogger, awsCl
 	if infra.Status.InfrastructureName != "" {
 		tags = append(tags, iamtypes.Tag{
 			Key:   awssdk.String(fmt.Sprintf("kubernetes.io/cluster/%s", infra.Status.InfrastructureName)),
-			Value: awssdk.String("owned"),
+			Value: awssdk.String(ccaws.InfraResourceTagValue),
 		})
 	} else {
 		tags = append(tags, iamtypes.Tag{
@@ -1054,20 +1054,76 @@ func (a *AWSActuator) syncAccessKeySecret(ctx context.Context, cr *minterv1.Cred
 	return nil
 }
 
-func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, userARN string) (string, error) {
+func (a *AWSActuator) getDesiredUserPolicy(entries []minterv1.StatementEntry, userARN, infraName string) (string, error) {
 
 	policyDoc := PolicyDocument{
 		Version:   "2012-10-17",
 		Statement: []StatementEntry{},
 	}
+
+	var infraConditionKey string
+	if infraName != "" {
+		infraConditionKey = ccaws.InfraResourceTagKeyPrefix + infraName
+	}
+
 	for _, se := range entries {
-		policyDoc.Statement = append(policyDoc.Statement,
-			StatementEntry{
-				Effect:    se.Effect,
-				Action:    se.Action,
-				Resource:  se.Resource,
-				Condition: se.PolicyCondition,
-			})
+		if infraConditionKey == "" || se.Effect != "Allow" {
+			policyDoc.Statement = append(policyDoc.Statement,
+				StatementEntry{
+					Effect:    se.Effect,
+					Action:    se.Action,
+					Resource:  se.Resource,
+					Condition: se.PolicyCondition,
+				})
+			continue
+		}
+
+		// Partition actions by aws:ResourceTag compatibility.
+		var unscopedActions, scopedActions []string
+		for _, action := range se.Action {
+			supported, err := ccaws.SupportsInfraResourceTagCondition(action)
+			if err != nil {
+				return "", fmt.Errorf("cannot build scoped IAM policy: %w", err)
+			}
+			if supported {
+				scopedActions = append(scopedActions, action)
+			} else {
+				unscopedActions = append(unscopedActions, action)
+			}
+		}
+
+		// Emit scoped statement with the infra tag condition
+		if len(scopedActions) > 0 {
+			var condition minterv1.IAMPolicyCondition
+			if se.PolicyCondition != nil {
+				condition = *se.PolicyCondition.DeepCopy()
+			} else {
+				condition = minterv1.IAMPolicyCondition{}
+			}
+			if condition["StringEquals"] == nil {
+				condition["StringEquals"] = minterv1.IAMPolicyConditionKeyValue{}
+			}
+			condition["StringEquals"][infraConditionKey] = ccaws.InfraResourceTagValue
+
+			policyDoc.Statement = append(policyDoc.Statement,
+				StatementEntry{
+					Effect:    se.Effect,
+					Action:    scopedActions,
+					Resource:  se.Resource,
+					Condition: condition,
+				})
+		}
+
+		// Emit unscoped statement without the infra tag condition
+		if len(unscopedActions) > 0 {
+			policyDoc.Statement = append(policyDoc.Statement,
+				StatementEntry{
+					Effect:    se.Effect,
+					Action:    unscopedActions,
+					Resource:  se.Resource,
+					Condition: se.PolicyCondition,
+				})
+		}
 	}
 
 	// Always allow a statment that enables iam:GetUser on yourself (to allow access_key/awsClient to username lookups)
