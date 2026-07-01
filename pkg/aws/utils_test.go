@@ -26,7 +26,7 @@ type payloadAWSAction struct {
 // CredentialsRequest manifests in the payload.
 var payloadAWSActions = []payloadAWSAction{
 	// aws-ebs-csi-driver-operator / openshift-machine-api-aws (shared)
-	{"ec2:AttachVolume", true},
+	{"ec2:AttachVolume", false},
 	{"ec2:CreateSnapshot", true},
 	{"ec2:CreateTags", false},
 	{"ec2:CreateVolume", false},
@@ -38,7 +38,7 @@ var payloadAWSActions = []payloadAWSAction{
 	{"ec2:DescribeTags", false},
 	{"ec2:DescribeVolumes", false},
 	{"ec2:DescribeVolumesModifications", false},
-	{"ec2:DetachVolume", true},
+	{"ec2:DetachVolume", false},
 	{"ec2:ModifyVolume", true},
 	{"ec2:DescribeAvailabilityZones", false},
 	{"ec2:EnableFastSnapshotRestores", true},
