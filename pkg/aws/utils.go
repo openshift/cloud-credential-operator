@@ -116,11 +116,9 @@ var (
 	// and modify this map in pkg/aws/utils.go.
 	infraResourceTagScopedActions = map[string]bool{
 		// EC2 — actions on existing, cluster-owned tagged resources
-		"ec2:AttachVolume":                    true,
 		"ec2:CreateSnapshot":                  true,
 		"ec2:DeleteSnapshot":                  true,
 		"ec2:DeleteVolume":                    true,
-		"ec2:DetachVolume":                    true,
 		"ec2:EnableFastSnapshotRestores":      true,
 		"ec2:ModifyNetworkInterfaceAttribute": true,
 		"ec2:ModifyVolume":                    true,
@@ -182,6 +180,12 @@ var (
 		"ec2:AssignPrivateIpAddresses":   true,
 		"ec2:UnassignIpv6Addresses":      true,
 		"ec2:UnassignPrivateIpAddresses": true,
+		// EC2 — Attach/Detach volume are multi-resource actions (volume +
+		// instance). AWS evaluates aws:ResourceTag against both resources, so
+		// the condition fails when the instance does not carry the cluster tag
+		// (common in UPI and externally-managed infrastructure).
+		"ec2:AttachVolume": true,
+		"ec2:DetachVolume": true,
 		// EC2 — Create/Delete for fleet resources (not cluster-tagged)
 		"ec2:AllocateHosts":        true,
 		"ec2:CreateFleet":          true,
