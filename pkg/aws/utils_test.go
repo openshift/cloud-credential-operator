@@ -126,7 +126,7 @@ var payloadAWSActions = []payloadAWSAction{
 	{"ec2:DescribeInstanceStatus", false},
 	{"ec2:DescribeNetworkInterfaceAttribute", false},
 	{"ec2:DescribeNetworkInterfaces", false},
-	{"ec2:ModifyNetworkInterfaceAttribute", true},
+	{"ec2:ModifyNetworkInterfaceAttribute", false},
 	{"ec2:AssignIpv6Addresses", false},
 	{"ec2:AssignPrivateIpAddresses", false},
 	{"ec2:UnassignIpv6Addresses", false},
