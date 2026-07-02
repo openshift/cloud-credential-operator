@@ -116,16 +116,15 @@ var (
 	// and modify this map in pkg/aws/utils.go.
 	infraResourceTagScopedActions = map[string]bool{
 		// EC2 — actions on existing, cluster-owned tagged resources
-		"ec2:AttachVolume":                    true,
-		"ec2:CreateSnapshot":                  true,
-		"ec2:DeleteSnapshot":                  true,
-		"ec2:DeleteVolume":                    true,
-		"ec2:DetachVolume":                    true,
-		"ec2:EnableFastSnapshotRestores":      true,
-		"ec2:ModifyNetworkInterfaceAttribute": true,
-		"ec2:ModifyVolume":                    true,
-		"ec2:ReleaseHosts":                    true,
-		"ec2:TerminateInstances":              true,
+		"ec2:AttachVolume":               true,
+		"ec2:CreateSnapshot":             true,
+		"ec2:DeleteSnapshot":             true,
+		"ec2:DeleteVolume":               true,
+		"ec2:DetachVolume":               true,
+		"ec2:EnableFastSnapshotRestores": true,
+		"ec2:ModifyVolume":               true,
+		"ec2:ReleaseHosts":               true,
+		"ec2:TerminateInstances":         true,
 		// ELB — mutating actions on tagged resources
 		"elasticloadbalancing:DeregisterTargets":                 true,
 		"elasticloadbalancing:RegisterInstancesWithLoadBalancer": true,
@@ -182,6 +181,9 @@ var (
 		"ec2:AssignPrivateIpAddresses":   true,
 		"ec2:UnassignIpv6Addresses":      true,
 		"ec2:UnassignPrivateIpAddresses": true,
+		// EC2 — AWS evaluates the aws:ResourceTag condition against the security groups
+		// referenced by this action, which may not carry the cluster ownership tag.
+		"ec2:ModifyNetworkInterfaceAttribute": true,
 		// EC2 — Create/Delete for fleet resources (not cluster-tagged)
 		"ec2:AllocateHosts":        true,
 		"ec2:CreateFleet":          true,
