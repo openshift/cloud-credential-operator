@@ -117,8 +117,6 @@ var (
 	infraResourceTagScopedActions = map[string]bool{
 		// EC2 — actions on existing, cluster-owned tagged resources
 		"ec2:AttachVolume":                    true,
-		"ec2:CreateSnapshot":                  true,
-		"ec2:DeleteSnapshot":                  true,
 		"ec2:DeleteVolume":                    true,
 		"ec2:DetachVolume":                    true,
 		"ec2:EnableFastSnapshotRestores":      true,
@@ -176,6 +174,9 @@ var (
 		// it, so an aws:ResourceTag condition is unsatisfiable at call time.
 		"ec2:CreateTags": true,
 		"ec2:DeleteTags": true,
+		// EC2 — Create/Delete snapshots
+		"ec2:CreateSnapshot": true,
+		"ec2:DeleteSnapshot": true,
 		// EC2 — ENI IP assignment actions target network interfaces that
 		// are not tagged with the cluster ownership tag.
 		"ec2:AssignIpv6Addresses":        true,

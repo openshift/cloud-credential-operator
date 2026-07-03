@@ -27,10 +27,10 @@ type payloadAWSAction struct {
 var payloadAWSActions = []payloadAWSAction{
 	// aws-ebs-csi-driver-operator / openshift-machine-api-aws (shared)
 	{"ec2:AttachVolume", true},
-	{"ec2:CreateSnapshot", true},
+	{"ec2:CreateSnapshot", false},
 	{"ec2:CreateTags", false},
 	{"ec2:CreateVolume", false},
-	{"ec2:DeleteSnapshot", true},
+	{"ec2:DeleteSnapshot", false},
 	{"ec2:DeleteTags", false},
 	{"ec2:DeleteVolume", true},
 	{"ec2:DescribeInstances", false},
