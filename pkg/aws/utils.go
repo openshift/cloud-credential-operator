@@ -123,7 +123,10 @@ var (
 		"ec2:DetachVolume":               true,
 		"ec2:EnableFastSnapshotRestores": true,
 		"ec2:ModifyVolume":               true,
+		"ec2:RebootInstances":           true,
 		"ec2:ReleaseHosts":               true,
+		"ec2:StartInstances":            true,
+		"ec2:StopInstances":             true,
 		"ec2:TerminateInstances":         true,
 		// ELB — mutating actions on tagged resources
 		"elasticloadbalancing:DeregisterTargets":                 true,

@@ -151,6 +151,14 @@ func TestSupportsInfraResourceTagCondition(t *testing.T) {
 		assert.True(t, supported)
 	})
 
+	t.Run("ec2 instance management actions are scoped", func(t *testing.T) {
+		for _, action := range []string{"ec2:StartInstances", "ec2:StopInstances", "ec2:RebootInstances"} {
+			supported, err := SupportsInfraResourceTagCondition(action)
+			require.NoError(t, err, "action %q should be classified", action)
+			assert.True(t, supported, "action %q should be scoped (supports aws:ResourceTag)", action)
+		}
+	})
+
 	t.Run("unscoped action returns false", func(t *testing.T) {
 		supported, err := SupportsInfraResourceTagCondition("ec2:DescribeInstances")
 		require.NoError(t, err)
