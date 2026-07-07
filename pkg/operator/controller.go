@@ -17,6 +17,8 @@ limitations under the License.
 package controller
 
 import (
+	"context"
+
 	configv1 "github.com/openshift/api/config/v1"
 	awsactuator "github.com/openshift/cloud-credential-operator/pkg/aws/actuator"
 	"github.com/openshift/cloud-credential-operator/pkg/azure"
@@ -51,7 +53,6 @@ const (
 func init() {
 	AddToManagerFuncs = append(AddToManagerFuncs, metrics.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, secretannotator.Add)
-	AddToManagerFuncs = append(AddToManagerFuncs, podidentity.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, status.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, loglevel.Add)
 	AddToManagerFuncs = append(AddToManagerFuncs, cleanup.Add)
@@ -65,13 +66,20 @@ var AddToManagerFuncs []func(manager.Manager, manager.Manager, string) error
 // AddToManagerWithActuatorFuncs is a list of functions to add all Controllers with Actuators to the Manager
 var AddToManagerWithActuatorFuncs []func(manager.Manager, manager.Manager, actuator.Actuator, configv1.PlatformType, corev1client.CoreV1Interface) error
 
-// AddToManager adds all Controllers to the Manager
-func AddToManager(m, rootM manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface) error {
+// AddToManager adds all Controllers to the Manager with optional TLS CLI flag overrides.
+// TODO: consolidate tlsMinVersion, tlsCipherSuites, tlsOverrideFromFlags into a struct
+// if more TLS parameters are added — the bool is derivable from the flag values.
+func AddToManager(ctx context.Context, m, rootM manager.Manager, explicitKubeconfig string, coreClient corev1client.CoreV1Interface, tlsMinVersion string, tlsCipherSuites []string, tlsOverrideFromFlags bool) error {
 	for _, f := range AddToManagerFuncs {
 		if err := f(m, rootM, explicitKubeconfig); err != nil {
 			return err
 		}
 	}
+
+	if err := podidentity.AddWithTLS(ctx, m, rootM, explicitKubeconfig, tlsMinVersion, tlsCipherSuites, tlsOverrideFromFlags); err != nil {
+		return err
+	}
+
 	for _, f := range AddToManagerWithActuatorFuncs {
 		// Check for supported platform types, dummy if not found:
 		// TODO: Use infrastructure type to determine this in future, it's not being populated yet:

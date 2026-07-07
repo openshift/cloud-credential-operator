@@ -149,7 +149,15 @@ func (c *podIdentityController) Start(ctx context.Context) error {
 	return nil
 }
 
+func AddWithTLS(ctx context.Context, mgr, _ manager.Manager, kubeconfig string, tlsMinVersion string, tlsCipherSuites []string, tlsOverrideFromFlags bool) error {
+	return addInternal(ctx, mgr, kubeconfig, tlsMinVersion, tlsCipherSuites, tlsOverrideFromFlags)
+}
+
 func Add(mgr, _ manager.Manager, kubeconfig string) error {
+	return addInternal(context.TODO(), mgr, kubeconfig, "", nil, false)
+}
+
+func addInternal(ctx context.Context, mgr manager.Manager, kubeconfig string, tlsMinVersion string, tlsCipherSuites []string, tlsOverrideFromFlags bool) error {
 	infraStatus, err := platform.GetInfraStatusUsingKubeconfig(kubeconfig)
 	if err != nil {
 		return err
@@ -172,7 +180,6 @@ func Add(mgr, _ manager.Manager, kubeconfig string) error {
 		log.WithField("controller", controllerName).Warn("Failed to get platform type")
 		return nil
 	}
-	ctx := context.TODO()
 	logger := log.WithFields(log.Fields{"platform": platformType, "controller": controllerName})
 
 	config := mgr.GetConfig()
@@ -224,18 +231,27 @@ func Add(mgr, _ manager.Manager, kubeconfig string) error {
 		return err
 	}
 
-	tlsAdherence, err := utiltls.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient)
-	if err != nil {
-		return err
-	}
+	if tlsOverrideFromFlags {
+		logger.Info("Webhook TLS configuration overridden via CLI flags")
+		r.tlsProfileSpec = configv1.TLSProfileSpec{
+			MinTLSVersion: configv1.TLSProtocolVersion(tlsMinVersion),
+			Ciphers:       tlsCipherSuites,
+		}
+		r.tlsFromFlags = true
+	} else {
+		tlsAdherence, err := utiltls.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient)
+		if err != nil {
+			return err
+		}
 
-	initialTLSProfile, err := utiltls.FetchAPIServerTLSProfile(ctx, k8sClient)
-	if err != nil {
-		return err
-	}
+		initialTLSProfile, err := utiltls.FetchAPIServerTLSProfile(ctx, k8sClient)
+		if err != nil {
+			return err
+		}
 
-	if libgocrypto.ShouldHonorClusterTLSProfile(tlsAdherence) {
-		r.tlsProfileSpec = initialTLSProfile
+		if libgocrypto.ShouldHonorClusterTLSProfile(tlsAdherence) {
+			r.tlsProfileSpec = initialTLSProfile
+		}
 	}
 
 	c, err := controller.New(controllerName, mgr, controller.Options{Reconciler: r})
@@ -321,6 +337,7 @@ type staticResourceReconciler struct {
 	cache                resourceapply.ResourceCache
 	podIdentityType      PodIdentityManifestSource
 	tlsProfileSpec       configv1.TLSProfileSpec
+	tlsFromFlags         bool
 	// degradedSince tracks when reconciliation errors started. On pod restart
 	// this resets to zero; seedDegradedSince recovers it from the published
 	// ClusterOperator Degraded condition so the grace period is not re-granted.
@@ -501,10 +518,29 @@ func (r *staticResourceReconciler) ReconcileResources(ctx context.Context) (*app
 
 	requestedDeployment.Spec.Template.Spec.Containers[0].Image = r.imagePullSpec
 
-	err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger, r.tlsProfileSpec)
-	if err != nil {
-		r.logger.WithError(err).Error("error substituting Deployment")
-		return nil, err
+	if r.tlsFromFlags {
+		// CLI flags provide IANA cipher names, but ApplyDeploymentSubstitutionsInPlace
+		// runs OpenSSL-to-IANA conversion that would silently drop them. Pass an empty
+		// TLSProfileSpec so non-TLS substitutions still run, then inject TLS args directly.
+		err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger, configv1.TLSProfileSpec{})
+		if err != nil {
+			r.logger.WithError(err).Error("error substituting Deployment")
+			return nil, err
+		}
+		if r.tlsProfileSpec.MinTLSVersion != "" {
+			requestedDeployment.Spec.Template.Spec.Containers[0].Command = append(requestedDeployment.Spec.Template.Spec.Containers[0].Command,
+				fmt.Sprintf("--tls-min-version=%s", r.tlsProfileSpec.MinTLSVersion))
+		}
+		if len(r.tlsProfileSpec.Ciphers) > 0 && r.tlsProfileSpec.MinTLSVersion != configv1.TLSProtocolVersion("VersionTLS13") {
+			requestedDeployment.Spec.Template.Spec.Containers[0].Command = append(requestedDeployment.Spec.Template.Spec.Containers[0].Command,
+				fmt.Sprintf("--tls-cipher-suites=%s", strings.Join(r.tlsProfileSpec.Ciphers, ",")))
+		}
+	} else {
+		err = r.podIdentityType.ApplyDeploymentSubstitutionsInPlace(requestedDeployment, r.client, r.logger, r.tlsProfileSpec)
+		if err != nil {
+			r.logger.WithError(err).Error("error substituting Deployment")
+			return nil, err
+		}
 	}
 
 	resultDeployment, modified, err := resourceapply.ApplyDeployment(ctx, r.clientset.AppsV1(), r.eventRecorder, requestedDeployment, r.deploymentGeneration)

@@ -49,6 +49,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
+	cliflag "k8s.io/component-base/cli/flag"
 	"k8s.io/utils/clock"
 	"sigs.k8s.io/controller-runtime/pkg/cache"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -84,8 +85,10 @@ const (
 )
 
 type ControllerManagerOptions struct {
-	LogLevel   string
-	Kubeconfig string
+	LogLevel        string
+	Kubeconfig      string
+	TLSMinVersion   string
+	TLSCipherSuites []string
 }
 
 func NewOperator() *cobra.Command {
@@ -260,29 +263,11 @@ func NewOperator() *cobra.Command {
 					return err
 				}
 
-				// Retrieve the initial TLS Adherence policy for the TLS profile watcher
-				initialTLSAdherence, err := utiltls.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient)
+				tlsConfig, initialTLSProfile, initialTLSAdherence, tlsOverrideFromFlags, err := resolveTLSConfig(
+					ctx, k8sClient, opts.TLSMinVersion, opts.TLSCipherSuites)
 				if err != nil {
-					log.WithError(err).Error("failed to fetch initial TLS adherence")
+					log.WithError(err).Error("failed to resolve TLS configuration")
 					return err
-				}
-
-				// Retrieve the initial TLS profile to use for the TLS profile watcher
-				initialTLSProfile, err := utiltls.FetchAPIServerTLSProfile(ctx, k8sClient)
-				if err != nil {
-					log.WithError(err).Error("failed to fetch initial TLS profile")
-					return err
-				}
-
-				tlsConfig := func(*tls.Config) {}
-
-				if libgocrypto.ShouldHonorClusterTLSProfile(initialTLSAdherence) {
-					var unsupportedCiphers []string
-					// Create the TLS configuration function for the server endpoints.
-					tlsConfig, unsupportedCiphers = utiltls.NewTLSConfigFromProfile(initialTLSProfile)
-					if len(unsupportedCiphers) > 0 {
-						log.Infof("TLS configuration contains unsupported ciphers that will be ignored: %v", unsupportedCiphers)
-					}
 				}
 
 				// Create a new Cmd to provide shared dependencies and start components
@@ -327,28 +312,32 @@ func NewOperator() *cobra.Command {
 
 				// Setup all Controllers
 				log.Info("setting up controllers")
-				if err := controller.AddToManager(mgr, rootMgr, opts.Kubeconfig, coreClient); err != nil {
+				if err := controller.AddToManager(ctx, mgr, rootMgr, opts.Kubeconfig, coreClient, opts.TLSMinVersion, opts.TLSCipherSuites, tlsOverrideFromFlags); err != nil {
 					log.WithError(err).Error("unable to register controllers to the manager")
 					return err
 				}
 
-				// Set up the TLS security profile watcher controller.
-				// This will trigger a graceful shutdown when the TLS profile changes.
-				if err := (&utiltls.SecurityProfileWatcher{
-					Client:                    mgr.GetClient(),
-					InitialTLSProfileSpec:     initialTLSProfile,
-					InitialTLSAdherencePolicy: initialTLSAdherence,
-					OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
-						log.Infof("TLS profile changed from %v to %v, restarting operator", oldTLSProfileSpec, newTLSProfileSpec)
-						cancel()
-					},
-					OnAdherencePolicyChange: func(ctx context.Context, oldTLSAdherencePolicy configv1.TLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
-						log.Infof("TLS adherence policy changed from %v to %v, restarting operator", oldTLSAdherencePolicy, newTLSAdherencePolicy)
-						cancel()
-					},
-				}).SetupWithManager(mgr); err != nil {
-					log.WithError(err).Error("failed to set up TLS profile watcher")
-					return err
+				// When TLS is overridden via CLI flags, the watcher is not needed since
+				// we're not reading from apiservers.config.openshift.io/cluster.
+				if tlsOverrideFromFlags {
+					log.Info("TLS security profile watcher disabled because TLS is configured via CLI flags")
+				} else {
+					if err := (&utiltls.SecurityProfileWatcher{
+						Client:                    mgr.GetClient(),
+						InitialTLSProfileSpec:     initialTLSProfile,
+						InitialTLSAdherencePolicy: initialTLSAdherence,
+						OnProfileChange: func(ctx context.Context, oldTLSProfileSpec, newTLSProfileSpec configv1.TLSProfileSpec) {
+							log.Infof("TLS profile changed from %v to %v, restarting operator", oldTLSProfileSpec, newTLSProfileSpec)
+							cancel()
+						},
+						OnAdherencePolicyChange: func(ctx context.Context, oldTLSAdherencePolicy configv1.TLSAdherencePolicy, newTLSAdherencePolicy configv1.TLSAdherencePolicy) {
+							log.Infof("TLS adherence policy changed from %v to %v, restarting operator", oldTLSAdherencePolicy, newTLSAdherencePolicy)
+							cancel()
+						},
+					}).SetupWithManager(mgr); err != nil {
+						log.WithError(err).Error("failed to set up TLS profile watcher")
+						return err
+					}
 				}
 
 				// Start the managers
@@ -456,6 +445,8 @@ func NewOperator() *cobra.Command {
 
 	cmd.PersistentFlags().StringVar(&opts.LogLevel, "log-level", defaultLogLevel, "Log level (debug,info,warn,error,fatal)")
 	cmd.PersistentFlags().StringVar(&opts.Kubeconfig, "kubeconfig", "", "Path to the kubeconfig to use.")
+	cmd.PersistentFlags().StringVar(&opts.TLSMinVersion, "tls-min-version", "", "Minimum TLS version supported. When set, overrides the cluster-wide TLS profile from APIServer CR. Possible values: VersionTLS10, VersionTLS11, VersionTLS12, VersionTLS13")
+	cmd.PersistentFlags().StringSliceVar(&opts.TLSCipherSuites, "tls-cipher-suites", nil, "Comma-separated list of cipher suites for the server. When set, overrides the cluster-wide TLS profile from APIServer CR. Values are Go crypto/tls cipher suite names.")
 	cmd.PersistentFlags().AddGoFlagSet(flag.CommandLine)
 	initializeGlog(cmd.PersistentFlags())
 	flag.CommandLine.Parse([]string{})
@@ -506,6 +497,71 @@ type glogWriter struct{}
 func (writer glogWriter) Write(data []byte) (n int, err error) {
 	glog.Info(string(data))
 	return len(data), nil
+}
+
+func resolveTLSConfig(ctx context.Context, k8sClient client.Client, tlsMinVersion string, tlsCipherSuites []string) (
+	func(*tls.Config), configv1.TLSProfileSpec, configv1.TLSAdherencePolicy, bool, error,
+) {
+	if tlsMinVersion != "" || len(tlsCipherSuites) > 0 {
+		log.Info("TLS configuration overridden via CLI flags")
+
+		var minVersion uint16
+		if tlsMinVersion != "" {
+			var err error
+			minVersion, err = cliflag.TLSVersion(tlsMinVersion)
+			if err != nil {
+				return nil, configv1.TLSProfileSpec{}, "", false,
+					fmt.Errorf("invalid --tls-min-version value: %w", err)
+			}
+		} else {
+			minVersion = cliflag.DefaultTLSVersion()
+		}
+
+		var cipherSuites []uint16
+		if len(tlsCipherSuites) > 0 {
+			var err error
+			cipherSuites, err = cliflag.TLSCipherSuites(tlsCipherSuites)
+			if err != nil {
+				return nil, configv1.TLSProfileSpec{}, "", false,
+					fmt.Errorf("invalid --tls-cipher-suites value: %w", err)
+			}
+		}
+
+		tlsConfigFunc := func(cfg *tls.Config) {
+			cfg.MinVersion = minVersion
+			if minVersion < tls.VersionTLS13 {
+				cfg.CipherSuites = cipherSuites
+			} else if len(tlsCipherSuites) > 0 {
+				log.Warning("TLS 1.3 cipher suites are not configurable in Go, ignoring --tls-cipher-suites")
+			}
+		}
+
+		return tlsConfigFunc, configv1.TLSProfileSpec{}, "", true, nil
+	}
+
+	initialTLSAdherence, err := utiltls.FetchAPIServerTLSAdherencePolicy(ctx, k8sClient)
+	if err != nil {
+		return nil, configv1.TLSProfileSpec{}, "", false,
+			fmt.Errorf("failed to fetch TLS adherence policy: %w", err)
+	}
+
+	initialTLSProfile, err := utiltls.FetchAPIServerTLSProfile(ctx, k8sClient)
+	if err != nil {
+		return nil, configv1.TLSProfileSpec{}, "", false,
+			fmt.Errorf("failed to fetch TLS profile: %w", err)
+	}
+
+	tlsConfigFunc := func(*tls.Config) {}
+
+	if libgocrypto.ShouldHonorClusterTLSProfile(initialTLSAdherence) {
+		var unsupportedCiphers []string
+		tlsConfigFunc, unsupportedCiphers = utiltls.NewTLSConfigFromProfile(initialTLSProfile)
+		if len(unsupportedCiphers) > 0 {
+			log.Infof("TLS configuration contains unsupported ciphers that will be ignored: %v", unsupportedCiphers)
+		}
+	}
+
+	return tlsConfigFunc, initialTLSProfile, initialTLSAdherence, false, nil
 }
 
 func terminateWhenProxyChanges(path string, cancel context.CancelFunc, done <-chan struct{}) {
