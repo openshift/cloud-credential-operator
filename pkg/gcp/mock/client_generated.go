@@ -288,6 +288,20 @@ func (mr *MockClientMockRecorder) GetProjectName() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetProjectName", reflect.TypeOf((*MockClient)(nil).GetProjectName))
 }
 
+// GetUniverseDomain mocks base method.
+func (m *MockClient) GetUniverseDomain() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetUniverseDomain")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetUniverseDomain indicates an expected call of GetUniverseDomain.
+func (mr *MockClientMockRecorder) GetUniverseDomain() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetUniverseDomain", reflect.TypeOf((*MockClient)(nil).GetUniverseDomain))
+}
+
 // GetRole mocks base method.
 func (m *MockClient) GetRole(arg0 context.Context, arg1 *admin.GetRoleRequest) (*admin.Role, error) {
 	m.ctrl.T.Helper()
