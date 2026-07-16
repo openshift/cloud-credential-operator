@@ -417,16 +417,11 @@ func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 	}
 	var authOpts []option.ClientOption
 	if len(creds.JSON) > 0 {
-		// WithAuthCredentialsJSON takes a credentials type argument to allow
-		// restricting which credential types are accepted from external sources.
-		// In this case, there are no restrictions so we simply pass the type through.
-		var f struct {
-			Type string `json:"type"`
+		credType, err := CredentialType(creds.JSON)
+		if err != nil {
+			return nil, err
 		}
-		if err := json.Unmarshal(creds.JSON, &f); err != nil {
-			return nil, fmt.Errorf("failed to parse credentials JSON: %w", err)
-		}
-		authOpts = append(authOpts, option.WithAuthCredentialsJSON(option.CredentialsType(f.Type), creds.JSON))
+		authOpts = append(authOpts, option.WithAuthCredentialsJSON(credType, creds.JSON))
 	} else {
 		authOpts = append(authOpts, option.WithCredentials(creds))
 	}
@@ -469,14 +464,22 @@ func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 	}, nil
 }
 
-func NewClientFromJSON(projectName string, authJSON []byte) (Client, error) {
+func CredentialType(authJSON []byte) (option.CredentialsType, error) {
 	var f struct {
 		Type string `json:"type"`
 	}
 	if err := json.Unmarshal(authJSON, &f); err != nil {
-		return nil, fmt.Errorf("failed to parse credentials JSON: %w", err)
+		return "", fmt.Errorf("failed to parse credentials JSON: %w", err)
 	}
-	creds, err := google.CredentialsFromJSONWithType(context.TODO(), authJSON, google.CredentialsType(f.Type), compute.CloudPlatformScope)
+	return option.CredentialsType(f.Type), nil
+}
+
+func NewClientFromJSON(projectName string, authJSON []byte) (Client, error) {
+	credType, err := CredentialType(authJSON)
+	if err != nil {
+		return nil, err
+	}
+	creds, err := google.CredentialsFromJSONWithType(context.TODO(), authJSON, google.CredentialsType(credType), compute.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
