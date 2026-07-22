@@ -28,7 +28,7 @@ import (
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	schemeutils "github.com/openshift/cloud-credential-operator/pkg/util"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -133,7 +133,7 @@ func TestCheckPermissionsAgainstPermissionListChunking(t *testing.T) {
 			testablePerms.lastUpdated = time.Now()
 			testablePerms.permSet = sets.NewString(permissionsList...)
 
-			mockCallList := []*gomock.Call{}
+			mockCallList := []any{}
 
 			for _, chunk := range test.chunks {
 				permRequest := &cloudresourcemanager.TestIamPermissionsRequest{

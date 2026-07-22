@@ -15,7 +15,7 @@ import (
 	armresources "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	armstorage "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	blockblob "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	models "github.com/microsoftgraph/msgraph-sdk-go/models"
 )
 

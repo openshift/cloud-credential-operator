@@ -12,7 +12,7 @@ import (
 
 	iamCloud "cloud.google.com/go/iam"
 	"cloud.google.com/go/storage"
-	"github.com/golang/mock/gomock"
+	"go.uber.org/mock/gomock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/api/googleapi"
