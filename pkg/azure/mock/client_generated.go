@@ -15,8 +15,8 @@ import (
 	armresources "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/resources/armresources"
 	armstorage "github.com/Azure/azure-sdk-for-go/sdk/resourcemanager/storage/armstorage"
 	blockblob "github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
-	gomock "go.uber.org/mock/gomock"
 	models "github.com/microsoftgraph/msgraph-sdk-go/models"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockAppClient is a mock of AppClient interface.
