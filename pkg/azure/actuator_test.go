@@ -818,3 +818,4 @@ func testAuthentication(issuer string) *openshiftapiv1.Authentication {
 		},
 	}
 }
+
