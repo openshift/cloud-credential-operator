@@ -19,6 +19,8 @@ import (
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2/google"
 	compute "google.golang.org/api/compute/v1"
+
+	gcpclient "github.com/openshift/cloud-credential-operator/pkg/gcp"
 )
 
 var (
@@ -149,7 +151,11 @@ type contentLoader struct {
 }
 
 func (f *contentLoader) Load(ctx context.Context) (*google.Credentials, error) {
-	return google.CredentialsFromJSON(ctx, []byte(f.content), compute.CloudPlatformScope)
+	credType, err := gcpclient.CredentialType([]byte(f.content))
+	if err != nil {
+		return nil, err
+	}
+	return google.CredentialsFromJSONWithType(ctx, []byte(f.content), google.CredentialsType(credType), compute.CloudPlatformScope)
 }
 
 func (f *contentLoader) String() string {

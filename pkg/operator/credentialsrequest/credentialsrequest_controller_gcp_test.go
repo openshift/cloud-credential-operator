@@ -1143,6 +1143,7 @@ func testGCPCredentialsRequestWithPermissions(t *testing.T) *minterv1.Credential
 
 func mockGetProjectName(mockGCPClient *mockgcp.MockClient) {
 	mockGCPClient.EXPECT().GetProjectName().AnyTimes().Return(testGCPProjectName)
+	mockGCPClient.EXPECT().GetUniverseDomain().AnyTimes().Return("googleapis.com")
 }
 
 func mockGetServiceAccount(mockGCPClient *mockgcp.MockClient) {

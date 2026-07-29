@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"regexp"
+	"strings"
 
 	log "github.com/sirupsen/logrus"
 
@@ -37,7 +38,7 @@ var (
 func GetServiceAccount(gcpClient ccgcp.Client, svcAcctID string) (*iamadminpb.ServiceAccount, error) {
 	projectName := gcpClient.GetProjectName()
 
-	restString := fmt.Sprintf("projects/%s/serviceAccounts/%s@%s.iam.gserviceaccount.com", projectName, svcAcctID, projectName)
+	restString := fmt.Sprintf("projects/%s/serviceAccounts/%s", projectName, serviceAccountEmail(svcAcctID, projectName))
 	request := &iamadminpb.GetServiceAccountRequest{
 		Name: restString,
 	}
@@ -155,5 +156,11 @@ func ServiceAccountBindingName(svcAccount *iamadminpb.ServiceAccount) string {
 }
 
 func serviceAccountEmail(svcAccountID, projectName string) string {
-	return fmt.Sprintf("%s@%s.iam.gserviceaccount.com", svcAccountID, projectName)
+	// Domain-scoped project IDs (e.g. "eu0:openshift") use a reversed
+	// dot-separated format in SA emails: "openshift.eu0".
+	emailProject := projectName
+	if parts := strings.SplitN(projectName, ":", 2); len(parts) == 2 {
+		emailProject = parts[1] + "." + parts[0]
+	}
+	return fmt.Sprintf("%s@%s.iam.gserviceaccount.com", svcAccountID, emailProject)
 }

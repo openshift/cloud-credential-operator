@@ -18,6 +18,7 @@ package gcp
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -64,6 +65,7 @@ type Client interface {
 
 	//CloudResourceManager
 	GetProjectName() string
+	GetUniverseDomain() string
 	GetProject(ctx context.Context, projectName string) (*cloudresourcemanager.Project, error)
 	GetProjectIamPolicy(string, *cloudresourcemanager.GetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
 	SetProjectIamPolicy(string, *cloudresourcemanager.SetIamPolicyRequest) (*cloudresourcemanager.Policy, error)
@@ -87,6 +89,7 @@ type Client interface {
 
 type gcpClient struct {
 	projectName                string
+	universeDomain             string
 	creds                      *google.Credentials
 	cloudResourceManagerClient *cloudresourcemanager.Service
 	iamClient                  *iamadmin.IamClient
@@ -208,6 +211,10 @@ func (c *gcpClient) GetServiceAccountIamPolicy(svcAcctResource string) (*iam.Pol
 
 func (c *gcpClient) GetProjectName() string {
 	return c.projectName
+}
+
+func (c *gcpClient) GetUniverseDomain() string {
+	return c.universeDomain
 }
 
 func (c *gcpClient) GetProject(ctx context.Context, projectName string) (*cloudresourcemanager.Project, error) {
@@ -404,33 +411,50 @@ func (c *gcpClient) DeleteObject(ctx context.Context, bucketName, objectName str
 func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 	ctx := context.TODO()
 
-	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, option.WithCredentials(creds))
+	ud, err := creds.GetUniverseDomain()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get universe domain: %w", err)
+	}
+	var authOpts []option.ClientOption
+	if len(creds.JSON) > 0 {
+		credType, err := CredentialType(creds.JSON)
+		if err != nil {
+			return nil, err
+		}
+		authOpts = append(authOpts, option.WithAuthCredentialsJSON(credType, creds.JSON))
+	} else {
+		authOpts = append(authOpts, option.WithCredentials(creds))
+	}
+	authOpts = append(authOpts, option.WithUniverseDomain(ud))
+
+	cloudResourceManagerClient, err := cloudresourcemanager.NewService(ctx, authOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	iamClient, err := iamadmin.NewIamClient(ctx, option.WithCredentials(creds))
+	iamClient, err := iamadmin.NewIamClient(ctx, authOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	iamService, err := iam.NewService(ctx, option.WithCredentials(creds))
+	iamService, err := iam.NewService(ctx, authOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	serviceUsageClient, err := serviceusage.NewService(ctx, option.WithCredentials(creds))
+	serviceUsageClient, err := serviceusage.NewService(ctx, authOpts...)
 	if err != nil {
 		return nil, err
 	}
 
-	storageClient, err := storage.NewClient(ctx, option.WithCredentials(creds))
+	storageClient, err := storage.NewClient(ctx, authOpts...)
 	if err != nil {
 		return nil, err
 	}
 
 	return &gcpClient{
 		projectName:                projectName,
+		universeDomain:             ud,
 		creds:                      creds,
 		cloudResourceManagerClient: cloudResourceManagerClient,
 		iamClient:                  iamClient,
@@ -440,11 +464,22 @@ func NewClient(projectName string, creds *google.Credentials) (Client, error) {
 	}, nil
 }
 
+func CredentialType(authJSON []byte) (option.CredentialsType, error) {
+	var f struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(authJSON, &f); err != nil {
+		return "", fmt.Errorf("failed to parse credentials JSON: %w", err)
+	}
+	return option.CredentialsType(f.Type), nil
+}
+
 func NewClientFromJSON(projectName string, authJSON []byte) (Client, error) {
-	var creds *google.Credentials
-	var err error
-	// since we're using a single creds var, we should specify all the required scopes when initializing
-	creds, err = google.CredentialsFromJSON(context.TODO(), authJSON, compute.CloudPlatformScope)
+	credType, err := CredentialType(authJSON)
+	if err != nil {
+		return nil, err
+	}
+	creds, err := google.CredentialsFromJSONWithType(context.TODO(), authJSON, google.CredentialsType(credType), compute.CloudPlatformScope)
 	if err != nil {
 		return nil, err
 	}
