@@ -1,9 +1,11 @@
 package extend
 
 import (
+	_ "embed"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -13,6 +15,9 @@ import (
 	g "github.com/onsi/ginkgo/v2"
 	o "github.com/onsi/gomega"
 )
+
+//go:embed testdata/credentials_request.yaml
+var credentialsRequestTemplate []byte
 
 const (
 	ccoCap                   = "CloudCredential"
@@ -47,7 +52,6 @@ type credentialsRequest struct {
 	name      string
 	namespace string
 	provider  string
-	template  string
 }
 
 type azureCredential struct {
@@ -260,7 +264,13 @@ func patchResourceAsAdmin(oc *CLI, ns, resource, rsname, patch string) {
 }
 
 func (cr *credentialsRequest) create(oc *CLI) {
-	applyNsResourceFromTemplate(oc, DefaultNamespace, "--ignore-unknown-parameters=true", "-f", cr.template, "-p", "NAME="+cr.name, "NAMESPACE="+cr.namespace, "PROVIDER="+cr.provider)
+	tmpFile, err := os.CreateTemp("", "credentials-request-*.yaml")
+	o.Expect(err).NotTo(o.HaveOccurred())
+	defer os.Remove(tmpFile.Name())
+	_, err = tmpFile.Write(credentialsRequestTemplate)
+	o.Expect(err).NotTo(o.HaveOccurred())
+	o.Expect(tmpFile.Close()).NotTo(o.HaveOccurred())
+	applyNsResourceFromTemplate(oc, DefaultNamespace, "--ignore-unknown-parameters=true", "-f", tmpFile.Name(), "-p", "NAME="+cr.name, "NAMESPACE="+cr.namespace, "PROVIDER="+cr.provider)
 }
 
 // Check if CCO conditions are healthy
