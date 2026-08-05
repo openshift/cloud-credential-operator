@@ -28,7 +28,6 @@ require (
 	github.com/go-jose/go-jose/v4 v4.1.4
 	github.com/go-logr/logr v1.4.3
 	github.com/golang/glog v1.2.5
-	github.com/golang/mock v1.7.0-rc.1
 	github.com/google/go-cmp v0.7.0
 	github.com/google/go-github/v57 v57.0.0
 	github.com/google/uuid v1.6.0
@@ -204,6 +203,7 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.44.0 // indirect
 	go.opentelemetry.io/otel/trace v1.44.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.9.0 // indirect
+	go.uber.org/mock v0.6.0
 	go.yaml.in/yaml/v2 v2.4.3 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
 	golang.org/x/crypto v0.53.0 // indirect

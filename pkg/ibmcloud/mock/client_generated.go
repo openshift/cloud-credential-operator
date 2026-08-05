@@ -11,7 +11,7 @@ import (
 	iamidentityv1 "github.com/IBM/platform-services-go-sdk/iamidentityv1"
 	iampolicymanagementv1 "github.com/IBM/platform-services-go-sdk/iampolicymanagementv1"
 	resourcemanagerv2 "github.com/IBM/platform-services-go-sdk/resourcemanagerv2"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClient is a mock of Client interface.

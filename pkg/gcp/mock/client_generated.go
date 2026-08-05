@@ -10,7 +10,7 @@ import (
 
 	iam "cloud.google.com/go/iam"
 	storage "cloud.google.com/go/storage"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 	cloudresourcemanager "google.golang.org/api/cloudresourcemanager/v1"
 	iam0 "google.golang.org/api/iam/v1"
 	admin "google.golang.org/genproto/googleapis/iam/admin/v1"

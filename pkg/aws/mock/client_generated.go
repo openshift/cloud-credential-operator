@@ -11,7 +11,7 @@ import (
 	cloudfront "github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	iam "github.com/aws/aws-sdk-go-v2/service/iam"
 	s3 "github.com/aws/aws-sdk-go-v2/service/s3"
-	gomock "github.com/golang/mock/gomock"
+	gomock "go.uber.org/mock/gomock"
 )
 
 // MockClient is a mock of Client interface.
