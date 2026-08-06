@@ -95,15 +95,15 @@ func createWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
 		publicKeyPath = filepath.Join(CreateWorkloadIdentityProviderOpts.TargetDir, provisioning.PublicKeyFile)
 	}
 
-	err = createWorkloadIdentityProvider(ctx, gcpClient, CreateWorkloadIdentityProviderOpts.Name, CreateWorkloadIdentityProviderOpts.Region, CreateWorkloadIdentityProviderOpts.Project, CreateWorkloadIdentityProviderOpts.WorkloadIdentityPool, publicKeyPath, CreateWorkloadIdentityProviderOpts.TargetDir, CreateWorkloadIdentityProviderOpts.KeyStorageMethod, CreateWorkloadIdentityProviderOpts.DryRun)
+	err = createWorkloadIdentityProvider(ctx, gcpClient, CreateWorkloadIdentityProviderOpts.Name, CreateWorkloadIdentityProviderOpts.Region, CreateWorkloadIdentityProviderOpts.Project, CreateWorkloadIdentityProviderOpts.WorkloadIdentityPool, publicKeyPath, CreateWorkloadIdentityProviderOpts.TargetDir, CreateWorkloadIdentityProviderOpts.KeyStorageMethod, CreateWorkloadIdentityProviderOpts.DryRun, gcpClient.GetUniverseDomain())
 	if err != nil {
 		log.Fatal(err)
 	}
 }
 
-func createWorkloadIdentityProvider(ctx context.Context, client gcp.Client, name, region, project, workloadIdentityPool string, publicKeyPath, targetDir, keyStorageMethod string, generateOnly bool) error {
+func createWorkloadIdentityProvider(ctx context.Context, client gcp.Client, name, region, project, workloadIdentityPool string, publicKeyPath, targetDir, keyStorageMethod string, generateOnly bool, universeDomain string) error {
 	bucketName := fmt.Sprintf("%s-oidc", name)
-	issuerURL := fmt.Sprintf("https://storage.googleapis.com/%s", bucketName)
+	issuerURL := fmt.Sprintf("https://storage.%s/%s", universeDomain, bucketName)
 
 	switch keyStorageMethod {
 	case KeyStorageMethodPoolJWKFile:

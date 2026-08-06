@@ -206,7 +206,7 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 				keyStorageMethod = KeyStorageMethodPublicBucket
 			}
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
-			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, keyStorageMethod, test.generateOnly)
+			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, keyStorageMethod, test.generateOnly, "googleapis.com")
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
@@ -416,7 +416,7 @@ func TestCreateWorkloadIdentityProviderWithPoolJwkFile(t *testing.T) {
 			defer os.RemoveAll(tempDirName)
 
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
-			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, KeyStorageMethodPoolJWKFile, test.generateOnly)
+			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, KeyStorageMethodPoolJWKFile, test.generateOnly, "googleapis.com")
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")

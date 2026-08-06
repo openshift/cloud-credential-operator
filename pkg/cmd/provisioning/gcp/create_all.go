@@ -47,12 +47,13 @@ func createAllCmd(cmd *cobra.Command, args []string) {
 		log.Fatalf("Failed to create workload identity pool: %s", err)
 	}
 
-	if err = createWorkloadIdentityProvider(ctx, gcpClient, CreateAllOpts.Name, CreateAllOpts.Region, CreateAllOpts.Project, CreateAllOpts.Name, publicKeyPath, CreateAllOpts.TargetDir, CreateAllOpts.KeyStorageMethod, false); err != nil {
+	ud := gcpClient.GetUniverseDomain()
+	if err = createWorkloadIdentityProvider(ctx, gcpClient, CreateAllOpts.Name, CreateAllOpts.Region, CreateAllOpts.Project, CreateAllOpts.Name, publicKeyPath, CreateAllOpts.TargetDir, CreateAllOpts.KeyStorageMethod, false, ud); err != nil {
 		log.Fatalf("Failed to create workload identity provider: %s", err)
 	}
 
 	if err = createServiceAccounts(ctx, gcpClient, CreateAllOpts.Name, CreateAllOpts.Name, CreateAllOpts.Name, CreateAllOpts.CredRequestDir,
-		CreateAllOpts.TargetDir, CreateAllOpts.EnableTechPreview, false); err != nil {
+		CreateAllOpts.TargetDir, CreateAllOpts.EnableTechPreview, false, ud); err != nil {
 		log.Fatalf("Failed to create IAM service accounts: %s", err)
 	}
 }
