@@ -52,6 +52,7 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 		setup            func(*testing.T) string
 		verify           func(t *testing.T, tempDirName string)
 		keyStorageMethod string
+		universeDomain   string
 		generateOnly     bool
 		expectError      bool
 	}{
@@ -118,6 +119,37 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 			},
 			verify:      func(t *testing.T, tempDirName string) {},
 			expectError: false,
+		},
+		{
+			name: "Empty universe domain defaults to googleapis.com",
+			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
+				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
+				return mockGCPClient
+			},
+			setup: func(t *testing.T) string {
+				tempDirName, err := os.MkdirTemp(os.TempDir(), testDirPrefix)
+				require.NoError(t, err, "Failed to create temp directory")
+
+				err = os.WriteFile(filepath.Join(tempDirName, testPublicKeyFile), []byte(testPublicKeyData), 0600)
+				require.NoError(t, err, "errored while setting up environment for test")
+
+				return tempDirName
+			},
+			verify: func(t *testing.T, tempDirName string) {
+				discoveryDocument, err := os.ReadFile(filepath.Join(tempDirName, gcpOidcConfigurationFilename))
+				require.NoError(t, err, "error reading in discovery document")
+
+				var discoveryDocumentJSON map[string]interface{}
+				err = json.Unmarshal(discoveryDocument, &discoveryDocumentJSON)
+				require.NoError(t, err, "discovery document is not a JSON")
+
+				issuerURL, ok := discoveryDocumentJSON["issuer"]
+				require.True(t, ok, "issuer field absent in discovery document")
+				bucketName := fmt.Sprintf("%s-oidc", testInfraName)
+				assert.Equal(t, fmt.Sprintf("https://storage.googleapis.com/%s", bucketName), issuerURL, "unexpected issuer url for empty universe domain")
+			},
+			generateOnly: true,
+			expectError:  false,
 		},
 		{
 			name: "unsupported key-storage-method returns error",
@@ -206,7 +238,7 @@ func TestCreateWorkloadIdentityProvider(t *testing.T) {
 				keyStorageMethod = KeyStorageMethodPublicBucket
 			}
 			testPublicKeyPath := filepath.Join(tempDirName, testPublicKeyFile)
-			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, keyStorageMethod, test.generateOnly, "googleapis.com")
+			err := createWorkloadIdentityProvider(context.TODO(), mockGCPClient, testInfraName, testRegionName, testProject, testName, testPublicKeyPath, tempDirName, keyStorageMethod, test.generateOnly, test.universeDomain)
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")

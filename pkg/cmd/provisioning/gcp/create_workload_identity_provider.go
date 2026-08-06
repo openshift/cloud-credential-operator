@@ -102,6 +102,9 @@ func createWorkloadIdentityProviderCmd(cmd *cobra.Command, args []string) {
 }
 
 func createWorkloadIdentityProvider(ctx context.Context, client gcp.Client, name, region, project, workloadIdentityPool string, publicKeyPath, targetDir, keyStorageMethod string, generateOnly bool, universeDomain string) error {
+	if universeDomain == "" {
+		universeDomain = "googleapis.com"
+	}
 	bucketName := fmt.Sprintf("%s-oidc", name)
 	issuerURL := fmt.Sprintf("https://storage.%s/%s", universeDomain, bucketName)
 
