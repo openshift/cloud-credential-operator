@@ -58,10 +58,10 @@ type ReconcileCloudCredSecret struct {
 }
 
 // NewReconciler will return a reconciler for handling vSphere cloud cred secrets.
-func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(client, rootCredClient client.Client) reconcile.Reconciler {
 	return &ReconcileCloudCredSecret{
-		Client:         c,
-		RootCredClient: mgr.GetClient(),
+		Client:         client,
+		RootCredClient: rootCredClient,
 		Logger:         log.WithField("controller", constants.SecretAnnotatorControllerName),
 	}
 }

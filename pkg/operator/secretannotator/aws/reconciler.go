@@ -38,16 +38,15 @@ const (
 	AwsSecretAccessKeyName = "aws_secret_access_key"
 )
 
-func NewReconciler(c client.Client, mgr manager.Manager) reconcile.Reconciler {
+func NewReconciler(client, rootCredClient client.Client) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
-		Client:           c,
-		RootCredClient:   mgr.GetClient(),
-		LiveClient:       utils.LiveClient(mgr),
+		Client:           client,
+		RootCredClient:   rootCredClient,
 		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
 		AWSClientBuilder: awsutils.ClientBuilder,
 	}
 
-	s := status.NewSecretStatusHandler(c)
+	s := status.NewSecretStatusHandler(client)
 	statuscontroller.AddHandler(constants.SecretAnnotatorControllerName, s)
 
 	return r
@@ -97,7 +96,6 @@ var _ reconcile.Reconciler = &ReconcileCloudCredSecret{}
 type ReconcileCloudCredSecret struct {
 	Client           client.Client
 	RootCredClient   client.Client
-	LiveClient       client.Client
 	Logger           log.FieldLogger
 	AWSClientBuilder func(accessKeyID, secretAccessKey []byte, c client.Client) (ccaws.Client, error)
 }
@@ -185,7 +183,7 @@ func (r *ReconcileCloudCredSecret) validateCloudCredsSecret(secret *corev1.Secre
 		return r.updateSecretAnnotations(secret, constants.InsufficientAnnotation)
 	}
 
-	awsClient, err := r.AWSClientBuilder(accessKey, secretKey, r.LiveClient)
+	awsClient, err := r.AWSClientBuilder(accessKey, secretKey, r.RootCredClient)
 	if err != nil {
 		return fmt.Errorf("error creating aws client: %v", err)
 	}
