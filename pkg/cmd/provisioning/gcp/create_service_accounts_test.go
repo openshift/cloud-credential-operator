@@ -204,7 +204,7 @@ func TestCreateServiceAccounts(t *testing.T) {
 			require.NoError(t, err, "Unexpected error creating manifests dir for test")
 			defer os.RemoveAll(manifestsDir)
 
-			err = createServiceAccounts(context.TODO(), mockGCPClient, testName, testName, testName, credReqDir, targetDir, false, test.generateOnly)
+			err = createServiceAccounts(context.TODO(), mockGCPClient, testName, testName, testName, credReqDir, targetDir, false, test.generateOnly, "googleapis.com")
 
 			if test.expectError {
 				require.Error(t, err, "expected error returned")
