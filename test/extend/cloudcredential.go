@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -416,15 +415,12 @@ data:
 		o.Expect(degradedStatus).To(o.Equal("False"))
 
 		g.By("Create 1st CredentialsRequest whose namespace does not exist")
-		// NOTE: tests run with repo root as CWD, so use an explicit path.
-		crTemp := filepath.Join("test", "extend", "testdata", "credentials_request.yaml")
 		crName1 := "cloud-credential-operator-iam-ro-1"
 		crNamespace := "namespace-does-not-exist"
 		credentialsRequest1 := credentialsRequest{
 			name:      crName1,
 			namespace: crNamespace,
 			provider:  providerSpec,
-			template:  crTemp,
 		}
 		defer oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName1, "-n", DefaultNamespace, "--ignore-not-found").Execute()
 		credentialsRequest1.create(oc)
@@ -453,7 +449,6 @@ data:
 			name:      crName2,
 			namespace: crNamespace,
 			provider:  providerSpec,
-			template:  crTemp,
 		}
 		defer oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName2, "-n", DefaultNamespace, "--ignore-not-found").Execute()
 		credentialsRequest2.create(oc)
@@ -554,7 +549,6 @@ data:
 			name:      crName,
 			namespace: targetNs,
 			provider:  "AWSProviderSpec",
-			template:  filepath.Join("test", "extend", "testdata", "credentials_request.yaml"),
 		}
 		defer func() {
 			_ = oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName, "-n", DefaultNamespace).Execute()
@@ -670,7 +664,6 @@ spec:
 			name:      crName,
 			namespace: targetNs,
 			provider:  "AzureProviderSpec",
-			template:  filepath.Join("test", "extend", "testdata", "credentials_request.yaml"),
 		}
 		defer func() {
 			_ = oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName, "-n", DefaultNamespace).Execute()
@@ -748,7 +741,6 @@ spec:
 			name:      crName,
 			namespace: targetNs,
 			provider:  "GCPProviderSpec",
-			template:  filepath.Join("test", "extend", "testdata", "credentials_request.yaml"),
 		}
 		defer func() {
 			_ = oc.AsAdmin().WithoutNamespace().Run("delete").Args("CredentialsRequest", crName, "-n", DefaultNamespace).Execute()
