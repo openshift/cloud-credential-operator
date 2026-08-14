@@ -193,3 +193,5 @@ replace golang.org/x/net => golang.org/x/net v0.38.0
 replace github.com/golang/glog => github.com/golang/glog v1.2.5
 
 replace google.golang.org/grpc => github.com/openshift-sustaining/grpc-go v1.75.1-sec.1
+
+replace github.com/go-jose/go-jose/v4 => github.com/openshift-sustaining/go-jose/v4 v4.0.5-sec.1
