@@ -173,4 +173,6 @@ require (
 // Safe to remove this once go.sum shows only v1.2.5 or higher
 replace github.com/golang/glog => github.com/golang/glog v1.2.5
 
+replace github.com/go-jose/go-jose/v4 => github.com/openshift-sustaining/go-jose/v4 v4.0.5-sec.1
+
 replace google.golang.org/grpc => github.com/openshift-sustaining/grpc-go v1.71.3-sec.1
