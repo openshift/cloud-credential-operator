@@ -233,6 +233,28 @@ func add(mgr, adminMgr manager.Manager, r reconcile.Reconciler) error {
 		return err
 	}
 
+	// Watch for per-component vSphere credential override secrets in openshift-config.
+	// When an override secret is created, updated, or deleted, all CredentialsRequests
+	// are reconciled so the actuator can pick up the change.
+	vsphereOverrideSecretPredicate := predicate.TypedFuncs[*corev1.Secret]{
+		UpdateFunc: func(e event.TypedUpdateEvent[*corev1.Secret]) bool {
+			return IsVSphereOverrideSecret(e.ObjectNew.GetNamespace(), e.ObjectNew.GetAnnotations())
+		},
+		CreateFunc: func(e event.TypedCreateEvent[*corev1.Secret]) bool {
+			return IsVSphereOverrideSecret(e.Object.GetNamespace(), e.Object.GetAnnotations())
+		},
+		DeleteFunc: func(e event.TypedDeleteEvent[*corev1.Secret]) bool {
+			return IsVSphereOverrideSecret(e.Object.GetNamespace(), e.Object.GetAnnotations())
+		},
+	}
+	err = c.Watch(
+		source.Kind(mgr.GetCache(), &corev1.Secret{},
+			secretAllCredRequestsMapFn,
+			vsphereOverrideSecretPredicate))
+	if err != nil {
+		return err
+	}
+
 	// infraAllCredRequestsMapFn simply looks up all CredentialsRequests and requests they be reconciled.
 	infraAllCredRequestsMapFn := handler.TypedEnqueueRequestsFromMapFunc(func(ctx context.Context, a *configv1.Infrastructure) []reconcile.Request {
 		log.Info("requeueing all CredentialsRequests")
@@ -593,6 +615,26 @@ func IsAdminCredSecret(namespace, secretName string) bool {
 			log.WithField("secret", secretName).WithField("namespace", namespace).Info("observed admin cloud credential secret event")
 			return true
 		}
+	}
+	return false
+}
+
+// IsVSphereOverrideSecret returns true if the given secret is a per-component
+// vSphere credential override in the openshift-config namespace. Override
+// secrets are identified by carrying both the target-secret-namespace and
+// target-secret-name annotations.
+func IsVSphereOverrideSecret(namespace string, annotations map[string]string) bool {
+	if namespace != constants.VSphereCredOverrideNamespace {
+		return false
+	}
+	if annotations == nil {
+		return false
+	}
+	_, hasTargetNS := annotations[constants.VSphereCredTargetSecretNamespaceAnnotation]
+	_, hasTargetName := annotations[constants.VSphereCredTargetSecretNameAnnotation]
+	if hasTargetNS && hasTargetName {
+		log.WithField("namespace", namespace).Info("observed vSphere credential override secret event")
+		return true
 	}
 	return false
 }
