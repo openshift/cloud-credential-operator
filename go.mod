@@ -1,6 +1,6 @@
 module github.com/openshift/cloud-credential-operator
 
-go 1.20
+go 1.21
 
 require (
 	cloud.google.com/go v0.115.0 // indirect
@@ -144,12 +144,12 @@ require (
 	go.opentelemetry.io/otel v1.24.0 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
-	golang.org/x/crypto v0.31.0 // indirect
+	golang.org/x/crypto v0.33.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
-	golang.org/x/sync v0.10.0 // indirect
-	golang.org/x/sys v0.28.0 // indirect
-	golang.org/x/term v0.27.0 // indirect
-	golang.org/x/text v0.21.0 // indirect
+	golang.org/x/sync v0.11.0 // indirect
+	golang.org/x/sys v0.30.0 // indirect
+	golang.org/x/term v0.29.0 // indirect
+	golang.org/x/text v0.22.0 // indirect
 	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	gomodules.xyz/jsonpatch/v2 v2.3.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240617180043-68d350f18fd4 // indirect
@@ -170,3 +170,6 @@ require (
 
 // Safe to remove this once go.sum shows only v1.2.5 or higher
 replace github.com/golang/glog => github.com/golang/glog v1.2.5
+
+// CVE-2026-33814: fix HTTP/2 DoS via malformed SETTINGS_MAX_FRAME_SIZE
+replace golang.org/x/net => github.com/openshift-sustaining/net v0.35.0-sec.4
