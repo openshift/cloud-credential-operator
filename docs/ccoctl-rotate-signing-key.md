@@ -6,10 +6,16 @@
 
 ## Scope
 
-The command is invoked externally for exactly one provider and one cluster:
+The initial AWS provider command is invoked externally for exactly one provider and one cluster:
 
 ```text
 ccoctl aws rotate-signing-key [options]
+```
+
+Future Azure and GCP provider adapters are expected to use the equivalent contract forms below;
+these commands are not registered by this foundation:
+
+```text
 ccoctl azure rotate-signing-key [options]
 ccoctl gcp rotate-signing-key [options]
 ```
