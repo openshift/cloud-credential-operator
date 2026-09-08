@@ -2,13 +2,14 @@
 
 The `ccoctl` tool provides various commands to assist with the creating and maintenance of cloud credentials from outside the cluster (necessary when CCO is put in "Manual" mode).
 
-The planned provider-specific signing-key rotation commands are defined by the
-[`rotate-signing-key` command contract](ccoctl-rotate-signing-key.md). Their shared engine exists,
-but the provider adapters and commands are not registered yet; use the
-[manual rotation procedure](rotate-oidc-key.md) in the meantime.
+The provider-specific signing-key rotation workflow is defined by the
+[`rotate-signing-key` command contract](ccoctl-rotate-signing-key.md). AWS direct publication for
+the standard ccoctl-managed S3 issuer layout is available as a command. Use the
+[manual rotation procedure](rotate-oidc-key.md) for other layouts and providers.
 
 - [AWS](#aws)
   - [Global flags](#global-flags)
+  - [Rotating the signing key](#rotating-the-signing-key)
   - [Creating RSA keys](#creating-rsa-keys)
   - [Creating OpenID Connect Provider](#creating-openid-connect-provider)
   - [Creating IAM Roles](#creating-iam-roles)
@@ -48,6 +49,36 @@ but the provider adapters and commands are not registered yet; use the
 By default, the tool will output to the directory the command(s) were run in. To specify a directory, use the `--output-dir` flag.
 
 Commands which would otherwise make AWS API calls can be passed the `--dry-run` flag to have `ccoctl` place JSON files on the local filesystem instead of creating/modifying any AWS resources. These JSON files can be reviewed/modified and then applied with the `aws` CLI tool (using the `--cli-input-json` parameters).
+
+### Rotating the signing key
+
+To rotate the signer and publish the overlapping JWKS directly to the standard
+ccoctl-managed S3 issuer, run:
+
+```bash
+$ ccoctl aws rotate-signing-key \
+    --name=<name> \
+    --region=<aws-region> \
+    --kubeconfig=/absolute/path/to/kubeconfig \
+    --output-dir=/path/to/rotation-state
+```
+
+The command derives the issuer bucket as `<name>-oidc`, updates its `keys.json`
+object, and uses `name` to verify ccoctl resource ownership. It loads AWS
+credentials from the standard AWS SDK credential chain and supports direct
+publication only. Do not run it while another process is changing the object's
+tags: S3 conditionally protects the object content by ETag, while tag and
+version drift can only be checked immediately before the write. Use `--resume`
+with the same arguments and output directory to continue a previously
+checkpointed rotation. The AWS identity needs `s3:GetObject`,
+`s3:GetObjectTagging` (and `s3:GetObjectVersionTagging` for a versioned object),
+`s3:PutObject`, and `s3:PutObjectTagging` on `keys.json`.
+
+All cluster Nodes must be stably managed by the Machine Config Operator. The
+command fails closed during preflight rather than excluding an unmanaged Node
+from the reboot evidence. Custom MachineConfigPools must inherit exactly one of
+the standard master or worker MachineConfigs; separate role pools such as
+`arbiter` are rejected before rotation begins.
 
 ### Creating RSA keys
 

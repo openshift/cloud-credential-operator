@@ -3,9 +3,10 @@
 ## Overview
 When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to authenticate with the cloud platform api, special care must be taken when rotating the bound service account signer keys in order to reduce authentication failures. This can be accomplished by adding the new public key to the existing issuer file immediately after the cluster generates it. Once the cluster has fully updated to the new key all other keys can be removed.
 
-This page describes the current manual procedure. The provider-neutral workflow is defined in the
-[`ccoctl rotate-signing-key` command contract](ccoctl-rotate-signing-key.md), but its provider
-adapters and commands are not registered yet.
+This page describes the manual procedure. The provider-neutral workflow is defined in the
+[`ccoctl rotate-signing-key` command contract](ccoctl-rotate-signing-key.md). AWS direct
+publication for the standard ccoctl-managed S3 issuer layout is available through `ccoctl`; the
+manual procedure remains necessary for other layouts and providers.
 
 This manual procedure assumes an exclusive maintenance window in which no other user, automation,
 or controller deletes `next-bound-service-account-signing-key`. Stop if that exclusivity cannot be
@@ -15,9 +16,30 @@ produced an entry, so concurrent rotations cannot be disambiguated safely by thi
 The provider upload examples below are legacy unconditional writes. Ensure exclusive publisher
 access, verify that the remote JWKS still equals the expected predecessor immediately before each
 upload, and read it back to compare with the exact uploaded file afterward. Stop if either
-comparison fails or if the provider cannot be protected from another writer. The provider adapters
-described by the command contract must replace this operational assumption with conditional writes
-and exact readback.
+comparison fails or if the provider cannot be protected from another writer. The AWS command
+replaces this operational assumption with conditional writes and exact readback; other provider
+adapters must do likewise.
+
+## AWS standard S3 issuer
+
+For an issuer created with the standard ccoctl-managed S3 layout, prefer the
+checkpointed direct-publication command:
+
+```bash
+$ ccoctl aws rotate-signing-key \
+    --name=<name> \
+    --region=<aws-region> \
+    --kubeconfig=/absolute/path/to/kubeconfig \
+    --output-dir=/path/to/rotation-state
+```
+
+The command derives `<name>-oidc` as the bucket, publishes `keys.json`, and
+checks ownership using `name`. It uses the standard AWS SDK credential chain.
+Manual publication mode and custom issuer layouts are not supported by this
+command. Do not change the object's tags concurrently: the S3 write is
+conditional on the content ETag, while tag and version drift are checked
+immediately before it. If an interrupted run has a checkpoint in the output
+directory, add `--resume` and retain the same provider arguments.
 
 ## Process
 
@@ -90,7 +112,7 @@ and exact readback.
       | jq -er '.oidc.jwksJson' > "${TEMPDIR}/jwks.current.download.json"
     ```
 
-    Perform this basic structural check before continuing. The forthcoming command also performs
+    Perform this basic structural check before continuing. The checkpointed AWS command also performs
     strict RSA key, key ID, algorithm, purpose, duplicate, and signer-baseline validation that is
     not reproduced by this legacy shell procedure.
 

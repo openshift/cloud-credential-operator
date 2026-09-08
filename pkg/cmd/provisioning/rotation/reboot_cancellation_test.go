@@ -120,7 +120,7 @@ func TestOrchestratorRebootEffectNotAppliedDoesNotAdvanceOrWait(t *testing.T) {
 	}
 }
 
-func TestOrchestratorRebootReadbackFailureResumesWithoutDuplicateRequest(t *testing.T) {
+func TestOrchestratorRebootReadbackFailureReconcilesWithoutDuplicateMutation(t *testing.T) {
 	harness := newOrchestratorTestHarness(t, PublicationModeDirect)
 	cluster := &rebootCoverageCluster{
 		fakeClusterRotation:      harness.cluster,
@@ -154,8 +154,56 @@ func TestOrchestratorRebootReadbackFailureResumesWithoutDuplicateRequest(t *test
 	if !result.Complete || result.Phase != PhaseComplete {
 		t.Fatalf("resumed Run() result = %#v, want complete", result)
 	}
-	if harness.cluster.rebootRequests != 1 {
-		t.Fatalf("reboot requests after resume = %d, want exactly one", harness.cluster.rebootRequests)
+	if harness.cluster.rebootRequests != 2 || harness.cluster.rebootMutations != 1 {
+		t.Fatalf("reboot request calls/mutations after resume = %d/%d, want 2/1", harness.cluster.rebootRequests, harness.cluster.rebootMutations)
+	}
+}
+
+func TestOrchestratorPartialRebootRequestIsReconciledBeforeWait(t *testing.T) {
+	harness := newOrchestratorTestHarness(t, PublicationModeDirect)
+	harness.cluster.rebootIntent = RebootIntent{
+		ID:      "rotation-test-intent",
+		Targets: []string{"master", "worker"},
+		Baselines: []NodeRebootBaseline{
+			{Target: "master", Node: "master-0", BootID: "master-boot-old"},
+			{Target: "worker", Node: "worker-0", BootID: "worker-boot-old"},
+		},
+	}
+	cluster := &partialRebootCluster{
+		fakeClusterRotation: harness.cluster,
+		targetRequests:      make(map[string]int),
+	}
+	harness.orchestrator.Cluster = cluster
+	outputDir := t.TempDir()
+	options := RunOptions{Provider: ProviderAWS, PublicationMode: PublicationModeDirect, OutputDir: outputDir}
+
+	result, err := harness.orchestrator.Run(context.Background(), options)
+	var unknown *OutcomeUnknownError
+	if !errors.As(err, &unknown) {
+		t.Fatalf("initial Run() error = %v, want OutcomeUnknownError", err)
+	}
+	if result.Phase != PhaseRebootIntentRecorded || cluster.requestCalls != 1 || cluster.canonicalWrites != 1 || cluster.waitCalls != 0 {
+		t.Fatalf("initial phase/request calls/canonical writes/waits = %q/%d/%d/%d, want %q/1/1/0", result.Phase, cluster.requestCalls, cluster.canonicalWrites, cluster.waitCalls, PhaseRebootIntentRecorded)
+	}
+	if cluster.targetRequests["master"] != 1 || cluster.targetRequests["worker"] != 0 {
+		t.Fatalf("initial target requests = %v, want only master requested", cluster.targetRequests)
+	}
+
+	options.Resume = true
+	result, err = harness.orchestrator.Run(context.Background(), options)
+	if err != nil {
+		t.Fatalf("resumed Run() returned unexpected error: %v", err)
+	}
+	if !result.Complete || result.Phase != PhaseComplete {
+		t.Fatalf("resumed Run() result = %#v, want complete", result)
+	}
+	if cluster.requestCalls != 2 || cluster.canonicalWrites != 1 || cluster.waitCalls != 1 {
+		t.Fatalf("final request calls/canonical writes/waits = %d/%d/%d, want 2/1/1", cluster.requestCalls, cluster.canonicalWrites, cluster.waitCalls)
+	}
+	for _, target := range []string{"master", "worker"} {
+		if cluster.targetRequests[target] != 1 {
+			t.Fatalf("target %q request mutations = %d, want 1; all targets = %v", target, cluster.targetRequests[target], cluster.targetRequests)
+		}
 	}
 }
 
@@ -190,8 +238,8 @@ func TestOrchestratorRejectsWaitThatReturnsBeforeCanonicalRebootCompletion(t *te
 	if !errors.As(err, &conflict) {
 		t.Fatalf("resumed Run() error = %v, want ConflictError", err)
 	}
-	if result.Phase != PhaseRebootIntentRecorded || harness.cluster.rebootRequests != 1 || cluster.waitCalls != 2 {
-		t.Fatalf("resumed phase/requests/waits = %q/%d/%d, want %q/1/2", result.Phase, harness.cluster.rebootRequests, cluster.waitCalls, PhaseRebootIntentRecorded)
+	if result.Phase != PhaseRebootIntentRecorded || harness.cluster.rebootRequests != 2 || harness.cluster.rebootMutations != 1 || cluster.waitCalls != 2 {
+		t.Fatalf("resumed phase/request calls/mutations/waits = %q/%d/%d/%d, want %q/2/1/2", result.Phase, harness.cluster.rebootRequests, harness.cluster.rebootMutations, cluster.waitCalls, PhaseRebootIntentRecorded)
 	}
 }
 
@@ -206,6 +254,43 @@ type rebootCoverageCluster struct {
 	failNextRebootReadback   bool
 	waitWithoutCompletion    bool
 	waitCalls                int
+}
+
+type partialRebootCluster struct {
+	*fakeClusterRotation
+	requestCalls    int
+	canonicalWrites int
+	targetRequests  map[string]int
+	waitCalls       int
+}
+
+func (cluster *partialRebootCluster) RequestReboot(_ context.Context, guard RotationGuardReference, intent RebootIntent) (EffectOutcome, error) {
+	*cluster.events = append(*cluster.events, "cluster.request-reboot")
+	if err := cluster.requireHeldRotationGuard(guard); err != nil {
+		return EffectNotApplied, err
+	}
+	cluster.requestCalls++
+	if cluster.canonicalReboot == nil {
+		canonical := cloneRebootIntent(intent)
+		cluster.canonicalReboot = &canonical
+		cluster.canonicalWrites++
+	}
+	cluster.rebootStatus = RebootInProgress
+	for _, target := range cluster.canonicalReboot.Targets {
+		if cluster.targetRequests[target] != 0 {
+			continue
+		}
+		cluster.targetRequests[target]++
+		if cluster.requestCalls == 1 {
+			return EffectUnknown, errors.New("remaining reboot target request outcome is unknown")
+		}
+	}
+	return EffectSubmitted, nil
+}
+
+func (cluster *partialRebootCluster) WaitForReboot(ctx context.Context, guard RotationGuardReference, intent RebootIntent) error {
+	cluster.waitCalls++
+	return cluster.fakeClusterRotation.WaitForReboot(ctx, guard, intent)
 }
 
 func (cluster *rebootCoverageCluster) PrepareReboot(ctx context.Context, guard RotationGuardReference, replacementKeyID string) (RebootPlan, error) {

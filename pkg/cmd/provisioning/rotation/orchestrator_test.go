@@ -546,6 +546,7 @@ type fakeClusterRotation struct {
 	waitForSignerError    error
 	replacementRequests   int
 	rebootRequests        int
+	rebootMutations       int
 	bundleObservations    int
 	applyReplacementAt    int
 	requestedReference    SignerObjectReference
@@ -733,6 +734,7 @@ func (f *fakeClusterRotation) RequestReboot(_ context.Context, guard RotationGua
 	if f.canonicalReboot == nil {
 		canonical := cloneRebootIntent(intent)
 		f.canonicalReboot = &canonical
+		f.rebootMutations++
 	}
 	f.rebootStatus = RebootInProgress
 	return EffectSubmitted, nil

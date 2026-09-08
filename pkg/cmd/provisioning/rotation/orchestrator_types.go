@@ -72,6 +72,8 @@ type RotationGuardObservation struct {
 }
 
 // RebootStatus is the observable state of a cluster-durable reboot record.
+// RebootInProgress includes the interval after the canonical intent is durable
+// but before every target reboot request has been reconciled.
 type RebootStatus string
 
 const (
@@ -109,12 +111,23 @@ type RebootObservation struct {
 // may already be absent or replaced, and at PhaseRebootIntentRecorded the exact
 // persisted reboot may be not started, in progress, or complete.
 //
-// RequestReboot is the sole reboot mutation. It must atomically create the
-// cluster-durable canonical record and request the reboot when the ID is new.
-// For an existing ID it must preserve the first canonical intent and must not
-// request another reboot. The canonical record must remain observable while a
+// RequestReboot is the sole reboot mutation. When the ID is new, it must first
+// durably create the cluster-canonical intent and must not mutate a reboot
+// target before that record exists. It must then idempotently reconcile every
+// target request in the canonical intent. For an existing ID it must preserve
+// the first canonical intent and finish any target requests that are not yet
+// durable, without repeating a target request that already records the same
+// operation ID. The orchestrator may therefore call RequestReboot again while
+// the operation is RebootInProgress.
+//
+// EffectSubmitted means the canonical intent and every target request are
+// known to be durable, including when they were already in the desired state.
+// A partial or ambiguous multi-target result must be EffectUnknown;
+// EffectNotApplied is valid only when the adapter knows that no mutation from
+// the call was applied. The canonical record must remain observable while a
 // checkpoint for the operation can be resumed. RebootNotStarted means that no
-// queued, active, or completed operation with that ID is observable.
+// canonical record, queued target, active target, or completed operation with
+// that ID is observable.
 // ObserveSignerReference must request only the meta.k8s.io/v1
 // PartialObjectMetadata representation of the next-signer Secret and must fail
 // closed rather than accepting a full Secret fallback. A nil reference means

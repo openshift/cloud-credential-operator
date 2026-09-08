@@ -72,7 +72,7 @@ func TestOrchestratorDoesNotAdvanceUntilSubmittedReplacementIsObserved(t *testin
 	}
 }
 
-func TestOrchestratorResumeDoesNotRepeatUnknownRebootRequest(t *testing.T) {
+func TestOrchestratorResumeDoesNotReenterUnknownRebootAfterCompletionIsObserved(t *testing.T) {
 	oldPublic := testPublicKeyPEM(t)
 	newPublic := testPublicKeyPEM(t)
 	oldSigner := safetySigner(oldPublic, "old-uid", "10")

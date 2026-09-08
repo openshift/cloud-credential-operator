@@ -1,8 +1,9 @@
 # `ccoctl` signing-key rotation command contract
 
-> **Status:** The shared phase engine and command factory implement this provider-neutral contract,
-> but the provider commands and their concrete cluster/cloud adapters are not registered yet. Until
-> those integrations are available, use the [manual rotation procedure](rotate-oidc-key.md).
+> **Status:** The shared phase engine and command factory implement this provider-neutral contract.
+> AWS direct publication is registered for the standard ccoctl-managed S3 issuer layout. Azure,
+> GCP, manual publication, and custom issuer layouts still require the
+> [manual rotation procedure](rotate-oidc-key.md).
 
 ## Scope
 
@@ -67,6 +68,12 @@ The command contract requires the following capabilities:
   Secret with UID and resource version preconditions to trigger regeneration, acquire and complete
   the cluster-durable signer-rotation guard, and reboot and observe the applicable worker and
   control-plane machine config pools.
+- Every cluster Node must be stably managed by the Machine Config Operator. A
+  provider command must fail before signer replacement rather than omit an
+  unmanaged Node from the reboot evidence. Nodes in a custom MachineConfigPool
+  are supported only when that pool inherits exactly one of the standard
+  master or worker MachineConfigs. A separate role pool such as `arbiter` is
+  rejected during preflight until a dedicated reboot target is supported.
 - Enough cloud permission to locate and read the current JWKS and to publish both the combined and
   final JWKS to the supported target.
 - A durable working directory for public artifacts and resumable, non-secret checkpoint state.
@@ -189,10 +196,12 @@ The implementation must durably record these exact schema-version-1 phases in or
     and each target node's baseline boot ID are durably recorded before requesting a reboot. The
     shared engine derives the operation ID deterministically from the cluster identity and
     replacement key ID so retries using another working directory converge even when their observed
-    targets or boot-ID baselines differ. The first reboot request atomically creates a
-    cluster-durable canonical record containing its exact targets and baselines. Later workspaces
-    adopt that canonical record before advancing, and it remains observable for the lifetime of
-    resumable operation state.
+    targets or boot-ID baselines differ. The first reboot request durably creates a
+    cluster-canonical record containing its exact targets and baselines before it triggers any
+    target. The request then reconciles each target idempotently. Later workspaces adopt that
+    canonical record before advancing, and an interrupted request is re-entered while it is in
+    progress to finish only targets that do not already record the same operation ID. The canonical
+    record remains observable for the lifetime of resumable operation state.
 12. **`nodes-rebooted`:** reboot completion is confirmed for every node recorded in the immutable
     reboot intent.
 13. **`post-reboot-stable`:** the cluster reports stability after the node reboots.
@@ -246,9 +255,11 @@ without requiring a publicly reachable JWKS endpoint.
   key merely because the previous run ended.
 - If a provider write has an unknown outcome, retry must read or otherwise reconcile the target
   before writing again.
-- The reboot intent must be checkpointed before the disruptive request. Resume must reconcile node
-  boot IDs against the cluster-canonical baselines and reuse the same operation ID; it must not
-  submit a second pool reboot merely because the previous run ended or its outcome is unknown.
+- The reboot intent must be checkpointed before the disruptive request. The cluster-canonical intent
+  must then be durable before any target is triggered. Resume must reconcile node boot IDs against
+  those canonical baselines and reuse the same operation ID. It may re-enter the request to finish
+  targets left incomplete by an interruption, but must not trigger a target that already records
+  that operation ID merely because the previous run ended or its outcome is unknown.
 - Reboot planning, observation, reconciliation, and waits are read-only. The reboot request is the
   only operation allowed to create the canonical reboot record or trigger the disruptive action.
 - Repeated execution must not duplicate keys in the combined JWKS, regress to an earlier artifact,

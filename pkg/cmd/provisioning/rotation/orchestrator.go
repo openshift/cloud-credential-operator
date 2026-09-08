@@ -565,7 +565,7 @@ func (o Orchestrator) completeReboot(ctx context.Context, workspace *RotationWor
 		return advanceCheckpoint(workspace, checkpoint, PhaseNodesRebooted, nil)
 	}
 
-	if status == RebootNotStarted {
+	if status == RebootNotStarted || status == RebootInProgress {
 		outcome, requestErr := o.Cluster.RequestReboot(ctx, *checkpoint.RotationGuard, cloneRebootIntent(intent))
 		if err := validateEffectOutcome(outcome); err != nil {
 			return err
@@ -580,15 +580,20 @@ func (o Orchestrator) completeReboot(ctx context.Context, workspace *RotationWor
 		if status == RebootComplete {
 			return advanceCheckpoint(workspace, checkpoint, PhaseNodesRebooted, nil)
 		}
-		if status == RebootNotStarted {
-			switch outcome {
-			case EffectUnknown, EffectSubmitted:
+		switch outcome {
+		case EffectUnknown:
+			return &OutcomeUnknownError{Phase: checkpoint.Phase, Operation: "reconcile persisted node reboot request", Cause: requestErr}
+		case EffectNotApplied:
+			if requestErr != nil {
+				return fmt.Errorf("node reboot request was not applied: %w", requestErr)
+			}
+			return &ConflictError{Phase: checkpoint.Phase, Reason: "the persisted reboot request was not applied"}
+		case EffectSubmitted:
+			if requestErr != nil {
+				return &OutcomeUnknownError{Phase: checkpoint.Phase, Operation: "reconcile persisted node reboot request", Cause: requestErr}
+			}
+			if status == RebootNotStarted {
 				return &OutcomeUnknownError{Phase: checkpoint.Phase, Operation: "request persisted node reboot", Cause: requestErr}
-			case EffectNotApplied:
-				if requestErr != nil {
-					return fmt.Errorf("node reboot request was not applied: %w", requestErr)
-				}
-				return &ConflictError{Phase: checkpoint.Phase, Reason: "the persisted reboot request was not applied"}
 			}
 		}
 	}
