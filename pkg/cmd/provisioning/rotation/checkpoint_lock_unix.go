@@ -6,12 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	"golang.org/x/sys/unix"
 )
 
 func acquireCheckpointLock(outputDir string) (*os.File, error) {
-	lockPath := outputDir + string(os.PathSeparator) + checkpointLockFileName
+	lockPath := filepath.Join(outputDir, checkpointLockFileName)
 	flags := unix.O_RDWR | unix.O_CLOEXEC | unix.O_NOFOLLOW
 	fd, err := unix.Open(lockPath, flags|unix.O_CREAT|unix.O_EXCL, uint32(checkpointFileMode))
 	created := err == nil

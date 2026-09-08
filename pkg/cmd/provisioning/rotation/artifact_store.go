@@ -79,7 +79,7 @@ func (w *RotationWorkspace) WriteArtifact(name string, payload []byte) (Artifact
 	if err := validateArtifactRelationships(checkpoint, payloads); err != nil {
 		return ArtifactMetadata{}, err
 	}
-	if existingErr == nil && bytes.Equal(existing, payload) {
+	if existingErr == nil {
 		return metadata, nil
 	}
 
