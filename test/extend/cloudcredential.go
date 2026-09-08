@@ -292,7 +292,7 @@ data:
 		o.Expect(seccompProfileType).To(o.Equal("RuntimeDefault"))
 		//Check IAAS platform type
 		iaasPlatform := checkPlatform(oc)
-		if iaasPlatform == "aws" || (iaasPlatform == "azure" && isWorkloadIdentityCluster(oc)) || iaasPlatform == "gcp" {
+		if !isPlatformExternal(oc) && (iaasPlatform == "aws" || (iaasPlatform == "azure" && isWorkloadIdentityCluster(oc)) || iaasPlatform == "gcp") {
 			g.By(fmt.Sprintf("2.Check pod-identity-webhook pod for %s", iaasPlatform))
 			if isSNOCluster(oc) {
 				checkWebhookSecurityContext(oc, 1)
@@ -312,7 +312,7 @@ data:
 
 		podsToCheck := ccoOperatorPodList
 		iaasPlatform := checkPlatform(oc)
-		if iaasPlatform == "aws" || iaasPlatform == "gcp" || (iaasPlatform == "azure" && isWorkloadIdentityCluster(oc)) {
+		if !isPlatformExternal(oc) && (iaasPlatform == "aws" || iaasPlatform == "gcp" || (iaasPlatform == "azure" && isWorkloadIdentityCluster(oc))) {
 			g.GinkgoT().Logf("Checking pod-identity-webhook pod for readOnlyRootFilesystem enable")
 			podIdentityWebhookPods, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("pod", "-l", "app=pod-identity-webhook", "-n", DefaultNamespace, "-o=jsonpath={.items[*].metadata.name}").Output()
 			o.Expect(err).NotTo(o.HaveOccurred())
@@ -345,7 +345,7 @@ data:
 		skipIfHypershiftHostedCluster(oc)
 		//Check IAAS platform type
 		iaasPlatform := checkPlatform(oc)
-		if iaasPlatform != "aws" {
+		if isPlatformExternal(oc) || iaasPlatform != "aws" {
 			g.Skip("IAAS platform is " + iaasPlatform + " while 48360 is for AWS - skipping test ...")
 		}
 		g.By("1.Check the Mutating Webhook Configuration service port is 443")

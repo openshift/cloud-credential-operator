@@ -180,6 +180,18 @@ func getIaasPlatform(oc *CLI) (string, error) {
 	return iaasPlatform, nil
 }
 
+// isPlatformExternal returns true when the cluster's infrastructure platform
+// type is "External". In that mode CCO runs as a no-op, so platform components
+// such as pod-identity-webhook are not deployed even though the underlying IaaS
+// (reported by getIaasPlatform) may be aws/gcp/azure.
+func isPlatformExternal(oc *CLI) bool {
+	platformType, err := oc.AsAdmin().WithoutNamespace().Run("get").Args("infrastructure", "cluster", "-o=jsonpath={.status.platformStatus.type}").Output()
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(platformType), "External")
+}
+
 func checkPlatform(oc *CLI) string {
 	p, err := getIaasPlatform(oc)
 	if err != nil {
