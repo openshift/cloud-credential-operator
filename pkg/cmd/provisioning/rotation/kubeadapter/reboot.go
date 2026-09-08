@@ -26,9 +26,10 @@ const (
 	rebootRecordNamePrefix    = "cco-signer-key-rotation-reboot-"
 	maxRebootRecordDataBytes  = 900 * 1024
 
-	rebootMachineConfigMaster = "95-cco-signer-key-rotation-reboot-master"
-	rebootMachineConfigWorker = "95-cco-signer-key-rotation-reboot-worker"
-	rebootMarkerPath          = "/etc/kubernetes/cco-signer-key-rotation-reboot-id"
+	rebootMachineConfigMaster            = "95-cco-signer-key-rotation-reboot-master"
+	rebootMachineConfigWorker            = "95-cco-signer-key-rotation-reboot-worker"
+	rebootMarkerPath                     = "/etc/kubernetes/cco-signer-key-rotation-reboot-id"
+	maxRebootMachineConfigCreateAttempts = 3
 
 	managedAnnotation        = "cloudcredential.openshift.io/signer-rotation-managed"
 	rebootIDAnnotation       = "cloudcredential.openshift.io/signer-rotation-reboot-id"
@@ -509,37 +510,42 @@ func decodeRebootRecord(configMap *corev1.ConfigMap, guard rotation.RotationGuar
 }
 
 func (a *Adapter) ensureRebootMachineConfig(ctx context.Context, target, rebootID string) (bool, error) {
-	pool, err := a.resources.Get(ctx, machineConfigPoolGVR, target, metav1.GetOptions{})
-	if err != nil {
-		return false, fmt.Errorf("read MachineConfigPool %q: %w", target, err)
-	}
-	selectorLabels, err := machineConfigSelectorLabels(pool)
-	if err != nil {
-		return false, err
-	}
-	name := rebootMachineConfigName(target)
-	current, err := a.resources.Get(ctx, machineConfigGVR, name, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		desired := desiredRebootMachineConfig(nil, name, target, rebootID, selectorLabels)
-		_, createErr := a.resources.Create(ctx, machineConfigGVR, desired, metav1.CreateOptions{})
-		if apierrors.IsAlreadyExists(createErr) {
-			return a.ensureRebootMachineConfig(ctx, target, rebootID)
+	for attempt := 1; ; attempt++ {
+		pool, err := a.resources.Get(ctx, machineConfigPoolGVR, target, metav1.GetOptions{})
+		if err != nil {
+			return false, fmt.Errorf("read MachineConfigPool %q: %w", target, err)
 		}
-		return createErr == nil, createErr
+		selectorLabels, err := machineConfigSelectorLabels(pool)
+		if err != nil {
+			return false, err
+		}
+		name := rebootMachineConfigName(target)
+		current, err := a.resources.Get(ctx, machineConfigGVR, name, metav1.GetOptions{})
+		if apierrors.IsNotFound(err) {
+			desired := desiredRebootMachineConfig(nil, name, target, rebootID, selectorLabels)
+			_, createErr := a.resources.Create(ctx, machineConfigGVR, desired, metav1.CreateOptions{})
+			if apierrors.IsAlreadyExists(createErr) {
+				if attempt >= maxRebootMachineConfigCreateAttempts {
+					return false, fmt.Errorf("create reboot MachineConfig %q still reported AlreadyExists after %d attempts: %w", name, attempt, createErr)
+				}
+				continue
+			}
+			return createErr == nil, createErr
+		}
+		if err != nil {
+			return false, fmt.Errorf("read reboot MachineConfig %q: %w", name, err)
+		}
+		currentID, err := validateManagedRebootMachineConfig(current, target, selectorLabels)
+		if err != nil {
+			return false, err
+		}
+		if currentID == rebootID {
+			return false, nil
+		}
+		desired := desiredRebootMachineConfig(current, name, target, rebootID, selectorLabels)
+		_, updateErr := a.resources.Update(ctx, machineConfigGVR, desired, metav1.UpdateOptions{})
+		return updateErr == nil, updateErr
 	}
-	if err != nil {
-		return false, fmt.Errorf("read reboot MachineConfig %q: %w", name, err)
-	}
-	currentID, err := validateManagedRebootMachineConfig(current, target, selectorLabels)
-	if err != nil {
-		return false, err
-	}
-	if currentID == rebootID {
-		return false, nil
-	}
-	desired := desiredRebootMachineConfig(current, name, target, rebootID, selectorLabels)
-	_, updateErr := a.resources.Update(ctx, machineConfigGVR, desired, metav1.UpdateOptions{})
-	return updateErr == nil, updateErr
 }
 
 func (a *Adapter) validateExistingRebootMachineConfig(ctx context.Context, target string, selectorLabels map[string]string) error {

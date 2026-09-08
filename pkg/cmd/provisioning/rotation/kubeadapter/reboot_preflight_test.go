@@ -327,6 +327,47 @@ func TestWaitUntilReturnsPromptlyWhenContextIsCancelled(t *testing.T) {
 	}
 }
 
+func TestEnsureRebootMachineConfigRecoversFromAlreadyExistsRace(t *testing.T) {
+	resources := newMemoryResourceClient(stableMachineConfigPool("master", 1))
+	resources.beforeCreate = func(resource schema.GroupVersionResource, object *unstructured.Unstructured) error {
+		if resource != machineConfigGVR {
+			return nil
+		}
+		resources.putLocked(resource, object)
+		return apierrors.NewAlreadyExists(resource.GroupResource(), object.GetName())
+	}
+	adapter := &Adapter{resources: resources}
+
+	applied, err := adapter.ensureRebootMachineConfig(context.Background(), "master", testSingleTargetRebootIntent().ID)
+	if err != nil || applied {
+		t.Fatalf("ensureRebootMachineConfig() = %t, %v; want false, nil after observing the competing create", applied, err)
+	}
+	creates, updates := resources.actionCount(machineConfigGVR, rebootMachineConfigMaster)
+	if creates != 1 || updates != 0 {
+		t.Fatalf("MachineConfig mutations: create/update=%d/%d, want 1/0", creates, updates)
+	}
+}
+
+func TestEnsureRebootMachineConfigBoundsAlreadyExistsRetries(t *testing.T) {
+	resources := newMemoryResourceClient(stableMachineConfigPool("master", 1))
+	resources.beforeCreate = func(resource schema.GroupVersionResource, object *unstructured.Unstructured) error {
+		if resource != machineConfigGVR {
+			return nil
+		}
+		return apierrors.NewAlreadyExists(resource.GroupResource(), object.GetName())
+	}
+	adapter := &Adapter{resources: resources}
+
+	applied, err := adapter.ensureRebootMachineConfig(context.Background(), "master", testSingleTargetRebootIntent().ID)
+	if applied || !apierrors.IsAlreadyExists(err) || !strings.Contains(err.Error(), "after 3 attempts") {
+		t.Fatalf("ensureRebootMachineConfig() = %t, %v; want bounded AlreadyExists failure", applied, err)
+	}
+	creates, updates := resources.actionCount(machineConfigGVR, rebootMachineConfigMaster)
+	if creates != maxRebootMachineConfigCreateAttempts || updates != 0 {
+		t.Fatalf("MachineConfig mutations: create/update=%d/%d, want %d/0", creates, updates, maxRebootMachineConfigCreateAttempts)
+	}
+}
+
 func TestRequestRebootRecordsIntentBeforeMachineConfigsAndResumesMissingTarget(t *testing.T) {
 	ctx := context.Background()
 	guard := testGuardReference()
