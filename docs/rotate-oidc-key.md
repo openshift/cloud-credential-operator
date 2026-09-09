@@ -3,6 +3,44 @@
 ## Overview
 When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to authenticate with the cloud platform api, special care must be taken when rotating the bound service account signer keys in order to reduce authentication failures. This can be accomplished by adding the new public key to the existing issuer file immediately after the cluster generates it. Once the cluster has fully updated to the new key all other keys can be removed.
 
+This page describes the manual procedure. The provider-neutral workflow is defined in the
+[`ccoctl rotate-signing-key` command contract](ccoctl-rotate-signing-key.md). AWS direct
+publication for the standard ccoctl-managed S3 issuer layout is available through `ccoctl`; the
+manual procedure remains necessary for other layouts and providers.
+
+This manual procedure assumes an exclusive maintenance window in which no other user, automation,
+or controller deletes `next-bound-service-account-signing-key`. Stop if that exclusivity cannot be
+guaranteed: the cumulative public signer ConfigMap does not identify which Secret generation
+produced an entry, so concurrent rotations cannot be disambiguated safely by this procedure.
+
+The provider upload examples below are legacy unconditional writes. Ensure exclusive publisher
+access, verify that the remote JWKS still equals the expected predecessor immediately before each
+upload, and read it back to compare with the exact uploaded file afterward. Stop if either
+comparison fails or if the provider cannot be protected from another writer. The AWS command
+replaces this operational assumption with conditional writes and exact readback; other provider
+adapters must do likewise.
+
+## AWS standard S3 issuer
+
+For an issuer created with the standard ccoctl-managed S3 layout, prefer the
+checkpointed direct-publication command:
+
+```bash
+$ ccoctl aws rotate-signing-key \
+    --name=<name> \
+    --region=<aws-region> \
+    --kubeconfig=/absolute/path/to/kubeconfig \
+    --output-dir=/path/to/rotation-state
+```
+
+The command derives `<name>-oidc` as the bucket, publishes `keys.json`, and
+checks ownership using `name`. It uses the standard AWS SDK credential chain.
+Manual publication mode and custom issuer layouts are not supported by this
+command. Do not change the object's tags concurrently: the S3 write is
+conditional on the content ETag, while tag and version drift are checked
+immediately before it. If an interrupted run has a checkpoint in the output
+directory, add `--resume` and retain the same provider arguments.
+
 ## Process
 
 1. Configure environment variables
@@ -11,7 +49,8 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 
     Common
     ```bash
-    TEMPDIR=$(mktemp -d)
+    set -euo pipefail
+    TEMPDIR="$(mktemp -d)"
     ```
 
     AWS
@@ -47,11 +86,79 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     oc adm wait-for-stable-cluster --minimum-stable-period=5s
     ```
 
+1. Download and inspect the current keys.json from the cloud provider.
+
+    Save this recovery artifact before triggering rotation. Confirm that it came from the intended
+    issuer and contains at least one key.
+
+    AWS
+    ```bash
+    aws s3api get-object --bucket "${AWS_BUCKET}" --key keys.json "${TEMPDIR}/jwks.current.download.json"
+    ```
+
+    Azure
+    ```bash
+    az storage blob download --container-name "${AZURE_STORAGE_CONTAINER}" --account-name "${AZURE_STORAGE_ACCOUNT}" --name 'openid/v1/jwks' -f "${TEMPDIR}/jwks.current.download.json"
+    ```
+
+    GCP public-bucket
+    ```bash
+    gcloud storage cp "gs://${GCP_BUCKET}/keys.json" "${TEMPDIR}/jwks.current.download.json"
+    ```
+
+    GCP pool-jwk-file
+    ```bash
+    gcloud iam workload-identity-pools providers describe --format json --location global --workload-identity-pool "${CLUSTER_NAME}" "${CLUSTER_NAME}" \
+      | jq -er '.oidc.jwksJson' > "${TEMPDIR}/jwks.current.download.json"
+    ```
+
+    Perform this basic structural check before continuing. The checkpointed AWS command also performs
+    strict RSA key, key ID, algorithm, purpose, duplicate, and signer-baseline validation that is
+    not reproduced by this legacy shell procedure.
+
+    ```bash
+    jq -e '
+      def supported_key:
+        type == "object"
+        and ((keys_unsorted - ["alg", "e", "kid", "kty", "n", "use", "x5c", "x5t", "x5t#S256", "x5u"]) | length) == 0
+        and .kty == "RSA"
+        and (.kid | type == "string" and length > 0)
+        and (.n | type == "string" and length > 0)
+        and (.e | type == "string" and length > 0)
+        and ((.alg // "RS256") == "RS256")
+        and ((.use // "sig") == "sig");
+      type == "object"
+      and ((keys_unsorted - ["keys"]) | length) == 0
+      and (.keys | type == "array" and length > 0)
+      and all(.keys[]; supported_key)
+      and (([.keys[].kid] | length) == ([.keys[].kid] | unique | length))
+    ' "${TEMPDIR}/jwks.current.download.json" > /dev/null
+
+    mv "${TEMPDIR}/jwks.current.download.json" "${TEMPDIR}/jwks.current.json"
+    ```
+
 1. Trigger the kube-apiserver to create a new bound service account signing key.
 
-    Deleting the next-bound-service-account-signing-key secret will cause the kube-apserver to generate a new one. At this point, the kube-apiserver will start rolling out the new key. In order to reduce the risk of authentication failures, it is important to complete all steps up to and including ***Upload the combined keys file*** as quickly as possible.
+    Deleting the `next-bound-service-account-signing-key` Secret asks the operator to generate a
+    replacement. The operator first appends the replacement public key to the cumulative signer
+    ConfigMap and rolls that verifier state through kube-apiserver revisions before it promotes the
+    replacement signer. In order to reduce the risk of authentication failures, it is important to
+    complete all steps up to and including ***Upload the combined keys file*** as quickly as
+    possible.
 
     WARNING: The remaining steps may cause downtime for the cluster.
+
+    Immediately before triggering rotation, save the public signer set so that the replacement can
+    be identified without reading any Secret data.
+
+    ```bash
+    oc -n openshift-kube-apiserver get configmap/bound-sa-token-signing-certs -o json \
+      > "${TEMPDIR}/bound-sa-token-signing-certs.before.json.tmp"
+
+    jq -e 'type == "object"' "${TEMPDIR}/bound-sa-token-signing-certs.before.json.tmp" > /dev/null
+    mv "${TEMPDIR}/bound-sa-token-signing-certs.before.json.tmp" \
+      "${TEMPDIR}/bound-sa-token-signing-certs.before.json"
+    ```
 
     ```bash
     oc -n openshift-kube-apiserver-operator delete secrets/next-bound-service-account-signing-key
@@ -59,11 +166,70 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
 
 1. Download the new bound service account signing key public key
 
-    Download the public key from the freshly generated next-bound-service-account-signing-key secret. We will use this key to generate keys.json files to upload to the oidc issuer.
+    Read the public-only signer ConfigMap and select the one public key that was not present in the
+    pre-rotation snapshot. Do not select a fixed or highest-numbered `service-account-NNN.pub`
+    entry: the ConfigMap is cumulative and its entry names do not identify the active or next key.
 
     ```bash
-    oc get -n openshift-kube-apiserver-operator secret/next-bound-service-account-signing-key -ojsonpath='{ .data.service-account\.pub }' | base64 -d > ${TEMPDIR}/serviceaccount-signer.public
+    oc -n openshift-kube-apiserver get configmap/bound-sa-token-signing-certs -o json \
+      > "${TEMPDIR}/bound-sa-token-signing-certs.after.json.tmp"
+
+    jq -e 'type == "object"' "${TEMPDIR}/bound-sa-token-signing-certs.after.json.tmp" > /dev/null
+    mv "${TEMPDIR}/bound-sa-token-signing-certs.after.json.tmp" \
+      "${TEMPDIR}/bound-sa-token-signing-certs.after.json"
+
+    jq -enr \
+      --slurpfile before "${TEMPDIR}/bound-sa-token-signing-certs.before.json" \
+      --slurpfile after "${TEMPDIR}/bound-sa-token-signing-certs.after.json" '
+        def signer_map:
+          (.data // {}) as $data
+          | if ($data | type) != "object" then
+              error("signer ConfigMap data is not an object")
+            elif ([$data | keys[]
+                   | select(test("^service-account-[0-9]+\\.pub$") | not)] | length) != 0 then
+              error("signer ConfigMap contains an unexpected data entry")
+            elif ([$data[] | select(type != "string")] | length) != 0 then
+              error("signer ConfigMap contains a non-string value")
+            else $data
+            end;
+        ($before[0] | signer_map) as $old
+        | ($after[0] | signer_map) as $new
+        | [$old | to_entries[] | . as $entry
+           | select($new[$entry.key] != $entry.value)] as $changed
+        | [$new | to_entries[] | . as $entry
+           | select(($old | has($entry.key)) | not)] as $added
+        | if ($before | length) != 1 or ($after | length) != 1 then
+            error("expected exactly one JSON object in each signer snapshot")
+          elif (($before[0].metadata.uid // "") | length) == 0
+               or (($after[0].metadata.uid // "") | length) == 0 then
+            error("signer ConfigMap UID is missing")
+          elif (($before[0].metadata.resourceVersion // "") | length) == 0
+               or (($after[0].metadata.resourceVersion // "") | length) == 0 then
+            error("signer ConfigMap resource version is missing")
+          elif $before[0].metadata.uid != $after[0].metadata.uid then
+            error("signer ConfigMap was replaced")
+          elif $before[0].metadata.resourceVersion == $after[0].metadata.resourceVersion then
+            error("signer ConfigMap has not changed")
+          elif ($old | length) == 0 then
+            error("pre-rotation signer set is empty")
+          elif ($changed | length) != 0 then
+            error("a pre-rotation signer entry changed or disappeared")
+          elif ($added | length) != 1 then
+            error("expected exactly one new signer public key, found \($added | length)")
+          elif ([$old[]] | index($added[0].value)) != null then
+            error("new signer entry repeats a pre-rotation public key")
+          else $added[0].value
+          end
+      ' > "${TEMPDIR}/serviceaccount-signer.public.tmp"
+
+    test -s "${TEMPDIR}/serviceaccount-signer.public.tmp"
+    mv "${TEMPDIR}/serviceaccount-signer.public.tmp" \
+      "${TEMPDIR}/serviceaccount-signer.public"
     ```
+
+    If no new signer is found, wait for the operator to update the ConfigMap and repeat this read.
+    If an existing entry changed or disappeared, the ConfigMap was replaced, or more than one new
+    signer is found, stop: another rotation may be in progress and the replacement is ambiguous.
 
 1. Create a keys.json using the new public key
 
@@ -90,34 +256,26 @@ When OpenShift is configured to use temporary credentials (AZWI, STS, WIF) to au
     cp ${TEMPDIR}/04-keys.json ${TEMPDIR}/jwks.new.json
     ```
 
-1. Download the current keys.json from the cloud provider.
-
-    AWS
-    ```bash
-    aws s3api get-object --bucket ${AWS_BUCKET} --key keys.json ${TEMPDIR}/jwks.current.json
-    ```
-
-    Azure
-    ```bash
-    az storage blob download --container-name ${AZURE_STORAGE_CONTAINER} --account-name ${AZURE_STORAGE_ACCOUNT} --name 'openid/v1/jwks' -f ${TEMPDIR}/jwks.current.json
-    ```
-
-    GCP public-bucket
-    ```bash
-    gcloud storage cp gs://${GCP_BUCKET}/keys.json ${TEMPDIR}/jwks.current.json
-    ```
-
-    GCP pool-jwk-file
-    ```bash
-    gcloud iam workload-identity-pools providers describe --format json --location global --workload-identity-pool ${CLUSTER_NAME} ${CLUSTER_NAME} | jq -r ".oidc.jwksJson" > ${TEMPDIR}/jwks.current.json
-    ```
-
 1. Combine the current and new keys
 
-    Combine the key(s) downloaded from the cloud provider with the new key. The resulting file will enable authentication for both the old and new keys during the transistion.
+    Combine the key(s) downloaded from the cloud provider with the new key. The resulting file will enable authentication for both the old and new keys during the transition.
 
     ```bash
-    jq -s '{ keys: map(.keys[])}' ${TEMPDIR}/jwks.current.json ${TEMPDIR}/jwks.new.json > ${TEMPDIR}/jwks.combined.json
+    jq -e -s '
+      .[0] as $current
+      | .[1] as $replacement
+      | ($current.keys | map(.kid)) as $current_ids
+      | if ($replacement.keys | type) != "array" or ($replacement.keys | length) != 1 then
+          error("replacement JWKS must contain exactly one key")
+        elif ($current_ids | index($replacement.keys[0].kid)) != null then
+          error("replacement key ID is already present in the current JWKS")
+        else
+          {keys: ($current.keys + $replacement.keys)}
+        end
+    ' "${TEMPDIR}/jwks.current.json" "${TEMPDIR}/jwks.new.json" \
+      > "${TEMPDIR}/jwks.combined.json.tmp"
+
+    mv "${TEMPDIR}/jwks.combined.json.tmp" "${TEMPDIR}/jwks.combined.json"
     ```
 
 1. Upload the combined keys file

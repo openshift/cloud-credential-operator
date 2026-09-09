@@ -37,6 +37,7 @@ func NewAWSCmd() *cobra.Command {
 	createCmd.AddCommand(NewCreateIAMRolesCmd())
 	createCmd.AddCommand(NewCreateAllCmd())
 	createCmd.AddCommand(NewDeleteCmd())
+	createCmd.AddCommand(NewRotateSigningKeyCmd())
 
 	return createCmd
 }
