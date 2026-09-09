@@ -2,6 +2,11 @@
 
 The `ccoctl` tool provides various commands to assist with the creating and maintenance of cloud credentials from outside the cluster (necessary when CCO is put in "Manual" mode).
 
+The planned provider-specific signing-key rotation commands are defined by the
+[`rotate-signing-key` command contract](ccoctl-rotate-signing-key.md). Their shared engine exists,
+but the provider adapters and commands are not registered yet; use the
+[manual rotation procedure](rotate-oidc-key.md) in the meantime.
+
 - [AWS](#aws)
   - [Global flags](#global-flags)
   - [Creating RSA keys](#creating-rsa-keys)
