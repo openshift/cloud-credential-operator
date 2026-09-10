@@ -319,6 +319,44 @@ func (a *VSphereActuator) GetCredentialsRootSecretLocation() types.NamespacedNam
 
 func (a *VSphereActuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.CredentialsRequest) (*corev1.Secret, error) {
 	logger := a.getLogger(cr)
+
+	// Check for a per-component override secret in the override namespace before
+	// falling back to the shared root credential. Override secrets are identified
+	// by annotations that map them to a specific CredentialsRequest's target secret.
+	overrideSecretList := &corev1.SecretList{}
+	if err := a.Client.List(ctx, overrideSecretList, client.InNamespace(constants.VSphereCredOverrideNamespace)); err != nil {
+		logger.WithError(err).Error("error listing secrets in override namespace")
+		return nil, &actuatoriface.ActuatorError{
+			ErrReason: minterv1.CredentialsProvisionFailure,
+			Message:   fmt.Sprintf("error listing secrets in %s: %v", constants.VSphereCredOverrideNamespace, err),
+		}
+	}
+
+	for i := range overrideSecretList.Items {
+		s := &overrideSecretList.Items[i]
+		if s.Annotations == nil {
+			continue
+		}
+		targetNS := s.Annotations[constants.VSphereCredTargetSecretNamespaceAnnotation]
+		targetName := s.Annotations[constants.VSphereCredTargetSecretNameAnnotation]
+		if targetNS == cr.Spec.SecretRef.Namespace && targetName == cr.Spec.SecretRef.Name {
+			if !isSecretAnnotated(s) {
+				logger.WithField("secret", fmt.Sprintf("%s/%s", s.Namespace, s.Name)).
+					Error("per-component override secret not yet annotated")
+				return nil, &actuatoriface.ActuatorError{
+					ErrReason: minterv1.CredentialsProvisionFailure,
+					Message:   "cannot proceed without per-component override secret annotation",
+				}
+			}
+			logger.WithField("secret", fmt.Sprintf("%s/%s", s.Namespace, s.Name)).
+				Info("using per-component credential override secret")
+			return s, nil
+		}
+	}
+
+	logger.Debug("no per-component override secret found, falling back to root credential")
+
+	// Fall back to the shared root credential secret.
 	cloudCredSecret := &corev1.Secret{}
 	if err := a.RootCredClient.Get(ctx, a.GetCredentialsRootSecretLocation(), cloudCredSecret); err != nil {
 		msg := "unable to fetch root cloud cred secret"
