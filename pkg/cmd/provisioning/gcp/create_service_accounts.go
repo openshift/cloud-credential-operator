@@ -38,14 +38,14 @@ type: Opaque`
   	"type": "external_account",
   	"audience": "//iam.googleapis.com/projects/%s/locations/global/workloadIdentityPools/%s/providers/%s",
   	"subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
-  	"token_url": "https://sts.googleapis.com/v1/token",
-  	"service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
+  	"token_url": "https://sts.%s/v1/token",
+  	"service_account_impersonation_url": "https://iamcredentials.%s/v1/projects/-/serviceAccounts/%s:generateAccessToken",
   	"credential_source": {
     	"file": "%s",
     	"format": {
       		"type": "text"
     	}
-	}
+	}%s
 }`
 	// createServiceAccountCmd is a gcloud cli command to create service account
 	createServiceAccountCmd = "gcloud iam service-accounts create %s --display-name=%s"
@@ -79,7 +79,7 @@ var (
 	}
 )
 
-func createServiceAccounts(ctx context.Context, client gcp.Client, name, workloadIdentityPool, workloadIdentityProvider, credReqDir, targetDir string, enableTechPreview, generateOnly bool) error {
+func createServiceAccounts(ctx context.Context, client gcp.Client, name, workloadIdentityPool, workloadIdentityProvider, credReqDir, targetDir string, enableTechPreview, generateOnly bool, universeDomain string) error {
 	// Process directory
 	credRequests, err := provisioning.GetListOfCredentialsRequests(credReqDir, enableTechPreview)
 	if err != nil {
@@ -87,17 +87,17 @@ func createServiceAccounts(ctx context.Context, client gcp.Client, name, workloa
 	}
 
 	// Create service accounts
-	if err := processCredentialsRequests(ctx, client, credRequests, name, workloadIdentityPool, workloadIdentityProvider, targetDir, generateOnly); err != nil {
+	if err := processCredentialsRequests(ctx, client, credRequests, name, workloadIdentityPool, workloadIdentityProvider, targetDir, generateOnly, universeDomain); err != nil {
 		return errors.Wrap(err, "Failed while processing each CredentialsRequest")
 	}
 
 	return nil
 }
 
-func processCredentialsRequests(ctx context.Context, client gcp.Client, credReqs []*credreqv1.CredentialsRequest, name, workloadIdentityPool, workloadIdentityProvider, targetDir string, generateOnly bool) error {
+func processCredentialsRequests(ctx context.Context, client gcp.Client, credReqs []*credreqv1.CredentialsRequest, name, workloadIdentityPool, workloadIdentityProvider, targetDir string, generateOnly bool, universeDomain string) error {
 	project := client.GetProjectName()
 	for i, cr := range credReqs {
-		_, err := createServiceAccount(ctx, client, name, cr, i, workloadIdentityPool, workloadIdentityProvider, project, targetDir, generateOnly)
+		_, err := createServiceAccount(ctx, client, name, cr, i, workloadIdentityPool, workloadIdentityProvider, project, targetDir, generateOnly, universeDomain)
 		if err != nil {
 			return err
 		}
@@ -106,7 +106,7 @@ func processCredentialsRequests(ctx context.Context, client gcp.Client, credReqs
 	return nil
 }
 
-func createServiceAccount(ctx context.Context, client gcp.Client, name string, credReq *credreqv1.CredentialsRequest, serviceAccountNum int, workloadIdentityPool, workloadIdentityProvider, project, targetDir string, generateOnly bool) (string, error) {
+func createServiceAccount(ctx context.Context, client gcp.Client, name string, credReq *credreqv1.CredentialsRequest, serviceAccountNum int, workloadIdentityPool, workloadIdentityProvider, project, targetDir string, generateOnly bool, universeDomain string) (string, error) {
 	// The credReq must have a non zero-length list of ServiceAccountNames
 	// that can be used to restrict which k8s ServiceAccounts can use the GCP ServiceAccount.
 	if len(credReq.Spec.ServiceAccountNames) == 0 {
@@ -318,7 +318,8 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		log.Printf("Updated policy bindings for IAM service account %s", serviceAccount.DisplayName)
 
 		projectNumStr := fmt.Sprint(projectNum)
-		credentialsConfig := fmt.Sprintf(credentialsConfigTemplate, projectNumStr, workloadIdentityPool, workloadIdentityProvider, serviceAccount.Email, provisioning.OidcTokenPath)
+		domain, udField := universeDomainArgs(universeDomain)
+		credentialsConfig := fmt.Sprintf(credentialsConfigTemplate, projectNumStr, workloadIdentityPool, workloadIdentityProvider, domain, domain, serviceAccount.Email, provisioning.OidcTokenPath, udField)
 		encodedCredentialsConfig = base64.StdEncoding.EncodeToString([]byte(credentialsConfig))
 	}
 
@@ -326,6 +327,13 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		return "", errors.Wrap(err, "Failed to save secret for install manifests")
 	}
 	return "", nil
+}
+
+func universeDomainArgs(universeDomain string) (domain, udField string) {
+	if universeDomain != "" && universeDomain != "googleapis.com" {
+		return universeDomain, fmt.Sprintf(",\n  \t\"universe_domain\": \"%s\"", universeDomain)
+	}
+	return "googleapis.com", ""
 }
 
 // createShellScript creates a shell script given commands to execute
@@ -455,7 +463,7 @@ func createServiceAccountsCmd(cmd *cobra.Command, args []string) {
 
 	err = createServiceAccounts(ctx, gcpClient, CreateServiceAccountsOpts.Name, CreateServiceAccountsOpts.WorkloadIdentityPool,
 		CreateServiceAccountsOpts.WorkloadIdentityProvider, CreateServiceAccountsOpts.CredRequestDir, CreateServiceAccountsOpts.TargetDir,
-		CreateServiceAccountsOpts.EnableTechPreview, CreateServiceAccountsOpts.DryRun)
+		CreateServiceAccountsOpts.EnableTechPreview, CreateServiceAccountsOpts.DryRun, gcpClient.GetUniverseDomain())
 	if err != nil {
 		log.Fatal(err)
 	}

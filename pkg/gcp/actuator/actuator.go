@@ -60,14 +60,14 @@ const (
   "type": "external_account",
   "audience": "%s",
   "subject_token_type": "urn:ietf:params:oauth:token-type:jwt",
-  "token_url": "https://sts.googleapis.com/v1/token",
-  "service_account_impersonation_url": "https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/%s:generateAccessToken",
+  "token_url": "https://sts.%s/v1/token",
+  "service_account_impersonation_url": "https://iamcredentials.%s/v1/projects/-/serviceAccounts/%s:generateAccessToken",
   "credential_source": {
     "file": "%s",
     "format": {
       "type": "text"
     }
-  }
+  }%s
 }`
 )
 
@@ -241,7 +241,12 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 			cloudTokenPath = "/var/run/secrets/openshift/serviceaccount/token"
 		}
 
-		return a.syncSTSSecret(providerSpec.Audience, providerSpec.ServiceAccountEmail, cloudTokenPath, cr, logger, ctx)
+		universeDomain, err := a.getUniverseDomain(logger)
+		if err != nil {
+			return err
+		}
+
+		return a.syncSTSSecret(providerSpec.Audience, providerSpec.ServiceAccountEmail, cloudTokenPath, universeDomain, cr, logger, ctx)
 	}
 
 	credentialsRootSecret, err := a.GetCredentialsRootSecret(ctx, cr)
@@ -291,12 +296,13 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 // has supplied the following in the CredentialsRequest:
 // a non-empty cr.CloudTokenPath
 // a non-empty, well-formed cr.ProviderSpec.Audience
-func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
+func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath, universeDomain string, cr *minterv1.CredentialsRequest, logger log.FieldLogger, ctx context.Context) error {
 	sLog := logger.WithFields(log.Fields{
 		"targetSecret": fmt.Sprintf("%s/%s", cr.Spec.SecretRef.Namespace, cr.Spec.SecretRef.Name),
 		"cr":           fmt.Sprintf("%s/%s", cr.Namespace, cr.Name),
 	})
 	sLog.Infof("processing secret")
+	domain, udField := universeDomainArgs(universeDomain)
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      cr.Spec.SecretRef.Name,
@@ -315,7 +321,7 @@ func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string
 		if secret.StringData == nil {
 			secret.StringData = map[string]string{}
 		}
-		secret.StringData[gcpSecretJSONKey] = fmt.Sprintf(gcpSTSCredsTemplate, audience, serviceAccount, cloudTokenPath)
+		secret.StringData[gcpSecretJSONKey] = fmt.Sprintf(gcpSTSCredsTemplate, audience, domain, domain, serviceAccount, cloudTokenPath, udField)
 		secret.Type = corev1.SecretTypeOpaque
 		return nil
 	})
@@ -327,6 +333,33 @@ func (a *Actuator) syncSTSSecret(audience, serviceAccount, cloudTokenPath string
 		}
 	}
 	return nil
+}
+
+// universeDomainArgs returns the domain to use in endpoint URLs and an optional
+// universe_domain JSON field for the credential file. For the default domain
+// (googleapis.com), the extra field is omitted.
+func universeDomainArgs(universeDomain string) (domain, udField string) {
+	if universeDomain != "" && universeDomain != "googleapis.com" {
+		return universeDomain, fmt.Sprintf(",\n  \"universe_domain\": \"%s\"", universeDomain)
+	}
+	return "googleapis.com", ""
+}
+
+// getUniverseDomain reads the universe domain from the cluster's Infrastructure
+// status. The field is gated by the GCPSovereignCloudInstall feature gate — when
+// the gate is disabled, the API server strips the field and this returns the
+// default domain.
+func (a *Actuator) getUniverseDomain(logger log.FieldLogger) (string, error) {
+	infra, err := utils.GetInfrastructure(a.Client)
+	if err != nil {
+		return "", fmt.Errorf("could not load Infrastructure for universe domain: %w", err)
+	}
+	if infra.Status.PlatformStatus != nil &&
+		infra.Status.PlatformStatus.GCP != nil &&
+		infra.Status.PlatformStatus.GCP.UniverseDomain != "" {
+		return infra.Status.PlatformStatus.GCP.UniverseDomain, nil
+	}
+	return "googleapis.com", nil
 }
 
 func (a *Actuator) syncPassthrough(ctx context.Context, cr *minterv1.CredentialsRequest, cloudCredsSecret *corev1.Secret, logger log.FieldLogger) error {
