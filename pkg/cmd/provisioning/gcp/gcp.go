@@ -44,6 +44,7 @@ func NewGCPCmd() *cobra.Command {
 	gcpCmd.AddCommand(NewCreateServiceAccountsCmd())
 	gcpCmd.AddCommand(NewCreateAllCmd())
 	gcpCmd.AddCommand(NewDeleteCmd())
+	gcpCmd.AddCommand(provisioning.NewApplyCmd())
 
 	return gcpCmd
 }
