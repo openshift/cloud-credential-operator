@@ -209,14 +209,15 @@ func (a *NetHttpRequestAdapter) setBaseUrlForRequestInformation(requestInfo *abs
 	requestInfo.PathParameters["baseurl"] = a.GetBaseUrl()
 }
 
-func (a *NetHttpRequestAdapter) prepareContext(ctx context.Context, requestInfo *abs.RequestInformation) context.Context {
+func (a *NetHttpRequestAdapter) prepareContext(ctx context.Context, requestInfo *abs.RequestInformation) (context.Context, context.CancelFunc) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
+	cancel := func() {} // no-op placeholder used when no timeout is applied
 	// set deadline if not set in receiving context
 	// ignore if timeout is 0 as it means no timeout
 	if _, deadlineSet := ctx.Deadline(); !deadlineSet && a.httpClient.Timeout != 0 {
-		ctx, _ = context.WithTimeout(ctx, a.httpClient.Timeout)
+		ctx, cancel = context.WithTimeout(ctx, a.httpClient.Timeout)
 	}
 
 	for _, value := range requestInfo.GetRequestOptions() {
@@ -231,7 +232,7 @@ func (a *NetHttpRequestAdapter) prepareContext(ctx context.Context, requestInfo 
 	if !obsOptionsSet {
 		ctx = context.WithValue(ctx, observabilityOptionsKeyValue, &a.observabilityOptions)
 	}
-	return ctx
+	return ctx, cancel
 }
 
 // ConvertToNativeRequest converts the given RequestInformation into a native HTTP request.
@@ -322,7 +323,8 @@ func (a *NetHttpRequestAdapter) Send(ctx context.Context, requestInfo *abs.Reque
 	if requestInfo == nil {
 		return nil, errors.New("requestInfo cannot be nil")
 	}
-	ctx = a.prepareContext(ctx, requestInfo)
+	ctx, cancel := a.prepareContext(ctx, requestInfo)
+	defer cancel()
 	ctx, span := a.startTracingSpan(ctx, requestInfo, "Send")
 	defer span.End()
 	response, err := a.getHttpResponseMessage(ctx, requestInfo, "", span)
@@ -382,7 +384,8 @@ func (a *NetHttpRequestAdapter) SendEnum(ctx context.Context, requestInfo *abs.R
 	if requestInfo == nil {
 		return nil, errors.New("requestInfo cannot be nil")
 	}
-	ctx = a.prepareContext(ctx, requestInfo)
+	ctx, cancel := a.prepareContext(ctx, requestInfo)
+	defer cancel()
 	ctx, span := a.startTracingSpan(ctx, requestInfo, "SendEnum")
 	defer span.End()
 	response, err := a.getHttpResponseMessage(ctx, requestInfo, "", span)
@@ -436,7 +439,8 @@ func (a *NetHttpRequestAdapter) SendCollection(ctx context.Context, requestInfo 
 	if requestInfo == nil {
 		return nil, errors.New("requestInfo cannot be nil")
 	}
-	ctx = a.prepareContext(ctx, requestInfo)
+	ctx, cancel := a.prepareContext(ctx, requestInfo)
+	defer cancel()
 	ctx, span := a.startTracingSpan(ctx, requestInfo, "SendCollection")
 	defer span.End()
 	response, err := a.getHttpResponseMessage(ctx, requestInfo, "", span)
@@ -490,7 +494,8 @@ func (a *NetHttpRequestAdapter) SendEnumCollection(ctx context.Context, requestI
 	if requestInfo == nil {
 		return nil, errors.New("requestInfo cannot be nil")
 	}
-	ctx = a.prepareContext(ctx, requestInfo)
+	ctx, cancel := a.prepareContext(ctx, requestInfo)
+	defer cancel()
 	ctx, span := a.startTracingSpan(ctx, requestInfo, "SendEnumCollection")
 	defer span.End()
 	response, err := a.getHttpResponseMessage(ctx, requestInfo, "", span)
@@ -552,7 +557,8 @@ func (a *NetHttpRequestAdapter) SendPrimitive(ctx context.Context, requestInfo *
 	if requestInfo == nil {
 		return nil, errors.New("requestInfo cannot be nil")
 	}
-	ctx = a.prepareContext(ctx, requestInfo)
+	ctx, cancel := a.prepareContext(ctx, requestInfo)
+	defer cancel()
 	ctx, span := a.startTracingSpan(ctx, requestInfo, "SendPrimitive")
 	defer span.End()
 	response, err := a.getHttpResponseMessage(ctx, requestInfo, "", span)
@@ -636,7 +642,8 @@ func (a *NetHttpRequestAdapter) SendPrimitiveCollection(ctx context.Context, req
 	if requestInfo == nil {
 		return nil, errors.New("requestInfo cannot be nil")
 	}
-	ctx = a.prepareContext(ctx, requestInfo)
+	ctx, cancel := a.prepareContext(ctx, requestInfo)
+	defer cancel()
 	ctx, span := a.startTracingSpan(ctx, requestInfo, "SendPrimitiveCollection")
 	defer span.End()
 	response, err := a.getHttpResponseMessage(ctx, requestInfo, "", span)
@@ -690,7 +697,8 @@ func (a *NetHttpRequestAdapter) SendNoContent(ctx context.Context, requestInfo *
 	if requestInfo == nil {
 		return errors.New("requestInfo cannot be nil")
 	}
-	ctx = a.prepareContext(ctx, requestInfo)
+	ctx, cancel := a.prepareContext(ctx, requestInfo)
+	defer cancel()
 	ctx, span := a.startTracingSpan(ctx, requestInfo, "SendNoContent")
 	defer span.End()
 	response, err := a.getHttpResponseMessage(ctx, requestInfo, "", span)
