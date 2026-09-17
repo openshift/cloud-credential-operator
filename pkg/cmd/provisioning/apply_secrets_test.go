@@ -17,6 +17,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 	"sigs.k8s.io/controller-runtime/pkg/client/interceptor"
@@ -242,26 +243,22 @@ func TestApplySecrets(t *testing.T) {
 	}
 
 	tests := []struct {
-		name               string
-		existingNamespaces []string
-		existing           []client.Object
-		secrets            []*unstructured.Unstructured
-		namespaceGetErr    error
-		applyErr           error
-		expectedErr        string
-		expectedApplied    map[string]string
+		name             string
+		existing         []client.Object
+		secrets          []*unstructured.Unstructured
+		createErrSecrets sets.Set[string]
+		expectedErr      string
+		expectedApplied  map[string]string
 	}{
 		{
-			name:               "creates secrets on a cluster that has none",
-			existingNamespaces: []string{"openshift-ingress-operator"},
+			name: "creates secrets on a cluster that has none",
 			secrets: []*unstructured.Unstructured{
 				newSecret("cloud-credentials", "openshift-ingress-operator", "new"),
 			},
 			expectedApplied: map[string]string{"openshift-ingress-operator/cloud-credentials": "new"},
 		},
 		{
-			name:               "updates a secret that already exists",
-			existingNamespaces: []string{"openshift-ingress-operator"},
+			name: "updates a secret that already exists",
 			existing: []client.Object{
 				&corev1.Secret{
 					ObjectMeta: metav1.ObjectMeta{Name: "cloud-credentials", Namespace: "openshift-ingress-operator"},
@@ -279,55 +276,28 @@ func TestApplySecrets(t *testing.T) {
 			expectedApplied: map[string]string{},
 		},
 		{
-			name:               "halts and surfaces an API error",
-			existingNamespaces: []string{"openshift-ingress-operator"},
-			secrets: []*unstructured.Unstructured{
-				newSecret("cloud-credentials", "openshift-ingress-operator", "new"),
-			},
-			applyErr:    apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "cloud-credentials", fmt.Errorf("no RBAC")),
-			expectedErr: "failed to apply Secret openshift-ingress-operator/cloud-credentials",
-		},
-		{
-			name:               "missing target namespaces are reported before anything is applied",
-			existingNamespaces: []string{"openshift-ingress-operator"},
+			name: "a secret failing to apply does not stop the others, and the failure is reported",
 			secrets: []*unstructured.Unstructured{
 				newSecret("cloud-credentials", "openshift-ingress-operator", "new"),
 				newSecret("installer-cloud-credentials", "openshift-image-registry", "new"),
-				newSecret("ebs-cloud-credentials", "openshift-cluster-csi-drivers", "new"),
 			},
-			expectedErr: "target namespace(s) openshift-cluster-csi-drivers, openshift-image-registry do not exist",
-		},
-		{
-			// Credentials that can write secrets but not read namespaces must still work:
-			// the precheck only exists to improve an error message.
-			name:            "namespace check is skipped when reading namespaces is forbidden",
-			namespaceGetErr: apierrors.NewForbidden(schema.GroupResource{Resource: "namespaces"}, "openshift-ingress-operator", fmt.Errorf("no RBAC")),
-			secrets: []*unstructured.Unstructured{
-				newSecret("cloud-credentials", "openshift-ingress-operator", "new"),
-			},
-			expectedApplied: map[string]string{"openshift-ingress-operator/cloud-credentials": "new"},
+			createErrSecrets: sets.New("openshift-image-registry/installer-cloud-credentials"),
+			expectedErr:      "failed to create Secret openshift-image-registry/installer-cloud-credentials",
+			expectedApplied:  map[string]string{"openshift-ingress-operator/cloud-credentials": "new"},
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			seeded := append([]client.Object{}, test.existing...)
-			for _, namespace := range test.existingNamespaces {
-				seeded = append(seeded, &corev1.Namespace{ObjectMeta: metav1.ObjectMeta{Name: namespace}})
-			}
 
 			funcs := interceptor.Funcs{}
-			if test.applyErr != nil {
-				funcs.Apply = func(_ context.Context, _ client.WithWatch, _ runtime.ApplyConfiguration, _ ...client.ApplyOption) error {
-					return test.applyErr
-				}
-			}
-			if test.namespaceGetErr != nil {
-				funcs.Get = func(ctx context.Context, wrapped client.WithWatch, key client.ObjectKey, obj client.Object, opts ...client.GetOption) error {
-					if _, isNamespace := obj.(*corev1.Namespace); isNamespace {
-						return test.namespaceGetErr
+			if test.createErrSecrets.Len() > 0 {
+				funcs.Create = func(ctx context.Context, wrapped client.WithWatch, obj client.Object, opts ...client.CreateOption) error {
+					if test.createErrSecrets.Has(obj.GetNamespace() + "/" + obj.GetName()) {
+						return apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, obj.GetName(), fmt.Errorf("no RBAC"))
 					}
-					return wrapped.Get(ctx, key, obj, opts...)
+					return wrapped.Create(ctx, obj, opts...)
 				}
 			}
 
@@ -338,16 +308,9 @@ func TestApplySecrets(t *testing.T) {
 			if test.expectedErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), test.expectedErr)
-
-				// The namespace precheck must run before any secret is written.
-				for _, secret := range test.secrets {
-					err := kubeClient.Get(context.TODO(), types.NamespacedName{Namespace: secret.GetNamespace(), Name: secret.GetName()}, &corev1.Secret{})
-					assert.True(t, apierrors.IsNotFound(err), "expected no secret to have been applied, got %v", err)
-				}
-				return
+			} else {
+				require.NoError(t, err)
 			}
-
-			require.NoError(t, err)
 
 			for key, expectedCredentials := range test.expectedApplied {
 				namespace, name := filepath.Split(key)
