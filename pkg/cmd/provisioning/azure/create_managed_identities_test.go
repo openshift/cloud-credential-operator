@@ -510,6 +510,26 @@ func TestCreateManagedIdentities(t *testing.T) {
 	}
 }
 
+func TestEnsureCustomRolesForCredentialsRequests(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	wrapper := mockAzureClientWrapper(ctrl)
+
+	// Each selected CredentialsRequest gets its role in the preflight phase;
+	// no managed-identity or role-assignment clients are configured here.
+	mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, []*armauthorization.RoleDefinition{})
+	mockCreateOrUpdateRoleDefinitionSuccess(wrapper, "first", testSubscriptionID)
+	mockRoleDefinitionsListPager(wrapper, "/subscriptions/"+testSubscriptionID, []*armauthorization.RoleDefinition{})
+	mockCreateOrUpdateRoleDefinitionSuccess(wrapper, "second", testSubscriptionID)
+
+	credentialsRequestDir := t.TempDir()
+	require.NoError(t, testCredentialsRequest(t, "first", "namespace1", "secret1", credentialsRequestDir, "", false, true))
+	require.NoError(t, testCredentialsRequest(t, "second", "namespace2", "secret2", credentialsRequestDir, "", false, true))
+	credentialsRequests, err := provisioning.GetListOfCredentialsRequests(credentialsRequestDir, false)
+	require.NoError(t, err)
+
+	require.NoError(t, ensureCustomRolesForCredentialsRequests(wrapper, credentialsRequests, "test", testSubscriptionID))
+}
+
 func TestEnsureUserAssignedManagedIdentity(t *testing.T) {
 	tests := []struct {
 		name                   string
