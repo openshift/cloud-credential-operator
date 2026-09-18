@@ -110,6 +110,18 @@ $ ccoctl aws delete --name=<name> --region=<aws-region>
 
 where `name` is the name used to tag and account any cloud resources that were created, and `region` is the aws region in which cloud resources were created.
 
+### Applying the generated secrets to a cluster
+
+The `create-iam-roles` and `create-all` commands write Secret manifests into `<output-dir>/manifests`. To apply those Secrets to a running cluster, run
+
+```bash
+$ ccoctl aws apply secrets --output-dir=<path-to-directory-with-generated-manifests>
+```
+
+Only manifests of kind `Secret` are applied; any other manifests in the directory, such as `cluster-authentication-02-config.yaml`, are ignored.
+
+The cluster is selected the same way as with `oc`: the `--kubeconfig` flag if given, otherwise `$KUBECONFIG`, otherwise `~/.kube/config`.
+
 ## Azure
 
 ### Global flags
@@ -194,6 +206,20 @@ To delete resources created by ccoctl, run
 ```bash
 $ ccoctl azure delete --name <azure_infra_name> --region <azure_region> --subscription-id <azure_subscription_id> --delete-oidc-resource-group
 ```
+
+### Applying the generated secrets to a cluster
+
+The `create-managed-identities` and `create-all` commands write Secret manifests into `<output-dir>/manifests`. To apply those Secrets to a running cluster, run
+
+```bash
+$ ccoctl azure apply secrets --output-dir=<path-to-directory-with-generated-manifests>
+```
+
+Only manifests of kind `Secret` are applied; any other manifests in the directory, such as `cluster-authentication-02-config.yaml`, are ignored.
+
+This selection includes `azure-ad-pod-identity-webhook-config.yaml`, which `create-oidc-issuer` writes into the same directory. It holds the `azure-credentials` Secret in the `openshift-cloud-credential-operator` namespace, which the pod identity webhook reads the tenant ID from. Applying a stale output directory therefore overwrites cluster-wide pod identity configuration, not just the per-component credentials.
+
+The cluster is selected the same way as with `oc`: the `--kubeconfig` flag if given, otherwise `$KUBECONFIG`, otherwise `~/.kube/config`.
 
 ## GCP
 
@@ -280,6 +306,18 @@ $ ccoctl gcp delete --name=<name> --project=<gcp-project-id> --credentials-reque
 ```
 
 where `name` is the name prefix used to create cloud resources, and `project` is the ID of the gcp project.
+
+### Applying the generated secrets to a cluster
+
+The `create-service-accounts` and `create-all` commands write Secret manifests into `<output-dir>/manifests`. To apply those Secrets to a running cluster, run
+
+```bash
+$ ccoctl gcp apply secrets --output-dir=<path-to-directory-with-generated-manifests>
+```
+
+Only manifests of kind `Secret` are applied; any other manifests in the directory, such as `cluster-authentication-02-config.yaml`, are ignored.
+
+The cluster is selected the same way as with `oc`: the `--kubeconfig` flag if given, otherwise `$KUBECONFIG`, otherwise `~/.kube/config`.
 
 ## IBMCloud
 

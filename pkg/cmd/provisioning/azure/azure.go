@@ -71,6 +71,7 @@ func NewAzureCmd() *cobra.Command {
 	createCmd.AddCommand(NewCreateManagedIdentitiesCmd())
 	createCmd.AddCommand(NewCreateAllCmd())
 	createCmd.AddCommand(NewDeleteCmd())
+	createCmd.AddCommand(provisioning.NewApplyCmd())
 
 	return createCmd
 }
