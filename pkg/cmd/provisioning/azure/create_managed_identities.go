@@ -96,11 +96,8 @@ func createManagedIdentity(client *azureclients.AzureClientWrapper, name, resour
 	}
 
 	if len(crProviderSpec.Permissions) > 0 || len(crProviderSpec.DataPermissions) > 0 {
-		// Ensure a custom role exists for the user-assigned managed identity with the specified permissions.
-		err := ensureCustomRole(client, shortenedManagedIdentityName, name, subscriptionID, crProviderSpec.Permissions, crProviderSpec.DataPermissions)
-		if err != nil {
-			return fmt.Errorf("error ensuring custom role: %w", err)
-		}
+		// Custom roles are created for every CredentialsRequest before this phase so
+		// they have time to propagate before any role assignment is attempted.
 		// Add the custom role to the list of roles to assign to the user-assigned managed identity
 		crProviderSpec.RoleBindings = append(crProviderSpec.RoleBindings, credreqv1.RoleBinding{Role: shortenedManagedIdentityName})
 	}
@@ -682,6 +679,14 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 		return errors.Wrap(err, "failed to process files containing CredentialsRequests")
 	}
 
+	// Azure role definitions can take time to propagate. Create or update every
+	// custom role before assigning any role to a managed identity.
+	if !dryRun {
+		if err := ensureCustomRolesForCredentialsRequests(client, credentialsRequests, name, subscriptionID); err != nil {
+			return err
+		}
+	}
+
 	// Create user-assigned managed identities for each CredentialsRequest
 	for _, credentialsRequest := range credentialsRequests {
 		// Scope user-assigned managed identity within the installationResourceGroupName
@@ -711,6 +716,28 @@ func createManagedIdentities(client *azureclients.AzureClientWrapper, credReqDir
 		}
 	}
 
+	return nil
+}
+
+// ensureCustomRolesForCredentialsRequests creates or updates custom roles for
+// every selected CredentialsRequest before the managed-identity phase begins.
+func ensureCustomRolesForCredentialsRequests(client *azureclients.AzureClientWrapper, credentialsRequests []*credreqv1.CredentialsRequest, name, subscriptionID string) error {
+	for _, credentialsRequest := range credentialsRequests {
+		managedIdentityName := fmt.Sprintf("%s-%s-%s", name, credentialsRequest.Spec.SecretRef.Namespace, credentialsRequest.Spec.SecretRef.Name)
+		roleName := provisioning.ShortenName(managedIdentityName, 128)
+		providerSpec := &credreqv1.AzureProviderSpec{}
+		if credentialsRequest.Spec.ProviderSpec != nil {
+			if err := credreqv1.Codec.DecodeProviderSpec(credentialsRequest.Spec.ProviderSpec, providerSpec); err != nil {
+				return fmt.Errorf("error decoding provider spec from CredentialsRequest: %w", err)
+			}
+		}
+		if len(providerSpec.Permissions) == 0 && len(providerSpec.DataPermissions) == 0 {
+			continue
+		}
+		if err := ensureCustomRole(client, roleName, name, subscriptionID, providerSpec.Permissions, providerSpec.DataPermissions); err != nil {
+			return fmt.Errorf("error ensuring custom role: %w", err)
+		}
+	}
 	return nil
 }
 

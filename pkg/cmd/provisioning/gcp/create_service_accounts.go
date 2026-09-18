@@ -96,12 +96,69 @@ func createServiceAccounts(ctx context.Context, client gcp.Client, name, workloa
 
 func processCredentialsRequests(ctx context.Context, client gcp.Client, credReqs []*credreqv1.CredentialsRequest, name, workloadIdentityPool, workloadIdentityProvider, targetDir string, generateOnly bool, universeDomain string) error {
 	project := client.GetProjectName()
+	if !generateOnly {
+		if err := ensureCustomRoles(ctx, client, credReqs, name, project); err != nil {
+			return err
+		}
+	}
 	for i, cr := range credReqs {
 		_, err := createServiceAccount(ctx, client, name, cr, i, workloadIdentityPool, workloadIdentityProvider, project, targetDir, generateOnly, universeDomain)
 		if err != nil {
 			return err
 		}
 
+	}
+	return nil
+}
+
+// ensureCustomRoles creates or updates every custom role before service-account
+// policy bindings are attempted. This lets role replication happen concurrently
+// with subsequent service-account creation.
+func ensureCustomRoles(ctx context.Context, client gcp.Client, credReqs []*credreqv1.CredentialsRequest, name, project string) error {
+	for _, credReq := range credReqs {
+		roleID, err := actuator.GenerateRoleID(project, credReq.Name)
+		if err != nil {
+			return fmt.Errorf("error generating custom role id: %v", err)
+		}
+		roleName, err := actuator.GenerateRoleName(project, credReq.Name)
+		if err != nil {
+			return fmt.Errorf("error generating custom role name: %v", err)
+		}
+		providerSpec := credreqv1.GCPProviderSpec{}
+		if err := credreqv1.Codec.DecodeProviderSpec(credReq.Spec.ProviderSpec, &providerSpec); err != nil {
+			return errors.Wrap(err, "Failed to decode the provider spec")
+		}
+		if providerSpec.Kind != "GCPProviderSpec" {
+			return fmt.Errorf("CredentialsRequest %s/%s is not of type GCP", credReq.Namespace, credReq.Name)
+		}
+		if len(providerSpec.Permissions) == 0 {
+			continue
+		}
+
+		role, err := getRoleByName(ctx, client, roleName)
+		if err != nil {
+			if !strings.Contains(err.Error(), "not found") {
+				return err
+			}
+			role, err = actuator.CreateRole(client, providerSpec.Permissions, roleName, roleID, fmt.Sprintf("%s for custom role %s", createdByCcoctl, roleName), project)
+			if err != nil {
+				return errors.Wrap(err, "Failed to create custom role")
+			}
+			log.Printf("IAM custom role %s created", role.Title)
+			continue
+		}
+
+		log.Printf("Existing IAM custom role %s found, updating permissions", role.Title)
+		addedPermissions, removedPermissions := actuator.CalculateSliceDiff(role.IncludedPermissions, providerSpec.Permissions)
+		if len(removedPermissions) > 0 {
+			log.Printf("Unexpected permissions found on existing custom role %s: %s", role.Title, strings.Join(removedPermissions, ", "))
+		}
+		if len(addedPermissions) > 0 {
+			role.IncludedPermissions = append(role.IncludedPermissions, addedPermissions...)
+			if _, err := actuator.UpdateRole(client, role, role.Name); err != nil {
+				return errors.Wrapf(err, "Failed to update custom role %s", role.Title)
+			}
+		}
 	}
 	return nil
 }
@@ -249,38 +306,8 @@ func createServiceAccount(ctx context.Context, client gcp.Client, name string, c
 		}
 
 		roles := gcpProviderSpec.PredefinedRoles
-		// Create custom role for all the specific permissions defined in credentials request spec.permissions field
 		if len(gcpProviderSpec.Permissions) > 0 {
-			role, err := getRoleByName(ctx, client, roleName)
-			if err != nil {
-				if strings.Contains(err.Error(), "not found") {
-					role, err := actuator.CreateRole(client, gcpProviderSpec.Permissions, roleName, roleID, createdByCcoctlForSvcAcct, project)
-					if err != nil {
-						return "", errors.Wrap(err, "Failed to create custom role")
-					}
-					roles = append(roles, role.Name)
-					log.Printf("IAM custom role %s created", role.Title)
-				} else {
-					return "", err
-				}
-			} else {
-				log.Printf("Existing IAM custom role %s found, updating permissions", role.Title)
-				addedPermissions, removedPermissions := actuator.CalculateSliceDiff(role.IncludedPermissions, gcpProviderSpec.Permissions)
-
-				if len(removedPermissions) > 0 {
-					allRemovedPermissions := strings.Join(removedPermissions, ", ")
-					log.Printf("Unexpected permissions found on existing custom role %s: %s", role.Title, allRemovedPermissions)
-				}
-
-				if len(addedPermissions) > 0 {
-					role.IncludedPermissions = append(role.IncludedPermissions, addedPermissions...)
-					_, err := actuator.UpdateRole(client, role, role.Name)
-					if err != nil {
-						return "", errors.Wrapf(err, "Failed to update custom role %s", role.Title)
-					}
-				}
-				roles = append(roles, role.Name)
-			}
+			roles = append(roles, fmt.Sprintf("projects/%s/roles/%s", project, roleID))
 		}
 
 		// Add member <-> role bindings for the project
