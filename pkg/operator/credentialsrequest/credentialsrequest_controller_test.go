@@ -904,6 +904,47 @@ func TestCredentialsRequestReconcile(t *testing.T) {
 			},
 		},
 		{
+			name: "SCP denied PutUserPolicy",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				testInfrastructure(testInfraName),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testCredentialsRequest(t),
+				testAWSCredsSecret("openshift-cloud-credential-operator", "cloud-credential-operator-iam-ro-creds", testReadAWSAccessKeyID, testReadAWSSecretAccessKey),
+				testClusterVersion(),
+			},
+			existingAdmin: []runtime.Object{
+				testAWSCredsSecret("kube-system", "aws-creds", testRootAWSAccessKeyID, testRootAWSSecretAccessKey),
+			},
+			mockRootAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUser(mockAWSClient)
+				mockCreateUser(mockAWSClient)
+				mockTagUser(mockAWSClient)
+				mockPutUserPolicyAccessDenied(mockAWSClient)
+				return mockAWSClient
+			},
+			mockReadAWSClient: func(mockCtrl *gomock.Controller) *mockaws.MockClient {
+				mockAWSClient := mockaws.NewMockClient(mockCtrl)
+				mockGetUserNotFound(mockAWSClient)
+				mockGetUserPolicyMissing(mockAWSClient)
+				return mockAWSClient
+			},
+			validate: func(c client.Client, t *testing.T) {
+				cr := getCR(c)
+				assert.False(t, cr.Status.Provisioned)
+			},
+			expectErr: true,
+			expectedConditions: []ExpectedCondition{
+				{
+					conditionType: minterv1.CredentialsProvisionFailure,
+					reason:        "CredentialsProvisionFailure",
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
 			name: "cred deletion failure condition",
 			existing: []runtime.Object{
 				testOperatorConfig(""),
@@ -1960,6 +2001,16 @@ func mockPutUserPolicyWithExpectedPolicy(mockAWSClient *mockaws.MockClient, poli
 
 func mockPutUserPolicy(mockAWSClient *mockaws.MockClient) {
 	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any(), gomock.Any()).Return(&iam.PutUserPolicyOutput{}, nil)
+}
+
+func mockPutUserPolicyAccessDenied(mockAWSClient *mockaws.MockClient) {
+	mockAWSClient.EXPECT().PutUserPolicy(gomock.Any(), gomock.Any()).Return(
+		nil,
+		&smithy.GenericAPIError{
+			Code:    "AccessDenied",
+			Message: "User: arn:aws:iam::123456789:user/root is not authorized to perform: iam:PutUserPolicy with an explicit deny in a service control policy",
+		},
+	)
 }
 
 func mockGetUserPolicy(mockAWSClient *mockaws.MockClient, policyDoc string) {

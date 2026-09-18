@@ -27,6 +27,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 
+	smithy "github.com/aws/smithy-go"
+
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
 
@@ -716,4 +718,44 @@ func testAuthentication(issuer string) *configv1.Authentication {
 		},
 	}
 	return conf
+}
+
+func TestIsAccessDenied(t *testing.T) {
+	tests := []struct {
+		name     string
+		err      error
+		expected bool
+	}{
+		{
+			name:     "AccessDenied API error",
+			err:      &smithy.GenericAPIError{Code: "AccessDenied", Message: "blocked by SCP"},
+			expected: true,
+		},
+		{
+			name:     "wrapped AccessDenied",
+			err:      fmt.Errorf("outer: %w", &smithy.GenericAPIError{Code: "AccessDenied", Message: "blocked"}),
+			expected: true,
+		},
+		{
+			name:     "different error code",
+			err:      &smithy.GenericAPIError{Code: "InvalidInput", Message: "bad input"},
+			expected: false,
+		},
+		{
+			name:     "generic error",
+			err:      fmt.Errorf("some other error"),
+			expected: false,
+		},
+		{
+			name:     "nil error",
+			err:      nil,
+			expected: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := isAccessDenied(tt.err)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
 }

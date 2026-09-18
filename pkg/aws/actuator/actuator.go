@@ -29,6 +29,7 @@ import (
 	awssdk "github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	iamtypes "github.com/aws/aws-sdk-go-v2/service/iam/types"
+	smithy "github.com/aws/smithy-go"
 
 	configv1 "github.com/openshift/api/config/v1"
 	operatorv1 "github.com/openshift/api/operator/v1"
@@ -653,6 +654,10 @@ func (a *AWSActuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequ
 		}
 		err = a.setUserPolicy(ctx, rootAWSClient, awsStatus.User, awsStatus.Policy, desiredUserPolicy)
 		if err != nil {
+			logger.WithFields(log.Fields{
+				"userName":   awsStatus.User,
+				"policyName": awsStatus.Policy,
+			}).Error("failed to set user policy")
 			return err
 		}
 		logger.Info("successfully set user policy")
@@ -1186,7 +1191,15 @@ func (a *AWSActuator) setUserPolicy(ctx context.Context, awsClient ccaws.Client,
 		PolicyName:     awssdk.String(policyName),
 	})
 	if err != nil {
-		return fmt.Errorf("unknown error setting user policy in AWS: %v", err)
+		if isAccessDenied(err) {
+			return fmt.Errorf("access denied setting IAM user policy (user: %s, policy: %s): "+
+				"this is typically caused by an AWS Service Control Policy (SCP) blocking iam:PutUserPolicy. "+
+				"To resolve, manually apply the following policy document to the IAM user, or adjust the SCP to allow iam:PutUserPolicy. "+
+				"Desired policy document: %s Original error: %v",
+				userName, policyName, userPolicy, err)
+		}
+		return fmt.Errorf("error setting user policy in AWS (user: %s, policy: %s): %v",
+			userName, policyName, err)
 	}
 
 	return nil
@@ -1335,6 +1348,14 @@ func (a *AWSActuator) loadClusterUUID(logger log.FieldLogger) (configv1.ClusterI
 	}
 	logger.WithField("clusterID", clusterVer.Spec.ClusterID).Debug("found cluster ID")
 	return clusterVer.Spec.ClusterID, nil
+}
+
+func isAccessDenied(err error) bool {
+	var apiErr smithy.APIError
+	if errors.As(err, &apiErr) {
+		return apiErr.ErrorCode() == "AccessDenied"
+	}
+	return false
 }
 
 func isAWSCredentials(providerSpec *runtime.RawExtension) (bool, error) {
