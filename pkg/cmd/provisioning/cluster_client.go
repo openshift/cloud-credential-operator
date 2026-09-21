@@ -3,6 +3,10 @@ package provisioning
 import (
 	"fmt"
 
+	configv1 "github.com/openshift/api/config/v1"
+	operatorv1 "github.com/openshift/api/operator/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes/scheme"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -16,12 +20,33 @@ func newClusterClient(kubeConfigFile string) (client.Client, error) {
 		return nil, err
 	}
 
-	kubeClient, err := client.New(restConfig, client.Options{})
+	clusterScheme, err := newClusterScheme()
+	if err != nil {
+		return nil, err
+	}
+
+	kubeClient, err := client.New(restConfig, client.Options{Scheme: clusterScheme})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Kubernetes client: %w", err)
 	}
 
 	return kubeClient, nil
+}
+
+// newClusterScheme registers the Kubernetes and OpenShift API types ccoctl
+// uses when reading cluster configuration and applying changes to it.
+func newClusterScheme() (*runtime.Scheme, error) {
+	clusterScheme := runtime.NewScheme()
+	for _, addToScheme := range []func(*runtime.Scheme) error{
+		scheme.AddToScheme,
+		configv1.AddToScheme,
+		operatorv1.AddToScheme,
+	} {
+		if err := addToScheme(clusterScheme); err != nil {
+			return nil, fmt.Errorf("failed to build client scheme: %w", err)
+		}
+	}
+	return clusterScheme, nil
 }
 
 func loadRESTConfig(kubeConfigFile string) (*rest.Config, error) {

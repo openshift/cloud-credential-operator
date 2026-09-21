@@ -72,6 +72,7 @@ func NewAzureCmd() *cobra.Command {
 	createCmd.AddCommand(NewCreateAllCmd())
 	createCmd.AddCommand(NewDeleteCmd())
 	createCmd.AddCommand(provisioning.NewApplyCmd())
+	createCmd.AddCommand(provisioning.NewSetUpgradeableToCmd())
 
 	return createCmd
 }

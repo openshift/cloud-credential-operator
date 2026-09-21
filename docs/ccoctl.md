@@ -122,6 +122,16 @@ Only manifests of kind `Secret` are applied; any other manifests in the director
 
 The cluster is selected the same way as with `oc`: the `--kubeconfig` flag if given, otherwise `$KUBECONFIG`, otherwise `~/.kube/config`.
 
+### Signalling that credentials are ready for an upgrade
+
+In manual mode the Cloud Credential Operator holds the cluster `Upgradeable=False` until it is told that credentials for the next minor version are in place. Once the Secrets above have been applied, run
+
+```bash
+$ ccoctl aws set-upgradeable-to 4.19
+```
+
+This sets the `cloudcredential.openshift.io/upgradeable-to` annotation on the cluster's `CloudCredential` config. The version must be higher than the version the cluster is currently running; anything below is rejected, because the operator would ignore it. A patch version such as `4.19.3` is accepted and reduced to `4.19`.
+
 ## Azure
 
 ### Global flags
@@ -221,6 +231,16 @@ This selection includes `azure-ad-pod-identity-webhook-config.yaml`, which `crea
 
 The cluster is selected the same way as with `oc`: the `--kubeconfig` flag if given, otherwise `$KUBECONFIG`, otherwise `~/.kube/config`.
 
+### Signalling that credentials are ready for an upgrade
+
+In manual mode the Cloud Credential Operator holds the cluster `Upgradeable=False` until it is told that credentials for the next minor version are in place. Once the Secrets above have been applied, run
+
+```bash
+$ ccoctl azure set-upgradeable-to 4.19
+```
+
+This sets the `cloudcredential.openshift.io/upgradeable-to` annotation on the cluster's `CloudCredential` config. The version must be higher than the version the cluster is currently running; anything below is rejected, because the operator would ignore it. A patch version such as `4.19.3` is accepted and reduced to `4.19`.
+
 ## GCP
 
 ### Global flags
@@ -318,6 +338,16 @@ $ ccoctl gcp apply secrets --output-dir=<path-to-directory-with-generated-manife
 Only manifests of kind `Secret` are applied; any other manifests in the directory, such as `cluster-authentication-02-config.yaml`, are ignored.
 
 The cluster is selected the same way as with `oc`: the `--kubeconfig` flag if given, otherwise `$KUBECONFIG`, otherwise `~/.kube/config`.
+
+### Signalling that credentials are ready for an upgrade
+
+In manual mode the Cloud Credential Operator holds the cluster `Upgradeable=False` until it is told that credentials for the next minor version are in place. Once the Secrets above have been applied, run
+
+```bash
+$ ccoctl gcp set-upgradeable-to 4.19
+```
+
+This sets the `cloudcredential.openshift.io/upgradeable-to` annotation on the cluster's `CloudCredential` config. The version must be higher than the version the cluster is currently running; anything below is rejected, because the operator would ignore it. A patch version such as `4.19.3` is accepted and reduced to `4.19`.
 
 ## IBMCloud
 

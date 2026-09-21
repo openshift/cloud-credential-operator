@@ -45,6 +45,7 @@ func NewGCPCmd() *cobra.Command {
 	gcpCmd.AddCommand(NewCreateAllCmd())
 	gcpCmd.AddCommand(NewDeleteCmd())
 	gcpCmd.AddCommand(provisioning.NewApplyCmd())
+	gcpCmd.AddCommand(provisioning.NewSetUpgradeableToCmd())
 
 	return gcpCmd
 }
