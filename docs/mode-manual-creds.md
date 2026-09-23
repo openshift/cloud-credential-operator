@@ -102,3 +102,9 @@ oc patch cloudcredential.operator.openshift.io/cluster --patch '{"metadata":{"an
 ```
 
 Set the "upgradeable-to" annotation value to correspond with the OpenShift minor version for which the admin has prepared the cluster's cloud credentials.
+
+Alternatively, `ccoctl` will do this for you and will validate the version first:
+
+```bash
+$ ccoctl aws set-upgradeable-to 4.8
+```
