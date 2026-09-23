@@ -14,6 +14,7 @@ import (
 	"google.golang.org/api/iam/v1"
 	iamadminpb "google.golang.org/genproto/googleapis/iam/admin/v1"
 
+	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
 	"github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning"
 	mockgcp "github.com/openshift/cloud-credential-operator/pkg/gcp/mock"
 )
@@ -139,8 +140,10 @@ func TestCreateServiceAccounts(t *testing.T) {
 			generateOnly: false,
 			mockGCPClient: func(mockCtrl *gomock.Controller) *mockgcp.MockClient {
 				mockGCPClient := mockgcp.NewMockClient(mockCtrl)
-				mockGetProjectName(mockGCPClient, 4)
+				mockGetProjectName(mockGCPClient, 5)
 				mockGetProject(mockGCPClient)
+				mockListRolesEmpty(mockGCPClient)
+				mockCreateRole(mockGCPClient)
 				mockListServiceAccountsEmpty(mockGCPClient)
 				mockCreateServiceAccountFailed(mockGCPClient)
 				return mockGCPClient
@@ -213,6 +216,44 @@ func TestCreateServiceAccounts(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProcessCredentialsRequestsEnsuresAllCustomRolesBeforeServiceAccounts(t *testing.T) {
+	ctx := context.TODO()
+	ctrl := gomock.NewController(t)
+	mockClient := mockgcp.NewMockClient(ctrl)
+
+	// Role creation is the preflight phase. The first service-account lookup is
+	// explicitly ordered after both creations, which guards the CCO-775 behavior.
+	mockClient.EXPECT().GetProjectName().Return(testProject).AnyTimes()
+	firstRoleLookup := mockClient.EXPECT().ListRoles(gomock.Any(), gomock.Any()).Return(&iamadminpb.ListRolesResponse{}, nil)
+	firstRoleCreate := mockClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{Name: "projects/test-project/roles/first", Title: "first"}, nil).After(firstRoleLookup)
+	secondRoleLookup := mockClient.EXPECT().ListRoles(gomock.Any(), gomock.Any()).Return(&iamadminpb.ListRolesResponse{}, nil).After(firstRoleCreate)
+	secondRoleCreate := mockClient.EXPECT().CreateRole(gomock.Any(), gomock.Any()).Return(&iamadminpb.Role{Name: "projects/test-project/roles/second", Title: "second"}, nil).After(secondRoleLookup)
+
+	mockClient.EXPECT().ListServiceAccounts(gomock.Any(), gomock.Any()).Return([]*iamadminpb.ServiceAccount{}, nil).Times(2).After(secondRoleCreate)
+	mockClient.EXPECT().CreateServiceAccount(gomock.Any(), gomock.Any()).Return(&iamadminpb.ServiceAccount{DisplayName: "test-service-account", Email: "test-service-account@test.example"}, nil).Times(2)
+	mockClient.EXPECT().GetProject(gomock.Any(), gomock.Any()).Return(&cloudresourcemanager.Project{ProjectNumber: testProjectNumber}, nil).Times(2)
+	mockClient.EXPECT().GetProjectIamPolicy(gomock.Any(), gomock.Any()).Return(&cloudresourcemanager.Policy{}, nil).Times(2)
+	mockClient.EXPECT().SetProjectIamPolicy(gomock.Any(), gomock.Any()).Return(&cloudresourcemanager.Policy{}, nil).Times(2)
+	mockClient.EXPECT().GetServiceAccountIamPolicy(gomock.Any()).Return(&iam.Policy{}, nil).Times(4)
+	// Both test requests deliberately share a mock service-account identity, so
+	// the second pass finds its workload-identity bindings already present.
+	mockClient.EXPECT().SetServiceAccountIamPolicy(gomock.Any(), gomock.Any()).Return(&iam.Policy{}, nil).Times(2)
+
+	targetDir := t.TempDir()
+	require.NoError(t, provisioning.EnsureDir(filepath.Join(targetDir, provisioning.ManifestsDirName)))
+	require.NoError(t, testCredentialsRequest(t, "first", testTargetNamespaceName, "first-secret", targetDir))
+	require.NoError(t, testCredentialsRequest(t, "second", testTargetNamespaceName, "second-secret", targetDir))
+
+	require.NoError(t, processCredentialsRequests(ctx, mockClient, mustLoadCredentialsRequests(t, targetDir), testName, testName, testName, targetDir, false, "googleapis.com"))
+}
+
+func mustLoadCredentialsRequests(t *testing.T, dir string) []*credreqv1.CredentialsRequest {
+	t.Helper()
+	credentialsRequests, err := provisioning.GetListOfCredentialsRequests(dir, false)
+	require.NoError(t, err)
+	return credentialsRequests
 }
 
 func testCredentialsRequest(t *testing.T, crName, targetSecretNamespace, targetSecretName, targetDir string) error {
