@@ -1,12 +1,7 @@
 package provisioning
 
 import (
-	"crypto"
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"log"
@@ -22,6 +17,7 @@ import (
 	configv1 "github.com/openshift/api/config/v1"
 
 	credreqv1 "github.com/openshift/cloud-credential-operator/pkg/apis/cloudcredential/v1"
+	jwkutil "github.com/openshift/cloud-credential-operator/pkg/cmd/provisioning/jwks"
 )
 
 type JSONWebKeySet struct {
@@ -88,65 +84,25 @@ spec:
 func BuildJsonWebKeySet(publicKeyPath string) ([]byte, error) {
 	log.Print("Reading public key")
 	publicKeyContent, err := os.ReadFile(publicKeyPath)
-
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read public key")
 	}
 
-	block, _ := pem.Decode(publicKeyContent)
-	if block == nil {
-		return nil, errors.Wrap(err, "error decoding PEM file")
-	}
-
-	publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+	keySet, err := jwkutil.NewSigner(publicKeyContent)
 	if err != nil {
-		return nil, errors.Wrap(err, "error parsing key content")
+		return nil, errors.Wrap(err, "failed to build JSON web key set from public key")
 	}
-
-	var alg jose.SignatureAlgorithm
-	switch publicKey.(type) {
-	case *rsa.PublicKey:
-		alg = jose.RS256
-	default:
-		return nil, errors.New("public key is not of type RSA")
-	}
-
-	kid, err := KeyIDFromPublicKey(publicKey)
+	encoded, err := json.MarshalIndent(JSONWebKeySet{Keys: keySet.Keys}, "", "    ")
 	if err != nil {
-		return nil, errors.New("Failed to fetch key ID from public key")
+		return nil, errors.Wrap(err, "failed to encode JSON web key set")
 	}
-
-	var keys []jose.JSONWebKey
-	keys = append(keys, jose.JSONWebKey{
-		Key:       publicKey,
-		KeyID:     kid,
-		Algorithm: string(alg),
-		Use:       "sig",
-	})
-
-	keySet, err := json.MarshalIndent(JSONWebKeySet{Keys: keys}, "", "    ")
-	if err != nil {
-		return nil, errors.New("JSON encoding of web key set failed")
-	}
-
-	return keySet, nil
+	return encoded, nil
 }
 
 // KeyIDFromPublicKey derives a key ID non-reversibly from a public key
 // reference: https://github.com/kubernetes/kubernetes/blob/0f140bf1eeaf63c155f5eba1db8db9b5d52d5467/pkg/serviceaccount/jwt.go#L89-L111
 func KeyIDFromPublicKey(publicKey interface{}) (string, error) {
-	publicKeyDERBytes, err := x509.MarshalPKIXPublicKey(publicKey)
-	if err != nil {
-		return "", fmt.Errorf("failed to serialize public key to DER format: %v", err)
-	}
-
-	hasher := crypto.SHA256.New()
-	hasher.Write(publicKeyDERBytes)
-	publicKeyDERHash := hasher.Sum(nil)
-
-	keyID := base64.RawURLEncoding.EncodeToString(publicKeyDERHash)
-
-	return keyID, nil
+	return jwkutil.KeyIDFromPublicKey(publicKey)
 }
 
 // GetListOfCredentialsRequests decodes manifests in a given directory and returns a list of CredentialsRequests

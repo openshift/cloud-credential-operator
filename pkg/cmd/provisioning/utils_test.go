@@ -2,6 +2,7 @@ package provisioning
 
 import (
 	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -92,6 +93,15 @@ func TestEnsureDir(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestBuildJsonWebKeySetRejectsInvalidPEM(t *testing.T) {
+	publicKeyPath := filepath.Join(t.TempDir(), "invalid-public-key.pem")
+	require.NoError(t, os.WriteFile(publicKeyPath, []byte("not PEM"), 0o600))
+
+	keySet, err := BuildJsonWebKeySet(publicKeyPath)
+	require.Error(t, err)
+	assert.Nil(t, keySet)
 }
 
 func TestFilteringCredReqs(t *testing.T) {

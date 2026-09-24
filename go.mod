@@ -51,6 +51,7 @@ require (
 	github.com/tidwall/gjson v1.18.0
 	golang.org/x/mod v0.36.0
 	golang.org/x/oauth2 v0.36.0
+	golang.org/x/sys v0.46.0
 	golang.org/x/time v0.15.0
 	google.golang.org/api v0.288.0
 	google.golang.org/genproto v0.0.0-20260319201613-d00831a3d3e7
@@ -210,7 +211,6 @@ require (
 	golang.org/x/exp v0.0.0-20251219203646-944ab1f22d93 // indirect
 	golang.org/x/net v0.56.0 // indirect
 	golang.org/x/sync v0.21.0 // indirect
-	golang.org/x/sys v0.46.0 // indirect
 	golang.org/x/term v0.44.0 // indirect
 	golang.org/x/text v0.38.0 // indirect
 	golang.org/x/tools v0.45.0 // indirect
