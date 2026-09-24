@@ -40,16 +40,16 @@ const (
 	GCPAuthJSONKey = "service_account.json"
 )
 
-func NewReconciler(c client.Client, mgr manager.Manager, projectName string) reconcile.Reconciler {
+func NewReconciler(client, rootCredClient client.Client, projectName string) reconcile.Reconciler {
 	r := &ReconcileCloudCredSecret{
-		Client:           c,
-		RootCredClient:   mgr.GetClient(),
+		Client:           client,
+		RootCredClient:   rootCredClient,
 		Logger:           log.WithField("controller", constants.SecretAnnotatorControllerName),
 		GCPClientBuilder: ccgcp.NewClientFromJSON,
 		ProjectName:      projectName,
 	}
 
-	s := status.NewSecretStatusHandler(c)
+	s := status.NewSecretStatusHandler(client)
 	statuscontroller.AddHandler(controllerName, s)
 
 	return r
