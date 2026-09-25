@@ -24,6 +24,8 @@ CCO-765 — Simplified upgrade process with automated Secret application and
 | Secret application implementation | [cloud-credential-operator#1095](https://github.com/openshift/cloud-credential-operator/pull/1095) |
 | Cloud role ordering implementation | [cloud-credential-operator#1104](https://github.com/openshift/cloud-credential-operator/pull/1104) |
 | Annotation implementation | [cloud-credential-operator#1105](https://github.com/openshift/cloud-credential-operator/pull/1105) |
+| Upgrade CI implementation | [openshift/release#85981](https://github.com/openshift/release/pull/85981) |
+| Manual credentials upgrade procedure | [Preparing to update a cluster with manually maintained credentials](https://docs.redhat.com/en/documentation/openshift_container_platform/4.20/html/updating_clusters/preparing-to-update-a-cluster#about-manually-maintained-credentials-upgrade_preparing-manual-creds-update) |
 | User documentation | [`docs/ccoctl.md`](../ccoctl.md), [`docs/mode-manual-creds.md`](../mode-manual-creds.md) |
 
 ## 3. Introduction
@@ -36,9 +38,11 @@ those cluster operations directly. It also creates all custom Azure and GCP
 roles before identities and role bindings so cloud-side propagation can begin
 earlier.
 
-This plan verifies the user-visible command paths for AWS, Azure, and GCP while
-retaining focused unit coverage for validation, error handling, and cloud API
-ordering.
+This plan verifies the complete documented upgrade path on AWS, Azure, and GCP:
+install a cluster with manually maintained short-term credentials, prepare the
+target-release cloud resources, apply the generated Secrets, mark the cluster
+upgradeable, and complete a cross-minor OpenShift upgrade. Focused unit coverage
+continues to verify validation, error handling, and cloud API ordering.
 
 ## 4. Test Items
 
@@ -47,7 +51,8 @@ ordering.
 - Azure `create-managed-identities` custom-role preflight
 - GCP `create-service-accounts` custom-role preflight
 - Generated AWS, Azure, and GCP Secret manifest compatibility
-- Existing manual-mode upgrade workflow and documentation
+- AWS manual OIDC STS cross-minor upgrade workflow
+- Azure and GCP manual OIDC workload identity cross-minor upgrade workflows
 
 ## 5. Features to Be Tested
 
@@ -62,66 +67,62 @@ ordering.
 | U5 | Patch only `cloudcredential.openshift.io/upgradeable-to` | Unit | Unrelated metadata and spec fields remain unchanged | Implemented in #1105 |
 | U6 | Prepare all Azure custom roles before identity creation or assignment | Unit orchestration | Every role operation precedes identity and binding operations | Partially implemented in #1104; see Risk R2 |
 | U7 | Prepare all GCP custom roles before service-account creation or IAM binding | Unit orchestration | Every role operation precedes account and binding operations | Implemented in #1104 |
-| U8 | Register `apply secrets` and `set-upgradeable-to` under AWS, Azure, and GCP | Unit command tree | Both commands are discoverable through every supported provider | `pkg/cmd/provisioning/provider_commands_test.go` |
 
 ### Live-cluster end-to-end coverage
 
 | ID | Scenario | Environment | Expected result | Automation |
 | --- | --- | --- | --- | --- |
-| E1 | Run the production `apply secrets` handler with a generated Secret | OpenShift cluster with CCO capability | The Secret is created with the generated data | `test/extend/ccoctl_upgrade.go` |
-| E2 | Change the generated data and rerun the production `apply secrets` handler | Same as E1 | The existing Secret is updated | `test/extend/ccoctl_upgrade.go` |
-| E3 | Run the production `set-upgradeable-to` handler with the next minor version | Same as E1 | The CloudCredential annotation equals the requested major.minor | `test/extend/ccoctl_upgrade.go` |
-| E4 | Restore the pre-test annotation and delete test Secrets | Same as E1 | The cluster returns to its original state | `test/extend/ccoctl_upgrade.go` cleanup |
-| E5 | Run provider manual-OIDC installation lanes | AWS, Azure, and GCP manual-OIDC Prow jobs | Existing short-term credential installation remains healthy | Existing Prow lanes |
+| E1 | Install the initial release with manually maintained OIDC credentials | AWS STS | The cluster installs and operators authenticate with generated short-term credentials | `e2e-aws-manual-oidc-upgrade` |
+| E2 | Install the initial release with manually maintained workload identity credentials | Azure | The cluster installs and operators authenticate with generated federated identities | `e2e-azure-manual-oidc-upgrade` |
+| E3 | Install the initial release with manually maintained workload identity credentials | GCP | The cluster installs and operators authenticate with generated workload identities | `e2e-gcp-manual-oidc-upgrade` |
+| E4 | Extract target-release CredentialsRequests and update provider resources | Each E1–E3 cluster | Target-release identities, roles, policies, and bindings are prepared without replacing required existing resources | Provider-specific upgrade credential step in #85981 |
+| E5 | Run `ccoctl <provider> apply secrets` and `set-upgradeable-to` | Each E1–E3 cluster | Generated Secrets are applied and CCO reports `Upgradeable=True` for the target release | Provider-specific upgrade credential step in #85981 |
+| E6 | Run the OpenShift upgrade suite from stable 5.0 to 5.1 | Each E1–E3 cluster | The cluster completes the upgrade and standard upgrade assertions pass | Provider-specific workflow in #85981 |
 
-The E1–E4 test is provider-neutral at the Kubernetes API layer and invokes the
-same production handlers used by all three provider trees. U8 separately
-verifies provider registration. Together they cover command exposure, flag
-handling, kubeconfig resolution, manifest decoding, real API create/update
-behavior, version validation, and the annotation patch without requiring
-disposable cloud IAM resources.
+The three workflows invoke the production provider command trees and exercise
+real cloud IAM resources, generated Secret manifests, kubeconfig handling,
+version normalization, the CloudCredential annotation, and CVO upgrade behavior
+as one end-to-end flow.
 
 ## 6. Features Not to Be Tested
 
 - Mint and passthrough credential modes; the feature targets manual mode with
   short-term credentials.
 - Providers other than AWS, Azure, and GCP.
+- Same-minor and z-stream upgrades; the feature gate is exercised through a
+  cross-minor stable 5.0 to 5.1 upgrade.
 - Bound service-account signer-key rotation.
 - Cloud-provider IAM propagation timing as a performance guarantee. The test
   verifies ordering, not a provider-specific propagation service level.
-- A real cluster upgrade across releases. Existing upgrade jobs provide
-  regression coverage; this feature changes preparation commands, not CVO's
-  upgrade execution.
 
 ## 7. Approach
 
 1. Use unit tests for malformed input, partial failures, Kubernetes client
    errors, version edge cases, and cloud-client call ordering.
-2. Use the OpenShift test extension for the API-server-backed golden path.
-3. Invoke the production shared command constructors instead of duplicating
-   their logic in the E2E test, and verify all provider command registrations in
-   U8.
-4. Use a unique namespace and non-sensitive synthetic Secret data.
-5. Calculate the next minor from the cluster under test, then restore the exact
-   pre-test annotation value.
-6. Run the extension case in `cco/conformance/parallel`, exercised by the
-   `e2e-aws-cco-parallel` presubmit. Use the existing Azure and GCP manual-OIDC
-   lanes for provider regression signal.
+2. Reuse the existing provider manual-OIDC installation and teardown chains.
+3. Before the upgrade suite, extract target-release CredentialsRequests, update
+   the provider resources with `ccoctl`, apply the generated Secrets, and set
+   the target version through `set-upgradeable-to`.
+4. Assert that the cloud-credential ClusterOperator reports
+   `Upgradeable=True` before invoking the standard OpenShift upgrade test.
+5. Execute equivalent workflows for AWS, Azure, and GCP using release registry
+   naming conventions and generated Prow configuration.
 
 ## 8. Pass/Fail Criteria
 
 The feature passes when:
 
 - all component unit tests pass;
-- E1–E4 pass against a live OpenShift API server;
-- `e2e-aws-cco-parallel`, `e2e-azure-manual-oidc`, and
-  `e2e-gcp-manual-oidc` pass on the exact pull request revision;
-- the test leaves no namespace, Secret, or annotation changes behind;
+- E1–E6 pass for `e2e-aws-manual-oidc-upgrade`,
+  `e2e-azure-manual-oidc-upgrade`, and `e2e-gcp-manual-oidc-upgrade` on the
+  exact pull request revision;
+- every provider workflow completes its post chain and removes cloud resources;
 - no critical or major unresolved defect remains against the acceptance
   criteria.
 
-Any command error, unexpected Secret data, incorrect annotation, cleanup
-failure, or provider regression is a failure.
+Any command error, cloud IAM preparation failure, incorrect Secret or
+annotation, blocked/failed upgrade, cleanup failure, or provider regression is
+a failure.
 
 ## 9. Suspension and Resumption Criteria
 
@@ -134,7 +135,7 @@ is healthy and rerun the affected scenario on the same code revision.
 
 - This Markdown test plan.
 - Component unit tests delivered by #1095, #1104, and #1105.
-- Live-cluster command-path coverage in `test/extend/ccoctl_upgrade.go`.
+- Three-platform upgrade automation delivered by openshift/release#85981.
 - Prow results for the pull request revision.
 - Jira links to the plan, automation pull request, and final CI evidence.
 
@@ -143,20 +144,19 @@ is healthy and rerun the affected scenario on the same code revision.
 | Task | Owner | State |
 | --- | --- | --- |
 | Review and merge implementation unit coverage | CCO maintainers | Complete |
-| Add API-server-backed command-path coverage | CCO QE | In progress |
+| Add AWS, Azure, and GCP cross-minor upgrade workflows | CCO QE | In review in openshift/release#85981 |
 | Review this plan against OCPSTRAT-3797 acceptance criteria | CCO team | Pending |
 | Run feature-specific and provider regression CI | CCO QE / CI | Pending |
 | Attach plan and results to OCPSTRAT-3797 and CCO-765 | CCO QE | Pending |
 
 ## 12. Environmental Needs
 
-- OpenShift cluster with the CCO capability enabled.
-- Cluster-admin kubeconfig for the test extension.
-- `cloudcredential.operator.openshift.io/cluster` and
-  `clusterversion.config.openshift.io/version` resources.
-- AWS cluster for the CCO extension presubmit.
-- Azure and GCP manual-OIDC presubmit environments for provider regressions.
-- No production credentials or user data are used by E1–E4.
+- AWS, Azure, and GCP cluster profiles used by the release CI manual-OIDC lanes.
+- Stable 5.0 initial and 5.1 target release payloads.
+- Disposable cloud projects/subscriptions/accounts with permissions to create
+  and remove the identities, roles, policies, and bindings required by CCO.
+- Cluster-admin kubeconfig generated by each installation workflow.
+- No production credentials or user data are used.
 
 ## 13. Responsibilities
 
@@ -168,8 +168,8 @@ is healthy and rerun the affected scenario on the same code revision.
 ## 14. Staffing and Training Needs
 
 No additional staffing or training is required. Reviewers should understand
-CCO manual mode, `ccoctl`, OpenShift test extensions, and provider manual-OIDC
-CI lanes.
+CCO manual mode, `ccoctl`, provider manual-OIDC CI lanes, and OpenShift upgrade
+testing.
 
 ## 15. Schedule
 
@@ -181,11 +181,11 @@ before CCO-765 is resolved.
 
 | ID | Risk | Mitigation |
 | --- | --- | --- |
-| R1 | A green provider lane proves only regression health if the new command is not selected | Require E1–E4 and inspect the extension JUnit entry by name |
+| R1 | A green provider install lane proves only regression health if the new commands are not selected | Require the provider upgrade credential step before `openshift-e2e-test` in each workflow and inspect its Prow output |
 | R2 | Azure #1104 tests the role-preflight helper but not the full multi-request orchestrator ordering | Add a follow-up orchestrator-level test if review requires stronger cloud-client ordering proof |
-| R3 | A failed test could leave the singleton annotation changed | Register cleanup immediately after reading the original value and report cleanup errors |
-| R4 | Running the same namespace name concurrently could collide | Generate a random namespace per execution |
-| R5 | Provider IAM APIs are eventually consistent | Verify ordering deterministically in unit tests and use existing manual-OIDC lanes for live regression evidence |
+| R3 | A failed upgrade could leave cloud resources behind | Always run the existing provider post chain as a best-effort post step |
+| R4 | Target CredentialsRequests can introduce new provider resources | Extract from the exact target payload and preserve existing Azure roles while reconciling requested resources |
+| R5 | Provider IAM APIs are eventually consistent | Verify ordering deterministically in unit tests and exercise the real provider path before the upgrade |
 
 ## 17. Approvals
 
