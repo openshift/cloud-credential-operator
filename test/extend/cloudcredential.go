@@ -73,7 +73,7 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 		}
 
 		if modeInCR == "" {
-			g.Fail(fmt.Sprintf("Failed to get cco mode from Cluster Resource"), 1)
+			g.Fail("Failed to get cco mode from Cluster Resource", 1)
 		} else {
 			g.By("Check if cco mode in metric is the same as cco mode in cluster resources")
 			g.GinkgoT().Logf("cco mode in cluster CR is %v", modeInCR)
@@ -90,7 +90,7 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 				g.By("Check cco mode when cco is in Passthrough mode")
 				//Force cco mode to Passthrough is NOT supported officially but is good for coverage on AWS/GCP Passthrough mode
 				g.GinkgoT().Logf("Force cco mode to Passthrough")
-				originCCOMode, err := oc.AsAdmin().Run("get").Args("cloudcredential/cluster", "-o=jsonpath={.spec.credentialsMode}").Output()
+				originCCOMode, _ := oc.AsAdmin().Run("get").Args("cloudcredential/cluster", "-o=jsonpath={.spec.credentialsMode}").Output()
 				if originCCOMode == "" {
 					originCCOMode = "\"\""
 				}
@@ -901,7 +901,7 @@ spec:
 		g.GinkgoT().Logf("ServiceMonitor endpoints configuration: %s", smEndpoints)
 
 		g.By("Verify request without Bearer token is rejected")
-		unauthorizedOutput, err := oc.AsAdmin().WithoutNamespace().Run("exec").Args("-n", OpenShiftMonitoringNamespace, "prometheus-k8s-0", "-c", "prometheus", "--", "sh", "-c", fmt.Sprintf("wget -qS -qO- --no-check-certificate https://cco-metrics.%s.svc:8443/metrics 2>&1 | head -5", DefaultNamespace)).Output()
+		unauthorizedOutput, _ := oc.AsAdmin().WithoutNamespace().Run("exec").Args("-n", OpenShiftMonitoringNamespace, "prometheus-k8s-0", "-c", "prometheus", "--", "sh", "-c", fmt.Sprintf("wget -qS -qO- --no-check-certificate https://cco-metrics.%s.svc:8443/metrics 2>&1 | head -5", DefaultNamespace)).Output()
 		// We expect wget to fail (non-zero exit) when unauthorized, but we still want the output
 		// The error is expected here, we're checking for 401/403 response
 		o.Expect(unauthorizedOutput).To(o.Or(
@@ -1003,7 +1003,7 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 				case 2:
 					resourceType = fmt.Sprintf("%s.%s.%s", kind, groupVersionSlice[1], groupVersionSlice[0])
 				default:
-					g.Fail(fmt.Sprintf("Unexpected apiVersion format"), 1)
+					g.Fail("Unexpected apiVersion format", 1)
 				}
 
 				metadata, ok := deserializedManifest["metadata"].(map[string]any)
@@ -1044,7 +1044,7 @@ var _ = g.Describe("[Jira:\"Cloud Credential Operator\"] Cluster_Operator CCO is
 			// Check if it's a rate limit error
 			if rateLimitErr, ok := err.(*github.RateLimitError); ok {
 				g.GinkgoT().Logf("GitHub API rate limit exceeded. Remaining: %d, Reset: %v", rateLimitErr.Rate.Remaining, rateLimitErr.Rate.Reset.Time)
-				g.Skip(fmt.Sprintf("GitHub API rate limit exceeded. Set GITHUB_TOKEN environment variable for higher rate limits. Rate reset in %v", rateLimitErr.Rate.Reset.Time.Sub(time.Now())))
+				g.Skip(fmt.Sprintf("GitHub API rate limit exceeded. Set GITHUB_TOKEN environment variable for higher rate limits. Rate reset in %v", time.Until(rateLimitErr.Rate.Reset.Time)))
 			}
 			o.Expect(err).NotTo(o.HaveOccurred())
 		}

@@ -206,7 +206,7 @@ func skipIfPlatformTypeNot(oc *CLI, expected string) {
 	if err != nil {
 		g.Skip(fmt.Sprintf("failed to detect platform: %v", err))
 	}
-	if strings.ToLower(platform) != strings.ToLower(expected) {
+	if !strings.EqualFold(platform, expected) {
 		g.Skip(fmt.Sprintf("platform is %q, expected %q", platform, expected))
 	}
 }

@@ -35,7 +35,7 @@ func EnsureDir(path string) error {
 		if err := os.Mkdir(path, 0700); err != nil {
 			return fmt.Errorf("failed to create directory: %s", err)
 		}
-		sResult, err = os.Stat(path)
+		sResult, _ = os.Stat(path)
 	} else if err != nil {
 		return fmt.Errorf("failed to stat: %+v", err)
 	}
