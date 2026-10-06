@@ -273,7 +273,7 @@ func TestPodIdentityWebhookController(t *testing.T) {
 					assert.Equal(t, podDisruptionBudget.Kind, "", "found unexpected pod-identity-webhook PodDisruptionBudget")
 				}
 
-				webhook, err := getWebhook(fakeClientset, "pod-identity-webhook")
+				webhook, _ := getWebhook(fakeClientset, "pod-identity-webhook")
 				assert.NotNil(t, webhook, "did not find expected pod-identity-webhook webhook config")
 				assert.Contains(t, webhook.Webhooks[0].Name, test.podIdentityType.Name())
 			}

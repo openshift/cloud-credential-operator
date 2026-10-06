@@ -150,7 +150,7 @@ func (r *ReconcileStaleCredentialsRequest) Reconcile(ctx context.Context, reques
 	if mode == operatorv1.CloudCredentialsModeManual {
 		logger.Warnf("operator set to disabled / manual mode, user needs to delete stale credentials")
 
-		msg := fmt.Sprintf("CredentialsRequest is no longer required. Delete CR, Secret containing credentials, and associated platform/cloud resources")
+		msg := "CredentialsRequest is no longer required. Delete CR, Secret containing credentials, and associated platform/cloud resources"
 		reason := "CredentialsNoLongerRequired"
 		updateCheck := utils.UpdateConditionIfReasonOrMessageChange
 		status := corev1.ConditionTrue

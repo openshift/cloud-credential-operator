@@ -962,13 +962,11 @@ func (r *ReconcileCredentialsRequest) Reconcile(ctx context.Context, request rec
 	return reconcile.Result{RequeueAfter: defaultRequeueTime}, nil
 }
 
-func (r *ReconcileCredentialsRequest) CreateOrUpdateOnCredsExist(ctx context.Context, credsExists bool, syncErr error, cr *minterv1.CredentialsRequest) error {
+func (r *ReconcileCredentialsRequest) CreateOrUpdateOnCredsExist(ctx context.Context, credsExists bool, _ error, cr *minterv1.CredentialsRequest) error {
 	if !credsExists {
-		syncErr = r.Actuator.Create(ctx, cr)
-	} else {
-		syncErr = r.Actuator.Update(ctx, cr)
+		return r.Actuator.Create(ctx, cr)
 	}
-	return syncErr
+	return r.Actuator.Update(ctx, cr)
 }
 
 func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.CredentialsRequest, reason minterv1.CredentialsRequestConditionType, conditionError error) {
@@ -992,8 +990,6 @@ func (r *ReconcileCredentialsRequest) updateActuatorConditions(cr *minterv1.Cred
 	} else {
 		setOrphanedCloudResourceCondition(cr, false, conditionError)
 	}
-
-	return
 }
 
 func setMissingTargetNamespaceCondition(cr *minterv1.CredentialsRequest, missing bool) {
@@ -1046,12 +1042,12 @@ func setInsufficientCredsCondition(cr *minterv1.CredentialsRequest, insufficient
 		updateCheck utils.UpdateConditionCheck
 	)
 	if insufficient {
-		msg = fmt.Sprintf("cloud creds are insufficient to satisfy CredentialsRequest")
+		msg = "cloud creds are insufficient to satisfy CredentialsRequest"
 		status = corev1.ConditionTrue
 		reason = cloudCredsInsufficient
 		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
 	} else {
-		msg = fmt.Sprintf("cloud credentials sufficient for minting or passthrough")
+		msg = "cloud credentials sufficient for minting or passthrough"
 		status = corev1.ConditionFalse
 		reason = cloudCredsSufficient
 		updateCheck = utils.UpdateConditionNever
@@ -1072,7 +1068,7 @@ func setFailedToProvisionCredentialsRequest(cr *minterv1.CredentialsRequest, fai
 		reason = credentialsProvisionFailure
 		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
 	} else {
-		msg = fmt.Sprintf("successfully granted credentials request")
+		msg = "successfully granted credentials request"
 		status = corev1.ConditionFalse
 		reason = credentialsProvisionSuccess
 		updateCheck = utils.UpdateConditionNever
@@ -1093,7 +1089,7 @@ func setCredentialsDeprovisionFailureCondition(cr *minterv1.CredentialsRequest, 
 		reason = cloudCredDeprovisionFailure
 		updateCheck = utils.UpdateConditionIfReasonOrMessageChange
 	} else {
-		msg = fmt.Sprintf("deprovisioned cloud credential resource(s)")
+		msg = "deprovisioned cloud credential resource(s)"
 		status = corev1.ConditionFalse
 		reason = cloudCredDeprovisionSuccess
 		updateCheck = utils.UpdateConditionNever
