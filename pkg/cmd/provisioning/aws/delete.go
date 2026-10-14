@@ -2,6 +2,7 @@ package aws
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"log"
 	"time"
@@ -279,36 +280,20 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 	return nil
 }
 
-func deleteCmd(cmd *cobra.Command, args []string) {
+func deleteCmd(cmd *cobra.Command, args []string) error {
 	awsClient, err := newAWSClient(DeleteOpts.Region)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	bucketName := fmt.Sprintf("%s-oidc", DeleteOpts.Name)
-
-	if err := deleteOIDCObjectsFromBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteOIDCBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteCloudFrontDistribution(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteCloudFrontOriginAccessIdentity(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteIAMRoles(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteIAMIdentityProvider(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
+	return stderrors.Join(
+		deleteOIDCObjectsFromBucket(awsClient, bucketName, DeleteOpts.Name),
+		deleteOIDCBucket(awsClient, bucketName, DeleteOpts.Name),
+		deleteCloudFrontDistribution(awsClient, DeleteOpts.Name),
+		deleteCloudFrontOriginAccessIdentity(awsClient, DeleteOpts.Name),
+		deleteIAMRoles(awsClient, DeleteOpts.Name),
+		deleteIAMIdentityProvider(awsClient, DeleteOpts.Name),
+	)
 }
 
 // NewDeleteCmd implements the "delete" command for the credentials provisioning
@@ -317,7 +302,7 @@ func NewDeleteCmd() *cobra.Command {
 		Use:   "delete",
 		Short: "Delete credentials objects",
 		Long:  "Deleting objects related to cloud credentials",
-		Run:   deleteCmd,
+		RunE:  deleteCmd,
 	}
 
 	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Name, "name", "", "User-defined name for all created AWS resources (can be separate from the cluster's infra-id)")
