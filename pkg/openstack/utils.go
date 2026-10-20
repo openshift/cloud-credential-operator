@@ -36,7 +36,7 @@ func GetRootCloudCredentialsSecretData(cloudCredSecret *corev1.Secret, logger lo
 	}
 
 	// cacert is optional, so it's okay if it's not present
-	cacert, _ := cloudCredSecret.Data[RootOpenStackCAFileSecretKey]
+	cacert := cloudCredSecret.Data[RootOpenStackCAFileSecretKey]
 
 	logger.Debug("found clouds.yaml in target secret")
 

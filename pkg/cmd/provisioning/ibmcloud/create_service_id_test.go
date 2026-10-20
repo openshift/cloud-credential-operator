@@ -58,10 +58,8 @@ func TestCreateSecretsCmd(t *testing.T) {
 				return tempDirName
 			},
 			verify: func(t *testing.T, targetDir string) {
-				return
 			},
 			cleanup: func(t *testing.T) {
-				return
 			},
 			expectError: true,
 		},

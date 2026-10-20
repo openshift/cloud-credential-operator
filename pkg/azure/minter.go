@@ -92,15 +92,15 @@ func NewAzureCredentialsMinter(logger log.FieldLogger, clientID, clientSecret st
 	}
 	cred, err := azidentity.NewClientSecretCredential(tenantID, clientID, clientSecret, &options)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to acquire credentials: %v", err)
+		return nil, fmt.Errorf("unable to acquire credentials: %v", err)
 	}
 	authorizer, err := azurekiota.NewAzureIdentityAuthenticationProvider(cred)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to construct GraphEndpoint authorizer: %v", err)
+		return nil, fmt.Errorf("unable to construct GraphEndpoint authorizer: %v", err)
 	}
 	adapter, err := msgraphsdk.NewGraphRequestAdapter(authorizer)
 	if err != nil {
-		return nil, fmt.Errorf("Unable to construct GraphRequest adapter: %v", err)
+		return nil, fmt.Errorf("unable to construct GraphRequest adapter: %v", err)
 	}
 
 	return &AzureCredentialsMinter{

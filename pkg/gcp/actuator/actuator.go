@@ -763,7 +763,7 @@ func (a *Actuator) buildReadGCPClient(cr *minterv1.CredentialsRequest) (ccgcp.Cl
 	}
 
 	logger.Debug("creating read GCP client")
-	client, err := a.GCPClientBuilder(a.ProjectName, jsonBytes)
+	client, _ := a.GCPClientBuilder(a.ProjectName, jsonBytes)
 
 	// Test if the read-only client is working, if any error here we will fall back to using
 	// the root client.
@@ -834,7 +834,7 @@ func (a *Actuator) GetCredentialsRootSecret(ctx context.Context, cr *minterv1.Cr
 		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.GCPCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
+			Message:   "cannot proceed without cloud cred secret annotation",
 		}
 	}
 
@@ -995,14 +995,14 @@ func checkServicesEnabled(gcpClient ccgcp.Client, permList []string, logger log.
 	return serviceAPIsEnabled, nil
 }
 
-var audienceFormat = regexp.MustCompile("^//iam\\.googleapis\\.com/projects/(\\d+?)/locations/global/workloadIdentityPools/([^/]+?)/providers/([^/]+?)$")
+var audienceFormat = regexp.MustCompile(`^//iam\.googleapis\.com/projects/(\d+?)/locations/global/workloadIdentityPools/([^/]+?)/providers/([^/]+?)$`)
 
 func validateSTSProviderSpec(providerSpec minterv1.GCPProviderSpec) error {
 	var errors []error
 	if providerSpec.Audience == "" {
-		errors = append(errors, fmt.Errorf("Audience must not be empty"))
+		errors = append(errors, fmt.Errorf("audience must not be empty"))
 	} else if !audienceFormat.MatchString(providerSpec.Audience) {
-		errors = append(errors, fmt.Errorf("Audience is malformed"))
+		errors = append(errors, fmt.Errorf("audience is malformed"))
 	}
 	if providerSpec.ServiceAccountEmail == "" {
 		errors = append(errors, fmt.Errorf("ServiceAccountEmail must not be empty"))

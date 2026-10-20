@@ -333,7 +333,7 @@ func (a *VSphereActuator) GetCredentialsRootSecret(ctx context.Context, cr *mint
 		logger.WithField("secret", fmt.Sprintf("%s/%s", constants.CloudCredSecretNamespace, constants.VSphereCloudCredSecretName)).Error("cloud cred secret not yet annotated")
 		return nil, &actuatoriface.ActuatorError{
 			ErrReason: minterv1.CredentialsProvisionFailure,
-			Message:   fmt.Sprintf("cannot proceed without cloud cred secret annotation"),
+			Message:   "cannot proceed without cloud cred secret annotation",
 		}
 	}
 

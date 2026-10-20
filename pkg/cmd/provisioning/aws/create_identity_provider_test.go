@@ -182,7 +182,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 				require.True(t, ok, "key id absent in JSON web key", key)
 
 				block, _ := pem.Decode([]byte(testPublicKeyData))
-				publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+				publicKey, _ := x509.ParsePKIXPublicKey(block.Bytes)
 				expectedKeyID, err := provisioning.KeyIDFromPublicKey(publicKey)
 				require.NoError(t, err, "error calculating expected key id")
 				assert.Equalf(t, expectedKeyID, kid, "unexpected key id")
@@ -237,7 +237,7 @@ func TestCreateIdentityProvider(t *testing.T) {
 				require.True(t, ok, "key id absent in JSON web key", key)
 
 				block, _ := pem.Decode([]byte(testPublicKeyData))
-				publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
+				publicKey, _ := x509.ParsePKIXPublicKey(block.Bytes)
 				expectedKeyID, err := provisioning.KeyIDFromPublicKey(publicKey)
 				require.NoError(t, err, "error calculating expected key id")
 				assert.Equalf(t, expectedKeyID, kid, "unexpected key id")
