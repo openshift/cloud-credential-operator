@@ -9,7 +9,7 @@ RUN CGO_ENABLED=0 GO_COMPLIANCE_POLICY=exempt_all go build -ldflags "-X $GO_PACK
     mkdir -p /tmp/build && \
     gzip -c ./cloud-credential-tests-ext > /tmp/build/cloud-credential-tests-ext.gz
 
-FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.25-openshift-4.22 AS builder_rhel8
+FROM registry.ci.openshift.org/ocp/builder:rhel-8-golang-1.26-openshift-4.22 AS builder_rhel8
 WORKDIR /go/src/github.com/openshift/cloud-credential-operator
 COPY . .
 ENV GO_PACKAGE github.com/openshift/cloud-credential-operator
