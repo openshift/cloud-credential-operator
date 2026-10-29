@@ -1,81 +1,109 @@
-# AGENTS.md
+# Cloud Credential Operator - Agentic Documentation
 
-Instructions for AI agents working on the Cloud Credential Operator project.
+**Component**: Cloud Credential Operator (CCO)  
+**Repository**: openshift/cloud-credential-operator  
+**Documentation Tier**: 2 (Component-specific)
 
-## Project Overview
-The Cloud Credential Operator (CCO) is an OpenShift Operator that manages cloud provider credentials. It allows other Operators to request credentials with specific permissions via `CredentialsRequest` custom resources.
+> **Agent Instruction**: When working on CCO, read relevant files from `ai-docs/` for component-specific details. For generic operator patterns, testing practices, or security guidelines, retrieve from [Tier 1 Hub](https://github.com/openshift/enhancements/tree/master/ai-docs).
 
-## Common development commands
-The project uses `make` for automation.
+> **Generic Platform Patterns**: See [Tier 1 Hub](https://github.com/openshift/enhancements/tree/master/ai-docs)
 
-### Development
-```bash
-make update # updates generated code
-make build # compiles the project binaries
-make clean # cleans up build artifacts
-```
+## What is CCO?
 
-### Testing
-```bash
-make test # runs unit tests
-make verify # verifies generated code and formatting.
-```
+Manages cloud provider credentials for OpenShift components. Allows operators to request fine-grained credentials via `CredentialsRequest` CRs instead of using admin credentials.
 
-## Architecture
+## Core Components
 
-### File Structure
+- **CCO Controller**: Reconciles CredentialsRequests | **ccoctl CLI**: Off-cluster credential management | **Mode Detection**: Mint/Passthrough/Manual selection
 
-- **`bindata/`**: Static assets compiled into the binary (e.g., default CredentialsRequests).
-- **`cmd/`**: Binary entry points
-- **`docs/`**: Developer and user documentation.
-- **`hack/`**: Developer tools.
-- **`manifests/`**: Kubernetes YAML manifests for deploying the operator.
-- **`pkg/`**: Package Source Code
-- **`test/`**: Code additional testing
+## Documentation Structure
 
-#### Entry Points (`cmd/`)
-- **`cmd/cloud-credential-operator/`**: Main entry point for the operator.
-- **`cmd/ccoctl/`**: CLI tool for creating and managing cloud credentials outside the cluster.
-
-#### Package Source Code (`pkg/`)
-- **`pkg/apis/`**: Kubernetes Custom Resource Definitions (CRDs) and API types.
-- **`pkg/assets/`**: Generated assets.
-- **`pkg/cmd/`**: Logic for command-line commands.
-- **`pkg/operator/`**: Operator Controllers.
-- **`pkg/{aws,azure,gcp,ibmcloud,kubevirt,openstack,ovirt,vsphere}/`**: Cloud provider-specific implementations.
-- **`pkg/util/`**: Utility functions.
-- **`pkg/version/`**: Logic for Operator version.
-
-#### Operator Controllers (`pkg/operator/`)
-- **`pkg/operator/cleanup`**: Cleans up stale `CredentialRequests`
-- **`pkg/operator/credentialsrequest`**: Reconciles CredentialRequests, creating and updating cloud credentials as necessary while ensuring the associated Kubernetes secret remains up to date.
-- **`pkg/operator/loglevel`**: Ensures the Operator is using the latest log level as specified in the operator config manifest.
-- **`pkg/operator/metrics`**: Calculates and publishes Prometheus metrics.
-- **`pkg/operator/podidentity`**: Ensures the pod identity webhook is deployed when appropriate.
-- **`pkg/operator/secretannotator`**: Ensures the `cloudcredential.openshift.io/mode` annotation is set on the root credential secret based on the credentials mode and permissions granted to the cloud credential specified in the root credential.
-- **`pkg/operator/status`**: Reconciles the status (`Available`, `Degraded`, `Progressing`, and `Upgradeable`) of the Operator based on the status of all CredentialRequests.
-
-### Operator Modes
-The actions preformed by the operator for each `CredentialRequest` is based on the mode of the operator.
-
-- **`Manual`** The operator will not manage cloud credentials or associated secrets.
-- **`Mint`**: The operator will create and manage cloud credentials and associated secrets.
-- **`Passthrough`**: The operator will reuse the root credential for all associated secrets.
-
-### Short Term Tokens
-When in Manual mode, the operator can be further configured to integrate with cloud providers using short term token authentication (OIDC). The `ccoctl` binary is designed to run off of the cluster. It configures the cloud credentials requested by the `CredentialRequests` and produces the secret manifests that are to be applied to the cluster.
-
-## Git Commit Instructions
-- All commits should follow a standard format to ensure clarity and traceability.
-- Title format: <Subsystem>: <Title>
-- Include a footer annotation when AI tools were used to generate or significantly assist.
-
-### Example
 ```text
-ccoctl: Add support for new cloud provider region
-
-This updates the AWS provider to support the new region by adding it to the
-validation list and updating the relevant constants.
-
-Assisted-by: <AI Model Name>`
+ai-docs/
+├── domain/              # CRDs: CredentialsRequest
+├── architecture/        # Controllers, modes, cloud providers
+├── decisions/           # Component ADRs (mode design, ccoctl)
+├── exec-plans/          # Active feature planning
+├── references/          # Tier 1 ecosystem links
+├── CCO_DEVELOPMENT.md   # Build, dev workflow
+└── CCO_TESTING.md       # Test suites
 ```
+
+## Tier 1 Links
+
+**Patterns**: [Operator](https://github.com/openshift/enhancements/tree/master/ai-docs/practices/operator-patterns.md) | [Testing](https://github.com/openshift/enhancements/tree/master/ai-docs/practices/testing.md) | [Security](https://github.com/openshift/enhancements/tree/master/ai-docs/practices/security.md)
+
+## Quick Navigation
+
+| Topic | Location | Description |
+|-------|----------|-------------|
+| **Core CRD** | [domain/credentialsrequest.md](ai-docs/domain/credentialsrequest.md) | CredentialsRequest API |
+| **Modes** | [architecture/components.md](ai-docs/architecture/components.md) | Mint/Passthrough/Manual |
+| **Controllers** | [architecture/components.md](ai-docs/architecture/components.md) | credentialsrequest, secretannotator, status |
+| **Cloud Providers** | [architecture/components.md](ai-docs/architecture/components.md) | AWS, Azure, GCP, etc. |
+| **ccoctl** | [decisions/adr-0002-ccoctl-design.md](ai-docs/decisions/adr-0002-ccoctl-design.md) | Off-cluster tool |
+| **Development** | [CCO_DEVELOPMENT.md](ai-docs/CCO_DEVELOPMENT.md) | Build, test locally |
+| **Testing** | [CCO_TESTING.md](ai-docs/CCO_TESTING.md) | Unit, integration, E2E |
+
+## Operator Modes
+
+| Mode | Behavior | Use Case |
+|------|----------|----------|
+| **Mint** | Creates fine-grained cloud credentials | Admin creds have IAM permissions |
+| **Passthrough** | Reuses root credential for all secrets | Root cred has all needed permissions |
+| **Manual** | No credential management by CCO | User provisions credentials externally |
+| **Manual + OIDC** | Short-lived tokens (AWS STS, Azure Workload Identity) | Zero long-lived credentials |
+
+## Cloud Provider Support
+
+**Supported**: AWS, Azure, GCP, IBM Cloud, KubeVirt, Nutanix, OpenStack, oVirt, PowerVS, vSphere
+
+**Provider-specific logic**: `pkg/{aws,azure,gcp,ibmcloud,kubevirt,nutanix,openstack,ovirt,powervs,vsphere}/`
+
+## Key Controllers
+
+| Controller | Purpose |
+|------------|---------|
+| `credentialsrequest` | Core: provisions/updates credentials |
+| `secretannotator` | Annotates root secret with mode |
+| `status` | Aggregates ClusterOperator status |
+| `cleanup` | Removes stale CredentialsRequests |
+| `podidentity` | Deploys pod identity webhook (OIDC) |
+| `awspodidentity` | AWS pod identity webhook |
+| `loglevel` | Syncs log level from operator config |
+| `metrics` | Prometheus metrics |
+
+## ccoctl CLI
+
+Off-cluster tool for manual mode with OIDC. Creates cloud IAM resources and secret manifests.
+
+**Common tasks**: `ccoctl aws create-all`, `ccoctl azure create-all`, `ccoctl gcp create-all`
+
+## Knowledge Graph
+
+```
+CredentialsRequest (CR)
+  ├─> credentialsrequest controller
+  │     ├─> Mode detection (Mint/Passthrough/Manual)
+  │     ├─> Cloud provider actuator (aws|azure|gcp|...)
+  │     └─> Secret creation/update
+  ├─> status controller (aggregates for ClusterOperator)
+  └─> cleanup controller (removes stale CRs)
+
+Root Credential Secret (kube-system)
+  ├─> secretannotator controller (sets mode annotation)
+  └─> Used by provider actuators
+
+ccoctl (off-cluster)
+  ├─> Creates cloud IAM (OIDC providers, roles, policies)
+  └─> Generates secret manifests for manual mode
+```
+
+## Ecosystem References
+
+See [references/ecosystem.md](ai-docs/references/ecosystem.md) for links to:
+- Operator patterns (controller-runtime, status conditions, webhooks, RBAC)
+- Testing practices (pyramid, E2E framework)
+- Security practices (STRIDE, secrets management)
+- Kubernetes fundamentals (Pod, Secret, ServiceAccount)
+- OpenShift fundamentals (ClusterOperator, release image)
