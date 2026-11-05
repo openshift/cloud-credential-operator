@@ -61,7 +61,7 @@ spec:
         resources:
           requests:
             cpu: 10m
-            memory: 20Mi
+            memory: 140Mi
         terminationMessagePolicy: FallbackToLogsOnError
         volumeMounts:
         - mountPath: /etc/pki/ca-trust/extracted/pem
