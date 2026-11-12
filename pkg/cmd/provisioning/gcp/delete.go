@@ -2,6 +2,7 @@ package gcp
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"log"
 	"strings"
@@ -197,42 +198,31 @@ func deleteWorkloadIdentityPool(ctx context.Context, client gcp.Client, poolName
 	return nil
 }
 
-func deleteCmd(cmd *cobra.Command, args []string) {
+func deleteCmd(cmd *cobra.Command, args []string) error {
 	ctx := context.Background()
 
 	creds, err := loadCredentials(ctx)
 	if err != nil {
-		log.Fatalf("Failed to load credentials: %s", err)
+		return errors.Wrap(err, "Failed to load credentials")
 	}
 
 	gcpClient, err := gcp.NewClient(DeleteOpts.Project, creds)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	bucketName := fmt.Sprintf("%s-oidc", DeleteOpts.Name)
-
-	if err := deleteOIDCObjectsFromBucket(ctx, gcpClient, bucketName, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteOIDCBucket(ctx, gcpClient, bucketName, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
+	err = stderrors.Join(
+		deleteOIDCObjectsFromBucket(ctx, gcpClient, bucketName, DeleteOpts.Name),
+		deleteOIDCBucket(ctx, gcpClient, bucketName, DeleteOpts.Name),
+	)
 	if DeleteOpts.ForceDeleteCustomRoles {
-		if err := deleteCustomRoles(ctx, gcpClient, DeleteOpts.CredRequestDir); err != nil {
-			log.Print(err)
-		}
+		err = stderrors.Join(err, deleteCustomRoles(ctx, gcpClient, DeleteOpts.CredRequestDir))
 	}
-
-	if err := deleteServiceAccounts(ctx, gcpClient, DeleteOpts.Name, DeleteOpts.CredRequestDir); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteWorkloadIdentityPool(ctx, gcpClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
+	return stderrors.Join(err,
+		deleteServiceAccounts(ctx, gcpClient, DeleteOpts.Name, DeleteOpts.CredRequestDir),
+		deleteWorkloadIdentityPool(ctx, gcpClient, DeleteOpts.Name),
+	)
 }
 
 // validationForDeleteCmd will validate the arguments to the command
@@ -248,7 +238,7 @@ func NewDeleteCmd() *cobra.Command {
 		Use:              "delete",
 		Short:            "Delete credentials objects",
 		Long:             "Deleting objects related to cloud credentials",
-		Run:              deleteCmd,
+		RunE:             deleteCmd,
 		PersistentPreRun: validationForDeleteCmd,
 	}
 
