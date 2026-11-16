@@ -2,7 +2,7 @@ module github.com/openshift/cloud-credential-operator
 
 go 1.26.0
 
-toolchain go1.26.5
+toolchain go1.26.10
 
 require (
 	cloud.google.com/go/iam v1.5.3
