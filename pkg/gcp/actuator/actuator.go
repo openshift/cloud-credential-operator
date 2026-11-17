@@ -181,6 +181,24 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 	logger := a.getLogger(cr)
 	logger.Debug("running sync")
 
+	// On WIF clusters, CRs without a ServiceAccountEmail have their secrets
+	// managed externally. Return early before needsUpdate (AWS parity).
+	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
+	if err != nil {
+		return err
+	}
+	logger.Debugf("stsDetected: %v", stsDetected)
+	if stsDetected {
+		providerSpec, err := decodeProviderSpec(minterv1.Codec, cr)
+		if err != nil {
+			return err
+		}
+		if providerSpec.ServiceAccountEmail == "" {
+			logger.Debug("CredentialsRequest has no ServiceAccountEmail, no reason to sync")
+			return nil
+		}
+	}
+
 	infraName, err := utils.LoadInfrastructureName(a.Client, logger)
 	if err != nil {
 		return err
@@ -210,19 +228,11 @@ func (a *Actuator) sync(ctx context.Context, cr *minterv1.CredentialsRequest) er
 		return nil
 	}
 
-	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
-	if err != nil {
-		return err
-	}
 	if stsDetected {
 		logger.Debug("actuator detected STS enabled GCP cluster (WIF)")
 		providerSpec, err := decodeProviderSpec(minterv1.Codec, cr)
 		if err != nil {
 			return err
-		}
-		if providerSpec.ServiceAccountEmail == "" {
-			logger.Debug("CredentialsRequest has no ServiceAccountEmail, no reason to sync")
-			return nil
 		}
 		err = validateSTSProviderSpec(*providerSpec)
 		if err != nil {
@@ -597,19 +607,65 @@ func (a *Actuator) syncMint(ctx context.Context, cr *minterv1.CredentialsRequest
 	return err
 }
 
+// wifSecretNeedsUpdate reports whether the WIF STS secret is missing or differs
+// from the desired content derived from the CredentialsRequest.
+func (a *Actuator) wifSecretNeedsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest, gcpSpec *minterv1.GCPProviderSpec, logger log.FieldLogger) (bool, error) {
+	existingSecret := &corev1.Secret{}
+	err := a.Client.Get(ctx, types.NamespacedName{
+		Namespace: cr.Spec.SecretRef.Namespace,
+		Name:      cr.Spec.SecretRef.Name,
+	}, existingSecret)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			return true, nil
+		}
+		return false, err
+	}
+
+	cloudTokenPath := cr.Spec.CloudTokenPath
+	if cloudTokenPath == "" {
+		cloudTokenPath = "/var/run/secrets/openshift/serviceaccount/token"
+	}
+
+	universeDomain, err := a.getUniverseDomain(logger)
+	if err != nil {
+		return false, err
+	}
+	domain, udField := universeDomainArgs(universeDomain)
+	desired := fmt.Sprintf(gcpSTSCredsTemplate, gcpSpec.Audience, domain, domain, gcpSpec.ServiceAccountEmail, cloudTokenPath, udField)
+
+	existing, ok := existingSecret.Data[gcpSecretJSONKey]
+	if !ok || string(existing) != desired {
+		return true, nil
+	}
+	return false, nil
+}
+
 // needsUpdate will return a bool indicated that all the applicable service APIs are enabled,
 // a bool indicating whether any update to existing perms are needed, and any error encountered.
 func (a *Actuator) needsUpdate(ctx context.Context, cr *minterv1.CredentialsRequest) (bool, bool, error) {
 	logger := a.getLogger(cr)
 
-	// HACK: this function is far too complex for its stated purpose, and should be refactored eventually
-	// once someone figures out how it actually works.  For the time being, we need to short-circuit out of here
-	// if we detect STS (WIF) enabled.  See azure/actuator/needsUpdate() for a more idealized version of this function.
+	// Short-circuit for WIF: only update when the STS secret is missing or stale.
+	// Previously this always returned needsUpdate=true, causing continuous
+	// re-reconcile of already-provisioned CredentialsRequests (OCPBUGS-132683).
 	stsDetected, err := utils.IsTimedTokenCluster(a.Client, ctx, logger)
 	if err != nil {
 		return true, false, err
 	} else if stsDetected {
-		return true, true, nil
+		gcpSpec, err := decodeProviderSpec(minterv1.Codec, cr)
+		if err != nil {
+			return true, false, fmt.Errorf("unable to decode ProviderSpec: %v", err)
+		}
+		if gcpSpec.ServiceAccountEmail == "" {
+			// Secrets managed externally; nothing for the actuator to update.
+			return true, false, nil
+		}
+		needs, err := a.wifSecretNeedsUpdate(ctx, cr, gcpSpec, logger)
+		if err != nil {
+			return true, false, err
+		}
+		return true, needs, nil
 	}
 
 	gcpSpec, err := decodeProviderSpec(minterv1.Codec, cr)
