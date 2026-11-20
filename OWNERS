@@ -1,6 +1,5 @@
 approvers:
 - dlom
 - jstuever
-- patrickdillon
 
 component: "Cloud Credential Operator"
