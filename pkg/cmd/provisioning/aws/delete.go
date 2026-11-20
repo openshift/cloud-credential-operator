@@ -2,8 +2,10 @@ package aws
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/pkg/errors"
@@ -13,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudfront"
 	"github.com/aws/aws-sdk-go-v2/service/iam"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/smithy-go"
 
 	"github.com/openshift/cloud-credential-operator/pkg/aws"
 )
@@ -23,6 +26,15 @@ var (
 	DeleteOpts = options{}
 )
 
+// isNoSuchResource reports whether an AWS API error indicates a missing resource
+func isNoSuchResource(err error) bool {
+	var apiErr smithy.APIError
+	if !errors.As(err, &apiErr) {
+		return false
+	}
+	return strings.HasPrefix(apiErr.ErrorCode(), "NoSuch")
+}
+
 // deleteOIDCObjectsFromBucket deletes the OIDC objects from the S3 bucket
 func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix string) error {
 	paginator := s3.NewListObjectsV2Paginator(client, &s3.ListObjectsV2Input{
@@ -31,6 +43,9 @@ func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix strin
 	for paginator.HasMorePages() {
 		objectsMetadata, err := paginator.NextPage(context.Background())
 		if err != nil {
+			if isNoSuchResource(err) {
+				return nil
+			}
 			return errors.Wrapf(err, "failed to fetch list of Identity Provider objects in the bucket %s", bucketName)
 		}
 
@@ -40,6 +55,9 @@ func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix strin
 				Bucket: awssdk.String(bucketName),
 			})
 			if err != nil {
+				if isNoSuchResource(err) {
+					continue
+				}
 				return errors.Wrapf(err, "failed to fetch tags of Identity Provider object %s in the bucket %s", *objectMetadata.Key, bucketName)
 			}
 
@@ -49,7 +67,7 @@ func deleteOIDCObjectsFromBucket(client aws.Client, bucketName, namePrefix strin
 						Key:    objectMetadata.Key,
 						Bucket: awssdk.String(bucketName),
 					})
-					if err != nil {
+					if err != nil && !isNoSuchResource(err) {
 						return errors.Wrapf(err, "failed to delete Identity Provider object %s in the bucket %s", *objectMetadata.Key, bucketName)
 					}
 					log.Printf("Identity Provider object %s deleted from the bucket %s", *objectMetadata.Key, bucketName)
@@ -68,6 +86,9 @@ func deleteOIDCBucket(client aws.Client, bucketName, namePrefix string) error {
 		Bucket: awssdk.String(bucketName),
 	})
 	if err != nil {
+		if isNoSuchResource(err) {
+			return nil
+		}
 		return errors.Wrapf(err, "failed to fetch tags of the bucket %s", bucketName)
 	}
 
@@ -76,7 +97,7 @@ func deleteOIDCBucket(client aws.Client, bucketName, namePrefix string) error {
 			_, err := client.DeleteBucket(context.Background(), &s3.DeleteBucketInput{
 				Bucket: awssdk.String(bucketName),
 			})
-			if err != nil {
+			if err != nil && !isNoSuchResource(err) {
 				return errors.Wrapf(err, "failed to delete the Identity Provider bucket %s", bucketName)
 			}
 			log.Printf("Identity Provider bucket %s deleted", bucketName)
@@ -100,6 +121,9 @@ func deleteCloudFrontOriginAccessIdentity(client aws.Client, namePrefix string) 
 					Id: originAccessIdentity.Id,
 				})
 				if err != nil {
+					if isNoSuchResource(err) {
+						continue
+					}
 					return errors.Wrapf(err, "failed to get the CloudFront origin access identity with ID %s", *originAccessIdentity.Id)
 				}
 
@@ -107,7 +131,7 @@ func deleteCloudFrontOriginAccessIdentity(client aws.Client, namePrefix string) 
 					Id:      originAccessIdentity.Id,
 					IfMatch: getCloudFrontOriginAccessIdentityOutput.ETag,
 				})
-				if err != nil {
+				if err != nil && !isNoSuchResource(err) {
 					return errors.Wrapf(err, "failed to delete the CloudFront origin access identity with ID %s", *originAccessIdentity.Id)
 				}
 				log.Printf("CloudFront origin access identity with ID %s deleted", *originAccessIdentity.Id)
@@ -125,11 +149,15 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 		if err != nil {
 			return errors.Wrapf(err, "failed to fetch a list of CloudFront distributions")
 		}
+	distributions:
 		for _, distribution := range ListCloudFrontDistributionsOutput.DistributionList.Items {
 			listTagsForCloudFrontResourceOutput, err := client.ListTagsForResource(context.Background(), &cloudfront.ListTagsForResourceInput{
 				Resource: distribution.ARN,
 			})
 			if err != nil {
+				if isNoSuchResource(err) {
+					continue distributions
+				}
 				return errors.Wrapf(err, "failed to fetch tags for CloudFront distribution with ID %s", *distribution.Id)
 			}
 
@@ -139,6 +167,9 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 						Id: distribution.Id,
 					})
 					if err != nil {
+						if isNoSuchResource(err) {
+							continue distributions
+						}
 						return errors.Wrapf(err, "failed to get CloudFront Distribution with ID %s", *distribution.Id)
 					}
 
@@ -150,6 +181,9 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 						DistributionConfig: getCloudFrontDistributionOutput.Distribution.DistributionConfig,
 					})
 					if err != nil {
+						if isNoSuchResource(err) {
+							continue distributions
+						}
 						return errors.Wrapf(err, "failed to disable CloudFront Distribution with ID %s", *distribution.Id)
 					}
 
@@ -158,6 +192,9 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 							Id: distribution.Id,
 						})
 						if err != nil {
+							if isNoSuchResource(err) {
+								continue distributions
+							}
 							return errors.Wrapf(err, "failed to get CloudFront Distribution with ID %s", *distribution.Id)
 						}
 
@@ -173,7 +210,7 @@ func deleteCloudFrontDistribution(client aws.Client, namePrefix string) error {
 						Id:      distribution.Id,
 						IfMatch: updateCloudFrontDistributionOutput.ETag,
 					})
-					if err != nil {
+					if err != nil && !isNoSuchResource(err) {
 						return errors.Wrapf(err, "failed to delete CloudFront distribution with ID %s", *distribution.Id)
 					}
 					log.Printf("CloudFront distribution with ID %s deleted", *distribution.Id)
@@ -200,6 +237,9 @@ func deleteIAMRoles(client aws.Client, namePrefix string) error {
 				RoleName: roleMetadata.RoleName,
 			})
 			if err != nil {
+				if isNoSuchResource(err) {
+					continue
+				}
 				return errors.Wrapf(err, "failed to fetch IAM role %s", *roleMetadata.RoleName)
 			}
 
@@ -212,7 +252,7 @@ func deleteIAMRoles(client aws.Client, namePrefix string) error {
 					_, err := client.DeleteRole(context.Background(), &iam.DeleteRoleInput{
 						RoleName: roleOutput.Role.RoleName,
 					})
-					if err != nil {
+					if err != nil && !isNoSuchResource(err) {
 						return errors.Wrapf(err, "failed to delete IAM Role %s", *roleOutput.Role.RoleName)
 					}
 					log.Printf("IAM Role %s deleted", *roleOutput.Role.RoleName)
@@ -233,6 +273,9 @@ func deleteRolePolicies(client aws.Client, roleName string) error {
 	for paginator.HasMorePages() {
 		policies, err := paginator.NextPage(context.Background())
 		if err != nil {
+			if isNoSuchResource(err) {
+				return nil
+			}
 			return errors.Wrapf(err, "failed to fetch a list of policies associated with IAM role %s", roleName)
 		}
 
@@ -241,7 +284,7 @@ func deleteRolePolicies(client aws.Client, roleName string) error {
 				RoleName:   awssdk.String(roleName),
 				PolicyName: &policyName,
 			})
-			if err != nil {
+			if err != nil && !isNoSuchResource(err) {
 				return errors.Wrapf(err, "failed to delete policy %s associated with IAM Role %s", policyName, roleName)
 			}
 			log.Printf("Policy %s associated with IAM Role %s deleted", policyName, roleName)
@@ -261,6 +304,9 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 	for _, provider := range oidcProviderList.OpenIDConnectProviderList {
 		ok, err := isExistingIdentifyProvider(client, *provider.Arn, namePrefix)
 		if err != nil {
+			if isNoSuchResource(err) {
+				continue
+			}
 			return errors.Wrapf(err, "failed to check for existing Identity Provider")
 		}
 
@@ -269,6 +315,9 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 				OpenIDConnectProviderArn: awssdk.String(*provider.Arn),
 			})
 			if err != nil {
+				if isNoSuchResource(err) {
+					continue
+				}
 				return errors.Wrapf(err, "failed to delete Identity Provider with ARN %s", *provider.Arn)
 			}
 			log.Printf("Identity Provider with ARN %s deleted", *provider.Arn)
@@ -279,36 +328,20 @@ func deleteIAMIdentityProvider(client aws.Client, namePrefix string) error {
 	return nil
 }
 
-func deleteCmd(cmd *cobra.Command, args []string) {
+func deleteCmd(cmd *cobra.Command, args []string) error {
 	awsClient, err := newAWSClient(DeleteOpts.Region)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	bucketName := fmt.Sprintf("%s-oidc", DeleteOpts.Name)
-
-	if err := deleteOIDCObjectsFromBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteOIDCBucket(awsClient, bucketName, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteCloudFrontDistribution(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteCloudFrontOriginAccessIdentity(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteIAMRoles(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
-
-	if err := deleteIAMIdentityProvider(awsClient, DeleteOpts.Name); err != nil {
-		log.Print(err)
-	}
+	return stderrors.Join(
+		deleteOIDCObjectsFromBucket(awsClient, bucketName, DeleteOpts.Name),
+		deleteOIDCBucket(awsClient, bucketName, DeleteOpts.Name),
+		deleteCloudFrontDistribution(awsClient, DeleteOpts.Name),
+		deleteCloudFrontOriginAccessIdentity(awsClient, DeleteOpts.Name),
+		deleteIAMRoles(awsClient, DeleteOpts.Name),
+		deleteIAMIdentityProvider(awsClient, DeleteOpts.Name),
+	)
 }
 
 // NewDeleteCmd implements the "delete" command for the credentials provisioning
@@ -317,7 +350,7 @@ func NewDeleteCmd() *cobra.Command {
 		Use:   "delete",
 		Short: "Delete credentials objects",
 		Long:  "Deleting objects related to cloud credentials",
-		Run:   deleteCmd,
+		RunE:  deleteCmd,
 	}
 
 	deleteCmd.PersistentFlags().StringVar(&DeleteOpts.Name, "name", "", "User-defined name for all created AWS resources (can be separate from the cluster's infra-id)")
