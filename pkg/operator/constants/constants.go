@@ -123,6 +123,22 @@ const (
 	// for vSphere are stored.
 	VSphereCloudCredSecretName = "vsphere-creds"
 
+	// VSphereCredOverrideNamespace is the namespace where per-component vSphere
+	// credential override secrets can be placed. When a secret carrying the
+	// appropriate target annotations exists in this namespace, it will be used
+	// instead of the root credential secret in kube-system.
+	VSphereCredOverrideNamespace = "openshift-config"
+
+	// VSphereCredTargetSecretNamespaceAnnotation is the annotation key on a
+	// per-component vSphere credential override secret that specifies the
+	// target namespace of the CredentialsRequest it applies to.
+	VSphereCredTargetSecretNamespaceAnnotation = "cloudcredential.openshift.io/target-secret-namespace"
+
+	// VSphereCredTargetSecretNameAnnotation is the annotation key on a
+	// per-component vSphere credential override secret that specifies the
+	// target secret name of the CredentialsRequest it applies to.
+	VSphereCredTargetSecretNameAnnotation = "cloudcredential.openshift.io/target-secret-name"
+
 	// KubevirtCloudCredSecretName is the name of the secret where credentials
 	// for Kubevirt are stored.
 	KubevirtCloudCredSecretName = "kubevirt-credentials"

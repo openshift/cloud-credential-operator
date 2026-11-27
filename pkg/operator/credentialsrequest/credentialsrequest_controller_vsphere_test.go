@@ -49,6 +49,10 @@ var (
 		"key1": []byte("key1data"),
 		"key2": []byte("key2data"),
 	}
+	testVSphereOverrideCredsSecretData = map[string][]byte{
+		"key1": []byte("override-key1data"),
+		"key2": []byte("override-key2data"),
+	}
 )
 
 func init() {
@@ -312,4 +316,305 @@ func testSecret(namespace, name string, secretData map[string][]byte) *corev1.Se
 		Data: secretData,
 	}
 	return s
+}
+
+// testVSphereOverrideSecret creates a per-component override secret in
+// openshift-config with both target annotations and the mode annotation.
+func testVSphereOverrideSecret(name, targetNamespace, targetSecretName string, data map[string][]byte) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: constants.VSphereCredOverrideNamespace,
+			Annotations: map[string]string{
+				constants.AnnotationKey:                              constants.PassthroughAnnotation,
+				constants.VSphereCredTargetSecretNamespaceAnnotation: targetNamespace,
+				constants.VSphereCredTargetSecretNameAnnotation:      targetSecretName,
+			},
+		},
+		Data: data,
+	}
+}
+
+func TestIsVSphereOverrideSecret(t *testing.T) {
+	tests := []struct {
+		name        string
+		namespace   string
+		annotations map[string]string
+		expected    bool
+	}{
+		{
+			name:      "valid override secret: correct namespace and both target annotations",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNamespaceAnnotation: "openshift-machine-api",
+				constants.VSphereCredTargetSecretNameAnnotation:      "vsphere-cloud-credentials",
+			},
+			expected: true,
+		},
+		{
+			name:      "wrong namespace: returns false",
+			namespace: "kube-system",
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNamespaceAnnotation: "openshift-machine-api",
+				constants.VSphereCredTargetSecretNameAnnotation:      "vsphere-cloud-credentials",
+			},
+			expected: false,
+		},
+		{
+			name:        "nil annotations: returns false",
+			namespace:   constants.VSphereCredOverrideNamespace,
+			annotations: nil,
+			expected:    false,
+		},
+		{
+			name:        "empty annotations: returns false",
+			namespace:   constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{},
+			expected:    false,
+		},
+		{
+			name:      "only target namespace annotation: returns false",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNamespaceAnnotation: "openshift-machine-api",
+			},
+			expected: false,
+		},
+		{
+			name:      "only target name annotation: returns false",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNameAnnotation: "vsphere-cloud-credentials",
+			},
+			expected: false,
+		},
+		{
+			name:      "unrelated annotations only: returns false",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				"some-other-key": "some-value",
+			},
+			expected: false,
+		},
+		{
+			name:      "both annotations plus extras: still returns true",
+			namespace: constants.VSphereCredOverrideNamespace,
+			annotations: map[string]string{
+				constants.VSphereCredTargetSecretNamespaceAnnotation: "openshift-cluster-csi-drivers",
+				constants.VSphereCredTargetSecretNameAnnotation:      "vsphere-csi-credentials",
+				constants.AnnotationKey:                              constants.PassthroughAnnotation,
+			},
+			expected: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := IsVSphereOverrideSecret(tt.namespace, tt.annotations)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestCredentialsRequestVSphereReconcileWithOverride(t *testing.T) {
+	schemeutils.SetupScheme(scheme.Scheme)
+
+	tests := []struct {
+		name          string
+		existing      []runtime.Object
+		existingAdmin []runtime.Object
+		expectErr     bool
+		validate      func(client.Client, *testing.T)
+		// Expected conditions on the credentials request:
+		expectedConditions []ExpectedCondition
+		// Expected conditions on the credentials cluster operator:
+		expectedCOConditions []ExpectedCOCondition
+	}{
+		{
+			name: "new credentialsrequest with override secret: uses override data",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequest(t),
+				testVSphereOverrideSecret("machine-api-override", testSecretNamespace, testSecretName, testVSphereOverrideCredsSecretData),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				assert.Equal(t, testVSphereOverrideCredsSecretData, targetSecret.Data)
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+				assert.Equal(t, int64(testCRGeneration), int64(cr.Status.LastSyncGeneration))
+				assert.NotNil(t, cr.Status.LastSyncTimestamp)
+			},
+		},
+		{
+			name: "existing target with root data but override now present: updates to override data",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequest(t),
+				testSecret(testSecretNamespace, testSecretName, testVSphereCloudCredsSecretData),
+				testVSphereOverrideSecret("machine-api-override", testSecretNamespace, testSecretName, testVSphereOverrideCredsSecretData),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				// Target secret should now hold the override data
+				assert.Equal(t, testVSphereOverrideCredsSecretData, targetSecret.Data)
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+		{
+			name: "override for non-matching target: falls back to root",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequest(t),
+				// Override targets a DIFFERENT namespace/secret than the CR's SecretRef
+				testVSphereOverrideSecret("csi-override", "openshift-cluster-csi-drivers", "vsphere-csi-credentials", testVSphereOverrideCredsSecretData),
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
+			},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret, "expected non-empty target secret to exist")
+				// Should use root data since override doesn't match
+				assert.Equal(t, testVSphereCloudCredsSecretData, targetSecret.Data)
+			},
+		},
+		{
+			name: "override secret without mode annotation: returns error",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequest(t),
+				// Override secret that has target annotations but is missing the
+				// cloudcredential.openshift.io/mode annotation (not yet processed
+				// by the secret annotator).
+				&corev1.Secret{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "unannotated-override",
+						Namespace: constants.VSphereCredOverrideNamespace,
+						Annotations: map[string]string{
+							constants.VSphereCredTargetSecretNamespaceAnnotation: testSecretNamespace,
+							constants.VSphereCredTargetSecretNameAnnotation:      testSecretName,
+						},
+					},
+					Data: testVSphereOverrideCredsSecretData,
+				},
+			},
+			existingAdmin: []runtime.Object{
+				testVSphereCredsSecretPassthrough(),
+			},
+			expectErr: true,
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				assert.Nil(t, targetSecret, "target secret should not be created when override is unannotated")
+				cr := getCredRequest(c)
+				assert.False(t, cr.Status.Provisioned)
+			},
+			expectedCOConditions: []ExpectedCOCondition{
+				{
+					conditionType: configv1.OperatorProgressing,
+					status:        corev1.ConditionTrue,
+				},
+			},
+		},
+		{
+			name: "override present with no root secret: uses override only",
+			existing: []runtime.Object{
+				testOperatorConfig(""),
+				createTestNamespace(testNamespace),
+				createTestNamespace(testSecretNamespace),
+				testVSphereCredentialsRequest(t),
+				testVSphereOverrideSecret("machine-api-override", testSecretNamespace, testSecretName, testVSphereOverrideCredsSecretData),
+			},
+			existingAdmin: []runtime.Object{},
+			validate: func(c client.Client, t *testing.T) {
+				targetSecret := getCredRequestTargetSecret(c)
+				require.NotNil(t, targetSecret, "expected target secret to exist even without root credential")
+				assert.Equal(t, testVSphereOverrideCredsSecretData, targetSecret.Data)
+				cr := getCredRequest(c)
+				assert.NotNil(t, cr)
+				assert.True(t, cr.Status.Provisioned)
+			},
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeClient := fake.NewClientBuilder().
+				WithStatusSubresource(&minterv1.CredentialsRequest{}).
+				WithRuntimeObjects(test.existing...).Build()
+			fakeAdminClient := fake.NewClientBuilder().
+				WithRuntimeObjects(test.existingAdmin...).Build()
+			rcr := &ReconcileCredentialsRequest{
+				Client:      fakeClient,
+				AdminClient: fakeAdminClient,
+				Actuator: &actuator.VSphereActuator{
+					Client:         fakeClient,
+					RootCredClient: fakeAdminClient,
+				},
+				platformType: configv1.VSpherePlatformType,
+			}
+
+			_, err := rcr.Reconcile(context.TODO(), reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      testCRName,
+					Namespace: testNamespace,
+				},
+			})
+
+			if test.validate != nil {
+				test.validate(fakeClient, t)
+			}
+
+			if err != nil && !test.expectErr {
+				t.Errorf("Unexpected error: %v", err)
+			}
+			if err == nil && test.expectErr {
+				t.Errorf("Expected error but got none")
+			}
+
+			cr := getCredRequest(fakeClient)
+			for _, condition := range test.expectedConditions {
+				foundCondition := utils.FindCredentialsRequestCondition(cr.Status.Conditions, condition.conditionType)
+				assert.NotNil(t, foundCondition)
+				assert.Exactly(t, condition.status, foundCondition.Status)
+				assert.Exactly(t, condition.reason, foundCondition.Reason)
+			}
+
+			if test.expectedCOConditions != nil {
+				logger := log.WithFields(log.Fields{"controller": controllerName})
+				currentConditions, err := rcr.GetConditions(logger)
+				require.NoError(t, err, "failed getting conditions")
+
+				for _, expectedCondition := range test.expectedCOConditions {
+					foundCondition := utils.FindClusterOperatorCondition(currentConditions, expectedCondition.conditionType)
+					require.NotNil(t, foundCondition)
+					assert.Equal(t, string(expectedCondition.status), string(foundCondition.Status), "condition %s had unexpected status", expectedCondition.conditionType)
+					if expectedCondition.reason != "" {
+						assert.Exactly(t, expectedCondition.reason, foundCondition.Reason)
+					}
+				}
+			}
+		})
+	}
 }
